@@ -1,72 +1,45 @@
-import sqlite3
-from flask import g
+# database.py
 
-DATABASE = "chat_app.db"
+import sqlite3
+from flask import g, current_app
+import click
+from flask.cli import with_appcontext
 
 
 def get_db():
+    """Open a new database connection if there is none yet for the current application context."""
     if "db" not in g:
-        g.db = sqlite3.connect(DATABASE)
+        g.db = sqlite3.connect(
+            current_app.config.get("DATABASE", "chat_app.db"),
+            detect_types=sqlite3.PARSE_DECLTYPES,
+        )
         g.db.row_factory = sqlite3.Row
     return g.db
 
 
-def close_db(error=None):
+def close_db(e=None):
+    """Close the database connection if it exists."""
     db = g.pop("db", None)
     if db is not None:
         db.close()
 
 
-def init_db(app):
-    with app.app_context():
-        db = get_db()
-        with app.open_resource("schema.sql", mode="r") as f:
-            db.cursor().executescript(f.read())
-        db.commit()
-
-
-def add_model(name, description, model_type='azure', api_endpoint=None, api_key=None, temperature=1.0, max_tokens=32000, is_default=False):
-    """Add a new model to the database."""
+def init_db():
+    """Initialize the database using the schema.sql file."""
     db = get_db()
-    db.execute(
-        "INSERT INTO models (name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default),
-    )
-    db.commit()
+    with current_app.open_resource("schema.sql") as f:
+        db.executescript(f.read().decode("utf8"))
 
 
-def get_models():
-    """Retrieve all models from the database."""
-    db = get_db()
-    return db.execute(
-        "SELECT id, name, description, model_type, api_endpoint, temperature, max_tokens, is_default FROM models"
-    ).fetchall()
-
-def get_default_model():
-    """Retrieve the default model configuration."""
-    db = get_db()
-    model = db.execute(
-        "SELECT * FROM models WHERE is_default = 1 LIMIT 1"
-    ).fetchone()
-    if not model:
-        model = db.execute(
-            "SELECT * FROM models ORDER BY id LIMIT 1"
-        ).fetchone()
-    return model
+@click.command("init-db")
+@with_appcontext
+def init_db_command():
+    """Clear existing data and create new tables."""
+    init_db()
+    click.echo("Initialized the database.")
 
 
-def update_model(model_id, name, description, model_type=None, api_endpoint=None, api_key=None, temperature=None, max_tokens=None, is_default=None):
-    """Update an existing model in the database."""
-    db = get_db()
-    db.execute(
-        "UPDATE models SET name = ?, description = ?, model_type = ?, api_endpoint = ?, api_key = ?, temperature = ?, max_tokens = ?, is_default = ? WHERE id = ?",
-        (name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default, model_id),
-    )
-    db.commit()
-
-
-def delete_model(model_id):
-    """Delete a model from the database."""
-    db = get_db()
-    db.execute("DELETE FROM models WHERE id = ?", (model_id,))
-    db.commit()
+def init_app(app):
+    """Register database functions with the Flask app."""
+    app.teardown_appcontext(close_db)
+    app.cli.add_command(init_db_command)

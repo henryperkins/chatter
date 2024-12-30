@@ -1,60 +1,102 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Chat - Azure OpenAI</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-</head>
-<body>
-    <div class="chat-container">
-        <div class="sidebar">
-            <div class="user-info">
-                <i class="fas fa-user-circle"></i>
-                <span>{{ username }}</span>
-                <a href="{{ url_for('logout') }}" class="logout-btn">
-                    <i class="fas fa-sign-out-alt"></i>
-                </a>
-            </div>
-            <button class="new-chat-btn" onclick="startNewChat()">
-                <i class="fas fa-plus"></i> New Chat
-            </button>
-            <div class="chat-history">
-                <h3>Chat History</h3>
-                <div id="chat-list">
-                    {% for chat in chats %}
-                    <div class="chat-item {% if chat.id == current_chat_id %}active{% endif %}" 
-                         onclick="loadChat('{{ chat.id }}')">
-                        <i class="fas fa-comments"></i>
-                        <span>{{ chat.title }}</span>
-                        <button class="delete-chat-btn" onclick="deleteChat('{{ chat.id }}', event)">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
+{% extends "base.html" %}
+
+{% block title %}Chat - Azure OpenAI{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="user-info">
+            <i class="fas fa-user-circle" aria-hidden="true"></i>
+            <span>{{ current_user.username }}</span>
+            <a href="{{ url_for('auth.logout') }}" class="logout-btn" aria-label="Logout">
+                <i class="fas fa-sign-out-alt" aria-hidden="true"></i>
+            </a>
         </div>
-        <div class="main-content">
-            <div class="chat-box" id="chat-box">
-                {% for message in messages %}
-                <div class="message {{ message.role }}">
-                    <div class="message-header">
-                        <i class="fas fa-{% if message.role == 'user' %}user{% else %}robot{% endif %}"></i>
-                        <span class="message-role">{{ message.role }}</span>
-                        <span class="message-time">{{ message.timestamp }}</span>
-                    </div>
-                    <div class="message-content">{{ message.content | safe }}</div>
+        <button class="new-chat-btn" id="new-chat-btn" aria-label="Start a new chat">
+            <i class="fas fa-plus" aria-hidden="true"></i> New Chat
+        </button>
+
+        <!-- Model Management Section -->
+        <div class="model-management">
+            <select id="model-select" class="form-control">
+                <option value="">Select Model</option>
+            </select>
+            <button id="add-model-btn" class="btn-secondary">
+                <i class="fas fa-plus"></i> Add Model
+            </button>
+            <button id="edit-model-btn" class="btn-secondary">
+                <i class="fas fa-edit"></i> Edit Model
+            </button>
+            <button id="delete-model-btn" class="btn-secondary">
+                <i class="fas fa-trash"></i> Delete Model
+            </button>
+        </div>
+
+        <!-- Conversations List -->
+        <div class="chat-history">
+            <h3>Chat History</h3>
+            <div id="chat-list">
+                <!-- Conversation items will be dynamically added here -->
+                {% for chat in chats %}
+                <div class="conversation-item {% if chat.id == chat_id %}active{% endif %}" data-id="{{ chat.id }}">
+                    <i class="fas fa-comments"></i>
+                    <span>{{ chat.title }}</span>
+                    <i class="fas fa-trash delete-conversation-btn" data-id="{{ chat.id }}" aria-label="Delete chat"></i>
                 </div>
                 {% endfor %}
             </div>
-            <div class="input-container">
-                <textarea id="message-input" placeholder="Type your message..." rows="1"></textarea>
-                <button id="send-button">
-                    <i class="fas fa-paper-plane"></i>
+        </div>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main class="main-content">
+        <!-- Context Section -->
+        <div class="context-section">
+            <h3>Conversation Context</h3>
+            <textarea id="context-textarea" class="context-textarea">{{ context }}</textarea>
+            <div class="context-buttons">
+                <button id="save-context-btn" class="btn-primary">
+                    <i class="fas fa-save"></i> Save Context
+                </button>
+                <button id="clear-context-btn" class="btn-secondary">
+                    <i class="fas fa-trash"></i> Clear
                 </button>
             </div>
         </div>
-    </div>
-    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
-</body>
-</html>
+
+        <!-- Chat Messages -->
+        <div class="chat-box" id="chat-box">
+            {% for message in messages %}
+            <div class="message {{ message.role }}">
+                <div class="message-header">
+                    <i class="fas fa-{{ 'user' if message.role == 'user' else 'robot' }}" aria-hidden="true"></i>
+                    <span class="message-role">{{ message.role }}</span>
+                    <span class="message-time">{{ message.timestamp }}</span>
+                </div>
+                <div class="message-content">{{ message.content | safe }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Message Input -->
+        <div class="input-container">
+            <textarea id="message-input" placeholder="Type your message..." rows="1"></textarea>
+            <button id="send-button" aria-label="Send message">
+                <i class="fas fa-paper-plane" aria-hidden="true"></i>
+            </button>
+        </div>
+
+        <!-- File Upload -->
+        <div class="input-container">
+            <input type="file" id="file-input" multiple>
+            <div id="upload-status"></div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+{% endblock %}

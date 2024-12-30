@@ -1,0 +1,50 @@
+<!-- templates/base.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Azure OpenAI Chat{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Include FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation Bar (Optional) -->
+    {% block navbar %}
+    <!-- Example Navigation (You can customize or remove this section) -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('chat.chat_interface') }}" class="nav-logo">Azure OpenAI Chat</a>
+            <div class="nav-links">
+                {% if current_user.is_authenticated %}
+                    <span>Hello, {{ current_user.username }}!</span>
+                    <a href="{{ url_for('auth.logout') }}">Logout</a>
+                {% else %}
+                    <a href="{{ url_for('auth.login') }}">Login</a>
+                    <a href="{{ url_for('auth.register') }}">Register</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    {% endblock %}
+    
+    <!-- Main Content -->
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer (Optional) -->
+    {% block footer %}
+    <footer class="footer">
+        <p>&copy; 2023 Azure OpenAI Chat Application</p>
+    </footer>
+    {% endblock %}
+  
+    <!-- Scripts -->
+    {% block scripts %}
+    <!-- Include any base scripts here -->
+    {% endblock %}
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
