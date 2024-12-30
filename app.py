@@ -375,8 +375,9 @@ def chat_interface():
 
     # Get messages for the current chat
     messages = conversation_manager.get_context(chat_id)
+    context = Chat.get_context(chat_id)
 
-    return render_template("chat_template.html", chat_id=chat_id, messages=messages)
+    return render_template("chat_template.html", chat_id=chat_id, messages=messages, context=context)
 
 
 @app.route("/load_chat/<chat_id>")
@@ -388,7 +389,8 @@ def load_chat(chat_id):
         (chat_id,),
     ).fetchall()
 
-    return jsonify({"messages": [dict(msg) for msg in messages]})
+    context = Chat.get_context(chat_id)
+    return jsonify({"messages": [dict(msg) for msg in messages], "context": context})
 
 
 @app.route("/delete_chat/<chat_id>", methods=["DELETE"])

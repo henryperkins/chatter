@@ -1,7 +1,84 @@
-// DOM Elements
 const chatBox = document.getElementById('chat-box');
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
+const fileInput = document.getElementById('file-input');
+const uploadStatus = document.getElementById('upload-status');
+const newChatBtn = document.getElementById('new-chat-btn');
+const conversationList = document.getElementById('conversation-list');
+const contextTextarea = document.getElementById('context-textarea');
+const saveContextBtn = document.getElementById('save-context-btn');
+const clearContextBtn = document.getElementById('clear-context-btn');
+
+// Save context
+saveContextBtn.onclick = async () => {
+    const context = contextTextarea.value.trim();
+    try {
+        await fetch(`/chat/{{ chat_id }}/context`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ context })
+        });
+        alert('Context saved successfully');
+    } catch (error) {
+        console.error('Error saving context:', error);
+        alert('Failed to save context');
+    }
+};
+
+// Clear context
+clearContextBtn.onclick = () => {
+    if (confirm('Are you sure you want to clear the context?')) {
+        contextTextarea.value = '';
+    }
+};
+
+// Load conversations
+async function loadConversations() {
+    try {
+        const response = await fetch('/conversations');
+        const conversations = await response.json();
+        renderConversations(conversations);
+    } catch (error) {
+        console.error('Error loading conversations:', error);
+    }
+}
+
+// Render conversations in sidebar
+function renderConversations(conversations) {
+    conversationList.innerHTML = conversations.map(conv => `
+        <div class="conversation-item ${conv.id === '{{ chat_id }}' ? 'active' : ''}" 
+             data-id="${conv.id}" 
+             onclick="loadConversation('${conv.id}')">
+            ${conv.title || 'Untitled Conversation'}
+            <i class="fas fa-trash float-right" onclick="deleteConversation('${conv.id}', event)"></i>
+        </div>
+    `).join('');
+}
+
+// Load a specific conversation
+async function loadConversation(conversationId) {
+    window.location.href = `/chat/${conversationId}`;
+}
+
+// Delete a conversation
+async function deleteConversation(conversationId, event) {
+    event.stopPropagation();
+    if (confirm('Are you sure you want to delete this conversation?')) {
+        try {
+            await fetch(`/conversations/${conversationId}`, { method: 'DELETE' });
+            loadConversations();
+        } catch (error) {
+            console.error('Error deleting conversation:', error);
+        }
+    }
+}
+
+// Create new conversation
+newChatBtn.onclick = () => {
+    window.location.href = '/new-chat';
+};
 
 // Auto-resize textarea
 messageInput.addEventListener('input', function() {
@@ -13,188 +90,211 @@ messageInput.addEventListener('input', function() {
 async function sendMessage() {
     const message = messageInput.value.trim();
     if (!message) return;
+    
+    // Immediately display user's message
+    const userMessageDiv = document.createElement('div');
+    userMessageDiv.className = 'message user';
+    userMessageDiv.innerHTML = '<strong>user:</strong> ' + message;
+    chatBox.appendChild(userMessageDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
 
-    // Disable input while processing
+    // Add loading indicator for assistant's response
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'message assistant loading';
+    loadingDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Thinking...';
+    chatBox.appendChild(loadingDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+
+    // Clear input and disable controls
     messageInput.value = '';
-    messageInput.style.height = 'auto';
     messageInput.disabled = true;
     sendButton.disabled = true;
 
-    try {
-        // Add user message to chat
-        appendMessage('user', message);
+    fetch('/chat', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ chat_id: '{{ chat_id }}', message: message }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Remove loading indicator
+        chatBox.removeChild(loadingDiv);
 
-        // Send message to server
-        const response = await fetch('/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ message: message }),
-        });
-
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-
-        const data = await response.json();
-        
-        // Add assistant's response to chat
-        appendMessage('assistant', data.response);
-
-    } catch (error) {
+        // Display assistant's response
+        const assistantMessageDiv = document.createElement('div');
+        assistantMessageDiv.className = 'message assistant';
+        assistantMessageDiv.innerHTML = '<strong>assistant:</strong> ' + marked.parse(data.response);
+        chatBox.appendChild(assistantMessageDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    })
+    .catch(error => {
         console.error('Error:', error);
-        appendMessage('system', 'An error occurred while sending the message.');
-    } finally {
-        // Re-enable input
+        // Remove loading indicator and show error
+        chatBox.removeChild(loadingDiv);
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'message system';
+        errorDiv.innerHTML = '<strong>system:</strong> An error occurred while sending the message.';
+        chatBox.appendChild(errorDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    })
+    .finally(() => {
         messageInput.disabled = false;
         sendButton.disabled = false;
         messageInput.focus();
-    }
-}
-
-// Append message to chat box
-function appendMessage(role, content) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${role}`;
-    
-    const header = document.createElement('div');
-    header.className = 'message-header';
-    
-    const icon = document.createElement('i');
-    icon.className = `fas fa-${role === 'user' ? 'user' : 'robot'}`;
-    
-    const roleSpan = document.createElement('span');
-    roleSpan.className = 'message-role';
-    roleSpan.textContent = role;
-    
-    const timeSpan = document.createElement('span');
-    timeSpan.className = 'message-time';
-    timeSpan.textContent = new Date().toLocaleTimeString();
-    
-    header.appendChild(icon);
-    header.appendChild(roleSpan);
-    header.appendChild(timeSpan);
-    
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    contentDiv.innerHTML = content; // Using innerHTML to render markdown
-    
-    messageDiv.appendChild(header);
-    messageDiv.appendChild(contentDiv);
-    
-    chatBox.appendChild(messageDiv);
-    chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-// Start new chat
-async function startNewChat() {
-    try {
-        const response = await fetch('/new_chat', {
-            method: 'POST',
-        });
-        
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        
-        const data = await response.json();
-        window.location.reload(); // Reload to show new chat
-        
-    } catch (error) {
-        console.error('Error starting new chat:', error);
-        alert('Failed to start new chat');
-    }
-}
-
-// Load existing chat
-async function loadChat(chatId) {
-    try {
-        const response = await fetch(`/load_chat/${chatId}`);
-        
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        
-        const data = await response.json();
-        
-        // Clear current chat
-        chatBox.innerHTML = '';
-        
-        // Load messages
-        data.messages.forEach(msg => {
-            appendMessage(msg.role, msg.content);
-        });
-        
-        // Update active chat in sidebar
-        document.querySelectorAll('.chat-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        document.querySelector(`[onclick="loadChat('${chatId}')"]`).classList.add('active');
-        
-    } catch (error) {
-        console.error('Error loading chat:', error);
-        alert('Failed to load chat');
-    }
-}
-
-// Delete chat
-async function deleteChat(chatId, event) {
-    event.stopPropagation(); // Prevent chat loading when clicking delete
-    
-    if (!confirm('Are you sure you want to delete this chat?')) {
-        return;
-    }
-    
-    try {
-        const response = await fetch(`/delete_chat/${chatId}`, {
-            method: 'DELETE',
-        });
-        
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        
-        // Remove chat from sidebar
-        const chatItem = document.querySelector(`[onclick="loadChat('${chatId}')"]`).parentNode;
-        chatItem.remove();
-        
-        // If deleted current chat, start a new one
-        if (chatItem.classList.contains('active')) {
-            window.location.reload();
-        }
-        
-    } catch (error) {
-        console.error('Error deleting chat:', error);
-        alert('Failed to delete chat');
-    }
-}
-
-// Copy message to clipboard
-function copyToClipboard() {
-    const text = document.querySelector('.message.assistant .message-content').innerText;
-    navigator.clipboard.writeText(text).then(() => {
-        alert('Copied to clipboard');
-    }).catch(err => {
-        console.error('Error copying to clipboard:', err);
     });
 }
 
-// Retry sending message
-function retryMessage() {
-    const lastMessage = document.querySelector('.message.user .message-content').innerText;
-    messageInput.value = lastMessage;
-    sendMessage();
-}
+// File upload handling
+fileInput.addEventListener('change', () => {
+    const files = fileInput.files;
+    if (!files.length) return;
+
+    uploadStatus.style.display = 'block';
+    
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+    }
+
+    fetch('/upload', {
+        method: 'POST',
+        body: formData,
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            uploadStatus.innerHTML = `<i class="fas fa-check-circle" style="color: green;"></i> Files uploaded: ${data.files.join(', ')}`;
+        } else {
+            uploadStatus.innerHTML = `<i class="fas fa-times-circle" style="color: red;"></i> Error: ${data.error}`;
+        }
+        setTimeout(() => {
+            uploadStatus.style.display = 'none';
+        }, 3000);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        uploadStatus.innerHTML = `<i class="fas fa-times-circle" style="color: red;"></i> Upload failed`;
+        setTimeout(() => {
+            uploadStatus.style.display = 'none';
+        }, 3000);
+    });
+});
 
 // Event listeners
 sendButton.onclick = sendMessage;
 messageInput.onkeyup = (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
+    if (event.key === 'Enter') {
         sendMessage();
     }
 };
 
-// Initialize auto-resize for textarea
+// Model Management Functions
+const modelSelect = document.getElementById('model-select');
+const addModelBtn = document.getElementById('add-model-btn');
+const editModelBtn = document.getElementById('edit-model-btn');
+const deleteModelBtn = document.getElementById('delete-model-btn');
+
+// Load available models
+async function loadModels() {
+    try {
+        const response = await fetch('/models');
+        const models = await response.json();
+        modelSelect.innerHTML = '<option value="">Select Model</option>' +
+            models.map(model => `
+                <option value="${model.id}" ${model.is_default ? 'selected' : ''}>
+                    ${model.name}${model.is_default ? ' (Default)' : ''}
+                </option>
+            `).join('');
+    } catch (error) {
+        console.error('Error loading models:', error);
+    }
+}
+
+// Add new model
+addModelBtn.onclick = () => {
+    const name = prompt('Enter model name:');
+    if (!name) return;
+    
+    const description = prompt('Enter model description (optional):');
+    const apiEndpoint = prompt('Enter API endpoint:');
+    const apiKey = prompt('Enter API key:');
+    
+    fetch('/models', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            name,
+            description,
+            api_endpoint: apiEndpoint,
+            api_key: apiKey
+        }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadModels();
+        }
+    })
+    .catch(error => console.error('Error adding model:', error));
+};
+
+// Edit selected model
+editModelBtn.onclick = () => {
+    const modelId = modelSelect.value;
+    if (!modelId) return alert('Please select a model to edit');
+    
+    const name = prompt('Enter new model name:');
+    if (!name) return;
+    
+    const description = prompt('Enter new model description (optional):');
+    const apiEndpoint = prompt('Enter new API endpoint:');
+    const apiKey = prompt('Enter new API key:');
+    
+    fetch(`/models/${modelId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            name,
+            description,
+            api_endpoint: apiEndpoint,
+            api_key: apiKey
+        }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadModels();
+        }
+    })
+    .catch(error => console.error('Error updating model:', error));
+};
+
+// Delete selected model
+deleteModelBtn.onclick = () => {
+    const modelId = modelSelect.value;
+    if (!modelId) return alert('Please select a model to delete');
+    
+    if (confirm('Are you sure you want to delete this model?')) {
+        fetch(`/models/${modelId}`, {
+            method: 'DELETE',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                loadModels();
+            }
+        })
+        .catch(error => console.error('Error deleting model:', error));
+    }
+};
+
+// Initialize
+loadConversations();
+loadModels();
 messageInput.setAttribute('style', 'height:' + (messageInput.scrollHeight) + 'px;overflow-y:hidden;');
