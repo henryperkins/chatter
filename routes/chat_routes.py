@@ -10,7 +10,7 @@ from flask import (
 from flask_login import login_required, current_user
 from conversation_manager import ConversationManager
 from database import get_db
-from azure_config import initialize_azure_client
+from azure_config import get_azure_client
 from models import Chat
 import uuid
 import logging
@@ -23,7 +23,7 @@ conversation_manager = ConversationManager()
 logger = logging.getLogger(__name__)
 
 # Initialize Azure client
-client, deployment_name = initialize_azure_client()
+client, deployment_name = get_azure_client()
 
 
 @bp.route("/")
