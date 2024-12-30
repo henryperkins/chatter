@@ -45,7 +45,7 @@ def chat_interface():
 
     messages = conversation_manager.get_context(chat_id)
     context = Chat.get_context(chat_id)
-    return render_template("chat_template.html", chat_id=chat_id, messages=messages, context=context)
+    return render_template("chat.html", chat_id=chat_id, messages=messages, context=context)
 
 
 @bp.route("/load_chat/<chat_id>")
