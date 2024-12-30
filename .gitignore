@@ -1,7 +1,21 @@
-.aider*
-.env
+# .gitignore
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
 .venv/
-venv
-__pycache__
-node_modules/
+venv/
+env/
+
+# Environment variables file
+.env
+
+# Logs
+*.log
+app.log
+
+# Uploads and user-generated content
 uploads/
+
+# Aider files (if applicable)
+.aider*
