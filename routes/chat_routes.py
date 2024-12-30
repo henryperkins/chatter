@@ -184,6 +184,15 @@ def chat():
     return jsonify({"response": model_response})
 
 
+@bp.route("/chat/<chat_id>/context", methods=["POST"])
+@login_required
+def update_context(chat_id):
+    data = request.get_json()
+    context = data.get("context", "")
+    Chat.update_context(chat_id, context)
+    return jsonify({"success": True})
+
+
 def generate_new_chat_id():
     return str(uuid.uuid4())
 
