@@ -91,3 +91,34 @@ class ConversationManager:
                 f"Trimmed context for chat {chat_id} "
                 f"to the most recent {max_messages} messages"
             )
+
+    def set_model(self, chat_id: str, model_id: int) -> None:
+        """Set the model for a specific chat ID.
+
+        Args:
+            chat_id (str): The unique identifier for the chat session.
+            model_id (int): The ID of the model to be set.
+        """
+        db = get_db()
+        db.execute(
+            "UPDATE chats SET model_id = ? WHERE id = ?",
+            (model_id, chat_id),
+        )
+        db.commit()
+        logger.info(f"Model set for chat {chat_id}: Model ID {model_id}")
+
+    def get_model(self, chat_id: str) -> int:
+        """Retrieve the model ID for a specific chat ID.
+
+        Args:
+            chat_id (str): The unique identifier for the chat session.
+
+        Returns:
+            int: The ID of the model associated with the chat.
+        """
+        db = get_db()
+        chat = db.execute(
+            "SELECT model_id FROM chats WHERE id = ?",
+            (chat_id,),
+        ).fetchone()
+        return chat["model_id"] if chat and chat["model_id"] is not None else None
