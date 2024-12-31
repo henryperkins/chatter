@@ -3,8 +3,12 @@
 import logging
 from typing import Dict, List
 from database import get_db
+import os
 
 logger = logging.getLogger(__name__)
+
+# Retrieve max_messages from environment variable, default to 10
+MAX_MESSAGES = int(os.getenv("MAX_MESSAGES", "10"))
 
 
 class ConversationManager:
@@ -57,14 +61,14 @@ class ConversationManager:
         db.commit()
         logger.debug(f"Cleared context for chat {chat_id}")
 
-    def trim_context(self, chat_id: str, max_messages: int = 10) -> None:
+    def trim_context(self, chat_id: str, max_messages: int = MAX_MESSAGES) -> None:
         """Trim the conversation context to maintain a maximum number of messages.
 
         Removes the oldest messages to keep the context within the specified limit.
 
         Args:
             chat_id (str): The unique identifier for the chat session.
-            max_messages (int, optional): The maximum number of messages to retain. Defaults to 10.
+            max_messages (int, optional): The maximum number of messages to retain. Defaults to MAX_MESSAGES.
         """
         db = get_db()
         messages = db.execute(

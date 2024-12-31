@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
 from database import get_db
 from models import User
+import bcrypt
 
 bp = Blueprint('auth', __name__)
 
@@ -25,7 +25,7 @@ def login():
             "SELECT * FROM users WHERE username = ?", (username,)
         ).fetchone()
 
-        if user and check_password_hash(user["password_hash"], password):
+        if user and bcrypt.checkpw(password.encode('utf-8'), user["password_hash"]):
             user_obj = User(user["id"], user["username"], user["email"])
             login_user(user_obj)
             return redirect(url_for("chat.chat_interface"))
@@ -59,9 +59,10 @@ def register():
             flash("Email already registered")
             return render_template("register.html")
 
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
         db.execute(
             "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
-            (username, email, generate_password_hash(password)),
+            (username, email, hashed_password),
         )
         db.commit()
 

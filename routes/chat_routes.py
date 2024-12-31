@@ -73,12 +73,14 @@ def delete_chat(chat_id):
     chat = db.execute("SELECT user_id FROM chats WHERE id = ?", (chat_id,)).fetchone()
 
     if not chat or chat["user_id"] != current_user.id:
+        logger.warning(f"Attempt to delete non-existent or unauthorized chat: {chat_id}")
         return jsonify({"error": "Chat not found"}), 404
 
     db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
     db.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
     db.commit()
 
+    logger.info(f"Chat {chat_id} deleted successfully")
     return jsonify({"success": True})
 
 
@@ -90,6 +92,7 @@ def new_chat():
     conversation_manager.add_message(
         chat_id, "user", "Please format your responses in Markdown."
     )
+    logger.info(f"New chat created with ID: {chat_id}")
     return jsonify({"chat_id": chat_id})
 
 
@@ -110,7 +113,6 @@ def chat():
     user_message = data["message"]
     messages = conversation_manager.get_context(chat_id)
     context = Chat.get_context(chat_id)
-
 
     if "```" not in user_message and (
         "def " in user_message or "import " in user_message
@@ -138,7 +140,6 @@ def chat():
         if not deployment_name:
             raise ValueError("Azure deployment name is not configured")
 
-        # Prepare messages for API call
         api_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages]
         
         response = openai.ChatCompletion.create(
@@ -154,7 +155,6 @@ def chat():
             else "The assistant was unable to generate a response. Please try again or rephrase your input."
         )
 
-        # Update context based on the conversation
         new_context = extract_context_from_conversation(messages, model_response)
         Chat.update_context(chat_id, new_context)
 
@@ -164,12 +164,17 @@ def chat():
         error_message = f"API Error: {str(e)}"
         logger.error(error_message)
         model_response = error_message
+    except Exception as e:
+        error_message = f"Unexpected Error: {str(e)}"
+        logger.error(error_message)
+        model_response = error_message
 
     messages.append({"role": "assistant", "content": model_response})
     conversation_manager.clear_context(chat_id)
     for message in messages:
         conversation_manager.add_message(chat_id, message["role"], message["content"])
 
+    logger.info(f"Chat response sent for chat ID: {chat_id}")
     return jsonify({"response": model_response})
 
 
@@ -179,6 +184,7 @@ def update_context(chat_id):
     data = request.get_json()
     context = data.get("context", "")
     Chat.update_context(chat_id, context)
+    logger.info(f"Context updated for chat ID: {chat_id}")
     return jsonify({"success": True})
 
 
@@ -188,15 +194,12 @@ def generate_new_chat_id():
 
 def extract_context_from_conversation(messages, latest_response):
     """Extract key context from the conversation"""
-    # Extract important information from the conversation
     context_parts = []
     for msg in messages[-5:]:  # Consider last 5 messages for context
         if msg["role"] in ["assistant", "user"]:
             context_parts.append(f"{msg['role']}: {msg['content']}")
     
-    # Add the latest response
     context_parts.append(f"assistant: {latest_response}")
     
-    # Join and truncate to reasonable length
     context = "\n".join(context_parts)
     return context[:2000]  # Limit context to 2000 characters
