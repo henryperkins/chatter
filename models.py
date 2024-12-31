@@ -20,6 +20,21 @@ class User:
             return User(user['id'], user['username'], user['email'])
         return None
 
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_active(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return str(self.id)
+
 class Model:
     @staticmethod
     def get_all(limit=10, offset=0):
