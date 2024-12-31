@@ -21,6 +21,11 @@
         <div class="model-management">
             <select id="model-select" class="form-control">
                 <option value="">Select Model</option>
+                {% for model in models %}
+                    <option value="{{ model.id }}" {{ 'selected' if model.is_default else '' }}>
+                        {{ model.name }}{{ ' (Default)' if model.is_default else '' }}
+                    </option>
+                {% endfor %}
             </select>
             <button id="add-model-btn" class="btn-secondary">
                 <i class="fas fa-plus"></i> Add Model
