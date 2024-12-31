@@ -4,9 +4,9 @@
 
 {% block content %}
 <div class="flex h-screen antialiased text-gray-800">
-    <div class="flex flex-row h-full w-full overflow-x-hidden">
+    <div class="flex flex-col md:flex-row h-full w-full overflow-x-hidden">
         <!-- Sidebar -->
-        <div class="flex flex-col py-8 pl-6 pr-2 w-64 bg-white flex-shrink-0">
+        <div class="sidebar hidden md:block flex flex-col py-8 pl-6 pr-2 w-full md:w-64 bg-white flex-shrink-0">
             <div class="flex flex-row items-center justify-center h-12 w-full">
                 <div class="ml-2 font-bold text-2xl">Azure OpenAI Chat</div>
             </div>
@@ -64,10 +64,10 @@
             <div class="flex flex-col flex-auto h-full p-6">
                 <!-- Context Section -->
                 <div class="flex flex-col h-1/4 mb-4">
-                    <h3 class="text-lg font-semibold mb-2">Conversation Context</h3>
+                    <h3 class="text-lg md:text-xl font-semibold mb-2">Conversation Context</h3>
                     <textarea id="context-textarea" class="w-full h-full border border-gray-300 p-2 rounded-lg resize-none">{{ context }}</textarea>
                     <div class="flex mt-2 space-x-2">
-                        <button id="save-context-btn" class="bg-blue-500 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                        <button id="save-context-btn" class="px-4 py-2 md:px-6 md:py-2 bg-blue-500 hover:bg-blue-700 text-white rounded-lg">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
                             Save Context
                         </button>
@@ -79,7 +79,7 @@
                 </div>
 
                 <!-- Chat Messages -->
-                <div class="flex flex-col flex-grow h-1/2 mb-4 overflow-y-auto">
+                <div class="flex flex-col flex-grow h-64 md:h-1/2 mb-4 overflow-y-auto">
                     {% for message in messages %}
                         {% if message.role == 'user' %}
                             <div class="flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end">

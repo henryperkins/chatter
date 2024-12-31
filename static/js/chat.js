@@ -381,4 +381,11 @@ document.addEventListener('DOMContentLoaded', function() {
     loadConversations();
     loadModels();
     adjustTextareaHeight(messageInput);
-});
+});const sidebarToggle = document.getElementById('sidebar-toggle');
+const sidebar = document.querySelector('.sidebar');
+
+if (sidebarToggle && sidebar) {
+    sidebarToggle.addEventListener('click', function() {
+        sidebar.classList.toggle('hidden');
+    });
+}
