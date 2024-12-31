@@ -12,6 +12,7 @@ from conversation_manager import ConversationManager
 from database import get_db
 from azure_config import get_azure_client
 import openai
+from openai import OpenAIError
 from models import Chat
 import uuid
 import logging
@@ -159,7 +160,7 @@ def chat():
 
         model_response = model_response
 
-    except openai.error.OpenAIError as e:
+    except OpenAIError as e:
         error_message = f"API Error: {str(e)}"
         logger.error(error_message)
         model_response = error_message
