@@ -1,6 +1,7 @@
-from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
+from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for, abort
 from flask_login import login_required, current_user
 from conversation_manager import ConversationManager
+from database import get_db
 from database import get_db
 from models import Chat, Model
 import logging
@@ -76,16 +77,40 @@ def delete_chat(chat_id):
     logger.info(f"Chat {chat_id} deleted successfully")
     return jsonify({"success": True})
 
-@bp.route("/new_chat", methods=["POST"])
+@bp.route("/new_chat", methods=["GET"])
 @login_required
 def new_chat():
+    """Create a new chat and redirect to the chat interface."""
     chat_id = generate_new_chat_id()
+    # Create a new chat in the database
+    Chat.create(chat_id, current_user.id, "New Chat")
     session["chat_id"] = chat_id
+    # Add the default message to the conversation
     conversation_manager.add_message(
         chat_id, "user", "Please format your responses in Markdown."
     )
     logger.info(f"New chat created with ID: {chat_id}")
-    return jsonify({"chat_id": chat_id})
+    return redirect(url_for("chat.chat_interface"))
+
+@bp.route("/conversations", methods=["GET"])
+@login_required
+def get_conversations():
+    """Retrieve all conversations for the current user."""
+    if not current_user.is_authenticated:
+        abort(401)  # Unauthorized
+    try:
+        db = get_db()
+        conversations = db.execute(
+            "SELECT id, title, created_at FROM chats WHERE user_id = ? ORDER BY created_at DESC",
+            (current_user.id,),
+        ).fetchall()
+        return jsonify([
+            {"id": row[0], "title": row[1], "created_at": row[2]}
+            for row in conversations
+        ])
+    except Exception as e:
+        logger.error(f"Error retrieving conversations: {e}")
+        return jsonify({"error": "Failed to retrieve conversations"}), 500
 
 @bp.route("/scrape", methods=["POST"])
 @login_required
