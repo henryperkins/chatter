@@ -24,7 +24,7 @@ class User(UserMixin):
             (user_id,),
         ).fetchone()
         if user:
-            return User(user["id"], user["username"], user["email"])
+            return User(int(user["id"]), user["username"], user["email"])
         return None
 
     @staticmethod
