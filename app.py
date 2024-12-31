@@ -11,6 +11,7 @@ from database import get_db, close_db, init_db
 from models import User
 from routes.auth_routes import bp as auth_bp
 from routes.chat_routes import bp as chat_bp
+from routes.model_routes import bp as model_bp
 
 # Configure logging
 logging.basicConfig(
@@ -42,6 +43,7 @@ def load_user(user_id):
 # Register blueprints
 app.register_blueprint(auth_bp)
 app.register_blueprint(chat_bp)
+app.register_blueprint(model_bp)
 
 # Teardown database connection
 app.teardown_appcontext(close_db)
