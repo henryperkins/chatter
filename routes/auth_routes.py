@@ -4,7 +4,7 @@ from database import get_db
 from models import User
 import bcrypt
 
-bp = Blueprint('auth', __name__)
+bp = Blueprint("auth", __name__)
 
 
 @bp.route("/login", methods=["GET", "POST"])
@@ -25,7 +25,7 @@ def login():
             "SELECT * FROM users WHERE username = ?", (username,)
         ).fetchone()
 
-        if user and bcrypt.checkpw(password.encode('utf-8'), user["password_hash"]):
+        if user and bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]):
             user_obj = User(user["id"], user["username"], user["email"])
             login_user(user_obj)
             return redirect(url_for("chat.chat_interface"))
@@ -49,17 +49,16 @@ def register():
             return render_template("register.html")
 
         db = get_db()
-        if db.execute(
-            "SELECT id FROM users WHERE username = ?", (username,)
-        ).fetchone():
-            flash("Username already exists")
+        # Combine username and email check into one
+        existing_user = db.execute(
+            "SELECT id FROM users WHERE username = ? OR email = ?", (username, email)
+        ).fetchone()
+
+        if existing_user:
+            flash("Username or email already exists")
             return render_template("register.html")
 
-        if db.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone():
-            flash("Email already registered")
-            return render_template("register.html")
-
-        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
         db.execute(
             "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
             (username, email, hashed_password),

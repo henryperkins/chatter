@@ -1,6 +1,6 @@
 """Flask application initialization and configuration module.
 
-This module sets up the Flask application, configures logging, initializes 
+This module sets up the Flask application, configures logging, initializes
 Flask-Login, and registers blueprints for authentication, chat, and model routes.
 """
 
@@ -8,6 +8,7 @@ import logging
 import os
 from flask import Flask
 from flask_login import LoginManager
+from flask_socketio import SocketIO
 
 from database import get_db, close_db, init_db, init_app
 from models import User
@@ -29,10 +30,9 @@ app = Flask(__name__)
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
-# Removed login_view assignment due to type mismatch
 app.config.update(
     DATABASE="chat_app.db",
-    SECRET_KEY=os.environ.get("SECRET_KEY", "your-default-secret-key")
+    SECRET_KEY=os.environ.get("SECRET_KEY", "your-default-secret-key"),
 )
 
 # Initialize database connection
@@ -46,6 +46,9 @@ app.register_blueprint(model_bp)
 # Initialize database tables
 with app.app_context():
     init_db()
+
+# Initialize SocketIO
+socketio = SocketIO(app)
 
 
 @login_manager.user_loader
@@ -65,15 +68,8 @@ def load_user(user_id: str) -> User | None:
     return None
 
 
-# Register blueprints
-# Removed duplicate registration of model_bp
-
 # Teardown database connection
 app.teardown_appcontext(close_db)
 
-# Initialize database
-with app.app_context():
-    init_db()
-
 if __name__ == "__main__":
-    app.run(debug=True)
+    socketio.run(app, debug=True)

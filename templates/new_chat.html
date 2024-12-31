@@ -5,7 +5,7 @@
 {% block content %}
 <div class="flex h-screen antialiased text-gray-800">
     <div class="flex flex-row h-full w-full overflow-x-hidden">
-        <!-- Sidebar (Optional) -->
+        <!-- Sidebar (Optional) - You can keep your existing sidebar code here -->
         <div class="sidebar hidden md:flex flex-col py-8 pl-6 pr-2 w-64 bg-white flex-shrink-0">
             <!-- Add sidebar content here if needed -->
         </div>
@@ -22,7 +22,7 @@
             <div class="flex flex-row items-center h-16 rounded-xl bg-white w-full px-4">
                 <div class="flex-grow ml-4">
                     <div class="relative w-full">
-                        <textarea id="message-input" class="flex w-full border rounded-xl focus:outline focus:outline-2 focus:outline-indigo-300 pl-4 h-10" rows="1" placeholder="Type your message..."></textarea>
+                        <textarea id="message-input" class="flex w-full border rounded-xl focus:outline focus:outline-2 focus:outline-indigo-300 pl-4 h-10 resize-none" rows="1" placeholder="Type your message..."></textarea>
                     </div>
                 </div>
                 <div class="ml-4">
@@ -37,5 +37,9 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script>
+    // Set the chatId for the new chat. The actual value will be set when redirecting from /new_chat
+    const chatId = '{{ chat_id }}';
+</script>
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% endblock %}

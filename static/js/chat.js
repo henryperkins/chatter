@@ -6,17 +6,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const uploadStatus = document.getElementById('upload-status');
     const newChatBtn = document.getElementById('new-chat-btn');
     const conversationList = document.getElementById('chat-list');
-    const contextTextarea = document.getElementById('context-textarea');
-    const saveContextBtn = document.getElementById('save-context-btn');
-    const clearContextBtn = document.getElementById('clear-context-btn');
     const modelSelect = document.getElementById('model-select');
     const addModelBtn = document.getElementById('add-model-btn');
     const editModelBtn = document.getElementById('edit-model-btn');
     const deleteModelBtn = document.getElementById('delete-model-btn');
-    const modelModal = document.getElementById('model-modal');
-    const modelForm = document.getElementById('model-form');
-    const modelModalTitle = document.getElementById('model-modal-title');
-    const cancelModelBtn = document.getElementById('cancel-model-btn');
 
     function adjustTextareaHeight(textarea) {
         textarea.style.height = 'auto';
@@ -26,36 +19,6 @@ document.addEventListener('DOMContentLoaded', function() {
     messageInput.addEventListener('input', function() {
         adjustTextareaHeight(this);
     });
-
-    if (saveContextBtn) {
-        saveContextBtn.addEventListener('click', async () => {
-            const context = contextTextarea.value.trim();
-            try {
-                const response = await fetch(`/chat/{{ chat_id }}/context`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ context })
-                });
-                if (response.ok) {
-                    showToast('Context saved successfully', 'success');
-                } else {
-                    showToast('Failed to save context', 'error');
-                }
-            } catch (error) {
-                console.error('Error saving context:', error);
-                showToast('Failed to save context', 'error');
-            }
-        });
-    }
-
-    if (clearContextBtn) {
-        clearContextBtn.addEventListener('click', () => {
-            contextTextarea.value = '';
-            showToast('Context cleared', 'success');
-        });
-    }
 
     async function loadConversations() {
         try {
@@ -69,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function renderConversations(conversations) {
         conversationList.innerHTML = conversations.map(conv => `
-            <div class="flex items-center px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 ${conv.id === '{{ chat_id }}' ? 'bg-gray-100' : ''}" data-id="${conv.id}">
+            <div class="flex items-center px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 ${conv.id === chatId ? 'bg-gray-100' : ''}" data-id="${conv.id}">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
                 <span class="flex-grow">${conv.title || 'Untitled Conversation'}</span>
                 <button class="delete-conversation-btn" data-id="${conv.id}">
@@ -81,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     conversationList.addEventListener('click', function(event) {
         const target = event.target;
-        const conversationItem = target.closest('.conversation-item');
+        const conversationItem = target.closest('div[data-id]');
         const deleteBtn = target.closest('.delete-conversation-btn');
 
         if (deleteBtn) {
@@ -93,18 +56,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+
     async function loadConversation(conversationId) {
-        window.location.href = `/chat/${conversationId}`;
+        window.location.href = `/load_chat/${conversationId}`;
     }
 
     async function deleteConversation(conversationId, event) {
         event.stopPropagation();
         if (confirm('Are you sure you want to delete this conversation?')) {
             try {
-                const response = await fetch(`/conversations/${conversationId}`, { method: 'DELETE' });
+                const response = await fetch(`/delete_chat/${conversationId}`, { method: 'DELETE' });
                 if (response.ok) {
-                    loadConversations();
-                    showToast('Conversation deleted', 'success');
+                    // Check if the current chat is the one being deleted
+                    if (conversationId === chatId) {
+                        window.location.href = '/new_chat';
+                    } else {
+                        loadConversations();
+                        showToast('Conversation deleted', 'success');
+                    }
                 } else {
                     showToast('Failed to delete conversation', 'error');
                 }
@@ -118,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function sendMessage() {
         const message = messageInput.value.trim();
         if (!message) return;
-        
+
         const userMessageDiv = document.createElement('div');
         userMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end';
         userMessageDiv.innerHTML = `
@@ -134,7 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         chatBox.appendChild(userMessageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
-    
+
         const loadingDiv = document.createElement('div');
         loadingDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs';
         loadingDiv.innerHTML = `
@@ -151,23 +120,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
         chatBox.appendChild(loadingDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
-    
+
         messageInput.value = '';
         messageInput.style.height = 'auto';
         messageInput.disabled = true;
         sendButton.disabled = true;
-    
+
         try {
             const response = await fetch('/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ chat_id: '{{ chat_id }}', message: message }),
+                body: JSON.stringify({ chat_id: chatId, message: message }),
             });
             const data = await response.json();
             chatBox.removeChild(loadingDiv);
-    
+
             const assistantMessageDiv = document.createElement('div');
             assistantMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs';
             assistantMessageDiv.innerHTML = `
@@ -208,15 +177,15 @@ document.addEventListener('DOMContentLoaded', function() {
         fileInput.addEventListener('change', () => {
             const files = fileInput.files;
             if (!files.length) return;
-    
+
             uploadStatus.classList.remove('hidden');
             uploadStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
-    
+
             const formData = new FormData();
             for (let i = 0; i < files.length; i++) {
                 formData.append('file', files[i]);
             }
-    
+
             fetch('/upload', {
                 method: 'POST',
                 body: formData,
@@ -245,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (sendButton) {
         sendButton.addEventListener('click', sendMessage);
     }
-    
+
     if (messageInput) {
         messageInput.addEventListener('keyup', (event) => {
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -273,7 +242,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (editModelBtn) {
         editModelBtn.addEventListener('click', () => {
-            openModelModal('Edit Model');
+            const modelId = modelSelect.value;
+            if (!modelId) return alert('Please select a model to edit');
+
+            // Fetch the selected model's data and populate the form
+            fetch(`/models/${modelId}`)
+                .then(response => response.json())
+                .then(model => {
+                    document.getElementById('model-name').value = model.name;
+                    document.getElementById('model-deployment-name').value = model.deployment_name;
+                    document.getElementById('model-description').value = model.description;
+                    document.getElementById('model-api-endpoint').value = model.api_endpoint;
+                    // Do not populate the API key field for security reasons
+                    document.getElementById('model-temperature').value = model.temperature;
+                    document.getElementById('model-max-tokens').value = model.max_tokens;
+                    document.getElementById('model-max-completion-tokens').value = model.max_completion_tokens;
+                    openModelModal('Edit Model');
+                })
+                .catch(error => {
+                    console.error('Error fetching model details:', error);
+                    showToast('Error fetching model details', 'error');
+                });
         });
     }
 
@@ -315,9 +304,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const isEditMode = modelModalTitle.textContent === 'Edit Model';
             const modelId = isEditMode ? modelSelect.value : null;
             const name = document.getElementById('model-name').value;
+            const deployment_name = document.getElementById('model-deployment-name').value;
             const description = document.getElementById('model-description').value;
             const apiEndpoint = document.getElementById('model-api-endpoint').value;
-            const apiKey = document.getElementById('model-api-key').value;
+            const temperature = parseFloat(document.getElementById('model-temperature').value);
+            const max_tokens = document.getElementById('model-max-tokens').value ? parseInt(document.getElementById('model-max-tokens').value) : null;
+            const max_completion_tokens = parseInt(document.getElementById('model-max-completion-tokens').value);
 
             const url = isEditMode ? `/models/${modelId}` : '/models';
             const method = isEditMode ? 'PUT' : 'POST';
@@ -328,7 +320,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ name, description, api_endpoint: apiEndpoint, api_key: apiKey }),
+                    body: JSON.stringify({ name, deployment_name, description, api_endpoint, temperature, max_tokens, max_completion_tokens }),
                 });
                 const data = await response.json();
                 if (data.success) {
@@ -375,7 +367,9 @@ document.addEventListener('DOMContentLoaded', function() {
     loadConversations();
     loadModels();
     adjustTextareaHeight(messageInput);
-});const sidebarToggle = document.getElementById('sidebar-toggle');
+});
+
+const sidebarToggle = document.getElementById('sidebar-toggle');
 const sidebar = document.querySelector('.sidebar');
 
 if (sidebarToggle && sidebar) {

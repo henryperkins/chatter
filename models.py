@@ -100,12 +100,13 @@ class Model:
     Attributes:
         id (int): Unique identifier for the model.
         name (str): Name of the model.
+        deployment_name (str): Deployment name of the model in Azure OpenAI.
         description (str): Description of the model.
         model_type (str): Type/category of the model.
         api_endpoint (str): API endpoint used to interact with the model.
-        api_key (str): API key for authentication with the model.
         temperature (float): Sampling temperature for APIs like OpenAI (default 1.0).
         max_tokens (int): Maximum number of tokens allowed (default 32000).
+        max_completion_tokens (int): Maximum number of completion tokens for the model.
         is_default (bool): Flag indicating if the model is the default one.
     """
 
@@ -113,12 +114,13 @@ class Model:
         self,
         id,
         name,
+        deployment_name,
         description,
         model_type,
         api_endpoint,
-        api_key,
         temperature=1.0,
-        max_tokens=32000,
+        max_tokens=None,
+        max_completion_tokens=500,
         is_default=False,
     ):
         """
@@ -127,22 +129,24 @@ class Model:
         Args:
             id (int): Unique identifier for the model.
             name (str): Name of the model.
+            deployment_name (str): Deployment name for Azure OpenAI models.
             description (str): Description of the model.
             model_type (str): Type of the model.
             api_endpoint (str): API endpoint for the model.
-            api_key (str): API key for the model.
             temperature (float): Sampling temperature (default 1.0).
             max_tokens (int): Maximum number of tokens allowed (default 32000).
+            max_completion_tokens (int): Maximum number of completion tokens.
             is_default (bool): Whether the model is the default one (default False).
         """
         self.id = id
         self.name = name
+        self.deployment_name = deployment_name
         self.description = description
         self.model_type = model_type
         self.api_endpoint = api_endpoint
-        self.api_key = api_key
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.max_completion_tokens = max_completion_tokens
         self.is_default = is_default
 
     @staticmethod
@@ -170,7 +174,7 @@ class Model:
         Raises:
             ValueError: If a required field is missing.
         """
-        required_fields = ["name", "api_endpoint", "api_key"]
+        required_fields = ["name", "deployment_name", "api_endpoint"]
         for field in required_fields:
             if field not in config or not config[field]:
                 raise ValueError(f"Missing required field: {field}")
@@ -205,26 +209,35 @@ class Model:
             Model: A Model instance if found, otherwise None.
         """
         db = get_db()
-        model = db.execute(
-            "SELECT * FROM models WHERE id = ?", (model_id,)
-        ).fetchone()
+        model = db.execute("SELECT * FROM models WHERE id = ?", (model_id,)).fetchone()
         if model:
             return Model(**dict(model))
         return None
 
     @staticmethod
-    def create(name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default):
+    def create(
+        name,
+        deployment_name,
+        description,
+        model_type,
+        api_endpoint,
+        temperature,
+        max_tokens,
+        max_completion_tokens,
+        is_default,
+    ):
         """
         Creates a new model in the database.
 
         Args:
             name (str): Name of the model.
+            deployment_name (str): Deployment name for Azure OpenAI models.
             description (str): Description of the model.
             model_type (str): Type of the model.
             api_endpoint (str): API endpoint for the model.
-            api_key (str): API key for the model.
             temperature (float): Sampling temperature.
             max_tokens (int): Maximum number of tokens allowed.
+            max_completion_tokens (int): Maximum number of completion tokens.
             is_default (bool): Whether this model is the default one.
 
         Returns:
@@ -233,8 +246,18 @@ class Model:
         db = get_db()
         cursor = db.cursor()
         cursor.execute(
-            "INSERT INTO models (name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default)
+            "INSERT INTO models (name, deployment_name, description, model_type, api_endpoint, temperature, max_tokens, max_completion_tokens, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                name,
+                deployment_name,
+                description,
+                model_type,
+                api_endpoint,
+                temperature,
+                max_tokens,
+                max_completion_tokens,
+                is_default,
+            ),
         )
         model_id = cursor.lastrowid
         db.commit()
@@ -242,25 +265,48 @@ class Model:
         return model_id
 
     @staticmethod
-    def update(model_id, name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default):
+    def update(
+        model_id,
+        name,
+        deployment_name,
+        description,
+        model_type,
+        api_endpoint,
+        temperature,
+        max_tokens,
+        max_completion_tokens,
+        is_default,
+    ):
         """
         Updates an existing model in the database.
 
         Args:
             model_id (int): ID of the model to update.
             name (str): Updated name of the model.
+            deployment_name (str): Updated deployment name for Azure OpenAI.
             description (str): Updated description of the model.
             model_type (str): Updated type of the model.
             api_endpoint (str): Updated API endpoint.
-            api_key (str): Updated API key.
             temperature (float): Updated sampling temperature.
             max_tokens (int): Updated maximum tokens.
+            max_completion_tokens (int): Updated maximum completion tokens.
             is_default (bool): Updated default flag.
         """
         db = get_db()
         db.execute(
-            "UPDATE models SET name = ?, description = ?, model_type = ?, api_endpoint = ?, api_key = ?, temperature = ?, max_tokens = ?, is_default = ? WHERE id = ?",
-            (name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default, model_id)
+            "UPDATE models SET name = ?, deployment_name = ?, description = ?, model_type = ?, api_endpoint = ?, temperature = ?, max_tokens = ?, max_completion_tokens = ?, is_default = ? WHERE id = ?",
+            (
+                name,
+                deployment_name,
+                description,
+                model_type,
+                api_endpoint,
+                temperature,
+                max_tokens,
+                max_completion_tokens,
+                is_default,
+                model_id,
+            ),
         )
         db.commit()
         logger.info(f"Model updated: {name}")
@@ -352,37 +398,6 @@ class Chat:
         db.execute("UPDATE chats SET model_id = ? WHERE id = ?", (model_id, chat_id))
         db.commit()
         logger.info(f"Model set for chat {chat_id}: {model_id}")
-
-    @staticmethod
-    def get_context(chat_id):
-        """
-        Retrieves the context (text/data) of a specific chat.
-
-        Args:
-            chat_id (int): ID of the chat.
-
-        Returns:
-            str: The context of the chat if found, otherwise an empty string.
-        """
-        db = get_db()
-        result = db.execute(
-            "SELECT context FROM chats WHERE id = ?", (chat_id,)
-        ).fetchone()
-        return result["context"] if result else ""
-
-    @staticmethod
-    def update_context(chat_id, context):
-        """
-        Updates the context of a chat.
-
-        Args:
-            chat_id (int): ID of the chat to update.
-            context (str): New context to set for the chat.
-        """
-        db = get_db()
-        db.execute("UPDATE chats SET context = ? WHERE id = ?", (context, chat_id))
-        db.commit()
-        logger.info(f"Context updated for chat {chat_id}")
 
     @staticmethod
     def get_by_id(chat_id):

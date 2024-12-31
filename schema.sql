@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS chats (
     id TEXT PRIMARY KEY,
     user_id INTEGER NOT NULL,
     title TEXT NOT NULL,
-    context TEXT DEFAULT '',
     model_id INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
@@ -33,14 +32,15 @@ CREATE TABLE IF NOT EXISTS messages (
 
 -- Models table
 CREATE TABLE IF NOT EXISTS models (
-    id INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL,
+    deployment_name TEXT UNIQUE NOT NULL,
     description TEXT,
     model_type TEXT NOT NULL DEFAULT 'azure',
     api_endpoint TEXT,
-    api_key TEXT,
     temperature REAL DEFAULT 1.0,
-    max_tokens INTEGER DEFAULT 32000,
+    max_tokens INTEGER,
+    max_completion_tokens INTEGER,
     is_default BOOLEAN DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

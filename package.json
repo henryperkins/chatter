@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "A real-time chat application built with Flask and Azure OpenAI's o1-preview model.",
   "scripts": {
-    "build:css": "tailwindcss -i ./static/css/style.css -o ./static/css/output.css"
+    "build:css": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css",
+    "start": "flask run",
+    "watch": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch"
   },
   "keywords": [],
   "author": "",
@@ -13,5 +15,5 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17"
   },
-  "main": "poscss.config.js"
+  "main": "postcss.config.js"
 }

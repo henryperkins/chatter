@@ -2,7 +2,6 @@
 
 import os
 from dotenv import load_dotenv
-import openai
 from openai import AzureOpenAI
 
 load_dotenv()
@@ -35,11 +34,9 @@ def get_azure_client():
             )
 
         # Configure the OpenAI client for Azure
-        openai.api_type = "azure"
-        openai.api_base = azure_endpoint
-        openai.api_key = api_key
-        openai.api_version = api_version
-        _client = openai
+        _client = AzureOpenAI(
+            api_key=api_key, azure_endpoint=azure_endpoint, api_version=api_version
+        )
         _deployment_name = deployment_name
 
     return _client, _deployment_name
@@ -65,17 +62,26 @@ def initialize_client_from_model(model_config):
 
     # Retrieve required configuration from the model config
     api_endpoint = model_config.get("api_endpoint")
-    api_key = model_config.get("api_key")
-    deployment_name = model_config.get("name")  # Assuming 'name' is used as the deployment name
+    deployment_name = model_config.get("deployment_name")
     api_version = model_config.get("api_version", "2024-12-01-preview")
+    temperature = model_config.get("temperature", 1.0)
+    max_tokens = model_config.get("max_tokens")
+    max_completion_tokens = model_config.get("max_completion_tokens")
+
+    # Handle o1-preview specific requirements
     if "o1-preview" in deployment_name:
         api_version = "2024-12-01-preview"
-    temperature = model_config.get("temperature", 1.0)
-    max_tokens = model_config.get("max_tokens", 32000)
+        temperature = 1
+        max_tokens = None  # max_tokens is not used for o1-preview
 
     # Validate required configuration fields
-    if not all([api_endpoint, api_key, deployment_name]):
+    if not all([api_endpoint, deployment_name]):
         raise ValueError("Model configuration is missing required fields.")
+
+    # Retrieve API key from environment variable
+    api_key = os.getenv("AZURE_OPENAI_KEY")
+    if not api_key:
+        raise ValueError("AZURE_OPENAI_KEY environment variable not set.")
 
     # Initialize the Azure OpenAI client
     client = AzureOpenAI(
@@ -84,4 +90,4 @@ def initialize_client_from_model(model_config):
         api_version=api_version,
     )
 
-    return client, deployment_name, temperature, max_tokens
+    return client, deployment_name, temperature, max_tokens, max_completion_tokens

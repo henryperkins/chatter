@@ -32,12 +32,10 @@
                             </option>
                         {% endfor %}
                     </select>
-                    <button id="add-model-btn" class="mt-2 w-full bg-green-500 hover:bg-green-700 text-white px-4 py-2 rounded-lg focus:outline focus:outline-2 focus:outline-indigo-300">
+                    <a href="{{ url_for('model.add_model_page') }}" class="mt-2 w-full bg-green-500 hover:bg-green-700 text-white px-4 py-2 rounded-lg focus:outline focus:outline-2 focus:outline-indigo-300">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        <a href="{{ url_for('model.add_model_page') }}" class="mt-2 w-full bg-green-500 hover:bg-green-700 text-white px-4 py-2 rounded-lg focus:outline focus:outline-2 focus:outline-indigo-300">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                            Add Model
-                        </a>
+                        Add Model
+                    </a>
                     <button id="edit-model-btn" class="mt-2 w-full bg-yellow-500 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg focus:outline focus:outline-2 focus:outline-indigo-300">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                         Edit Model
@@ -65,24 +63,8 @@
 
         <!-- Main Chat Area -->
         <main class="flex flex-col flex-auto h-full p-6">
-            <!-- Context Section -->
-            <div class="flex flex-col h-1/4 mb-4">
-                <h3 class="text-lg md:text-xl font-semibold mb-2">Conversation Context</h3>
-                <textarea id="context-textarea" class="w-full h-full border border-gray-300 p-2 rounded-lg resize-none">{{ context }}</textarea>
-                <div class="flex mt-2 space-x-2">
-                    <button id="save-context-btn" class="px-4 py-2 md:px-6 md:py-2 bg-blue-500 hover:bg-blue-700 text-white rounded-lg focus:outline focus:outline-2 focus:outline-indigo-300">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
-                        Save Context
-                    </button>
-                    <button id="clear-context-btn" class="bg-gray-500 hover:bg-gray-700 text-white px-4 py-2 rounded-lg focus:outline focus:outline-2 focus:outline-indigo-300">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                        Clear
-                    </button>
-                </div>
-            </div>
-
             <!-- Chat Messages -->
-            <div class="flex flex-col flex-grow h-64 md:h-1/2 mb-4 overflow-y-auto">
+            <div id="chat-box" class="flex flex-col flex-grow h-64 md:h-1/2 mb-4 overflow-y-auto">
                 {% for message in messages %}
                     {% if message.role == 'user' %}
                         <div class="flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end">
@@ -137,15 +119,13 @@
             </div>
         </main>
     </div>
-    <button id="sidebar-toggle" class="md:hidden mr-2">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-        </svg>
-    </button>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+    const chatId = "{{ chat_id }}";
+</script>
 <script src="{{ url_for('static', filename='js/chat.js') }}" async></script>
 {% endblock %}

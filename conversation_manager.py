@@ -10,11 +10,11 @@ logger = logging.getLogger(__name__)
 # Retrieve max_messages from environment variable, default to 20
 MAX_MESSAGES = int(os.getenv("MAX_MESSAGES", "20"))
 
+
 class ConversationManager:
     """Manages conversations by storing and retrieving messages from the database."""
 
     def __init__(self):
-        # Initialization is not required since we interact directly with the database
         pass
 
     def get_context(self, chat_id: str) -> List[Dict[str, str]]:
@@ -47,6 +47,7 @@ class ConversationManager:
             (chat_id, role, content),
         )
         db.commit()
+        self.trim_context(chat_id)
         logger.debug(f"Added message to chat {chat_id}: {role}: {content[:50]}...")
 
     def clear_context(self, chat_id: str) -> None:
@@ -70,20 +71,26 @@ class ConversationManager:
             max_messages (int, optional): The maximum number of messages to retain. Defaults to MAX_MESSAGES.
         """
         db = get_db()
-        messages = db.execute(
-            """
-            SELECT id FROM messages
-            WHERE chat_id = ?
-            ORDER BY timestamp ASC
-            LIMIT (SELECT COUNT(*) FROM messages WHERE chat_id = ?) - ?
-            """,
-            (chat_id, chat_id, max_messages),
-        ).fetchall()
-        if messages:
-            message_ids = [str(msg["id"]) for msg in messages]
+
+        # Count the number of messages for the chat_id
+        count = db.execute(
+            "SELECT COUNT(*) FROM messages WHERE chat_id = ?", (chat_id,)
+        ).fetchone()[0]
+
+        # If the number of messages exceeds the max, delete the oldest ones
+        if count > max_messages:
             db.execute(
-                f"DELETE FROM messages WHERE id IN ({','.join(['?'] * len(message_ids))})",
-                message_ids,
+                """
+                DELETE FROM messages
+                WHERE id IN (
+                    SELECT id
+                    FROM messages
+                    WHERE chat_id = ?
+                    ORDER BY timestamp ASC
+                    LIMIT ?
+                )
+                """,
+                (chat_id, count - max_messages),
             )
             db.commit()
             logger.debug(

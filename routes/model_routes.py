@@ -1,4 +1,9 @@
-# routes/model_routes.py
+"""
+model_routes.py
+
+This module defines the routes for managing AI models, including
+creating, updating, deleting, and retrieving models.
+"""
 
 from flask import Blueprint, jsonify, request, render_template
 from flask_login import login_required
@@ -6,14 +11,14 @@ from models import Model
 from decorators import admin_required
 import logging
 
-bp = Blueprint('model', __name__)
+bp = Blueprint("model", __name__)
 logger = logging.getLogger(__name__)
 
 
 @bp.route("/models", methods=["GET"])
 @login_required
 def get_models():
-    """Retrieve all models with pagination."""
+    """Retrieve all models with optional pagination."""
     try:
         limit = request.args.get("limit", 10, type=int)
         offset = request.args.get("offset", 0, type=int)
@@ -23,6 +28,7 @@ def get_models():
                 {
                     "id": model.id,
                     "name": model.name,
+                    "deployment_name": model.deployment_name,
                     "description": model.description,
                     "is_default": model.is_default,
                 }
@@ -30,66 +36,90 @@ def get_models():
             ]
         )
     except Exception as e:
-        logger.error(f"Error retrieving models: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error("Error retrieving models: %s", str(e))
+        return jsonify({"error": "An error occurred while retrieving models"}), 500
 
 
-@bp.route('/models', methods=['POST'])
+@bp.route("/models", methods=["POST"])
 @login_required
 @admin_required
 def create_model():
     """Create a new model."""
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid request data", "success": False}), 400
+
     try:
         Model.validate_model_config(data)
         model_id = Model.create(
-            data['name'],
-            data.get('description', ''),
-            data.get('model_type', 'azure'),
-            data['api_endpoint'],
-            data['api_key'],
-            data.get('temperature', 1.0),
-            data.get('max_tokens', 32000),
-            data.get('is_default', 0)
+            name=data["name"],
+            deployment_name=data["deployment_name"],
+            description=data.get("description", ""),
+            model_type=data.get("model_type", "azure"),
+            api_endpoint=data["api_endpoint"],
+            temperature=data.get("temperature", 1.0),
+            max_tokens=data.get("max_tokens"),
+            max_completion_tokens=data.get("max_completion_tokens", 500),
+            is_default=data.get("is_default", 0),
         )
-        logger.info(f"Model created successfully: {data['name']}")
+        logger.info("Model created successfully: %s", data["name"])
         return jsonify({"id": model_id, "success": True})
     except ValueError as e:
-        logger.error(f"Error creating model: {str(e)}")
+        logger.error("Error creating model: %s", str(e))
         return jsonify({"error": str(e), "success": False}), 400
 
-@bp.route('/models/<int:model_id>', methods=['PUT'])
+
+@bp.route("/models/<int:model_id>", methods=["PUT"])
 @login_required
 @admin_required
-def update_model(model_id):
+def update_model(model_id: int):
     """Update an existing model."""
-    data = request.json
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid request data", "success": False}), 400
+
     try:
         Model.validate_model_config(data)
         Model.update(
-            model_id,
-            data['name'],
-            data.get('description', ''),
-            data.get('model_type', 'azure'),
-            data['api_endpoint'],
-            data['api_key'],
-            data.get('temperature', 1.0),
-            data.get('max_tokens', 32000),
-            data.get('is_default', 0)
+            model_id=model_id,
+            name=data["name"],
+            deployment_name=data["deployment_name"],
+            description=data.get("description", ""),
+            model_type=data.get("model_type", "azure"),
+            api_endpoint=data["api_endpoint"],
+            temperature=data.get("temperature", 1.0),
+            max_tokens=data.get("max_tokens"),
+            max_completion_tokens=data.get("max_completion_tokens", 500),
+            is_default=data.get("is_default", 0),
         )
-        logger.info(f"Model updated successfully: {data['name']}")
+        logger.info("Model updated successfully: %s", data["name"])
         return jsonify({"success": True})
     except ValueError as e:
-        logger.error(f"Error updating model: {str(e)}")
+        logger.error("Error updating model: %s", str(e))
         return jsonify({"error": str(e), "success": False}), 400
 
-@bp.route('/models/<int:model_id>', methods=['DELETE'])
+
+@bp.route("/models/<int:model_id>", methods=["DELETE"])
 @login_required
 @admin_required
-def delete_model(model_id):
+def delete_model(model_id: int):
     """Delete a model."""
-    Model.delete(model_id)
-    return jsonify({"success": True})
+    try:
+        Model.delete(model_id)
+        logger.info("Model deleted: %s", model_id)
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error("Error deleting model: %s, %s", model_id, str(e))
+        return (
+            jsonify(
+                {
+                    "error": "An error occurred while deleting the model",
+                    "success": False,
+                }
+            ),
+            500,
+        )
+
 
 @bp.route("/add-model", methods=["GET"])
 @login_required
@@ -97,9 +127,10 @@ def add_model_page():
     """Render the add model page."""
     return render_template("add_model.html")
 
-@bp.route('/models/default/<int:model_id>', methods=['POST'])
+
+@bp.route("/models/default/<int:model_id>", methods=["POST"])
 @login_required
-def set_default_model(model_id):
+def set_default_model(model_id: int):
     """Set a model as the default."""
     Model.set_default(model_id)
     return jsonify({"success": True})
