@@ -6,6 +6,8 @@ from models import Chat, Model
 import logging
 from chat_api import get_azure_response, scrape_data
 from chat_utils import generate_new_chat_id, extract_context_from_conversation
+from werkzeug.utils import secure_filename
+import os
 
 bp = Blueprint("chat", __name__)
 conversation_manager = ConversationManager()
@@ -143,6 +145,8 @@ def chat():
     try:
         # Retrieve the selected model or use the default
         selected_model_id = session.get("selected_model_id")
+        # Assuming deployment_name is defined elsewhere or passed as a parameter
+        deployment_name = "default_deployment_name"  # This should be replaced with actual logic to get deployment_name
         model_response = get_azure_response(messages, deployment_name, selected_model_id)
 
         # Update context with the latest interaction
