@@ -1,0 +1,16 @@
+{
+  "name": "azure-openai-chat-app",
+  "version": "1.0.0",
+  "description": "A real-time chat application built with Flask and Azure OpenAI's o1-preview model.",
+  "scripts": {
+    "build:css": "tailwindcss -i ./static/css/style.css -o ./static/css/output.css"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3"
+  }
+}

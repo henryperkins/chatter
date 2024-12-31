@@ -14,6 +14,8 @@ from azure_config import get_azure_client, initialize_client_from_model
 from models import Chat, Model
 import uuid
 import logging
+import os
+from werkzeug.utils import secure_filename
 from markupsafe import Markup
 import markdown2
 from azure.ai.ml import AzureOpenAI
@@ -22,15 +24,13 @@ bp = Blueprint("chat", __name__)
 conversation_manager = ConversationManager()
 logger = logging.getLogger(__name__)
 
-# Initialize Azure client
+# Initialize Azure client only once
 client, deployment_name = get_azure_client()
-
 
 @bp.route("/")
 @login_required
 def index():
     return redirect(url_for("chat.chat_interface"))
-
 
 @bp.route("/chat_interface")
 @login_required
@@ -45,8 +45,11 @@ def chat_interface():
 
     messages = conversation_manager.get_context(chat_id)
     context = Chat.get_context(chat_id)
-    return render_template("chat.html", chat_id=chat_id, messages=messages, context=context)
-
+    
+    # Fetch models for the dropdown
+    models = Model.get_all()
+    
+    return render_template("chat.html", chat_id=chat_id, messages=messages, context=context, models=models)
 
 @bp.route("/load_chat/<chat_id>")
 @login_required
@@ -62,7 +65,6 @@ def load_chat(chat_id):
 
     context = Chat.get_context(chat_id)
     return jsonify({"messages": [dict(msg) for msg in messages], "context": context})
-
 
 @bp.route("/delete_chat/<chat_id>", methods=["DELETE"])
 @login_required
@@ -81,7 +83,6 @@ def delete_chat(chat_id):
     logger.info(f"Chat {chat_id} deleted successfully")
     return jsonify({"success": True})
 
-
 @bp.route("/new_chat", methods=["POST"])
 @login_required
 def new_chat():
@@ -93,7 +94,6 @@ def new_chat():
     logger.info(f"New chat created with ID: {chat_id}")
     return jsonify({"chat_id": chat_id})
 
-
 @bp.route("/models", methods=["GET"])
 @login_required
 def get_models():
@@ -101,59 +101,74 @@ def get_models():
     models = Model.get_all()
     return jsonify([model.__dict__ for model in models])
 
-
 @bp.route("/models", methods=["POST"])
 @login_required
 def create_model():
     """Create a new model."""
     data = request.json
-    model_id = Model.create(
-        data['name'],
-        data.get('description', ''),
-        data.get('model_type', 'azure'),
-        data['api_endpoint'],
-        data['api_key'],
-        data.get('temperature', 1.0),
-        data.get('max_tokens', 32000),
-        data.get('is_default', 0)
-    )
-    return jsonify({"id": model_id, "success": True})
-
+    if not all(key in data for key in ['name', 'api_endpoint', 'api_key']):
+        return jsonify({"error": "Missing required fields", "success": False}), 400
+    try:
+        model_id = Model.create(
+            data['name'],
+            data.get('description', ''),
+            data.get('model_type', 'azure'),
+            data['api_endpoint'],
+            data['api_key'],
+            data.get('temperature', 1.0),
+            data.get('max_tokens', 32000),
+            data.get('is_default', 0)
+        )
+        return jsonify({"id": model_id, "success": True})
+    except Exception as e:
+        logger.error(f"Error creating model: {e}")
+        return jsonify({"error": str(e), "success": False}), 500
 
 @bp.route("/models/<int:model_id>", methods=["PUT"])
 @login_required
 def update_model(model_id):
     """Update an existing model."""
     data = request.json
-    Model.update(
-        model_id,
-        data['name'],
-        data.get('description', ''),
-        data.get('model_type', 'azure'),
-        data['api_endpoint'],
-        data['api_key'],
-        data.get('temperature', 1.0),
-        data.get('max_tokens', 32000),
-        data.get('is_default', 0)
-    )
-    return jsonify({"success": True})
-
+    if not all(key in data for key in ['name', 'api_endpoint', 'api_key']):
+        return jsonify({"error": "Missing required fields", "success": False}), 400
+    try:
+        Model.update(
+            model_id,
+            data['name'],
+            data.get('description', ''),
+            data.get('model_type', 'azure'),
+            data['api_endpoint'],
+            data['api_key'],
+            data.get('temperature', 1.0),
+            data.get('max_tokens', 32000),
+            data.get('is_default', 0)
+        )
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error(f"Error updating model: {e}")
+        return jsonify({"error": str(e), "success": False}), 500
 
 @bp.route("/models/<int:model_id>", methods=["DELETE"])
 @login_required
 def delete_model(model_id):
     """Delete a model."""
-    Model.delete(model_id)
-    return jsonify({"success": True})
-
+    try:
+        Model.delete(model_id)
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error(f"Error deleting model: {e}")
+        return jsonify({"error": str(e), "success": False}), 500
 
 @bp.route("/models/default/<int:model_id>", methods=["POST"])
 @login_required
 def set_default_model(model_id):
     """Set a model as the default."""
-    Model.set_default(model_id)
-    return jsonify({"success": True})
-
+    try:
+        Model.set_default(model_id)
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error(f"Error setting default model: {e}")
+        return jsonify({"error": str(e), "success": False}), 500
 
 @bp.route("/chat", methods=["POST"])
 @login_required
@@ -165,52 +180,46 @@ def chat():
         return jsonify({"error": "Chat ID not found."}), 400
 
     data = request.get_json()
-    if not data or "message" not in data:
+    user_message = data.get("message")
+
+    if not user_message:
         logger.error("Invalid request data: missing 'message' field")
         return jsonify({"error": "Message is required."}), 400
 
-    user_message = data["message"]
-    messages = conversation_manager.get_context(chat_id)
-    context = Chat.get_context(chat_id)
-
-    if "```" not in user_message and (
-        "def " in user_message or "import " in user_message
-    ):
+    # Apply specific formatting to the user message if it contains certain keywords
+    if "```" not in user_message and ("def " in user_message or "import " in user_message):
         user_message = f"```\n{user_message}\n```"
 
+    # Combine user message with context
+    context = Chat.get_context(chat_id)
     combined_message = f"{context}\n\n{user_message}"
+    messages = conversation_manager.get_context(chat_id)
     messages.append({"role": "user", "content": combined_message})
 
+    # Load and process uploaded files, appending their contents to messages
     uploaded_files = session.get("uploaded_files", [])
-    file_contents = []
     for file_path in uploaded_files:
         try:
             with open(file_path, "r") as file:
-                file_contents.append(file.read())
+                messages.append({"role": "user", "content": f"File content:\n```\n{file.read()}\n```"})
         except Exception as e:
             logger.error(f"Error reading file {file_path}: {e}")
 
-    for content in file_contents:
-        messages.append(
-            {"role": "user", "content": f"File content:\n```\n{content}\n```"}
-        )
-
     try:
-        # Set a default deployment_name to avoid the F823 error
-        deployment_name = deployment_name  # Use the global deployment_name as default
-
-        # Use the selected model from the session
+        # Retrieve the selected model or use the default
         selected_model_id = session.get("selected_model_id")
         if selected_model_id:
             model = Model.get_by_id(selected_model_id)
             if model:
-                deployment_name = model.name
+                # Reinitialize the Azure client with the selected model
                 client = initialize_client_from_model(model.__dict__)
             else:
                 raise ValueError("Selected model not found")
 
+        # Prepare messages for the API call
         api_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages]
-        
+
+        # Call the Azure OpenAI API to get a response
         response = client.chat.completions.create(
             model=deployment_name,
             messages=api_messages,
@@ -218,30 +227,26 @@ def chat():
             max_tokens=500
         )
 
-        model_response = (
-            response.choices[0].message.content
-            if response.choices[0].message
-            else "The assistant was unable to generate a response. Please try again or rephrase your input."
-        )
+        # Extract and log the model's response
+        model_response = response.choices[0].message.content if response.choices[0].message else "The assistant was unable to generate a response. Please try again or rephrase your input."
+        logger.info(f"Response received from the model: {model_response}")
 
+        # Update context with the latest interaction
         new_context = extract_context_from_conversation(messages, model_response)
         Chat.update_context(chat_id, new_context)
 
-        model_response = model_response
+        # Add the model's response to the conversation history
+        messages.append({"role": "assistant", "content": model_response})
+        conversation_manager.clear_context(chat_id)
+        for message in messages:
+            conversation_manager.add_message(chat_id, message["role"], message["content"])
+
+        return jsonify({"response": model_response})
 
     except Exception as e:
         error_message = f"Unexpected Error: {str(e)}"
         logger.error(error_message)
-        model_response = error_message
-
-    messages.append({"role": "assistant", "content": model_response})
-    conversation_manager.clear_context(chat_id)
-    for message in messages:
-        conversation_manager.add_message(chat_id, message["role"], message["content"])
-
-    logger.info(f"Chat response sent for chat ID: {chat_id}")
-    return jsonify({"response": model_response})
-
+        return jsonify({"error": error_message}), 500
 
 @bp.route("/chat/<chat_id>/context", methods=["POST"])
 @login_required
@@ -252,10 +257,34 @@ def update_context(chat_id):
     logger.info(f"Context updated for chat ID: {chat_id}")
     return jsonify({"success": True})
 
+@bp.route('/upload', methods=['POST'])
+@login_required
+def upload_files():
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file part'})
+
+    files = request.files.getlist('file')
+    if not files:
+        return jsonify({'success': False, 'error': 'No files selected'})
+
+    uploaded_files = []
+    for file in files:
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No selected file'})
+        if file:
+            filename = secure_filename(file.filename)
+            file_path = os.path.join('uploads', current_user.username, filename)
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            file.save(file_path)
+            uploaded_files.append(file_path)
+
+    # Store the uploaded file paths in the session
+    session['uploaded_files'] = uploaded_files
+
+    return jsonify({'success': True, 'files': [secure_filename(file.filename) for file in files]})
 
 def generate_new_chat_id():
     return str(uuid.uuid4())
-
 
 def extract_context_from_conversation(messages, latest_response):
     """Extract key context from the conversation"""
