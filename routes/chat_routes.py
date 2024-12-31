@@ -294,9 +294,9 @@ def chat():
             model=deployment_name,
             messages=api_messages,
             temperature=1 if "o1-preview" in deployment_name else 0.7,
-            max_tokens=None,
+            max_tokens=None if "o1-preview" in deployment_name else 500,
             max_completion_tokens=500 if "o1-preview" in deployment_name else None,
-            max_tokens=500
+            api_version="2024-12-01-preview" if "o1-preview" in deployment_name else None
         )
 
         # Extract and log the model's response
