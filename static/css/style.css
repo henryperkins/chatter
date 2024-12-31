@@ -383,3 +383,41 @@ input[type='file'] {
         color: #e2e8f0;
     }
 }
+
+/* Model Management Section */
+.model-management {
+    margin-bottom: 20px;
+}
+
+.model-management select {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid var(--input-border-color);
+    border-radius: var(--radius);
+    font-size: var(--font-body);
+    transition: var(--transition);
+}
+
+.model-management select:focus {
+    outline: none;
+    border-color: var(--input-focus-color);
+    box-shadow: 0 0 5px var(--input-focus-color);
+}
+
+.model-management button {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-size: var(--font-body);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.model-management button:hover {
+    background-color: var(--primary-hover);
+}
