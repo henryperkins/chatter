@@ -86,6 +86,8 @@ def new_chat_route():
     user_id = int(current_user.id)
     # Ensure current_user.id is an integer
     user_id = int(current_user.id)
+    # Ensure current_user.id is an integer
+    user_id = int(current_user.id)
     # Create a new chat in the database
     Chat.create(chat_id, user_id, "New Chat")
     session["chat_id"] = chat_id
