@@ -4,8 +4,16 @@ from conversation_manager import ConversationManager
 from database import get_db
 from models import Chat, Model
 import logging
+from flask import render_template
 from chat_api import get_azure_response, scrape_data
 from chat_utils import generate_new_chat_id, extract_context_from_conversation
+
+@bp.route("/new-chat", methods=["GET"])
+@login_required
+def new_chat_page():
+    """Render the new chat page."""
+    return render_template("new_chat.html")
+
 from werkzeug.utils import secure_filename
 import os
 

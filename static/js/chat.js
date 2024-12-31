@@ -115,12 +115,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    if (newChatBtn) {
-        newChatBtn.addEventListener('click', () => {
-            window.location.href = '/new-chat';
-        });
-    }
-
     async function sendMessage() {
         const message = messageInput.value.trim();
         if (!message) return;

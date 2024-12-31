@@ -1,6 +1,6 @@
 # routes/model_routes.py
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, render_template
 from flask_login import login_required
 from models import Model
 import logging
@@ -70,6 +70,12 @@ def delete_model(model_id):
     """Delete a model."""
     Model.delete(model_id)
     return jsonify({"success": True})
+
+@bp.route("/add-model", methods=["GET"])
+@login_required
+def add_model_page():
+    """Render the add model page."""
+    return render_template("add_model.html")
 
 @bp.route('/models/default/<int:model_id>', methods=['POST'])
 @login_required

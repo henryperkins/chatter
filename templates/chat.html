@@ -18,10 +18,10 @@
                 <a href="{{ url_for('auth.logout') }}" class="text-xs text-gray-500">Logout</a>
             </div>
             <div class="flex flex-col mt-8">
-                <button id="new-chat-btn" class="flex flex-row items-center justify-center h-12 w-full bg-indigo-600 hover:bg-indigo-800 text-white px-4 py-2 rounded-lg">
+                <a href="{{ url_for('chat.new_chat') }}" class="flex flex-row items-center justify-center h-12 w-full bg-indigo-600 hover:bg-indigo-800 text-white px-4 py-2 rounded-lg">
                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                     New Chat
-                </button>
+                </a>
                 <!-- Model Management Section -->
                 <div class="mt-8">
                     <select id="model-select" class="w-full px-4 py-2 border rounded-lg">
@@ -34,8 +34,10 @@
                     </select>
                     <button id="add-model-btn" class="mt-2 w-full bg-green-500 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        Add Model
-                    </button>
+                        <a href="{{ url_for('model.add_model_page') }}" class="mt-2 w-full bg-green-500 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            Add Model
+                        </a>
                     <button id="edit-model-btn" class="mt-2 w-full bg-yellow-500 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg">
                         <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                         Edit Model
