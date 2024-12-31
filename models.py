@@ -212,10 +212,10 @@ class Model:
         self.created_at = created_at
 
     @staticmethod
-    def get_all():
-        """Retrieve all models from the database."""
+    def get_all(limit=10, offset=0):
+        """Retrieve models from the database with pagination."""
         db = get_db()
-        models = db.execute("SELECT * FROM models").fetchall()
+        models = db.execute("SELECT * FROM models LIMIT ? OFFSET ?", (limit, offset)).fetchall()
         return [Model(**dict(model)) for model in models]
 
     @staticmethod
@@ -266,3 +266,16 @@ class Model:
         db.execute("UPDATE models SET is_default = 1 WHERE id = ?", (model_id,))
         db.commit()
         logger.info(f"Model set as default: {model_id}")
+    @staticmethod
+    def validate_model_config(config):
+        """Validate model configuration before saving."""
+        required_fields = ['name', 'api_endpoint', 'api_key']
+        for field in required_fields:
+            if not config.get(field):
+                raise ValueError(f"Missing required field: {field}")
+        if config['model_type'] != 'azure':
+            raise ValueError(f"Unsupported model type: {config['model_type']}")
+        if not isinstance(config.get('temperature'), (int, float)) or config['temperature'] < 0 or config['temperature'] > 2:
+            raise ValueError("Temperature must be a number between 0 and 2")
+        if not isinstance(config.get('max_tokens'), int) or config['max_tokens'] <= 0:
+            raise ValueError("Max tokens must be a positive integer")
