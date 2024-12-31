@@ -6,7 +6,7 @@ __pycache__/
 .venv/
 venv/
 env/
-
+node_modules/
 # Environment variables file
 .env
 
@@ -19,3 +19,7 @@ uploads/
 
 # Aider files (if applicable)
 .aider*
+.aider.tags.cache.v3
+.aider.chat.history.md
+.aider.input.history
+routes/__pycache__
