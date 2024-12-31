@@ -9,15 +9,30 @@ import logging
 bp = Blueprint('model', __name__)
 logger = logging.getLogger(__name__)
 
-@bp.route('/models', methods=['GET'])
+
+@bp.route("/models", methods=["GET"])
 @login_required
-@admin_required
 def get_models():
     """Retrieve all models with pagination."""
-    limit = request.args.get('limit', 10, type=int)
-    offset = request.args.get('offset', 0, type=int)
-    models = Model.get_all(limit, offset)
-    return jsonify([model.__dict__ for model in models])
+    try:
+        limit = request.args.get("limit", 10, type=int)
+        offset = request.args.get("offset", 0, type=int)
+        models = Model.get_all(limit, offset)
+        return jsonify(
+            [
+                {
+                    "id": model.id,
+                    "name": model.name,
+                    "description": model.description,
+                    "is_default": model.is_default,
+                }
+                for model in models
+            ]
+        )
+    except Exception as e:
+        logger.error(f"Error retrieving models: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 
 @bp.route('/models', methods=['POST'])
 @login_required

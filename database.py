@@ -4,13 +4,14 @@ import sqlite3
 from flask import g, current_app
 import click
 from flask.cli import with_appcontext
+from datetime import datetime
 
 
 def get_db():
     """Open a new database connection if there is none yet for the current application context."""
     if "db" not in g:
         # Register a converter for timestamps
-        sqlite3.register_converter("TIMESTAMP", lambda x: sqlite3.Timestamp.fromisoformat(x.decode()))
+        sqlite3.register_converter("TIMESTAMP", lambda x: datetime.fromisoformat(x.decode()))
         g.db = sqlite3.connect(
             current_app.config.get("DATABASE", "chat_app.db"),
             detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,

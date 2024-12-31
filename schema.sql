@@ -16,13 +16,14 @@ CREATE TABLE IF NOT EXISTS chats (
     user_id INTEGER NOT NULL,
     title TEXT NOT NULL,
     context TEXT DEFAULT '',
+    model_id INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (model_id) REFERENCES models (id) ON DELETE SET NULL
 );
 
--- Messages table
 CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id TEXT NOT NULL,
     role TEXT NOT NULL,
     content TEXT NOT NULL,
