@@ -52,7 +52,7 @@ def initialize_client_from_model(model_config):
         model_config (dict): The model configuration dictionary.
 
     Returns:
-        Tuple[AzureOpenAI, str]: The Azure OpenAI client and deployment name.
+        Tuple[AzureOpenAI, str, float, int]: The Azure OpenAI client, deployment name, temperature, and max_tokens.
 
     Raises:
         ValueError: If required fields are missing or if the model type is unsupported.
@@ -66,9 +66,10 @@ def initialize_client_from_model(model_config):
     # Retrieve required configuration from the model config
     api_endpoint = model_config.get("api_endpoint")
     api_key = model_config.get("api_key")
-    deployment_name = model_config.get(
-        "name"
-    )  # Assuming 'name' is used as the deployment name
+    deployment_name = model_config.get("name")  # Assuming 'name' is used as the deployment name
+    api_version = model_config.get("api_version", "2024-12-01-preview")
+    temperature = model_config.get("temperature", 1.0)
+    max_tokens = model_config.get("max_tokens", 32000)
 
     # Validate required configuration fields
     if not all([api_endpoint, api_key, deployment_name]):
@@ -78,7 +79,7 @@ def initialize_client_from_model(model_config):
     client = AzureOpenAI(
         azure_endpoint=api_endpoint,
         api_key=api_key,
-        api_version="2024-12-01-preview",  # Use default or specify as needed
+        api_version=api_version,
     )
 
-    return client, deployment_name
+    return client, deployment_name, temperature, max_tokens
