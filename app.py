@@ -36,7 +36,7 @@ def load_user(user_id):
     db = get_db()
     user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if user:
-        return User(user["id"], user["username"], user["email"])
+        return User(int(user["id"]), user["username"], user["email"])
     return None
 
 
