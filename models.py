@@ -11,10 +11,13 @@ class User(UserMixin):
     """User model compatible with Flask-Login."""
 
     def __init__(self, id, username, email, role='user'):
-        self.id = id
+        self.id = int(id)
         self.username = username
         self.email = email
         self.role = role
+
+    def get_id(self):
+        return str(self.id)
 
     @staticmethod
     def get_by_id(user_id):
