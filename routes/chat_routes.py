@@ -49,6 +49,16 @@ def chat_interface():
 @login_required
 def load_chat(chat_id):
     db = get_db()
+    # Verify chat ownership
+    chat = db.execute(
+        "SELECT id FROM chats WHERE id = ? AND user_id = ?",
+        (chat_id, current_user.id),
+    ).fetchone()
+
+    if not chat:
+        logger.warning(f"Unauthorized access attempt to chat {chat_id}")
+        return jsonify({"error": "Chat not found or access denied"}), 403
+
     query = (
         "SELECT role, content, timestamp\n"
         "FROM messages\n"
@@ -66,9 +76,9 @@ def delete_chat(chat_id):
     db = get_db()
     chat = db.execute("SELECT user_id FROM chats WHERE id = ?", (chat_id,)).fetchone()
 
-    if not chat or chat["user_id"] != current_user.id:
+    if not chat or int(chat["user_id"]) != int(current_user.id):
         logger.warning(f"Attempt to delete non-existent or unauthorized chat: {chat_id}")
-        return jsonify({"error": "Chat not found"}), 404
+        return jsonify({"error": "Chat not found or access denied"}), 403
 
     db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
     db.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
@@ -192,6 +202,12 @@ def chat():
 @bp.route("/chat/<chat_id>/context", methods=["POST"])
 @login_required
 def update_context(chat_id):
+    # Verify chat ownership
+    chat = Chat.get_by_id(chat_id)
+    if not chat or chat.user_id != current_user.id:
+        logger.warning(f"Unauthorized context update attempt for chat {chat_id}")
+        return jsonify({"error": "Chat not found or access denied"}), 403
+
     data = request.get_json()
     context = data.get("context", "")
     Chat.update_context(chat_id, context)

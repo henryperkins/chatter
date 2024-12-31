@@ -10,10 +10,11 @@ logger = logging.getLogger(__name__)
 class User(UserMixin):
     """User model compatible with Flask-Login."""
 
-    def __init__(self, id, username, email):
+    def __init__(self, id, username, email, role='user'):
         self.id = id
         self.username = username
         self.email = email
+        self.role = role
 
     @staticmethod
     def get_by_id(user_id):
@@ -24,7 +25,7 @@ class User(UserMixin):
             (user_id,),
         ).fetchone()
         if user:
-            return User(int(user["id"]), user["username"], user["email"])
+            return User(int(user["id"]), user["username"], user["email"], user["role"])
         return None
 
     @staticmethod
@@ -36,7 +37,7 @@ class User(UserMixin):
             (username,),
         ).fetchone()
         if user:
-            return User(user["id"], user["username"], user["email"])
+            return User(user["id"], user["username"], user["email"], user["role"])
         return None
 
     @staticmethod

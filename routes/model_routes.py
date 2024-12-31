@@ -3,6 +3,7 @@
 from flask import Blueprint, jsonify, request, render_template
 from flask_login import login_required
 from models import Model
+from decorators import admin_required
 import logging
 
 bp = Blueprint('model', __name__)
@@ -10,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 @bp.route('/models', methods=['GET'])
 @login_required
+@admin_required
 def get_models():
     """Retrieve all models with pagination."""
     limit = request.args.get('limit', 10, type=int)
@@ -19,6 +21,7 @@ def get_models():
 
 @bp.route('/models', methods=['POST'])
 @login_required
+@admin_required
 def create_model():
     """Create a new model."""
     data = request.json
@@ -42,6 +45,7 @@ def create_model():
 
 @bp.route('/models/<int:model_id>', methods=['PUT'])
 @login_required
+@admin_required
 def update_model(model_id):
     """Update an existing model."""
     data = request.json
@@ -66,6 +70,7 @@ def update_model(model_id):
 
 @bp.route('/models/<int:model_id>', methods=['DELETE'])
 @login_required
+@admin_required
 def delete_model(model_id):
     """Delete a model."""
     Model.delete(model_id)
