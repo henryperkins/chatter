@@ -1,34 +1,15 @@
-from flask import (
-    Blueprint,
-    jsonify,
-    redirect,
-    render_template,
-    request,
-    session,
-    url_for,
-)
+from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 from flask_login import login_required, current_user
 from conversation_manager import ConversationManager
 from database import get_db
-from azure_config import get_azure_client, initialize_client_from_model
 from models import Chat, Model
-import uuid
 import logging
-import os
-from werkzeug.utils import secure_filename
-from markupsafe import Markup
-import markdown2
-from azure.ai.ml import AzureOpenAI
-import requests  # Import the missing module
+from chat_api import get_azure_response, scrape_data
+from chat_utils import generate_new_chat_id, extract_context_from_conversation
 
 bp = Blueprint("chat", __name__)
 conversation_manager = ConversationManager()
 logger = logging.getLogger(__name__)
-
-# Initialize Azure client only once
-client, deployment_name = get_azure_client()
-
-messages = []  # Define the missing variable
 
 @bp.route("/")
 @login_required
@@ -97,82 +78,6 @@ def new_chat():
     logger.info(f"New chat created with ID: {chat_id}")
     return jsonify({"chat_id": chat_id})
 
-@bp.route("/models", methods=["GET"])
-@login_required
-def get_models():
-    """Retrieve all models."""
-    models = Model.get_all()
-    return jsonify([model.__dict__ for model in models])
-
-@bp.route("/models", methods=["POST"])
-@login_required
-def create_model():
-    """Create a new model."""
-    data = request.json
-    if not all(key in data for key in ['name', 'api_endpoint', 'api_key']):
-        return jsonify({"error": "Missing required fields", "success": False}), 400
-    try:
-        model_id = Model.create(
-            data['name'],
-            data.get('description', ''),
-            data.get('model_type', 'azure'),
-            data['api_endpoint'],
-            data['api_key'],
-            data.get('temperature', 1.0),
-            data.get('max_tokens', 32000),
-            data.get('is_default', 0)
-        )
-        return jsonify({"id": model_id, "success": True})
-    except Exception as e:
-        logger.error(f"Error creating model: {e}")
-        return jsonify({"error": str(e), "success": False}), 500
-
-@bp.route("/models/<int:model_id>", methods=["PUT"])
-@login_required
-def update_model(model_id):
-    """Update an existing model."""
-    data = request.json
-    if not all(key in data for key in ['name', 'api_endpoint', 'api_key']):
-        return jsonify({"error": "Missing required fields", "success": False}), 400
-    try:
-        Model.update(
-            model_id,
-            data['name'],
-            data.get('description', ''),
-            data.get('model_type', 'azure'),
-            data['api_endpoint'],
-            data['api_key'],
-            data.get('temperature', 1.0),
-            data.get('max_tokens', 32000),
-            data.get('is_default', 0)
-        )
-        return jsonify({"success": True})
-    except Exception as e:
-        logger.error(f"Error updating model: {e}")
-        return jsonify({"error": str(e), "success": False}), 500
-
-@bp.route("/models/<int:model_id>", methods=["DELETE"])
-@login_required
-def delete_model(model_id):
-    """Delete a model."""
-    try:
-        Model.delete(model_id)
-        return jsonify({"success": True})
-    except Exception as e:
-        logger.error(f"Error deleting model: {e}")
-        return jsonify({"error": str(e), "success": False}), 500
-
-@bp.route("/models/default/<int:model_id>", methods=["POST"])
-@login_required
-def set_default_model(model_id):
-    """Set a model as the default."""
-    try:
-        Model.set_default(model_id)
-        return jsonify({"success": True})
-    except Exception as e:
-        logger.error(f"Error setting default model: {e}")
-        return jsonify({"error": str(e), "success": False}), 500
-
 @bp.route("/scrape", methods=["POST"])
 @login_required
 def scrape():
@@ -181,44 +86,11 @@ def scrape():
     if not query:
         return jsonify({"error": "Query is required."}), 400
 
-    if query.startswith("what's the weather in"):
-        location = query.split("what's the weather in")[1].strip()
-        weather_data = scrape_weather(location)
-        return jsonify({"response": weather_data})
-
-    elif query.startswith("search for"):
-        search_term = query.split("search for")[1].strip()
-        search_results = scrape_search(search_term)
-        return jsonify({"response": search_results})
-
-    return jsonify({"error": "Invalid query type."}), 400
-
-def scrape_weather(location):
-    import requests
-    from bs4 import BeautifulSoup
-
-    url = f"https://www.google.com/search?q=weather+{location}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
-    weather = soup.find("div", class_="BNeawe").text
-    return f"The weather in {location} is: {weather}"
-
-def scrape_search(search_term):
-    import requests
-    from bs4 import BeautifulSoup
-
-    url = f"https://www.google.com/search?q={search_term}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
-    results = soup.find_all("div", class_="BNeawe s3v9rd AP7Wnd")
-    search_results = [result.text for result in results[:3]]
-    return "Search results:\n" + "\n".join(search_results)
+    try:
+        response = scrape_data(query)
+        return jsonify({"response": response})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
 @bp.route("/chat", methods=["POST"])
 @login_required
@@ -238,22 +110,15 @@ def chat():
 
     # Check for special commands
     if user_message.startswith("what's the weather in") or user_message.startswith("search for"):
-        scrape_response = requests.post(
-            url_for("chat.scrape", _external=True),
-            json={"query": user_message},
-            headers={"Authorization": f"Bearer {session.get('access_token')}"}
-        )
-        if scrape_response.status_code == 200:
-            scrape_data = scrape_response.json()
-            model_response = scrape_data["response"]
-            messages = []  # Initialize messages here
-            messages.append({"role": "assistant", "content": model_response})
+        try:
+            model_response = scrape_data(user_message)
+            messages = [{"role": "assistant", "content": model_response}]
             conversation_manager.clear_context(chat_id)
             for message in messages:
                 conversation_manager.add_message(chat_id, message["role"], message["content"])
             return jsonify({"response": model_response})
-        else:
-            logger.error(f"Error in scraping: {scrape_response.text}")
+        except ValueError as e:
+            logger.error(f"Error in scraping: {str(e)}")
             return jsonify({"error": "Error processing special command."}), 500
 
     # Apply specific formatting to the user message if it contains certain keywords
@@ -278,30 +143,7 @@ def chat():
     try:
         # Retrieve the selected model or use the default
         selected_model_id = session.get("selected_model_id")
-        if selected_model_id:
-            model = Model.get_by_id(selected_model_id)
-            if model:
-                # Reinitialize the Azure client with the selected model
-                client = initialize_client_from_model(model.__dict__)
-            else:
-                raise ValueError("Selected model not found")
-
-        # Prepare messages for the API call
-        api_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages if msg["role"] in ["user", "assistant"]]
-
-        # Call the Azure OpenAI API to get a response
-        response = client.chat.completions.create(
-            model=deployment_name,
-            messages=api_messages,
-            temperature=1 if "o1-preview" in deployment_name else 0.7,
-            max_tokens=None if "o1-preview" in deployment_name else 500,
-            max_completion_tokens=500 if "o1-preview" in deployment_name else None,
-            api_version="2024-12-01-preview" if "o1-preview" in deployment_name else None
-        )
-
-        # Extract and log the model's response
-        model_response = response.choices[0].message.content if response.choices[0].message else "The assistant was unable to generate a response. Please try again or rephrase your input."
-        logger.info(f"Response received from the model: {model_response}")
+        model_response = get_azure_response(messages, deployment_name, selected_model_id)
 
         # Update context with the latest interaction
         new_context = extract_context_from_conversation(messages, model_response)
@@ -354,18 +196,3 @@ def upload_files():
     session['uploaded_files'] = uploaded_files
 
     return jsonify({'success': True, 'files': [secure_filename(file.filename) for file in files]})
-
-def generate_new_chat_id():
-    return str(uuid.uuid4())
-
-def extract_context_from_conversation(messages, latest_response):
-    """Extract key context from the conversation"""
-    context_parts = []
-    for msg in messages[-10:]:  # Consider last 10 messages for context
-        if msg["role"] in ["assistant", "user"]:
-            context_parts.append(f"{msg['role']}: {msg['content']}")
-    
-    context_parts.append(f"assistant: {latest_response}")
-    
-    context = "\n".join(context_parts)
-    return context[:4000]  # Limit context to 4000 characters
