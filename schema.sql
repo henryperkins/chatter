@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL DEFAULT 'user',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-);
 
 -- Chats table
 CREATE TABLE IF NOT EXISTS chats (
@@ -41,7 +40,6 @@ CREATE TABLE IF NOT EXISTS models (
     api_key TEXT,
     temperature REAL DEFAULT 1.0,
     max_tokens INTEGER DEFAULT 32000,
-    is_default BOOLEAN DEFAULT 0
-);
+    is_default BOOLEAN DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
