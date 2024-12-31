@@ -1,285 +1,114 @@
-# models.py
-
-from flask_login import UserMixin
-from database import get_db
-import logging
-
-logger = logging.getLogger(__name__)
-
-
-class User(UserMixin):
-    """User model compatible with Flask-Login."""
-
-    def __init__(self, id, username, email, role='user'):
-        self.id = int(id)
-        self.username = username
-        self.email = email
-        self.role = role
-
-    def get_id(self):
-        return str(self.id)
-
-    @staticmethod
-    def get_by_id(user_id):
-        """Retrieve a user by ID."""
-        db = get_db()
-        user = db.execute(
-            "SELECT * FROM users WHERE id = ?",
-            (user_id,),
-        ).fetchone()
-        if user:
-            return User(int(user["id"]), user["username"], user["email"], user["role"])
-        return None
-
-    @staticmethod
-    def get_by_username(username):
-        """Retrieve a user by username."""
-        db = get_db()
-        user = db.execute(
-            "SELECT * FROM users WHERE username = ?",
-            (username,),
-        ).fetchone()
-        if user:
-            return User(user["id"], user["username"], user["email"], user["role"])
-        return None
-
-    @staticmethod
-    def create(username, email, password_hash):
-        """Create a new user."""
-        db = get_db()
+Traceback (most recent call last)
+File "/home/azureuser/docs/pip/lib/python3.12/site-packages/flask/app.py", line 2213, in __call__
+    def __call__(self, environ: dict, start_response: t.Callable) -> t.Any:
+        """The WSGI server calls the Flask application object as the
+        WSGI application. This calls :meth:`wsgi_app`, which can be
+        wrapped to apply middleware.
+        """
+        return self.wsgi_app(environ, start_response)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/azureuser/docs/pip/lib/python3.12/site-packages/flask/app.py", line 2193, in wsgi_app
+            try:
+                ctx.push()
+                response = self.full_dispatch_request()
+            except Exception as e:
+                error = e
+                response = self.handle_exception(e)
+                           ^^^^^^^^^^^^^^^^^^^^^^^^
+            except:  # noqa: B001
+                error = sys.exc_info()[1]
+                raise
+            return response(environ, start_response)
+        finally:
+File "/home/azureuser/docs/pip/lib/python3.12/site-packages/flask/app.py", line 2190, in wsgi_app
+        ctx = self.request_context(environ)
+        error: BaseException | None = None
         try:
-            db.execute(
-                "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
-                (username, email, password_hash),
-            )
-            db.commit()
-            logger.info(f"User created: {username}")
-            return True
+            try:
+                ctx.push()
+                response = self.full_dispatch_request()
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            except Exception as e:
+                error = e
+                response = self.handle_exception(e)
+            except:  # noqa: B001
+                error = sys.exc_info()[1]
+File "/home/azureuser/docs/pip/lib/python3.12/site-packages/flask/app.py", line 1486, in full_dispatch_request
+            request_started.send(self, _async_wrapper=self.ensure_sync)
+            rv = self.preprocess_request()
+            if rv is None:
+                rv = self.dispatch_request()
         except Exception as e:
-            logger.error(f"Error creating user {username}: {str(e)}")
-            return False
-
-    @staticmethod
-    def validate_credentials(username, password_hash):
-        """Validate user credentials."""
-        db = get_db()
-        user = db.execute(
-            "SELECT * FROM users WHERE username = ? AND password_hash = ?",
-            (username, password_hash),
-        ).fetchone()
-        if user:
-            return User(user["id"], user["username"], user["email"])
-        return None
-
-
-class Chat:
-    """Chat model representing a conversation."""
-
-    def __init__(self, id, user_id, title, context="", created_at=None):
-        self.id = id
-        self.user_id = user_id
-        self.title = title
-        self.context = context
-        self.created_at = created_at
-
-    @staticmethod
-    def get_by_id(chat_id):
-        """Retrieve a chat by ID."""
-        db = get_db()
-        chat = db.execute(
-            "SELECT * FROM chats WHERE id = ?",
-            (chat_id,),
-        ).fetchone()
-        if chat:
-            return Chat(
-                chat["id"],
-                chat["user_id"],
-                chat["title"],
-                chat["context"],
-                chat["created_at"],
-            )
-        return None
-
+            rv = self.handle_user_exception(e)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        return self.finalize_request(rv)
+ 
+    def finalize_request(
+        self,
+        rv: ft.ResponseReturnValue | HTTPException,
+File "/home/azureuser/docs/pip/lib/python3.12/site-packages/flask/app.py", line 1484, in full_dispatch_request
+ 
+        try:
+            request_started.send(self, _async_wrapper=self.ensure_sync)
+            rv = self.preprocess_request()
+            if rv is None:
+                rv = self.dispatch_request()
+                     ^^^^^^^^^^^^^^^^^^^^^^^
+        except Exception as e:
+            rv = self.handle_user_exception(e)
+        return self.finalize_request(rv)
+ 
+    def finalize_request(
+File "/home/azureuser/docs/pip/lib/python3.12/site-packages/flask/app.py", line 1469, in dispatch_request
+            and req.method == "OPTIONS"
+        ):
+            return self.make_default_options_response()
+        # otherwise dispatch to the handler for that endpoint
+        view_args: dict[str, t.Any] = req.view_args  # type: ignore[assignment]
+        return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 
+    def full_dispatch_request(self) -> Response:
+        """Dispatches the request and on top of that performs request
+        pre and postprocessing as well as HTTP exception catching and
+        error handling.
+File "/home/azureuser/docs/pip/lib/python3.12/site-packages/flask_login/utils.py", line 290, in decorated_view
+            return current_app.login_manager.unauthorized()Open an interactive python shell in this frame
+ 
+        # flask 1.x compatibility
+        # current_app.ensure_sync is only available in Flask >= 2.0
+        if callable(getattr(current_app, "ensure_sync", None)):
+            return current_app.ensure_sync(func)(*args, **kwargs)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        return func(*args, **kwargs)
+ 
+    return decorated_view
+ 
+ 
+File "/home/azureuser/chatter/routes/chat_routes.py", line 99, in new_chat_route
+    # Ensure current_user.id is an integer
+    user_id = int(current_user.id)
+    # Ensure chat_id is a string
+    chat_id = str(chat_id)
+    # Create a new chat in the database
+    Chat.create(chat_id, user_id, "New Chat")
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    session["chat_id"] = chat_id
+    # Add the default message to the conversation
+    conversation_manager.add_message(
+        chat_id, "user", "Please format your responses in Markdown."
+    )
+File "/home/azureuser/chatter/models.py", line 107, in create
+ 
     @staticmethod
     def create(chat_id, user_id, title):
         """Create a new chat."""
         db = get_db()
         db.execute(
+        ^
             "INSERT INTO chats (id, user_id, title) VALUES (?, ?, ?)",
             (chat_id, user_id, title),
         )
         db.commit()
         logger.info(f"Chat created: {chat_id} for user {user_id}")
-
-    @staticmethod
-    def get_user_chats(user_id):
-        """Retrieve all chats for a given user."""
-        db = get_db()
-        chats = db.execute(
-            "SELECT id, title, created_at FROM chats WHERE user_id = ? ORDER BY created_at DESC",
-            (user_id,),
-        ).fetchall()
-        return [dict(chat) for chat in chats]
-
-    @staticmethod
-    def update_title(chat_id, title):
-        """Update the title of a chat."""
-        db = get_db()
-        db.execute(
-            "UPDATE chats SET title = ? WHERE id = ?",
-            (title, chat_id),
-        )
-        db.commit()
-        logger.info(f"Chat {chat_id} title updated to {title}")
-
-    @staticmethod
-    def delete(chat_id):
-        """Delete a chat and its messages."""
-        db = get_db()
-        db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
-        db.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
-        db.commit()
-        logger.info(f"Chat {chat_id} and associated messages deleted")
-
-    @staticmethod
-    def get_context(chat_id):
-        """Retrieve the context of a chat."""
-        db = get_db()
-        chat = db.execute(
-            "SELECT context FROM chats WHERE id = ?",
-            (chat_id,),
-        ).fetchone()
-        return chat["context"] if chat else ""
-
-    @staticmethod
-    def update_context(chat_id, context):
-        """Update the context of a chat."""
-        db = get_db()
-        db.execute("UPDATE chats SET context = ? WHERE id = ?", (context, chat_id))
-        db.commit()
-        logger.info(f"Chat {chat_id} context updated")
-
-
-class Message:
-    """Message model representing a chat message."""
-
-    def __init__(self, id, chat_id, role, content, timestamp=None):
-        self.id = id
-        self.chat_id = chat_id
-        self.role = role
-        self.content = content
-        self.timestamp = timestamp
-
-    @staticmethod
-    def add_message(chat_id, role, content):
-        """Add a message to a chat."""
-        db = get_db()
-        db.execute(
-            "INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)",
-            (chat_id, role, content),
-        )
-        db.commit()
-        logger.debug(f"Added message to chat {chat_id}: {role}: {content[:50]}...")
-
-    @staticmethod
-    def get_messages(chat_id):
-        """Retrieve all messages for a chat."""
-        db = get_db()
-        messages = db.execute(
-            "SELECT role, content, timestamp FROM messages WHERE chat_id = ? ORDER BY timestamp",
-            (chat_id,),
-        ).fetchall()
-        return [dict(msg) for msg in messages]
-
-    @staticmethod
-    def delete_messages(chat_id):
-        """Delete all messages for a chat."""
-        db = get_db()
-        db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
-        db.commit()
-        logger.info(f"All messages deleted for chat {chat_id}")
-
-
-class Model:
-    """Model class for managing AI models."""
-
-    def __init__(self, id, name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default, created_at):
-        self.id = id
-        self.name = name
-        self.description = description
-        self.model_type = model_type
-        self.api_endpoint = api_endpoint
-        self.api_key = api_key
-        self.temperature = temperature
-        self.max_tokens = max_tokens
-        self.is_default = is_default
-        self.created_at = created_at
-
-    @staticmethod
-    def get_all(limit=10, offset=0):
-        """Retrieve models from the database with pagination."""
-        db = get_db()
-        models = db.execute("SELECT * FROM models LIMIT ? OFFSET ?", (limit, offset)).fetchall()
-        return [Model(**dict(model)) for model in models]
-
-    @staticmethod
-    def get_by_id(model_id):
-        """Retrieve a model by ID."""
-        db = get_db()
-        model = db.execute("SELECT * FROM models WHERE id = ?", (model_id,)).fetchone()
-        if model:
-            return Model(**dict(model))
-        return None
-
-    @staticmethod
-    def create(name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default):
-        """Create a new model."""
-        db = get_db()
-        db.execute(
-            "INSERT INTO models (name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default),
-        )
-        db.commit()
-        logger.info(f"Model created: {name}")
-        return db.execute("SELECT last_insert_rowid()").fetchone()[0]
-
-    @staticmethod
-    def update(model_id, name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default):
-        """Update an existing model."""
-        db = get_db()
-        db.execute(
-            "UPDATE models SET name = ?, description = ?, model_type = ?, api_endpoint = ?, api_key = ?, temperature = ?, max_tokens = ?, is_default = ? WHERE id = ?",
-            (name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default, model_id),
-        )
-        db.commit()
-        logger.info(f"Model updated: {name}")
-
-    @staticmethod
-    def delete(model_id):
-        """Delete a model."""
-        db = get_db()
-        db.execute("DELETE FROM models WHERE id = ?", (model_id,))
-        db.commit()
-        logger.info(f"Model deleted: {model_id}")
-
-    @staticmethod
-    def set_default(model_id):
-        """Set a model as the default."""
-        db = get_db()
-        db.execute("UPDATE models SET is_default = 0")
-        db.execute("UPDATE models SET is_default = 1 WHERE id = ?", (model_id,))
-        db.commit()
-        logger.info(f"Model set as default: {model_id}")
-    @staticmethod
-    def validate_model_config(config):
-        """Validate model configuration before saving."""
-        required_fields = ['name', 'api_endpoint', 'api_key']
-        for field in required_fields:
-            if not config.get(field):
-                raise ValueError(f"Missing required field: {field}")
-        if config['model_type'] != 'azure':
-            raise ValueError(f"Unsupported model type: {config['model_type']}")
-        if not isinstance(config.get('temperature'), (int, float)) or config['temperature'] < 0 or config['temperature'] > 2:
-            raise ValueError("Temperature must be a number between 0 and 2")
-        if not isinstance(config.get('max_tokens'), int) or config['max_tokens'] <= 0:
-            raise ValueError("Max tokens must be a positive integer")
+sqlite3.IntegrityError: datatype mismatch 
