@@ -19,6 +19,7 @@ from werkzeug.utils import secure_filename
 from markupsafe import Markup
 import markdown2
 from azure.ai.ml import AzureOpenAI
+import requests  # Import the missing module
 
 bp = Blueprint("chat", __name__)
 conversation_manager = ConversationManager()
@@ -26,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 # Initialize Azure client only once
 client, deployment_name = get_azure_client()
+
+messages = []  # Define the missing variable
 
 @bp.route("/")
 @login_required
