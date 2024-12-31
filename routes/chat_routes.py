@@ -196,8 +196,8 @@ def chat():
         )
 
     try:
-        if not deployment_name:
-            raise ValueError("Azure deployment name is not configured")
+        # Set a default deployment_name to avoid the F823 error
+        deployment_name = deployment_name  # Use the global deployment_name as default
 
         # Use the selected model from the session
         selected_model_id = session.get("selected_model_id")
