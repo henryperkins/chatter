@@ -79,8 +79,6 @@ def delete_chat(chat_id):
 
 @bp.route("/new_chat", methods=["GET"])
 @login_required
-@bp.route("/new_chat", methods=["GET"])
-@login_required
 def new_chat_route():
     """Create a new chat and redirect to the chat interface."""
     chat_id = generate_new_chat_id()
