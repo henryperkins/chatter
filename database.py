@@ -9,9 +9,11 @@ from flask.cli import with_appcontext
 def get_db():
     """Open a new database connection if there is none yet for the current application context."""
     if "db" not in g:
+        # Register a converter for timestamps
+        sqlite3.register_converter("TIMESTAMP", lambda x: sqlite3.Timestamp.fromisoformat(x.decode()))
         g.db = sqlite3.connect(
             current_app.config.get("DATABASE", "chat_app.db"),
-            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
+            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
         )
         g.db.row_factory = sqlite3.Row
     return g.db

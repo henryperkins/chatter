@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for, abort
+from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 from flask_login import login_required, current_user
 from conversation_manager import ConversationManager
 from database import get_db
@@ -82,8 +82,10 @@ def delete_chat(chat_id):
 def new_chat_route():
     """Create a new chat and redirect to the chat interface."""
     chat_id = generate_new_chat_id()
+    # Ensure current_user.id is an integer
+    user_id = int(current_user.id)
     # Create a new chat in the database
-    Chat.create(chat_id, current_user.id, "New Chat")
+    Chat.create(chat_id, user_id, "New Chat")
     session["chat_id"] = chat_id
     # Add the default message to the conversation
     conversation_manager.add_message(
@@ -91,6 +93,14 @@ def new_chat_route():
     )
     logger.info(f"New chat created with ID: {chat_id}")
     return redirect(url_for("chat.chat_interface"))
+
+@bp.route("/conversations", methods=["GET"])
+@login_required
+def get_conversations():
+    """Retrieve all conversations for the current user."""
+    user_id = int(current_user.id)
+    conversations = Chat.get_user_chats(user_id)
+    return jsonify(conversations)
 
 @bp.route("/scrape", methods=["POST"])
 @login_required
