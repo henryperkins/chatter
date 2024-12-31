@@ -10,15 +10,13 @@ from flask import (
 from flask_login import login_required, current_user
 from conversation_manager import ConversationManager
 from database import get_db
-from azure_config import get_azure_client
-import openai
-from openai import OpenAIError
-from models import Chat
+from azure_config import get_azure_client, initialize_client_from_model
+from models import Chat, Model
 import uuid
 import logging
 from markupsafe import Markup
 import markdown2
-
+from azure.ai.ml import AzureOpenAI
 
 bp = Blueprint("chat", __name__)
 conversation_manager = ConversationManager()
@@ -96,6 +94,67 @@ def new_chat():
     return jsonify({"chat_id": chat_id})
 
 
+@bp.route("/models", methods=["GET"])
+@login_required
+def get_models():
+    """Retrieve all models."""
+    models = Model.get_all()
+    return jsonify([model.__dict__ for model in models])
+
+
+@bp.route("/models", methods=["POST"])
+@login_required
+def create_model():
+    """Create a new model."""
+    data = request.json
+    model_id = Model.create(
+        data['name'],
+        data.get('description', ''),
+        data.get('model_type', 'azure'),
+        data['api_endpoint'],
+        data['api_key'],
+        data.get('temperature', 1.0),
+        data.get('max_tokens', 32000),
+        data.get('is_default', 0)
+    )
+    return jsonify({"id": model_id, "success": True})
+
+
+@bp.route("/models/<int:model_id>", methods=["PUT"])
+@login_required
+def update_model(model_id):
+    """Update an existing model."""
+    data = request.json
+    Model.update(
+        model_id,
+        data['name'],
+        data.get('description', ''),
+        data.get('model_type', 'azure'),
+        data['api_endpoint'],
+        data['api_key'],
+        data.get('temperature', 1.0),
+        data.get('max_tokens', 32000),
+        data.get('is_default', 0)
+    )
+    return jsonify({"success": True})
+
+
+@bp.route("/models/<int:model_id>", methods=["DELETE"])
+@login_required
+def delete_model(model_id):
+    """Delete a model."""
+    Model.delete(model_id)
+    return jsonify({"success": True})
+
+
+@bp.route("/models/default/<int:model_id>", methods=["POST"])
+@login_required
+def set_default_model(model_id):
+    """Set a model as the default."""
+    Model.set_default(model_id)
+    return jsonify({"success": True})
+
+
 @bp.route("/chat", methods=["POST"])
 @login_required
 def chat():
@@ -140,13 +199,23 @@ def chat():
         if not deployment_name:
             raise ValueError("Azure deployment name is not configured")
 
+        # Use the selected model from the session
+        selected_model_id = session.get("selected_model_id")
+        if selected_model_id:
+            model = Model.get_by_id(selected_model_id)
+            if model:
+                deployment_name = model.name
+                client = initialize_client_from_model(model.__dict__)
+            else:
+                raise ValueError("Selected model not found")
+
         api_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages]
         
-        response = openai.ChatCompletion.create(
-            engine=deployment_name,
+        response = client.chat.completions.create(
+            model=deployment_name,
             messages=api_messages,
             temperature=1,
-            max_completion_tokens=500
+            max_tokens=500
         )
 
         model_response = (
@@ -160,10 +229,6 @@ def chat():
 
         model_response = model_response
 
-    except OpenAIError as e:
-        error_message = f"API Error: {str(e)}"
-        logger.error(error_message)
-        model_response = error_message
     except Exception as e:
         error_message = f"Unexpected Error: {str(e)}"
         logger.error(error_message)
