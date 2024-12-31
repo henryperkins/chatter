@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 # Retrieve max_messages from environment variable, default to 20
 MAX_MESSAGES = int(os.getenv("MAX_MESSAGES", "20"))
 
-
 class ConversationManager:
     """Manages conversations by storing and retrieving messages from the database."""
 
@@ -48,7 +47,7 @@ class ConversationManager:
             (chat_id, role, content),
         )
         db.commit()
-        logger.debug(f"Added message to chat {chat_id}: " f"{role}: {content[:50]}...")
+        logger.debug(f"Added message to chat {chat_id}: {role}: {content[:50]}...")
 
     def clear_context(self, chat_id: str) -> None:
         """Clear the conversation context for a specific chat ID.

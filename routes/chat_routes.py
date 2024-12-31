@@ -93,6 +93,14 @@ def new_chat_route():
     chat_id = generate_new_chat_id()
     # Ensure current_user.id is an integer
     user_id = int(current_user.id)
+    # Ensure chat_id is a string
+    chat_id = str(chat_id)
+    
+    # Add logging for debugging
+    logger.debug(f"chat_id: {chat_id}, type: {type(chat_id)}")
+    logger.debug(f"user_id: {user_id}, type: {type(user_id)}")
+    logger.debug(f"title: 'New Chat', type: {type('New Chat')}")
+    
     # Create a new chat in the database
     Chat.create(chat_id, user_id, "New Chat")
     session["chat_id"] = chat_id

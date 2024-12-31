@@ -30,15 +30,13 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "auth.login"
 
-
 @login_manager.user_loader
 def load_user(user_id):
     db = get_db()
     user = db.execute("SELECT * FROM users WHERE id = ?", (int(user_id),)).fetchone()
     if user:
-        return User(int(user["id"]), user["username"], user["email"])
+        return User(int(user["id"]), user["username"], user["email"], user["role"])
     return None
-
 
 # Register blueprints
 app.register_blueprint(auth_bp)
