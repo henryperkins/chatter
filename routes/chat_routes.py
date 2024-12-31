@@ -170,6 +170,53 @@ def set_default_model(model_id):
         logger.error(f"Error setting default model: {e}")
         return jsonify({"error": str(e), "success": False}), 500
 
+@bp.route("/scrape", methods=["POST"])
+@login_required
+def scrape():
+    data = request.get_json()
+    query = data.get("query")
+    if not query:
+        return jsonify({"error": "Query is required."}), 400
+
+    if query.startswith("what's the weather in"):
+        location = query.split("what's the weather in")[1].strip()
+        weather_data = scrape_weather(location)
+        return jsonify({"response": weather_data})
+
+    elif query.startswith("search for"):
+        search_term = query.split("search for")[1].strip()
+        search_results = scrape_search(search_term)
+        return jsonify({"response": search_results})
+
+    return jsonify({"error": "Invalid query type."}), 400
+
+def scrape_weather(location):
+    import requests
+    from bs4 import BeautifulSoup
+
+    url = f"https://www.google.com/search?q=weather+{location}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+    weather = soup.find("div", class_="BNeawe").text
+    return f"The weather in {location} is: {weather}"
+
+def scrape_search(search_term):
+    import requests
+    from bs4 import BeautifulSoup
+
+    url = f"https://www.google.com/search?q={search_term}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+    results = soup.find_all("div", class_="BNeawe s3v9rd AP7Wnd")
+    search_results = [result.text for result in results[:3]]
+    return "Search results:\n" + "\n".join(search_results)
+
 @bp.route("/chat", methods=["POST"])
 @login_required
 def chat():
@@ -185,6 +232,25 @@ def chat():
     if not user_message:
         logger.error("Invalid request data: missing 'message' field")
         return jsonify({"error": "Message is required."}), 400
+
+    # Check for special commands
+    if user_message.startswith("what's the weather in") or user_message.startswith("search for"):
+        scrape_response = requests.post(
+            url_for("chat.scrape", _external=True),
+            json={"query": user_message},
+            headers={"Authorization": f"Bearer {session.get('access_token')}"}
+        )
+        if scrape_response.status_code == 200:
+            scrape_data = scrape_response.json()
+            model_response = scrape_data["response"]
+            messages.append({"role": "assistant", "content": model_response})
+            conversation_manager.clear_context(chat_id)
+            for message in messages:
+                conversation_manager.add_message(chat_id, message["role"], message["content"])
+            return jsonify({"response": model_response})
+        else:
+            logger.error(f"Error in scraping: {scrape_response.text}")
+            return jsonify({"error": "Error processing special command."}), 500
 
     # Apply specific formatting to the user message if it contains certain keywords
     if "```" not in user_message and ("def " in user_message or "import " in user_message):
