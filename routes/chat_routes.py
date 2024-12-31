@@ -287,13 +287,13 @@ def chat():
                 raise ValueError("Selected model not found")
 
         # Prepare messages for the API call
-        api_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages]
+        api_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages if msg["role"] != "system"]
 
         # Call the Azure OpenAI API to get a response
         response = client.chat.completions.create(
             model=deployment_name,
             messages=api_messages,
-            temperature=1,
+            temperature=1 if "o1-preview" in deployment_name else 0.7,
             max_tokens=500
         )
 

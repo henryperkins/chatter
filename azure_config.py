@@ -68,6 +68,8 @@ def initialize_client_from_model(model_config):
     api_key = model_config.get("api_key")
     deployment_name = model_config.get("name")  # Assuming 'name' is used as the deployment name
     api_version = model_config.get("api_version", "2024-12-01-preview")
+    if "o1-preview" in deployment_name:
+        api_version = "2024-12-01-preview"
     temperature = model_config.get("temperature", 1.0)
     max_tokens = model_config.get("max_tokens", 32000)
 
