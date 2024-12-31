@@ -246,6 +246,7 @@ def chat():
         if scrape_response.status_code == 200:
             scrape_data = scrape_response.json()
             model_response = scrape_data["response"]
+            messages = []  # Initialize messages here
             messages.append({"role": "assistant", "content": model_response})
             conversation_manager.clear_context(chat_id)
             for message in messages:
