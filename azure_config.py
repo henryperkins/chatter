@@ -2,7 +2,7 @@
 
 import os
 from dotenv import load_dotenv
-from openai import AzureOpenAI
+import openai
 
 load_dotenv()
 
@@ -23,7 +23,7 @@ def get_azure_client():
         # Retrieve Azure OpenAI configuration from environment variables
         azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
         api_key = os.getenv("AZURE_OPENAI_KEY")
-        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
+        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2023-05-15")
         deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
         # Validate required configuration variables
@@ -33,10 +33,12 @@ def get_azure_client():
                 "Please set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY, and AZURE_OPENAI_DEPLOYMENT_NAME."
             )
 
-        # Initialize the Azure OpenAI client
-        _client = AzureOpenAI(
-            azure_endpoint=azure_endpoint, api_key=api_key, api_version=api_version
-        )
+        # Configure the OpenAI client for Azure
+        openai.api_type = "azure"
+        openai.api_base = azure_endpoint
+        openai.api_key = api_key
+        openai.api_version = api_version
+        _client = openai
         _deployment_name = deployment_name
 
     return _client, _deployment_name

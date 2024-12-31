@@ -11,6 +11,7 @@ from flask_login import login_required, current_user
 from conversation_manager import ConversationManager
 from database import get_db
 from azure_config import get_azure_client
+import openai
 from models import Chat
 import uuid
 import logging
@@ -146,12 +147,13 @@ def chat():
         # Prepare messages for API call
         api_messages = [{"role": msg["role"], "content": msg["content"]} for msg in messages]
         
-        response = client.chat.completions.create(
-            model=deployment_name,
+        response = openai.ChatCompletion.create(
+            engine=deployment_name,
             messages=api_messages,
             temperature=1,
-            max_completion_tokens=32000,
-            response_format={"type": "text"},
+            max_tokens=800,
+            n=1,
+            stop=None
         )
 
         model_response = (
