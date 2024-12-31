@@ -2,7 +2,6 @@ from flask import Blueprint, jsonify, redirect, render_template, request, sessio
 from flask_login import login_required, current_user
 from conversation_manager import ConversationManager
 from database import get_db
-from database import get_db
 from models import Chat, Model
 import logging
 from flask import render_template
@@ -92,7 +91,6 @@ def delete_chat(chat_id):
 def new_chat_route():
     """Create a new chat and redirect to the chat interface."""
     chat_id = generate_new_chat_id()
-    # Ensure current_user.id is an integer
     # Ensure current_user.id is an integer
     user_id = int(current_user.id)
     # Create a new chat in the database
