@@ -194,3 +194,75 @@ class Message:
         db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
         db.commit()
         logger.info(f"All messages deleted for chat {chat_id}")
+
+
+class Model:
+    """Model class for managing AI models."""
+
+    def __init__(self, id, name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default, created_at):
+        self.id = id
+        self.name = name
+        self.description = description
+        self.model_type = model_type
+        self.api_endpoint = api_endpoint
+        self.api_key = api_key
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.is_default = is_default
+        self.created_at = created_at
+
+    @staticmethod
+    def get_all():
+        """Retrieve all models from the database."""
+        db = get_db()
+        models = db.execute("SELECT * FROM models").fetchall()
+        return [Model(**dict(model)) for model in models]
+
+    @staticmethod
+    def get_by_id(model_id):
+        """Retrieve a model by ID."""
+        db = get_db()
+        model = db.execute("SELECT * FROM models WHERE id = ?", (model_id,)).fetchone()
+        if model:
+            return Model(**dict(model))
+        return None
+
+    @staticmethod
+    def create(name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default):
+        """Create a new model."""
+        db = get_db()
+        db.execute(
+            "INSERT INTO models (name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default),
+        )
+        db.commit()
+        logger.info(f"Model created: {name}")
+        return db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+    @staticmethod
+    def update(model_id, name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default):
+        """Update an existing model."""
+        db = get_db()
+        db.execute(
+            "UPDATE models SET name = ?, description = ?, model_type = ?, api_endpoint = ?, api_key = ?, temperature = ?, max_tokens = ?, is_default = ? WHERE id = ?",
+            (name, description, model_type, api_endpoint, api_key, temperature, max_tokens, is_default, model_id),
+        )
+        db.commit()
+        logger.info(f"Model updated: {name}")
+
+    @staticmethod
+    def delete(model_id):
+        """Delete a model."""
+        db = get_db()
+        db.execute("DELETE FROM models WHERE id = ?", (model_id,))
+        db.commit()
+        logger.info(f"Model deleted: {model_id}")
+
+    @staticmethod
+    def set_default(model_id):
+        """Set a model as the default."""
+        db = get_db()
+        db.execute("UPDATE models SET is_default = 0")
+        db.execute("UPDATE models SET is_default = 1 WHERE id = ?", (model_id,))
+        db.commit()
+        logger.info(f"Model set as default: {model_id}")
