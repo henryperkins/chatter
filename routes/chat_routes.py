@@ -195,11 +195,11 @@ def generate_new_chat_id():
 def extract_context_from_conversation(messages, latest_response):
     """Extract key context from the conversation"""
     context_parts = []
-    for msg in messages[-5:]:  # Consider last 5 messages for context
+    for msg in messages[-10:]:  # Consider last 10 messages for context
         if msg["role"] in ["assistant", "user"]:
             context_parts.append(f"{msg['role']}: {msg['content']}")
     
     context_parts.append(f"assistant: {latest_response}")
     
     context = "\n".join(context_parts)
-    return context[:2000]  # Limit context to 2000 characters
+    return context[:4000]  # Limit context to 4000 characters

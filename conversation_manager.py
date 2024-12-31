@@ -7,8 +7,8 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# Retrieve max_messages from environment variable, default to 10
-MAX_MESSAGES = int(os.getenv("MAX_MESSAGES", "10"))
+# Retrieve max_messages from environment variable, default to 20
+MAX_MESSAGES = int(os.getenv("MAX_MESSAGES", "20"))
 
 
 class ConversationManager:
