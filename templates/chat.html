@@ -22,8 +22,8 @@
             <select id="model-select" class="form-control">
                 <option value="">Select Model</option>
                 {% for model in models %}
-                    <option value="{{ model.id }}" {{ 'selected' if model.is_default else '' }}>
-                        {{ model.name }}{{ ' (Default)' if model.is_default else '' }}
+                    <option value="{{ model.id }}" {% if model.is_default %}selected{% endif %}>
+                        {{ model.name }}{% if model.is_default %} (Default){% endif %}
                     </option>
                 {% endfor %}
             </select>
