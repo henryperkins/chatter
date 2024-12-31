@@ -110,21 +110,14 @@ def chat():
     messages = conversation_manager.get_context(chat_id)
     context = Chat.get_context(chat_id)
 
-    # Create system message with context
-    system_message = {
-        "role": "system",
-        "content": f"Current conversation context:\n{context}\n\nPlease use this context to provide relevant responses."
-    }
-
-    # Include context in the conversation
-    messages.insert(0, system_message)
 
     if "```" not in user_message and (
         "def " in user_message or "import " in user_message
     ):
         user_message = f"```\n{user_message}\n```"
 
-    messages.append({"role": "user", "content": user_message})
+    combined_message = f"{context}\n\n{user_message}"
+    messages.append({"role": "user", "content": combined_message})
 
     uploaded_files = session.get("uploaded_files", [])
     file_contents = []
@@ -151,9 +144,7 @@ def chat():
             engine=deployment_name,
             messages=api_messages,
             temperature=1,
-            max_tokens=800,
-            n=1,
-            stop=None
+            max_completion_tokens=500
         )
 
         model_response = (
@@ -166,17 +157,12 @@ def chat():
         new_context = extract_context_from_conversation(messages, model_response)
         Chat.update_context(chat_id, new_context)
 
-        model_response = Markup(markdown2.markdown(model_response))
-        model_response += Markup(
-            '<div class="shortcuts">'
-            '<button onclick="copyToClipboard()">Copy</button>'
-            '<button onclick="retryMessage()">Retry</button>'
-            "</div>"
-        )
+        model_response = model_response
 
-    except Exception as e:
-        logger.error(f"Error during API call: {str(e)}")
-        model_response = "Sorry, I encountered an error while processing your request. Please try again."
+    except openai.error.OpenAIError as e:
+        error_message = f"API Error: {str(e)}"
+        logger.error(error_message)
+        model_response = error_message
 
     messages.append({"role": "assistant", "content": model_response})
     conversation_manager.clear_context(chat_id)

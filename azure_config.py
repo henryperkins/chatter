@@ -23,7 +23,7 @@ def get_azure_client():
         # Retrieve Azure OpenAI configuration from environment variables
         azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
         api_key = os.getenv("AZURE_OPENAI_KEY")
-        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2023-05-15")
+        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
         deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
         # Validate required configuration variables
