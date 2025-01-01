@@ -17,7 +17,7 @@
             loadChat: function(chatId) {
                 return `/load_chat/${chatId}`;
             },
-            addModel: "{{ url_for('model.add_model_page') }}",
+            addModel: "{{ url_for('model.create_model') }}",
             loadModels: "{{ url_for('model.get_models') }}",
             setModel: function(modelId) {
                 return `/models/default/${modelId}`;

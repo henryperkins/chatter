@@ -17,16 +17,25 @@ from models import User
 from routes.auth_routes import bp as auth_bp
 from routes.chat_routes import bp as chat_bp
 from routes.model_routes import bp as model_bp
+from datetime import timedelta
 
 # Initialize Flask app
 app = Flask(__name__)
 
 # Simplified Configuration (Directly in app.py)
-app.config["SECRET_KEY"] = (
-    os.environ.get("SECRET_KEY") or "your-secret-key"
-)  # Replace 'your-secret-key' with a strong secret!
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "your-secret-key")
 app.config["LOGGING_LEVEL"] = logging.DEBUG  # Set to logging.INFO for production
 app.config["LOGGING_FORMAT"] = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Session Security Settings
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=True,  # Ensure the app is served over HTTPS
+    SESSION_COOKIE_SAMESITE='Lax',
+    REMEMBER_COOKIE_HTTPONLY=True,
+    REMEMBER_COOKIE_SECURE=True,  # Ensure the app is served over HTTPS
+    PERMANENT_SESSION_LIFETIME=timedelta(minutes=60),  # Adjust as needed
+)
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -56,7 +65,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 @login_manager.user_loader
 def load_user(user_id: str) -> User | None:
     """Load user by ID for Flask-Login.
@@ -73,17 +81,14 @@ def load_user(user_id: str) -> User | None:
         return User(user["id"], user["username"], user["email"], user["role"])
     return None
 
-
 # Teardown database connection
 app.teardown_appcontext(close_db)
-
 
 # Error handlers
 @app.errorhandler(400)
 def bad_request(error):
     """Handle 400 Bad Request errors."""
     return jsonify(error="Bad request", message=error.description), 400
-
 
 @app.errorhandler(403)
 def forbidden(error):
@@ -96,7 +101,6 @@ def forbidden(error):
         403,
     )
 
-
 @app.errorhandler(404)
 def not_found(error):
     """Handle 404 Not Found errors."""
@@ -104,7 +108,6 @@ def not_found(error):
         jsonify(error="Not found", message="The requested resource was not found."),
         404,
     )
-
 
 @app.errorhandler(500)
 def internal_server_error(error):
@@ -114,7 +117,6 @@ def internal_server_error(error):
         jsonify(error="Internal server error", message="An unexpected error occurred."),
         500,
     )
-
 
 @app.errorhandler(Exception)
 def handle_exception(e):
@@ -128,7 +130,6 @@ def handle_exception(e):
         jsonify(error="Internal server error", message="An unexpected error occurred."),
         500,
     )
-
 
 if __name__ == "__main__":
     app.run(debug=True)  # Set debug=False in production

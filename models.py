@@ -6,47 +6,25 @@ This module contains classes and methods for managing users, models, and chat se
 
 from database import get_db
 import logging
+import re
+from urllib.parse import urlparse
+from dataclasses import dataclass, field
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-
+@dataclass
 class User:
     """
     Represents a user in the system.
-
-    Attributes:
-        id (int): Unique identifier for the user.
-        username (str): Username of the user.
-        email (str): Email address of the user.
-        role (str): Role of the user (default is "user").
     """
-
-    def __init__(self, id, username, email, role="user"):
-        """
-        Initializes a User instance.
-
-        Args:
-            id (int): User ID (converted to integer for consistency).
-            username (str): Username of the user.
-            email (str): Email address of the user.
-            role (str): Role of the user (default is "user").
-        """
-        self.id = int(id)  # Ensure id is an integer
-        self.username = username
-        self.email = email
-        self.role = role
+    id: int
+    username: str
+    email: str
+    role: str = "user"
 
     @staticmethod
     def get_by_id(user_id):
-        """
-        Fetches a user from the database by their ID.
-
-        Args:
-            user_id (int): ID of the user to retrieve.
-
-        Returns:
-            User: A User object if found, otherwise None.
-        """
         db = get_db()
         user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         if user:
@@ -55,116 +33,44 @@ class User:
 
     @property
     def is_authenticated(self):
-        """
-        Checks if the user is authenticated.
-
-        Returns:
-            bool: True if the user is authenticated.
-        """
         return True
 
     @property
     def is_active(self):
-        """
-        Checks if the user is active.
-
-        Returns:
-            bool: True if the user is active.
-        """
         return True
 
     @property
     def is_anonymous(self):
-        """
-        Checks if the user is anonymous.
-
-        Returns:
-            bool: False as this model does not support anonymous users.
-        """
         return False
 
     def get_id(self):
-        """
-        Retrieves the user's ID as a string.
-
-        Returns:
-            str: User ID as a string.
-        """
         return str(self.id)
 
-
+@dataclass
 class Model:
     """
     Represents an AI model in the system.
-
-    Attributes:
-        id (int): Unique identifier for the model.
-        name (str): Name of the model.
-        deployment_name (str): Deployment name of the model in Azure OpenAI.
-        description (str): Description of the model.
-        model_type (str): Type/category of the model.
-        api_endpoint (str): API endpoint used to interact with the model.
-        temperature (float): Sampling temperature for APIs like OpenAI (default 1.0).
-        max_tokens (int): Maximum number of tokens allowed (default 32000).
-        max_completion_tokens (int): Maximum number of completion tokens for the model.
-        is_default (bool): Flag indicating if the model is the default one.
-        requires_o1_handling (bool): Flag indicating if the model requires o1-preview specific handling.
-        api_version (str): The API version for the model.
     """
+    id: int
+    name: str
+    deployment_name: str
+    description: Optional[str]
+    model_type: str
+    api_endpoint: str
+    temperature: float = 1.0
+    max_tokens: Optional[int] = None
+    max_completion_tokens: int = 500
+    is_default: bool = False
+    requires_o1_handling: bool = False
+    api_version: str = "2024-10-01-preview"
+    version: int = 1
 
-    def __init__(
-        self,
-        id,
-        name,
-        deployment_name,
-        description,
-        model_type,
-        api_endpoint,
-        temperature=1.0,
-        max_tokens=None,
-        max_completion_tokens=500,
-        is_default=False,
-        requires_o1_handling=False,  # New field
-        api_version="2024-10-01-preview",  # New field
-    ):
-        """
-        Initializes a Model instance.
-
-        Args:
-            id (int): Unique identifier for the model.
-            name (str): Name of the model.
-            deployment_name (str): Deployment name for Azure OpenAI models.
-            description (str): Description of the model.
-            model_type (str): Type of the model.
-            api_endpoint (str): API endpoint for the model.
-            temperature (float): Sampling temperature (default 1.0).
-            max_tokens (int): Maximum number of tokens allowed (default 32000).
-            max_completion_tokens (int): Maximum number of completion tokens.
-            is_default (bool): Whether the model is the default one (default False).
-            requires_o1_handling (bool): Whether the model requires o1 handling.
-            api_version (str): The API version for the model.
-        """
-        self.id = id
-        self.name = name
-        self.deployment_name = deployment_name
-        self.description = description
-        self.model_type = model_type
-        self.api_endpoint = api_endpoint
-        self.temperature = temperature
-        self.max_tokens = max_tokens
-        self.max_completion_tokens = max_completion_tokens
-        self.is_default = is_default
-        self.requires_o1_handling = requires_o1_handling  # New field
-        self.api_version = api_version  # New field
+    def __post_init__(self):
+        # Ensure id is an integer
+        self.id = int(self.id)
 
     @staticmethod
     def get_default():
-        """
-        Fetches the default model from the database.
-
-        Returns:
-            Model: The default Model instance if found, otherwise None.
-        """
         db = get_db()
         model = db.execute("SELECT * FROM models WHERE is_default = 1").fetchone()
         if model:
@@ -182,20 +88,50 @@ class Model:
         Raises:
             ValueError: If a required field is missing or invalid.
         """
-        required_fields = ["name", "deployment_name", "api_endpoint"]
+        required_fields = [
+            "name",
+            "deployment_name",
+            "api_endpoint",
+            "api_version",
+            "model_type",
+            "max_completion_tokens",
+        ]
         for field in required_fields:
             if field not in config or not config[field]:
                 raise ValueError(f"Missing required field: {field}")
 
-        # Validate data types and ranges
-        if "temperature" in config:
-            try:
-                temperature = float(config["temperature"])
-                if not (0 <= temperature <= 2):
-                    raise ValueError("Temperature must be between 0 and 2")
-            except ValueError:
-                raise ValueError("Temperature must be a number between 0 and 2")
+        # Validate 'name'
+        if not re.match(r'^[\w\s\-]+$', config["name"]):
+            raise ValueError("Model name can only contain letters, numbers, spaces, underscores, and hyphens.")
 
+        # Validate 'deployment_name'
+        if not re.match(r'^[\w\-]+$', config["deployment_name"]):
+            raise ValueError("Deployment name can only contain letters, numbers, underscores, and hyphens.")
+
+        # Validate 'api_endpoint'
+        parsed_url = urlparse(config["api_endpoint"])
+        if not all([parsed_url.scheme, parsed_url.netloc]):
+            raise ValueError("Invalid API endpoint URL.")
+
+        # Validate 'api_version'
+        valid_api_versions = ["2024-10-01-preview", "2024-12-01-preview"]
+        if config["api_version"] not in valid_api_versions:
+            raise ValueError("Invalid API version specified.")
+
+        # Validate 'model_type'
+        valid_model_types = ["azure", "openai"]
+        if config["model_type"] not in valid_model_types:
+            raise ValueError("Invalid model_type specified.")
+
+        # Validate 'temperature'
+        try:
+            temperature = float(config.get("temperature", 1.0))
+            if not (0 <= temperature <= 2):
+                raise ValueError("Temperature must be between 0 and 2")
+        except ValueError:
+            raise ValueError("Temperature must be a number between 0 and 2")
+
+        # Validate 'max_tokens'
         if "max_tokens" in config and config["max_tokens"] is not None:
             try:
                 max_tokens = int(config["max_tokens"])
@@ -204,43 +140,37 @@ class Model:
             except ValueError:
                 raise ValueError("Max tokens must be a positive integer")
 
-        if "max_completion_tokens" in config:
-            try:
-                max_completion_tokens = int(config["max_completion_tokens"])
-                if max_completion_tokens <= 0:
-                    raise ValueError("Max completion tokens must be a positive integer")
-            except ValueError:
+        # Validate 'max_completion_tokens'
+        try:
+            max_completion_tokens = int(config["max_completion_tokens"])
+            if max_completion_tokens <= 0:
                 raise ValueError("Max completion tokens must be a positive integer")
+        except ValueError:
+            raise ValueError("Max completion tokens must be a positive integer")
+
+        # Validate 'requires_o1_handling'
+        if not isinstance(config.get("requires_o1_handling", False), bool):
+            raise ValueError("requires_o1_handling must be a boolean.")
+
+        # Validate 'version'
+        if "version" in config:
+            try:
+                version = int(config["version"])
+                if version <= 0:
+                    raise ValueError("Version must be a positive integer.")
+            except ValueError:
+                raise ValueError("Version must be a positive integer.")
 
     @staticmethod
     def get_all(limit=10, offset=0):
-        """
-        Retrieves all models with optional pagination.
-
-        Args:
-            limit (int): Number of models to retrieve (default is 10).
-            offset (int): Offset for pagination (default is 0).
-
-        Returns:
-            list[Model]: List of Model instances.
-        """
         db = get_db()
         models = db.execute(
-            "SELECT * FROM models LIMIT ? OFFSET ?", (limit, offset)
+            "SELECT * FROM models ORDER BY created_at DESC LIMIT ? OFFSET ?", (limit, offset)
         ).fetchall()
         return [Model(**dict(model)) for model in models]
 
     @staticmethod
     def get_by_id(model_id):
-        """
-        Fetches a model by its ID.
-
-        Args:
-            model_id (int): ID of the model to retrieve.
-
-        Returns:
-            Model: A Model instance if found, otherwise None.
-        """
         db = get_db()
         model = db.execute("SELECT * FROM models WHERE id = ?", (model_id,)).fetchone()
         if model:
@@ -248,182 +178,135 @@ class Model:
         return None
 
     @staticmethod
-    def create(
-        name,
-        deployment_name,
-        description,
-        model_type,
-        api_endpoint,
-        temperature,
-        max_tokens,
-        max_completion_tokens,
-        is_default,
-        requires_o1_handling=False,
-        api_version="2024-10-01-preview",
-    ):
-        """
-        Creates a new model in the database.
+    def is_model_in_use(model_id):
+        db = get_db()
+        # Check if the model is default
+        default_model = db.execute("SELECT id FROM models WHERE is_default = 1").fetchone()
+        if default_model and default_model["id"] == model_id:
+            return True
 
-        Args:
-            name (str): Name of the model.
-            deployment_name (str): Deployment name for Azure OpenAI models.
-            description (str): Description of the model.
-            model_type (str): Type of the model.
-            api_endpoint (str): API endpoint for the model.
-            temperature (float): Sampling temperature.
-            max_tokens (int): Maximum number of tokens allowed.
-            max_completion_tokens (int): Maximum number of completion tokens.
-            is_default (bool): Whether this model is the default one.
-            requires_o1_handling (bool): Whether the model requires o1 handling.
-            api_version (str): The API version for the model.
+        # Check if the model is associated with any chats
+        chat_count = db.execute(
+            "SELECT COUNT(*) FROM chats WHERE model_id = ?", (model_id,)
+        ).fetchone()[0]
+        return chat_count > 0
 
-        Returns:
-            int: ID of the newly created model.
-        """
+    @staticmethod
+    def create(config):
+        Model.validate_model_config(config)
         db = get_db()
         cursor = db.cursor()
         cursor.execute(
-            "INSERT INTO models (name, deployment_name, description, model_type, api_endpoint, temperature, max_tokens, max_completion_tokens, is_default, requires_o1_handling, api_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            """
+            INSERT INTO models
+            (name, deployment_name, description, model_type, api_endpoint, temperature, max_tokens,
+             max_completion_tokens, is_default, requires_o1_handling, api_version, version)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
             (
-                name,
-                deployment_name,
-                description,
-                model_type,
-                api_endpoint,
-                temperature,
-                max_tokens,
-                max_completion_tokens,
-                is_default,
-                requires_o1_handling,
-                api_version,
+                config["name"],
+                config["deployment_name"],
+                config.get("description", ""),
+                config.get("model_type", "azure"),
+                config["api_endpoint"],
+                float(config.get("temperature", 1.0)),
+                int(config.get("max_tokens")) if config.get("max_tokens") else None,
+                int(config["max_completion_tokens"]),
+                bool(config.get("is_default", 0)),
+                bool(config.get("requires_o1_handling", 0)),
+                config["api_version"],
+                int(config.get("version", 1)),
             ),
         )
         model_id = cursor.lastrowid
         db.commit()
-        logger.info(f"Model created: {name}")
+        logger.info(f"Model created: {config['name']} with ID {model_id}")
         return model_id
 
     @staticmethod
-    def update(
-        model_id,
-        name,
-        deployment_name,
-        description,
-        model_type,
-        api_endpoint,
-        temperature,
-        max_tokens,
-        max_completion_tokens,
-        is_default,
-        requires_o1_handling=False,
-        api_version="2024-10-01-preview",
-    ):
-        """
-        Updates an existing model in the database.
-
-        Args:
-            model_id (int): ID of the model to update.
-            name (str): Updated name of the model.
-            deployment_name (str): Updated deployment name for Azure OpenAI.
-            description (str): Updated description of the model.
-            model_type (str): Updated type of the model.
-            api_endpoint (str): Updated API endpoint.
-            temperature (float): Updated sampling temperature.
-            max_tokens (int): Updated maximum tokens.
-            max_completion_tokens (int): Updated maximum completion tokens.
-            is_default (bool): Updated default flag.
-            requires_o1_handling (bool): Updated o1 handling flag.
-            api_version (str): Updated API version.
-        """
+    def update(model_id, config):
+        Model.validate_model_config(config)
         db = get_db()
+        # Fetch current model data
+        current_model = Model.get_by_id(model_id)
+        if not current_model:
+            raise ValueError("Model not found.")
+
+        # Check if the model is in use and prevent changing critical fields if so
+        if Model.is_model_in_use(model_id):
+            immutable_fields = [
+                "name",
+                "deployment_name",
+                "api_endpoint",
+                "api_version",
+                "model_type",
+            ]
+            for field in immutable_fields:
+                if getattr(current_model, field) != config[field]:
+                    raise ValueError(f"Cannot change '{field}' of a model that is in use.")
+
+        # Increment version if any changes are made
+        new_version = current_model.version + 1
+
         db.execute(
-            "UPDATE models SET name = ?, deployment_name = ?, description = ?, model_type = ?, api_endpoint = ?, temperature = ?, max_tokens = ?, max_completion_tokens = ?, is_default = ?, requires_o1_handling = ?, api_version = ? WHERE id = ?",
+            """
+            UPDATE models SET
+                name = ?, deployment_name = ?, description = ?, model_type = ?, api_endpoint = ?, temperature = ?,
+                max_tokens = ?, max_completion_tokens = ?, is_default = ?, requires_o1_handling = ?, api_version = ?, version = ?
+            WHERE id = ?
+            """,
             (
-                name,
-                deployment_name,
-                description,
-                model_type,
-                api_endpoint,
-                temperature,
-                max_tokens,
-                max_completion_tokens,
-                is_default,
-                requires_o1_handling,
-                api_version,
+                config["name"],
+                config["deployment_name"],
+                config.get("description", ""),
+                config.get("model_type", "azure"),
+                config["api_endpoint"],
+                float(config.get("temperature", 1.0)),
+                int(config.get("max_tokens")) if config.get("max_tokens") else None,
+                int(config["max_completion_tokens"]),
+                bool(config.get("is_default", 0)),
+                bool(config.get("requires_o1_handling", 0)),
+                config["api_version"],
+                new_version,
                 model_id,
             ),
         )
         db.commit()
-        logger.info(f"Model updated: {name}")
+        logger.info(f"Model updated: {config['name']} with ID {model_id} to version {new_version}")
 
     @staticmethod
     def delete(model_id):
-        """
-        Deletes a model from the database.
-
-        Args:
-            model_id (int): ID of the model to delete.
-        """
+        if Model.is_model_in_use(model_id):
+            raise ValueError("Cannot delete a model that is in use.")
         db = get_db()
         db.execute("DELETE FROM models WHERE id = ?", (model_id,))
         db.commit()
-        logger.info(f"Model deleted: {model_id}")
+        logger.info(f"Model deleted with ID {model_id}")
 
     @staticmethod
     def set_default(model_id):
-        """
-        Sets a specific model as the default model.
-
-        Args:
-            model_id (int): ID of the model to set as default.
-
-        Note:
-            Resets all other models' default flags.
-        """
         db = get_db()
-        db.execute("UPDATE models SET is_default = 0")
+        db.execute("UPDATE models SET is_default = 0 WHERE is_default = 1")
         db.execute("UPDATE models SET is_default = 1 WHERE id = ?", (model_id,))
         db.commit()
         logger.info(f"Model set as default: {model_id}")
 
-
+@dataclass
 class Chat:
     """
     Represents a chat session in the system.
-
-    Attributes:
-        id (int): Unique identifier for the chat.
-        user_id (int): ID of the user associated with the chat.
-        title (str): Title or name of the chat session.
-        model_id (int, optional): ID of the model associated with the chat (if any).
     """
+    id: str
+    user_id: int
+    title: str
+    model_id: Optional[int] = None
 
-    def __init__(self, id, user_id, title, model_id=None):
-        """
-        Initializes a Chat instance.
-
-        Args:
-            id (int): Unique identifier for the chat.
-            user_id (int): ID of the user owning this chat.
-            title (str): Title of the chat.
-            model_id (int, optional): ID of the model associated with this chat.
-        """
-        self.id = id
-        self.user_id = user_id
-        self.title = title
-        self.model_id = model_id
+    def __post_init__(self):
+        # Ensure user_id is an integer
+        self.user_id = int(self.user_id)
 
     @staticmethod
     def get_model(chat_id):
-        """
-        Retrieves the ID of the model associated with a specific chat.
-
-        Args:
-            chat_id (int): ID of the chat.
-
-        Returns:
-            int: Model ID if found, otherwise None.
-        """
         db = get_db()
         result = db.execute(
             "SELECT model_id FROM chats WHERE id = ?", (chat_id,)
@@ -432,29 +315,13 @@ class Chat:
 
     @staticmethod
     def set_model(chat_id, model_id):
-        """
-        Associates a model with a specific chat.
-
-        Args:
-            chat_id (int): ID of the chat.
-            model_id (int): ID of the model to associate with the chat.
-        """
         db = get_db()
         db.execute("UPDATE chats SET model_id = ? WHERE id = ?", (model_id, chat_id))
         db.commit()
-        logger.info(f"Model set for chat {chat_id}: {model_id}")
+        logger.info(f"Model set for chat {chat_id}: Model ID {model_id}")
 
     @staticmethod
     def get_by_id(chat_id):
-        """
-        Retrieves a chat by its ID.
-
-        Args:
-            chat_id (int): ID of the chat to retrieve.
-
-        Returns:
-            Chat: A Chat instance if found, otherwise None.
-        """
         db = get_db()
         chat = db.execute("SELECT * FROM chats WHERE id = ?", (chat_id,)).fetchone()
         if chat:
@@ -465,15 +332,6 @@ class Chat:
 
     @staticmethod
     def get_user_chats(user_id):
-        """
-        Retrieves all chats for a specific user.
-
-        Args:
-            user_id (int): ID of the user.
-
-        Returns:
-            list[dict]: A list of dictionaries representing chats.
-        """
         db = get_db()
         chats = db.execute(
             "SELECT * FROM chats WHERE user_id = ? ORDER BY created_at DESC", (user_id,)
@@ -482,14 +340,6 @@ class Chat:
 
     @staticmethod
     def create(chat_id, user_id, title):
-        """
-        Creates a new chat in the database.
-
-        Args:
-            chat_id (int): Unique identifier for the chat.
-            user_id (int): ID of the user who owns the chat.
-            title (str): Title of the chat.
-        """
         db = get_db()
         db.execute(
             "INSERT INTO chats (id, user_id, title) VALUES (?, ?, ?)",

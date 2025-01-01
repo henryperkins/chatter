@@ -2,12 +2,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const chatBox = document.getElementById('chat-box');
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
-    const fileInput = document.getElementById('file-input');
-    const uploadStatus = document.getElementById('upload-status');
     const newChatBtn = document.getElementById('new-chat-btn');
     const conversationList = document.getElementById('chat-list');
     const modelSelect = document.getElementById('model-select');
-    const addModelBtn = document.getElementById('add-model-btn');
     const editModelBtn = document.getElementById('edit-model-btn');
     const deleteModelBtn = document.getElementById('delete-model-btn');
 
@@ -129,8 +126,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function sendMessage() {
         const message = messageInput.value.trim();
-        if (!message) return;
-
+        if (!message || message.length > 1000) {
+            if (!message) {
+                showToast("Message cannot be empty.", "error");
+            } else {
+                showToast("Message is too long. Maximum length is 1000 characters.", "error");
+            }
+            return;
+        }
+    
         appendUserMessage(message);
         messageInput.value = '';
         adjustTextareaHeight(messageInput);
@@ -252,47 +256,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return `${hours}:${minutes}`;
     }
 
-    if (fileInput) {
-        fileInput.addEventListener('change', () => {
-            const files = fileInput.files;
-            if (!files.length) return;
-
-            uploadStatus.classList.remove('hidden');
-            uploadStatus.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
-
-            const formData = new FormData();
-            for (let i = 0; i < files.length; i++) {
-                formData.append('file', files[i]);
-            }
-
-            fetch('/upload', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCSRFToken()
-                },
-                body: formData,
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    uploadStatus.innerHTML = `<i class="fas fa-check-circle" style="color: green;"></i> Files uploaded: ${data.files.join(', ')}`;
-                } else {
-                    uploadStatus.innerHTML = `<i class="fas fa-times-circle" style="color: red;"></i> Error: ${data.error}`;
-                }
-                setTimeout(() => {
-                    uploadStatus.classList.add('hidden');
-                }, 3000);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                uploadStatus.innerHTML = `<i class="fas fa-times-circle" style="color: red;"></i> Upload failed`;
-                setTimeout(() => {
-                    uploadStatus.classList.add('hidden');
-                }, 3000);
-            });
-        });
-    }
-
     if (sendButton) {
         sendButton.addEventListener('click', sendMessage);
     }
@@ -324,7 +287,7 @@ document.addEventListener('DOMContentLoaded', function() {
             modelSelect.innerHTML = '<option value="">Select Model</option>' +
                 models.map(model => `
                     <option value="${model.id}" ${model.is_default ? 'selected' : ''}>
-                        ${model.name}${model.is_default ? ' (Default)' : ''}
+                        ${model.name} - Version ${model.version}
                     </option>
                 `).join('');
         } catch (error) {
@@ -334,71 +297,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function getCSRFToken() {
         return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    }
-
-    async function handleModelChange(modelId) {
-        try {
-            const response = await fetch(apiUrls.setModel(modelId), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCSRFToken()
-                }
-            });
-            if (!response.ok) throw new Error('Failed to update model');
-            return true;
-        } catch (error) {
-            console.error('Error updating model:', error);
-            return false;
-        }
-    }
-
-    // Update the model select handler
-    if (modelSelect) {
-        modelSelect.addEventListener('change', async function() {
-            const modelId = this.value;
-            if (modelId) {
-                const success = await handleModelChange(modelId);
-                if (success) {
-                    editModelBtn.dataset.modelId = modelId;
-                    deleteModelBtn.dataset.modelId = modelId;
-                } else {
-                    this.value = ''; // Reset selection on failure
-                    alert('Failed to update model selection');
-                }
-            }
-        });
-    }
-
-    // Update delete model handler
-    if (deleteModelBtn) {
-        deleteModelBtn.addEventListener('click', async function() {
-            const modelId = this.dataset.modelId;
-            if (!modelId) {
-                alert('Please select a model to delete');
-                return;
-            }
-
-            if (!confirm('Are you sure you want to delete this model?')) return;
-
-            try {
-                const response = await fetch(apiUrls.deleteModel(modelId), {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRFToken': getCSRFToken()
-                    }
-                });
-
-                if (!response.ok) throw new Error('Failed to delete model');
-
-                // Refresh models list
-                await loadModels();
-                showToast('Model deleted successfully');
-            } catch (error) {
-                console.error('Error deleting model:', error);
-                showToast('Failed to delete model', 'error');
-            }
-        });
     }
 
     // Initialize

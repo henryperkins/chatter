@@ -8,11 +8,11 @@
     <form id="model-form">
         <div class="mb-4">
             <label for="model-name" class="block text-gray-700 text-sm font-bold mb-2">Name:</label>
-            <input type="text" id="model-name" name="name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+            <input type="text" id="model-name" name="name" required pattern="^[\w\s\-]+$" title="Letters, numbers, spaces, underscores, and hyphens only." class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
         </div>
         <div class="mb-4">
             <label for="model-deployment-name" class="block text-gray-700 text-sm font-bold mb-2">Deployment Name:</label>
-            <input type="text" id="model-deployment-name" name="deployment_name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+            <input type="text" id="model-deployment-name" name="deployment_name" required pattern="^[\w\-]+$" title="Letters, numbers, underscores, and hyphens only." class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
         </div>
         <div class="mb-4">
             <label for="model-description" class="block text-gray-700 text-sm font-bold mb-2">Description:</label>
@@ -20,7 +20,7 @@
         </div>
         <div class="mb-4">
             <label for="model-api-endpoint" class="block text-gray-700 text-sm font-bold mb-2">API Endpoint:</label>
-            <input type="text" id="model-api-endpoint" name="api_endpoint" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+            <input type="url" id="model-api-endpoint" name="api_endpoint" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
         </div>
         <div class="mb-4">
             <label for="model-temperature" class="block text-gray-700 text-sm font-bold mb-2">Temperature:</label>
@@ -32,16 +32,26 @@
         </div>
         <div class="mb-4">
             <label for="model-max-completion-tokens" class="block text-gray-700 text-sm font-bold mb-2">Max Completion Tokens:</label>
-            <input type="number" id="model-max-completion-tokens" name="max_completion_tokens" value="500" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
+            <input type="number" id="model-max-completion-tokens" name="max_completion_tokens" value="500" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+        </div>
+        <div class="mb-4">
+            <label for="model-type" class="block text-gray-700 text-sm font-bold mb-2">Model Type:</label>
+            <select id="model-type" name="model_type" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                <option value="azure">Azure</option>
+                <option value="openai">OpenAI</option>
+            </select>
+        </div>
+        <div class="mb-4">
+            <label for="model-api-version" class="block text-gray-700 text-sm font-bold mb-2">API Version:</label>
+            <input type="text" id="model-api-version" name="api_version" value="2024-10-01-preview" required class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
         </div>
         <div class="mb-4">
             <label for="model-requires-o1-handling" class="block text-gray-700 text-sm font-bold mb-2">Requires o1-preview Handling:</label>
             <input type="checkbox" id="model-requires-o1-handling" name="requires_o1_handling" class="form-checkbox h-5 w-5 text-blue-600">
         </div>
-        <div class="mb-4">
-            <label for="model-api-version" class="block text-gray-700 text-sm font-bold mb-2">API Version:</label>
-            <input type="text" id="model-api-version" name="api_version" value="2024-10-01-preview" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" required>
-        </div>
+        <!-- Version Field (Hidden) -->
+        <input type="hidden" id="model-version" name="version" value="1">
+
         <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
             Add Model
         </button>
@@ -55,17 +65,14 @@ document.getElementById('model-form').addEventListener('submit', async function(
     e.preventDefault();
 
     const formData = new FormData(this);
-    const data = {
-        name: formData.get('name'),
-        deployment_name: formData.get('deployment_name'),
-        description: formData.get('description'),
-        api_endpoint: formData.get('api_endpoint'),
-        temperature: parseFloat(formData.get('temperature')),
-        max_tokens: formData.get('max_tokens') ? parseInt(formData.get('max_tokens')) : null,
-        max_completion_tokens: parseInt(formData.get('max_completion_tokens')),
-        requires_o1_handling: formData.get('requires_o1_handling') === 'on',
-        api_version: formData.get('api_version')
-    };
+    const data = {};
+    formData.forEach((value, key) => {
+        if (key === 'requires_o1_handling') {
+            data[key] = value === 'on';
+        } else {
+            data[key] = value;
+        }
+    });
 
     try {
         const response = await fetch('/models', {

@@ -17,14 +17,20 @@
             {% endif %}
         {% endwith %}
         <form method="POST" action="{{ url_for('auth.login') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+            {{ form.hidden_tag() }}
             <div class="mt-4">
-                <label for="username" class="block">Username</label>
-                <input type="text" id="username" name="username" required autocomplete="username" class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600">
+                {{ form.username.label(class="block") }}
+                {{ form.username(class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600") }}
+                {% if form.username.errors %}
+                    <p class="text-red-500 text-xs mt-1">{{ form.username.errors[0] }}</p>
+                {% endif %}
             </div>
             <div class="mt-4">
-                <label for="password" class="block">Password</label>
-                <input type="password" id="password" name="password" required autocomplete="current-password" class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600">
+                {{ form.password.label(class="block") }}
+                {{ form.password(class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600") }}
+                {% if form.password.errors %}
+                    <p class="text-red-500 text-xs mt-1">{{ form.password.errors[0] }}</p>
+                {% endif %}
             </div>
             <button type="submit" class="w-full px-6 py-2 mt-4 text-white bg-blue-600 rounded-lg hover:bg-blue-900">Login</button>
         </form>
@@ -34,4 +40,3 @@
     </div>
 </div>
 {% endblock %}
-```

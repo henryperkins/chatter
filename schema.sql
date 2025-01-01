@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS chats (
     model_id INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-    FOREIGN KEY (model_id) REFERENCES models (id) ON DELETE SET NULL
+    FOREIGN KEY (model_id) REFERENCES models (id) ON DELETE RESTRICT
 );
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -37,12 +37,13 @@ CREATE TABLE IF NOT EXISTS models (
     deployment_name TEXT UNIQUE NOT NULL,
     description TEXT,
     model_type TEXT NOT NULL DEFAULT 'azure',
-    api_endpoint TEXT,
+    api_endpoint TEXT NOT NULL,
     temperature REAL DEFAULT 1.0,
     max_tokens INTEGER,
-    max_completion_tokens INTEGER,
+    max_completion_tokens INTEGER NOT NULL,
     is_default BOOLEAN DEFAULT 0,
-    requires_o1_handling BOOLEAN DEFAULT 0, -- New field for o1-preview handling
-    api_version TEXT DEFAULT '2024-10-01-preview', -- New field for API version
+    requires_o1_handling BOOLEAN DEFAULT 0,
+    api_version TEXT DEFAULT '2024-10-01-preview',
+    version INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
