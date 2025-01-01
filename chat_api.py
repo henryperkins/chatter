@@ -10,7 +10,7 @@ from typing import Optional
 
 import requests
 from bs4 import BeautifulSoup
-from openai import AzureOpenAI
+from openai import AzureOpenAI, OpenAIError
 
 from azure_config import get_azure_client, initialize_client_from_model
 from models import Model
@@ -38,7 +38,8 @@ def get_azure_response(
 
     Raises:
         ValueError: If the selected model is not found.
-        Exception: If any other error occurs during the API call.
+        OpenAIError: If there is an error during API communication.
+        Exception: If any other error occurs.
     """
     try:
         client, deployment_name = get_azure_client()
@@ -64,13 +65,21 @@ def get_azure_response(
             if msg["role"] in ["user", "assistant"]
         ]
 
-        response = client.chat.completions.create(
-            model=deployment_name,
-            messages=api_messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            max_completion_tokens=max_completion_tokens,
-        )
+        # Prepare the parameters for the API call
+        api_params = {
+            "model": deployment_name,
+            "messages": api_messages,
+            "temperature": temperature,
+        }
+
+        if max_completion_tokens is not None:
+            api_params["max_completion_tokens"] = max_completion_tokens
+
+        # Include max_tokens only if it's not None and the model doesn't require o1 handling
+        if max_tokens is not None and not (model and model.requires_o1_handling):
+            api_params["max_tokens"] = max_tokens
+
+        response = client.chat.completions.create(**api_params)
 
         model_response = (
             response.choices[0].message.content
@@ -80,6 +89,9 @@ def get_azure_response(
         logger.info("Response received from the model: %s", model_response)
         return model_response
 
+    except OpenAIError as e:
+        logger.error("OpenAI API error: %s", str(e))
+        raise
     except Exception as e:
         logger.error("Error in get_azure_response: %s", str(e))
         raise

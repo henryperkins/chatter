@@ -6,16 +6,18 @@
 <div class="flex items-center justify-center min-h-screen bg-gray-100">
     <div class="px-8 py-6 mx-4 mt-4 text-left bg-white shadow-lg md:w-1/3 lg:w-1/3 sm:w-1/3">
         <h1 class="text-2xl font-bold text-center">Login</h1>
-        {% with messages = get_flashed_messages() %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
-                {% for message in messages %}
+                {% for category, message in messages %}
                     <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                        {{ message }}
+                        <strong class="font-bold">{{ category | capitalize }}: </strong>
+                        <span class="block sm:inline">{{ message }}</span>
                     </div>
                 {% endfor %}
             {% endif %}
         {% endwith %}
         <form method="POST" action="{{ url_for('auth.login') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
             <div class="mt-4">
                 <label for="username" class="block">Username</label>
                 <input type="text" id="username" name="username" required autocomplete="username" class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-600">
@@ -32,3 +34,4 @@
     </div>
 </div>
 {% endblock %}
+```

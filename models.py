@@ -108,6 +108,8 @@ class Model:
         max_tokens (int): Maximum number of tokens allowed (default 32000).
         max_completion_tokens (int): Maximum number of completion tokens for the model.
         is_default (bool): Flag indicating if the model is the default one.
+        requires_o1_handling (bool): Flag indicating if the model requires o1-preview specific handling.
+        api_version (str): The API version for the model.
     """
 
     def __init__(
@@ -122,6 +124,8 @@ class Model:
         max_tokens=None,
         max_completion_tokens=500,
         is_default=False,
+        requires_o1_handling=False,  # New field
+        api_version="2024-10-01-preview",  # New field
     ):
         """
         Initializes a Model instance.
@@ -137,6 +141,8 @@ class Model:
             max_tokens (int): Maximum number of tokens allowed (default 32000).
             max_completion_tokens (int): Maximum number of completion tokens.
             is_default (bool): Whether the model is the default one (default False).
+            requires_o1_handling (bool): Whether the model requires o1 handling.
+            api_version (str): The API version for the model.
         """
         self.id = id
         self.name = name
@@ -148,6 +154,8 @@ class Model:
         self.max_tokens = max_tokens
         self.max_completion_tokens = max_completion_tokens
         self.is_default = is_default
+        self.requires_o1_handling = requires_o1_handling  # New field
+        self.api_version = api_version  # New field
 
     @staticmethod
     def get_default():
@@ -172,12 +180,37 @@ class Model:
             config (dict): Dictionary containing model configuration.
 
         Raises:
-            ValueError: If a required field is missing.
+            ValueError: If a required field is missing or invalid.
         """
         required_fields = ["name", "deployment_name", "api_endpoint"]
         for field in required_fields:
             if field not in config or not config[field]:
                 raise ValueError(f"Missing required field: {field}")
+
+        # Validate data types and ranges
+        if "temperature" in config:
+            try:
+                temperature = float(config["temperature"])
+                if not (0 <= temperature <= 2):
+                    raise ValueError("Temperature must be between 0 and 2")
+            except ValueError:
+                raise ValueError("Temperature must be a number between 0 and 2")
+
+        if "max_tokens" in config and config["max_tokens"] is not None:
+            try:
+                max_tokens = int(config["max_tokens"])
+                if max_tokens <= 0:
+                    raise ValueError("Max tokens must be a positive integer")
+            except ValueError:
+                raise ValueError("Max tokens must be a positive integer")
+
+        if "max_completion_tokens" in config:
+            try:
+                max_completion_tokens = int(config["max_completion_tokens"])
+                if max_completion_tokens <= 0:
+                    raise ValueError("Max completion tokens must be a positive integer")
+            except ValueError:
+                raise ValueError("Max completion tokens must be a positive integer")
 
     @staticmethod
     def get_all(limit=10, offset=0):
@@ -225,6 +258,8 @@ class Model:
         max_tokens,
         max_completion_tokens,
         is_default,
+        requires_o1_handling=False,
+        api_version="2024-10-01-preview",
     ):
         """
         Creates a new model in the database.
@@ -239,6 +274,8 @@ class Model:
             max_tokens (int): Maximum number of tokens allowed.
             max_completion_tokens (int): Maximum number of completion tokens.
             is_default (bool): Whether this model is the default one.
+            requires_o1_handling (bool): Whether the model requires o1 handling.
+            api_version (str): The API version for the model.
 
         Returns:
             int: ID of the newly created model.
@@ -246,7 +283,7 @@ class Model:
         db = get_db()
         cursor = db.cursor()
         cursor.execute(
-            "INSERT INTO models (name, deployment_name, description, model_type, api_endpoint, temperature, max_tokens, max_completion_tokens, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO models (name, deployment_name, description, model_type, api_endpoint, temperature, max_tokens, max_completion_tokens, is_default, requires_o1_handling, api_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 name,
                 deployment_name,
@@ -257,6 +294,8 @@ class Model:
                 max_tokens,
                 max_completion_tokens,
                 is_default,
+                requires_o1_handling,
+                api_version,
             ),
         )
         model_id = cursor.lastrowid
@@ -276,6 +315,8 @@ class Model:
         max_tokens,
         max_completion_tokens,
         is_default,
+        requires_o1_handling=False,
+        api_version="2024-10-01-preview",
     ):
         """
         Updates an existing model in the database.
@@ -291,10 +332,12 @@ class Model:
             max_tokens (int): Updated maximum tokens.
             max_completion_tokens (int): Updated maximum completion tokens.
             is_default (bool): Updated default flag.
+            requires_o1_handling (bool): Updated o1 handling flag.
+            api_version (str): Updated API version.
         """
         db = get_db()
         db.execute(
-            "UPDATE models SET name = ?, deployment_name = ?, description = ?, model_type = ?, api_endpoint = ?, temperature = ?, max_tokens = ?, max_completion_tokens = ?, is_default = ? WHERE id = ?",
+            "UPDATE models SET name = ?, deployment_name = ?, description = ?, model_type = ?, api_endpoint = ?, temperature = ?, max_tokens = ?, max_completion_tokens = ?, is_default = ?, requires_o1_handling = ?, api_version = ? WHERE id = ?",
             (
                 name,
                 deployment_name,
@@ -305,6 +348,8 @@ class Model:
                 max_tokens,
                 max_completion_tokens,
                 is_default,
+                requires_o1_handling,
+                api_version,
                 model_id,
             ),
         )

@@ -23,10 +23,15 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadConversations() {
         try {
             const response = await fetch('/conversations');
-            const conversations = await response.json();
-            renderConversations(conversations);
+            if (response.ok) {
+                const conversations = await response.json();
+                renderConversations(conversations);
+            } else {
+                showToast('Failed to load conversations', 'error');
+            }
         } catch (error) {
             console.error('Error loading conversations:', error);
+            showToast('Failed to load conversations', 'error');
         }
     }
 
@@ -42,36 +47,74 @@ document.addEventListener('DOMContentLoaded', function() {
         `).join('');
     }
 
-    conversationList.addEventListener('click', function(event) {
+    conversationList.addEventListener('click', async function(event) {
         const target = event.target;
         const conversationItem = target.closest('div[data-id]');
         const deleteBtn = target.closest('.delete-conversation-btn');
 
         if (deleteBtn) {
             const conversationId = deleteBtn.dataset.id;
-            deleteConversation(conversationId, event);
+            await deleteConversation(conversationId, event);
         } else if (conversationItem) {
             const conversationId = conversationItem.dataset.id;
-            loadConversation(conversationId);
+            await loadConversation(conversationId);
         }
     });
 
-
     async function loadConversation(conversationId) {
-        window.location.href = `/load_chat/${conversationId}`;
+        try {
+            const response = await fetch(`/load_chat/${conversationId}`);
+            if (response.ok) {
+                const data = await response.json();
+
+                // Clear the current chat messages
+                chatBox.innerHTML = '';
+
+                // Append the messages to the chatbox
+                appendMessages(data.messages);
+
+                // Update the session storage with the current chat_id
+                sessionStorage.setItem('chat_id', conversationId);
+
+                // Update the URL without reloading the page
+                history.pushState({}, '', `/chat_interface?chat_id=${conversationId}`);
+
+                // Optionally, update the UI to reflect the current chat
+                // For example, highlight the selected conversation in the sidebar
+                document.querySelectorAll('.conversation-item').forEach(item => {
+                    item.classList.remove('bg-gray-100');
+                });
+                const currentConversationItem = document.querySelector(`.conversation-item[data-id="${conversationId}"]`);
+                if (currentConversationItem) {
+                    currentConversationItem.classList.add('bg-gray-100');
+                }
+            } else {
+                showToast('Failed to load conversation', 'error');
+            }
+        } catch (error) {
+            console.error('Error loading conversation:', error);
+            showToast('Failed to load conversation', 'error');
+        }
     }
 
     async function deleteConversation(conversationId, event) {
         event.stopPropagation();
         if (confirm('Are you sure you want to delete this conversation?')) {
             try {
-                const response = await fetch(`/delete_chat/${conversationId}`, { method: 'DELETE' });
+                const response = await fetch(`/delete_chat/${conversationId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken() // Include CSRF token
+                    }
+                });
                 if (response.ok) {
                     // Check if the current chat is the one being deleted
                     if (conversationId === chatId) {
+                        // Redirect to new chat only if the current chat is deleted
                         window.location.href = '/new_chat';
                     } else {
-                        loadConversations();
+                        // Otherwise, just reload the conversations
+                        await loadConversations();
                         showToast('Conversation deleted', 'success');
                     }
                 } else {
@@ -88,6 +131,44 @@ document.addEventListener('DOMContentLoaded', function() {
         const message = messageInput.value.trim();
         if (!message) return;
 
+        appendUserMessage(message);
+        messageInput.value = '';
+        adjustTextareaHeight(messageInput);
+        messageInput.disabled = true;
+        sendButton.disabled = true;
+        showTypingIndicator();
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ chat_id: chatId, message: message }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                removeTypingIndicator();
+                appendAssistantMessage(data.response);
+            } else {
+                const errorData = await response.json();
+                removeTypingIndicator();
+                showErrorInChat(errorData.error || 'An error occurred while processing your message.');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            removeTypingIndicator();
+            showErrorInChat('An error occurred while sending the message.');
+        } finally {
+            messageInput.disabled = false;
+            sendButton.disabled = false;
+            messageInput.focus();
+        }
+    }
+
+    function appendUserMessage(message) {
         const userMessageDiv = document.createElement('div');
         userMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end';
         userMessageDiv.innerHTML = `
@@ -103,9 +184,29 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         chatBox.appendChild(userMessageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
+    }
 
+    function appendAssistantMessage(message) {
+        const assistantMessageDiv = document.createElement('div');
+        assistantMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs';
+        assistantMessageDiv.innerHTML = `
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
+                <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            </div>
+            <div>
+                <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
+                    <p class="text-sm">${marked.parse(message)}</p>
+                </div>
+                <span class="text-xs text-gray-500 leading-none">${formatTimestamp(new Date())}</span>
+            </div>
+        `;
+        chatBox.appendChild(assistantMessageDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function showTypingIndicator() {
         const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs';
+        loadingDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs typing-indicator';
         loadingDiv.innerHTML = `
             <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
                 <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
@@ -117,54 +218,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span class="text-xs text-gray-500 leading-none">Typing...</span>
             </div>
         `;
-
         chatBox.appendChild(loadingDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
+    }
 
-        messageInput.value = '';
-        messageInput.style.height = 'auto';
-        messageInput.disabled = true;
-        sendButton.disabled = true;
-
-        try {
-            const response = await fetch('/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ chat_id: chatId, message: message }),
-            });
-            const data = await response.json();
-            chatBox.removeChild(loadingDiv);
-
-            const assistantMessageDiv = document.createElement('div');
-            assistantMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs';
-            assistantMessageDiv.innerHTML = `
-                <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
-                    <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                </div>
-                <div>
-                    <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
-                        <p class="text-sm">${marked.parse(data.response)}</p>
-                    </div>
-                    <span class="text-xs text-gray-500 leading-none">${formatTimestamp(new Date())}</span>
-                </div>
-            `;
-            chatBox.appendChild(assistantMessageDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        } catch (error) {
-            console.error('Error:', error);
-            chatBox.removeChild(loadingDiv);
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'message system';
-            errorDiv.innerHTML = '<strong>system:</strong> An error occurred while sending the message.';
-            chatBox.appendChild(errorDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        } finally {
-            messageInput.disabled = false;
-            sendButton.disabled = false;
-            messageInput.focus();
+    function removeTypingIndicator() {
+        const typingIndicator = chatBox.querySelector('.typing-indicator');
+        if (typingIndicator) {
+            chatBox.removeChild(typingIndicator);
         }
+    }
+
+    function showErrorInChat(errorMessage) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs';
+        errorDiv.innerHTML = `
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
+                <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            </div>
+            <div>
+                <div class="bg-red-300 p-3 rounded-r-lg rounded-bl-lg">
+                    <p class="text-sm text-red-800">${errorMessage}</p>
+                </div>
+            </div>
+        `;
+        chatBox.appendChild(errorDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     function formatTimestamp(date) {
@@ -188,6 +267,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
             fetch('/upload', {
                 method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken()
+                },
                 body: formData,
             })
             .then(response => response.json())
@@ -224,119 +306,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    function openModelModal(title) {
-        modelModalTitle.textContent = title;
-        modelModal.classList.remove('hidden');
-    }
-
-    function closeModelModal() {
-        modelModal.classList.add('hidden');
-        modelForm.reset();
-    }
-
-    if (addModelBtn) {
-        addModelBtn.addEventListener('click', () => {
-            openModelModal('Add Model');
-        });
-    }
-
-    if (editModelBtn) {
-        editModelBtn.addEventListener('click', () => {
-            const modelId = modelSelect.value;
-            if (!modelId) return alert('Please select a model to edit');
-
-            // Fetch the selected model's data and populate the form
-            fetch(`/models/${modelId}`)
-                .then(response => response.json())
-                .then(model => {
-                    document.getElementById('model-name').value = model.name;
-                    document.getElementById('model-deployment-name').value = model.deployment_name;
-                    document.getElementById('model-description').value = model.description;
-                    document.getElementById('model-api-endpoint').value = model.api_endpoint;
-                    // Do not populate the API key field for security reasons
-                    document.getElementById('model-temperature').value = model.temperature;
-                    document.getElementById('model-max-tokens').value = model.max_tokens;
-                    document.getElementById('model-max-completion-tokens').value = model.max_completion_tokens;
-                    openModelModal('Edit Model');
-                })
-                .catch(error => {
-                    console.error('Error fetching model details:', error);
-                    showToast('Error fetching model details', 'error');
-                });
-        });
-    }
-
-    if (deleteModelBtn) {
-        deleteModelBtn.addEventListener('click', () => {
-            const modelId = modelSelect.value;
-            if (!modelId) return alert('Please select a model to delete');
-
-            if (confirm('Are you sure you want to delete this model?')) {
-                fetch(`/models/${modelId}`, {
-                    method: 'DELETE',
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        loadModels();
-                        showToast('Model deleted successfully', 'success');
-                    } else {
-                        showToast('Error deleting model: ' + data.error, 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error deleting model:', error);
-                    showToast('Error deleting model', 'error');
-                });
-            }
-        });
-    }
-
-    if (cancelModelBtn) {
-        cancelModelBtn.addEventListener('click', () => {
-            closeModelModal();
-        });
-    }
-
-    if (modelForm) {
-        modelForm.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const isEditMode = modelModalTitle.textContent === 'Edit Model';
-            const modelId = isEditMode ? modelSelect.value : null;
-            const name = document.getElementById('model-name').value;
-            const deployment_name = document.getElementById('model-deployment-name').value;
-            const description = document.getElementById('model-description').value;
-            const apiEndpoint = document.getElementById('model-api-endpoint').value;
-            const temperature = parseFloat(document.getElementById('model-temperature').value);
-            const max_tokens = document.getElementById('model-max-tokens').value ? parseInt(document.getElementById('model-max-tokens').value) : null;
-            const max_completion_tokens = parseInt(document.getElementById('model-max-completion-tokens').value);
-
-            const url = isEditMode ? `/models/${modelId}` : '/models';
-            const method = isEditMode ? 'PUT' : 'POST';
-
-            try {
-                const response = await fetch(url, {
-                    method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ name, deployment_name, description, api_endpoint, temperature, max_tokens, max_completion_tokens }),
-                });
-                const data = await response.json();
-                if (data.success) {
-                    loadModels();
-                    closeModelModal();
-                    showToast(`Model ${isEditMode ? 'updated' : 'added'} successfully`, 'success');
-                } else {
-                    showToast(`Error ${isEditMode ? 'updating' : 'adding'} model: ${data.error}`, 'error');
-                }
-            } catch (error) {
-                console.error(`Error ${isEditMode ? 'updating' : 'adding'} model:`, error);
-                showToast(`Error ${isEditMode ? 'updating' : 'adding'} model`, 'error');
-            }
-        });
-    }
-
     function showToast(message, type = 'success') {
         const toastContainer = document.getElementById('toast-container');
         const toast = document.createElement('div');
@@ -361,6 +330,10 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Error loading models:', error);
         }
+    }
+
+    function getCSRFToken() {
+        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     }
 
     // Initialize

@@ -4,11 +4,13 @@ import logging
 from typing import Dict, List
 from database import get_db
 import os
+from chat_utils import count_tokens
 
 logger = logging.getLogger(__name__)
 
-# Retrieve max_messages from environment variable, default to 20
+# Retrieve max_messages and max_tokens from environment variables, with default values
 MAX_MESSAGES = int(os.getenv("MAX_MESSAGES", "20"))
+MAX_TOKENS = int(os.getenv("MAX_TOKENS", "3500"))
 
 
 class ConversationManager:
@@ -61,24 +63,28 @@ class ConversationManager:
         db.commit()
         logger.debug(f"Cleared context for chat {chat_id}")
 
-    def trim_context(self, chat_id: str, max_messages: int = MAX_MESSAGES) -> None:
-        """Trim the conversation context to maintain a maximum number of messages.
+    def trim_context(
+        self,
+        chat_id: str,
+        max_messages: int = MAX_MESSAGES,
+        max_tokens: int = MAX_TOKENS,
+    ) -> None:
+        """Trim the conversation context based on the number of messages and total tokens.
 
-        Removes the oldest messages to keep the context within the specified limit.
+        Removes the oldest messages if either the number of messages exceeds max_messages
+        or the total number of tokens exceeds max_tokens.
 
         Args:
             chat_id (str): The unique identifier for the chat session.
-            max_messages (int, optional): The maximum number of messages to retain. Defaults to MAX_MESSAGES.
+            max_messages (int): The maximum number of messages to retain.
+            max_tokens (int): The maximum number of tokens to retain.
         """
         db = get_db()
+        messages = self.get_context(chat_id)
 
-        # Count the number of messages for the chat_id
-        count = db.execute(
-            "SELECT COUNT(*) FROM messages WHERE chat_id = ?", (chat_id,)
-        ).fetchone()[0]
-
-        # If the number of messages exceeds the max, delete the oldest ones
-        if count > max_messages:
+        # Trim based on number of messages
+        if len(messages) > max_messages:
+            excess = len(messages) - max_messages
             db.execute(
                 """
                 DELETE FROM messages
@@ -90,13 +96,31 @@ class ConversationManager:
                     LIMIT ?
                 )
                 """,
-                (chat_id, count - max_messages),
+                (chat_id, excess),
             )
             db.commit()
             logger.debug(
                 f"Trimmed context for chat {chat_id} "
                 f"to the most recent {max_messages} messages"
             )
+
+        # Trim based on token count
+        total_tokens = sum(count_tokens(msg["content"]) for msg in messages)
+        while total_tokens > max_tokens:
+            oldest_message = db.execute(
+                "SELECT id, content FROM messages WHERE chat_id = ? ORDER BY timestamp ASC LIMIT 1",
+                (chat_id,),
+            ).fetchone()
+
+            if oldest_message:
+                db.execute("DELETE FROM messages WHERE id = ?", (oldest_message["id"],))
+                db.commit()
+                total_tokens -= count_tokens(oldest_message["content"])
+                logger.debug(
+                    f"Trimmed context for chat {chat_id} due to exceeding token limit"
+                )
+            else:
+                break  # No more messages to trim
 
     def set_model(self, chat_id: str, model_id: int) -> None:
         """Set the model for a specific chat ID.

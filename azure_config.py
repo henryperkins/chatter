@@ -23,7 +23,9 @@ def get_azure_client():
         # Retrieve Azure OpenAI configuration from environment variables
         azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
         api_key = os.getenv("AZURE_OPENAI_KEY")
-        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
+        api_version = os.getenv(
+            "AZURE_OPENAI_API_VERSION", "2024-12-01-preview"
+        )  # Default to o1-preview
         deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
 
         # Validate required configuration variables
@@ -49,7 +51,7 @@ def initialize_client_from_model(model_config):
         model_config (dict): The model configuration dictionary.
 
     Returns:
-        Tuple[AzureOpenAI, str, float, int]: The Azure OpenAI client, deployment name, temperature, and max_tokens.
+        Tuple[AzureOpenAI, str, float, int, int]: The Azure OpenAI client, deployment name, temperature, max_tokens and max_completion_tokens.
 
     Raises:
         ValueError: If required fields are missing or if the model type is unsupported.
@@ -67,9 +69,10 @@ def initialize_client_from_model(model_config):
     temperature = model_config.get("temperature", 1.0)
     max_tokens = model_config.get("max_tokens")
     max_completion_tokens = model_config.get("max_completion_tokens")
+    requires_o1_handling = model_config.get("requires_o1_handling", False)
 
     # Handle o1-preview specific requirements
-    if "o1-preview" in deployment_name:
+    if requires_o1_handling:
         api_version = "2024-12-01-preview"
         temperature = 1
         max_tokens = None  # max_tokens is not used for o1-preview

@@ -42,5 +42,7 @@ CREATE TABLE IF NOT EXISTS models (
     max_tokens INTEGER,
     max_completion_tokens INTEGER,
     is_default BOOLEAN DEFAULT 0,
+    requires_o1_handling BOOLEAN DEFAULT 0, -- New field for o1-preview handling
+    api_version TEXT DEFAULT '2024-10-01-preview', -- New field for API version
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

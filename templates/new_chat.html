@@ -5,11 +5,6 @@
 {% block content %}
 <div class="flex h-screen antialiased text-gray-800">
     <div class="flex flex-row h-full w-full overflow-x-hidden">
-        <!-- Sidebar (Optional) - You can keep your existing sidebar code here -->
-        <div class="sidebar hidden md:flex flex-col py-8 pl-6 pr-2 w-64 bg-white flex-shrink-0">
-            <!-- Add sidebar content here if needed -->
-        </div>
-
         <!-- Main Chat Area -->
         <div class="flex flex-col flex-auto h-full p-6">
             <div class="flex flex-col flex-grow h-full mb-4 overflow-y-auto">
@@ -39,7 +34,7 @@
 {% block extra_scripts %}
 <script>
     // Set the chatId for the new chat. The actual value will be set when redirecting from /new_chat
-    const chatId = '{{ chat_id }}';
+    const chatId = "{{ chat_id }}";
 </script>
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% endblock %}

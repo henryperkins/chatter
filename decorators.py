@@ -3,7 +3,7 @@
 import functools
 from typing import Callable, TypeVar, cast
 
-from flask import abort
+from flask import abort, session
 from flask_login import current_user
 
 RT = TypeVar("RT")  # Return type for the decorated function
@@ -24,8 +24,13 @@ def admin_required(func: Callable[..., RT]) -> Callable[..., RT]:
 
     @functools.wraps(func)
     def decorated_function(*args: object, **kwargs: object) -> RT:
-        if not current_user.is_authenticated or current_user.role != "admin":
-            abort(403)  # Forbidden
+        if not current_user.is_authenticated:
+            abort(403, description="You need to be logged in to access this resource.")
+        if current_user.role != "admin":
+            abort(
+                403,
+                description="You don't have sufficient privileges to access this resource.",
+            )
         return cast(RT, func(*args, **kwargs))
 
     return decorated_function

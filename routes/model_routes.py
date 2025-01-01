@@ -6,7 +6,7 @@ creating, updating, deleting, and retrieving models.
 """
 
 from flask import Blueprint, jsonify, request, render_template
-from flask_login import login_required
+from flask_login import login_required, current_user
 from models import Model
 from decorators import admin_required
 import logging
@@ -31,6 +31,8 @@ def get_models():
                     "deployment_name": model.deployment_name,
                     "description": model.description,
                     "is_default": model.is_default,
+                    "requires_o1_handling": model.requires_o1_handling,
+                    "api_version": model.api_version,
                 }
                 for model in models
             ]
@@ -57,16 +59,30 @@ def create_model():
             description=data.get("description", ""),
             model_type=data.get("model_type", "azure"),
             api_endpoint=data["api_endpoint"],
-            temperature=data.get("temperature", 1.0),
-            max_tokens=data.get("max_tokens"),
-            max_completion_tokens=data.get("max_completion_tokens", 500),
-            is_default=data.get("is_default", 0),
+            temperature=float(data.get("temperature", 1.0)),
+            max_tokens=int(data.get("max_tokens")) if data.get("max_tokens") else None,
+            max_completion_tokens=int(data.get("max_completion_tokens", 500)),
+            is_default=bool(data.get("is_default", 0)),
+            requires_o1_handling=bool(data.get("requires_o1_handling", 0)),
+            api_version=data.get("api_version", "2024-10-01-preview"),
         )
         logger.info("Model created successfully: %s", data["name"])
         return jsonify({"id": model_id, "success": True})
     except ValueError as e:
         logger.error("Error creating model: %s", str(e))
         return jsonify({"error": str(e), "success": False}), 400
+    except KeyError as e:
+        missing_field = e.args[0]
+        logger.error("Missing required field: %s", missing_field)
+        return (
+            jsonify(
+                {"error": f"Missing required field: {missing_field}", "success": False}
+            ),
+            400,
+        )
+    except Exception as e:
+        logger.error("Unexpected error: %s", str(e))
+        return jsonify({"error": "An unexpected error occurred", "success": False}), 500
 
 
 @bp.route("/models/<int:model_id>", methods=["PUT"])
@@ -87,16 +103,30 @@ def update_model(model_id: int):
             description=data.get("description", ""),
             model_type=data.get("model_type", "azure"),
             api_endpoint=data["api_endpoint"],
-            temperature=data.get("temperature", 1.0),
-            max_tokens=data.get("max_tokens"),
-            max_completion_tokens=data.get("max_completion_tokens", 500),
-            is_default=data.get("is_default", 0),
+            temperature=float(data.get("temperature", 1.0)),
+            max_tokens=int(data.get("max_tokens")) if data.get("max_tokens") else None,
+            max_completion_tokens=int(data.get("max_completion_tokens", 500)),
+            is_default=bool(data.get("is_default", 0)),
+            requires_o1_handling=bool(data.get("requires_o1_handling", 0)),
+            api_version=data.get("api_version", "2024-10-01-preview"),
         )
         logger.info("Model updated successfully: %s", data["name"])
         return jsonify({"success": True})
     except ValueError as e:
         logger.error("Error updating model: %s", str(e))
         return jsonify({"error": str(e), "success": False}), 400
+    except KeyError as e:
+        missing_field = e.args[0]
+        logger.error("Missing required field: %s", missing_field)
+        return (
+            jsonify(
+                {"error": f"Missing required field: {missing_field}", "success": False}
+            ),
+            400,
+        )
+    except Exception as e:
+        logger.error("Unexpected error: %s", str(e))
+        return jsonify({"error": "An unexpected error occurred", "success": False}), 500
 
 
 @bp.route("/models/<int:model_id>", methods=["DELETE"])
@@ -123,6 +153,7 @@ def delete_model(model_id: int):
 
 @bp.route("/add-model", methods=["GET"])
 @login_required
+@admin_required
 def add_model_page():
     """Render the add model page."""
     return render_template("add_model.html")
@@ -130,6 +161,7 @@ def add_model_page():
 
 @bp.route("/models/default/<int:model_id>", methods=["POST"])
 @login_required
+@admin_required
 def set_default_model(model_id: int):
     """Set a model as the default."""
     Model.set_default(model_id)
