@@ -50,4 +50,47 @@
         </button>
     </form>
 </div>
+<script>
+document.getElementById('model-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    const data = {
+        name: formData.get('name'),
+        deployment_name: formData.get('deployment_name'),
+        description: formData.get('description'),
+        api_endpoint: formData.get('api_endpoint'),
+        temperature: parseFloat(formData.get('temperature')),
+        max_tokens: formData.get('max_tokens') ? parseInt(formData.get('max_tokens')) : null,
+        max_completion_tokens: parseInt(formData.get('max_completion_tokens')),
+        requires_o1_handling: formData.get('requires_o1_handling') === 'on',
+        api_version: formData.get('api_version')
+    };
+
+    try {
+        const response = await fetch('/models', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            alert('Model added successfully!');
+            window.location.href = '/chat_interface';
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.error || 'Failed to add model'));
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+});
+
+document.getElementById('cancel-model-btn').addEventListener('click', function() {
+    window.location.href = '/chat_interface';
+});
+</script>
 {% endblock %}

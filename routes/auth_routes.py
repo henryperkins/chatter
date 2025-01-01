@@ -4,6 +4,7 @@ from database import get_db
 from models import User
 import bcrypt
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,7 @@ def register():
         email = request.form.get("email", "")
         password = request.form.get("password", "")
         confirm_password = request.form.get("confirm_password", "")
+        admin_code = request.form.get("admin_code", "")
 
         if not all([username, email, password, confirm_password]):
             flash("All fields are required", "error")
@@ -62,6 +64,9 @@ def register():
         if password != confirm_password:
             flash("Passwords do not match", "error")
             return render_template("register.html")
+
+        # Set role based on admin code
+        role = "admin" if admin_code == os.getenv("ADMIN_CODE") else "user"
 
         db = get_db()
         try:
@@ -78,8 +83,8 @@ def register():
                 password.encode("utf-8"), bcrypt.gensalt(rounds=12)
             )
             db.execute(
-                "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
-                (username, email, hashed_password),
+                "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
+                (username, email, hashed_password, role),
             )
             db.commit()
 

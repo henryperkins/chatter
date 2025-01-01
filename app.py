@@ -21,16 +21,12 @@ from routes.model_routes import bp as model_bp
 # Initialize Flask app
 app = Flask(__name__)
 
-# Load default configuration from config.py
-app.config.from_object("config.Config")
-
-# Override with environment-specific settings if present
-if os.environ.get("FLASK_ENV") == "production":
-    app.config.from_object("config.ProductionConfig")
-elif os.environ.get("FLASK_ENV") == "testing":
-    app.config.from_object("config.TestingConfig")
-else:
-    app.config.from_object("config.DevelopmentConfig")
+# Simplified Configuration (Directly in app.py)
+app.config["SECRET_KEY"] = (
+    os.environ.get("SECRET_KEY") or "your-secret-key"
+)  # Replace 'your-secret-key' with a strong secret!
+app.config["LOGGING_LEVEL"] = logging.DEBUG  # Set to logging.INFO for production
+app.config["LOGGING_FORMAT"] = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -135,4 +131,4 @@ def handle_exception(e):
 
 
 if __name__ == "__main__":
-    app.run(debug=app.config["DEBUG"])
+    app.run(debug=True)  # Set debug=False in production

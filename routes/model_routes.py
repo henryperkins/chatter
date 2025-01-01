@@ -89,66 +89,27 @@ def create_model():
 @login_required
 @admin_required
 def update_model(model_id: int):
-    """Update an existing model."""
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Invalid request data", "success": False}), 400
-
     try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided", "success": False}), 400
+
         Model.validate_model_config(data)
-        Model.update(
-            model_id=model_id,
-            name=data["name"],
-            deployment_name=data["deployment_name"],
-            description=data.get("description", ""),
-            model_type=data.get("model_type", "azure"),
-            api_endpoint=data["api_endpoint"],
-            temperature=float(data.get("temperature", 1.0)),
-            max_tokens=int(data.get("max_tokens")) if data.get("max_tokens") else None,
-            max_completion_tokens=int(data.get("max_completion_tokens", 500)),
-            is_default=bool(data.get("is_default", 0)),
-            requires_o1_handling=bool(data.get("requires_o1_handling", 0)),
-            api_version=data.get("api_version", "2024-10-01-preview"),
-        )
-        logger.info("Model updated successfully: %s", data["name"])
+        Model.update(model_id=model_id, **data)
         return jsonify({"success": True})
-    except ValueError as e:
-        logger.error("Error updating model: %s", str(e))
-        return jsonify({"error": str(e), "success": False}), 400
-    except KeyError as e:
-        missing_field = e.args[0]
-        logger.error("Missing required field: %s", missing_field)
-        return (
-            jsonify(
-                {"error": f"Missing required field: {missing_field}", "success": False}
-            ),
-            400,
-        )
     except Exception as e:
-        logger.error("Unexpected error: %s", str(e))
-        return jsonify({"error": "An unexpected error occurred", "success": False}), 500
+        return jsonify({"error": str(e), "success": False}), 500
 
 
 @bp.route("/models/<int:model_id>", methods=["DELETE"])
 @login_required
 @admin_required
 def delete_model(model_id: int):
-    """Delete a model."""
     try:
         Model.delete(model_id)
-        logger.info("Model deleted: %s", model_id)
         return jsonify({"success": True})
     except Exception as e:
-        logger.error("Error deleting model: %s, %s", model_id, str(e))
-        return (
-            jsonify(
-                {
-                    "error": "An error occurred while deleting the model",
-                    "success": False,
-                }
-            ),
-            500,
-        )
+        return jsonify({"error": str(e), "success": False}), 500
 
 
 @bp.route("/add-model", methods=["GET"])

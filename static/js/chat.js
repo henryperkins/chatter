@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function loadConversation(conversationId) {
         try {
-            const response = await fetch(`/load_chat/${conversationId}`);
+            const response = await fetch(apiUrls.loadChat(conversationId));
             if (response.ok) {
                 const data = await response.json();
 
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
         event.stopPropagation();
         if (confirm('Are you sure you want to delete this conversation?')) {
             try {
-                const response = await fetch(`/delete_chat/${conversationId}`, {
+                const response = await fetch(apiUrls.deleteChat(conversationId), {
                     method: 'DELETE',
                     headers: {
                         'X-CSRFToken': getCSRFToken() // Include CSRF token
@@ -334,6 +334,71 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function getCSRFToken() {
         return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    }
+
+    async function handleModelChange(modelId) {
+        try {
+            const response = await fetch(apiUrls.setModel(modelId), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                }
+            });
+            if (!response.ok) throw new Error('Failed to update model');
+            return true;
+        } catch (error) {
+            console.error('Error updating model:', error);
+            return false;
+        }
+    }
+
+    // Update the model select handler
+    if (modelSelect) {
+        modelSelect.addEventListener('change', async function() {
+            const modelId = this.value;
+            if (modelId) {
+                const success = await handleModelChange(modelId);
+                if (success) {
+                    editModelBtn.dataset.modelId = modelId;
+                    deleteModelBtn.dataset.modelId = modelId;
+                } else {
+                    this.value = ''; // Reset selection on failure
+                    alert('Failed to update model selection');
+                }
+            }
+        });
+    }
+
+    // Update delete model handler
+    if (deleteModelBtn) {
+        deleteModelBtn.addEventListener('click', async function() {
+            const modelId = this.dataset.modelId;
+            if (!modelId) {
+                alert('Please select a model to delete');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to delete this model?')) return;
+
+            try {
+                const response = await fetch(apiUrls.deleteModel(modelId), {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken()
+                    }
+                });
+
+                if (!response.ok) throw new Error('Failed to delete model');
+
+                // Refresh models list
+                await loadModels();
+                showToast('Model deleted successfully');
+            } catch (error) {
+                console.error('Error deleting model:', error);
+                showToast('Failed to delete model', 'error');
+            }
+        });
     }
 
     // Initialize

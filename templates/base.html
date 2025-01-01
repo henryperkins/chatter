@@ -11,14 +11,25 @@
             sendMessage: "{{ url_for('chat.handle_chat') }}",
             loadConversations: "{{ url_for('chat.get_conversations') }}",
             newChat: "{{ url_for('chat.new_chat_route') }}",
-            deleteChat: "{{ url_for('chat.delete_chat', chat_id='') }}",
-            addModel: "{{ url_for('model.create_model') }}",
-            editModel: "{{ url_for('model.update_model', model_id='') }}",
-            deleteModel: "{{ url_for('model.delete_model', model_id='') }}",
+            deleteChat: function(chatId) {
+                return `/delete_chat/${chatId}`;
+            },
+            loadChat: function(chatId) {
+                return `/load_chat/${chatId}`;
+            },
+            addModel: "{{ url_for('model.add_model_page') }}",
             loadModels: "{{ url_for('model.get_models') }}",
-            setModel: "{{ url_for('model.set_default_model', model_id='') }}",
+            setModel: function(modelId) {
+                return `/models/default/${modelId}`;
+            },
             upload: "{{ url_for('chat.upload_files') }}",
             scrape: "{{ url_for('chat.scrape') }}",
+            deleteModel: function(modelId) {
+                return `/models/${modelId}`;
+            },
+            editModel: function(modelId) {
+                return `/models/${modelId}`;
+            }
         };
     </script>
     {% block extra_head %}{% endblock %}
