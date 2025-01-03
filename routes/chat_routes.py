@@ -163,16 +163,9 @@ def handle_chat() -> dict:
 
     # Input sanitization
     if not user_message:
-        logger.error("Invalid request data: missing 'message' field")
-        return jsonify({"error": "Message is required."}), 400
-
+        return jsonify({"error": "Message cannot be empty."}), 400
     if len(user_message) > 1000:
-        return (
-            jsonify(
-                {"error": "Message is too long. Maximum length is 1000 characters."}
-            ),
-            400,
-        )
+        return jsonify({"error": "Message is too long. Maximum length is 1000 characters."}), 400
 
     user_message = escape(user_message)
 
