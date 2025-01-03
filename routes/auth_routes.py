@@ -44,14 +44,14 @@ def register():
         email = form.email.data.strip()
         password = form.password.data.strip()
 
-        hashed_password = bcrypt.hashpw(
-            password.encode("utf-8"), bcrypt.gensalt(rounds=12)
-        )
         # Flash form errors
         for field_name, errors in form.errors.items():
             for error in errors:
                 flash(f"{getattr(form, field_name).label.text}: {error}", "error")
         # All new users have 'user' role; admins set manually
+        hashed_password = bcrypt.hashpw(
+            password.encode("utf-8"), bcrypt.gensalt(rounds=12)
+        )
         db = get_db()
         db.execute(
             "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
