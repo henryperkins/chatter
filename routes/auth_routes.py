@@ -52,6 +52,7 @@ def register():
             for error in errors:
                 flash(f"{getattr(form, field_name).label.text}: {error}", "error")
         # All new users have 'user' role; admins set manually
+        db = get_db()
         db.execute(
             "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
             (username, email, hashed_password, "user"),
