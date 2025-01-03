@@ -140,4 +140,4 @@ def handle_exception(e):
 
 
 if __name__ == "__main__":
-    app.run(debug=True)  # Set debug=False in production
+    app.run(debug=False)  # Set debug=False in production

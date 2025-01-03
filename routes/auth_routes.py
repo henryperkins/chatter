@@ -29,6 +29,12 @@ def login():
             user_obj = User(user["id"], user["username"], user["email"], user["role"])
             session.clear()
             login_user(user_obj)
+
+            # Set a default chat_id in the session
+            chat_id = generate_new_chat_id()
+            Chat.create(chat_id, user_obj.id, "New Chat")
+            session["chat_id"] = chat_id
+
             return redirect(url_for("chat.chat_interface"))
         else:
             flash("Invalid username or password", "error")

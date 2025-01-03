@@ -62,16 +62,16 @@ def chat_interface() -> str:
     """Render the main chat interface page."""
     chat_id = session.get("chat_id")
     if not chat_id:
-        return redirect(url_for("chat.new_chat_route"))
+        # Create a new chat if no chat_id exists
+        chat_id = generate_new_chat_id()
+        user_id = int(current_user.id)
+        Chat.create(chat_id, user_id, "New Chat")
+        session["chat_id"] = chat_id
+        logger.info("New chat created with ID: %s", chat_id)
 
     messages = conversation_manager.get_context(chat_id)
-
-    # Fetch models for the dropdown
     models = Model.get_all()
-
-    return render_template(
-        "chat.html", chat_id=chat_id, messages=messages, models=models
-    )
+    return render_template("chat.html", chat_id=chat_id, messages=messages, models=models)
 
 
 @bp.route("/load_chat/<chat_id>")
