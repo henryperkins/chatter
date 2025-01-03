@@ -10,6 +10,7 @@ from wtforms.validators import (
 )
 import re
 
+
 class StrongPassword(object):
     def __init__(self, message=None):
         if not message:
@@ -27,6 +28,7 @@ class StrongPassword(object):
         ):
             raise ValidationError(self.message)
 
+
 class LoginForm(FlaskForm):
     username = StringField(
         "Username",
@@ -41,6 +43,7 @@ class LoginForm(FlaskForm):
     )
     password = PasswordField("Password", validators=[DataRequired(), Length(min=8)])
 
+
 class RegistrationForm(FlaskForm):
     username = StringField(
         "Username",
@@ -54,9 +57,7 @@ class RegistrationForm(FlaskForm):
         ],
     )
     email = StringField("Email", validators=[DataRequired(), Email()])
-    password = PasswordField(
-        "Password", validators=[DataRequired(), StrongPassword()]
-    )
+    password = PasswordField("Password", validators=[DataRequired(), StrongPassword()])
     confirm_password = PasswordField(
         "Confirm Password",
         validators=[

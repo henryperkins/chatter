@@ -59,45 +59,65 @@
             Cancel
         </button>
     </form>
-</div>
-<script>
-document.getElementById('model-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
 
-    const formData = new FormData(this);
-    const data = {};
-    formData.forEach((value, key) => {
-        if (key === 'requires_o1_handling') {
-            data[key] = value === 'on';
-        } else {
-            data[key] = value;
+    <!-- Feedback Message -->
+    <div id="feedback-message" class="hidden fixed bottom-4 right-4 p-4 rounded-lg"></div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('model-form');
+    const feedbackMessage = document.getElementById('feedback-message');
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+        const data = {};
+        formData.forEach((value, key) => {
+            if (key === 'requires_o1_handling') {
+                data[key] = value === 'on';
+            } else {
+                data[key] = value;
+            }
+        });
+
+        try {
+            const response = await fetch('/models', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                showFeedback('Model added successfully!', 'success');
+                setTimeout(() => window.location.href = '/chat_interface', 2000);
+            } else {
+                const error = await response.json();
+                showFeedback('Error: ' + (error.error || 'Failed to add model.'), 'error');
+            }
+        } catch (error) {
+            showFeedback('Error: ' + error.message, 'error');
         }
     });
 
-    try {
-        const response = await fetch('/models', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
-            },
-            body: JSON.stringify(data)
-        });
+    document.getElementById('cancel-model-btn').addEventListener('click', function() {
+        window.location.href = '/chat_interface';
+    });
 
-        if (response.ok) {
-            alert('Model added successfully!');
-            window.location.href = '/chat_interface';
-        } else {
-            const error = await response.json();
-            alert('Error: ' + (error.error || 'Failed to add model'));
-        }
-    } catch (error) {
-        alert('Error: ' + error.message);
+    function showFeedback(message, type) {
+        feedbackMessage.textContent = message;
+        feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${type === 'success' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700'}`;
+        feedbackMessage.classList.remove('hidden');
+        setTimeout(() => feedbackMessage.classList.add('hidden'), 3000);
     }
-});
 
-document.getElementById('cancel-model-btn').addEventListener('click', function() {
-    window.location.href = '/chat_interface';
+    function getCSRFToken() {
+        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    }
 });
 </script>
 {% endblock %}

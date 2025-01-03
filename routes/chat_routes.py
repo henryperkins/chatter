@@ -17,7 +17,7 @@ from flask import (
     request,
     session,
     url_for,
-    flash
+    flash,
 )
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
@@ -34,11 +34,13 @@ bp = Blueprint("chat", __name__)
 conversation_manager = ConversationManager()
 logger = logging.getLogger(__name__)
 
+
 @bp.route("/")
 @login_required
 def index() -> str:
     """Redirect to the chat interface."""
     return redirect(url_for("chat.chat_interface"))
+
 
 @bp.route("/new_chat", methods=["POST"])
 @login_required
@@ -52,6 +54,7 @@ def new_chat_route() -> str:
     session["chat_id"] = chat_id
     logger.info("New chat created with ID: %s", chat_id)
     return jsonify({"success": True, "chat_id": chat_id})
+
 
 @bp.route("/chat_interface")
 @login_required
@@ -69,6 +72,7 @@ def chat_interface() -> str:
     return render_template(
         "chat.html", chat_id=chat_id, messages=messages, models=models
     )
+
 
 @bp.route("/load_chat/<chat_id>")
 @login_required
@@ -88,6 +92,7 @@ def load_chat(chat_id: str) -> dict:
     messages = conversation_manager.get_context(chat_id)
 
     return jsonify({"messages": messages})
+
 
 @bp.route("/delete_chat/<chat_id>", methods=["DELETE"])
 @login_required
@@ -111,6 +116,7 @@ def delete_chat(chat_id: str) -> dict:
     logger.info("Chat %s deleted successfully", chat_id)
     return jsonify({"success": True})
 
+
 @bp.route("/conversations", methods=["GET"])
 @login_required
 def get_conversations() -> dict:
@@ -118,6 +124,7 @@ def get_conversations() -> dict:
     user_id = int(current_user.id)
     conversations = Chat.get_user_chats(user_id)
     return jsonify(conversations)
+
 
 @bp.route("/scrape", methods=["POST"])
 @login_required
@@ -136,6 +143,7 @@ def scrape() -> dict:
     except Exception as e:
         logger.error("Error during scraping: %s", str(e))
         return jsonify({"error": "An error occurred during scraping"}), 500
+
 
 @bp.route("/chat", methods=["POST"])
 @login_required
@@ -157,10 +165,15 @@ def handle_chat() -> dict:
     if not user_message:
         logger.error("Invalid request data: missing 'message' field")
         return jsonify({"error": "Message is required."}), 400
-    
+
     if len(user_message) > 1000:
-        return jsonify({"error": "Message is too long. Maximum length is 1000 characters."}), 400
-    
+        return (
+            jsonify(
+                {"error": "Message is too long. Maximum length is 1000 characters."}
+            ),
+            400,
+        )
+
     user_message = escape(user_message)
 
     # Check for special commands
@@ -210,14 +223,14 @@ def handle_chat() -> dict:
             for msg in messages
             if msg["role"] in ["user", "assistant"]
         ]
-        
+
         # Prepare the parameters for the API call
         api_params = {
             "model": deployment_name,
             "messages": api_messages,
             "temperature": temperature,
         }
-        
+
         if max_completion_tokens is not None:
             api_params["max_completion_tokens"] = max_completion_tokens
 
@@ -228,8 +241,12 @@ def handle_chat() -> dict:
         response = client.chat.completions.create(**api_params)
 
         # Process and log the model's response
-        model_response = response.choices[0].message.content if response.choices[0].message else "The assistant was unable to generate a response. Please try again or rephrase your input."
-        
+        model_response = (
+            response.choices[0].message.content
+            if response.choices[0].message
+            else "The assistant was unable to generate a response. Please try again or rephrase your input."
+        )
+
         # Sanitize the model response
         model_response = escape(model_response)
 
@@ -237,37 +254,54 @@ def handle_chat() -> dict:
 
         # Add the model's response to the conversation history
         conversation_manager.add_message(chat_id, "assistant", model_response)
-        
+
         # Extract usage data
-        usage_info = getattr(response, 'usage', {})
-        prompt_tokens = usage_info.get('prompt_tokens', 0)
-        completion_tokens = usage_info.get('completion_tokens', 0)
-        total_tokens = usage_info.get('total_tokens', 0)
+        usage_info = getattr(response, "usage", {})
+        prompt_tokens = usage_info.get("prompt_tokens", 0)
+        completion_tokens = usage_info.get("completion_tokens", 0)
+        total_tokens = usage_info.get("total_tokens", 0)
         logger.info(
             "API usage - Prompt tokens: %d, Completion tokens: %d, Total tokens: %d",
-            prompt_tokens, completion_tokens, total_tokens
+            prompt_tokens,
+            completion_tokens,
+            total_tokens,
         )
 
         return jsonify({"response": model_response})
 
     except Exception as e:
-        logger.exception("An unexpected error occurred while handling the chat message.")
-        return jsonify({"error": "An unexpected error occurred. Please try again later."}), 500
+        logger.exception(
+            "An unexpected error occurred while handling the chat message."
+        )
+        return (
+            jsonify({"error": "An unexpected error occurred. Please try again later."}),
+            500,
+        )
+
 
 @bp.route("/upload", methods=["POST"])
 @login_required
 def upload_files() -> dict:
     """Handle file uploads."""
     try:
-        if 'file' not in request.files:
-            return jsonify({"success": False, "error": "No file part in the request"}), 400
+        if "file" not in request.files:
+            return (
+                jsonify({"success": False, "error": "No file part in the request"}),
+                400,
+            )
 
         files = request.files.getlist("file")
-        if not files or files[0].filename == '':
+        if not files or files[0].filename == "":
             return jsonify({"success": False, "error": "No files selected"}), 400
 
         # Basic file validation (replace with more robust validation)
-        allowed_extensions = {".txt", ".pdf", ".docx", ".jpg", ".png"}  # Example allowed file types
+        allowed_extensions = {
+            ".txt",
+            ".pdf",
+            ".docx",
+            ".jpg",
+            ".png",
+        }  # Example allowed file types
         max_file_size = 10 * 1024 * 1024  # 10 MB limit
 
         uploaded_files = []
@@ -275,14 +309,25 @@ def upload_files() -> dict:
             filename = secure_filename(file.filename)
             if not filename:
                 continue  # Skip files with invalid filenames
-            
+
             # Check file extension
             if os.path.splitext(filename)[1].lower() not in allowed_extensions:
-                return jsonify({"success": False, "error": f"File type not allowed: {filename}"}), 400
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": f"File type not allowed: {filename}",
+                        }
+                    ),
+                    400,
+                )
 
             # Check file size
             if file.content_length > max_file_size:
-                return jsonify({"success": False, "error": f"File too large: {filename}"}), 400
+                return (
+                    jsonify({"success": False, "error": f"File too large: {filename}"}),
+                    400,
+                )
 
             file_path = os.path.join("uploads", current_user.username, filename)
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
@@ -290,7 +335,20 @@ def upload_files() -> dict:
             uploaded_files.append(file_path)
 
         session["uploaded_files"] = uploaded_files
-        return jsonify({"success": True, "files": [os.path.basename(f) for f in uploaded_files]}), 200
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "files": [os.path.basename(f) for f in uploaded_files],
+                }
+            ),
+            200,
+        )
     except Exception as e:
         logger.exception("Error occurred during file upload")
-        return jsonify({"success": False, "error": "An error occurred during file upload"}), 500
+        return (
+            jsonify(
+                {"success": False, "error": "An error occurred during file upload"}
+            ),
+            500,
+        )

@@ -152,3 +152,34 @@ class ConversationManager:
             (chat_id,),
         ).fetchone()
         return chat["model_id"] if chat and chat["model_id"] is not None else None
+
+    def migrate_chats(self, old_model_id: int, new_model_id: int) -> None:
+        """Migrate chats from one model to another.
+
+        Args:
+            old_model_id (int): The ID of the old model.
+            new_model_id (int): The ID of the new model.
+        """
+        db = get_db()
+        db.execute(
+            "UPDATE chats SET model_id = ? WHERE model_id = ?",
+            (new_model_id, old_model_id),
+        )
+        db.commit()
+        logger.info(f"Migrated chats from model {old_model_id} to model {new_model_id}")
+
+    def get_usage_stats(self, chat_id: str) -> Dict[str, int]:
+        """Retrieve usage statistics for a specific chat.
+
+        Args:
+            chat_id (str): The unique identifier for the chat session.
+
+        Returns:
+            Dict[str, int]: A dictionary containing usage statistics (e.g., token count).
+        """
+        messages = self.get_context(chat_id)
+        total_tokens = sum(count_tokens(msg["content"]) for msg in messages)
+        return {
+            "total_messages": len(messages),
+            "total_tokens": total_tokens,
+        }

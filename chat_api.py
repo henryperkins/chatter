@@ -7,7 +7,6 @@ including sending chat messages and getting responses, as well as web scraping.
 
 import logging
 from typing import Optional
-
 import requests
 from bs4 import BeautifulSoup
 from openai import AzureOpenAI, OpenAIError
@@ -16,6 +15,7 @@ from azure_config import get_azure_client, initialize_client_from_model
 from models import Model
 
 logger = logging.getLogger(__name__)
+
 
 def get_azure_response(
     messages: list[dict[str, str]],
@@ -87,13 +87,14 @@ def get_azure_response(
         )
         logger.info("Response received from the model: %s", model_response)
         return model_response
-    
+
     except OpenAIError as e:
         logger.error("OpenAI API error: %s", str(e))
         raise
     except Exception as e:
         logger.error("Error in get_azure_response: %s", str(e))
         raise
+
 
 def scrape_data(query: str) -> str:
     """
@@ -116,6 +117,7 @@ def scrape_data(query: str) -> str:
         return scrape_search(search_term)
     else:
         raise ValueError("Invalid query type")
+
 
 def scrape_weather(location: str) -> str:
     """
@@ -147,6 +149,7 @@ def scrape_weather(location: str) -> str:
     else:
         logger.warning("Could not find weather information in the page.")
         return f"Could not retrieve weather information for {location}."
+
 
 def scrape_search(search_term: str) -> str:
     """

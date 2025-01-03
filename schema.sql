@@ -2,7 +2,7 @@
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS chats (
     FOREIGN KEY (model_id) REFERENCES models (id) ON DELETE RESTRICT
 );
 
+-- Messages table
 CREATE TABLE IF NOT EXISTS messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id TEXT NOT NULL,
@@ -47,3 +48,29 @@ CREATE TABLE IF NOT EXISTS models (
     version INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Model Versions table (for version history)
+CREATE TABLE IF NOT EXISTS model_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    model_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    deployment_name TEXT NOT NULL,
+    description TEXT,
+    model_type TEXT NOT NULL,
+    api_endpoint TEXT NOT NULL,
+    temperature REAL,
+    max_tokens INTEGER,
+    max_completion_tokens INTEGER,
+    is_default BOOLEAN,
+    requires_o1_handling BOOLEAN,
+    api_version TEXT,
+    version INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (model_id) REFERENCES models (id) ON DELETE CASCADE
+);
+
+-- Indexes for faster queries
+CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats (user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id);
+CREATE INDEX IF NOT EXISTS idx_models_is_default ON models (is_default);
+CREATE INDEX IF NOT EXISTS idx_model_versions_model_id ON model_versions (model_id);

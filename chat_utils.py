@@ -4,6 +4,7 @@ import tiktoken
 
 
 def generate_new_chat_id():
+    """Generate a new unique chat ID."""
     return str(uuid.uuid4())
 
 

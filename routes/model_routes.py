@@ -14,6 +14,7 @@ import logging
 bp = Blueprint("model", __name__)
 logger = logging.getLogger(__name__)
 
+
 @bp.route("/models", methods=["GET"])
 @login_required
 def get_models():
@@ -41,6 +42,7 @@ def get_models():
         logger.error("Error retrieving models: %s", str(e))
         return jsonify({"error": "An error occurred while retrieving models"}), 500
 
+
 @bp.route("/models", methods=["POST"])
 @login_required
 @admin_required
@@ -61,10 +63,12 @@ def create_model():
         logger.exception("Unexpected error during model creation")
         return jsonify({"error": "An unexpected error occurred", "success": False}), 500
 
+
 @bp.route("/models/<int:model_id>", methods=["PUT"])
 @login_required
 @admin_required
 def update_model(model_id: int):
+    """Update an existing model."""
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided", "success": False}), 400
@@ -79,10 +83,12 @@ def update_model(model_id: int):
         logger.exception("Unexpected error during model update")
         return jsonify({"error": "An unexpected error occurred", "success": False}), 500
 
+
 @bp.route("/models/<int:model_id>", methods=["DELETE"])
 @login_required
 @admin_required
 def delete_model(model_id: int):
+    """Delete a model."""
     try:
         Model.delete(model_id)
         return jsonify({"success": True})
@@ -93,12 +99,14 @@ def delete_model(model_id: int):
         logger.exception("Unexpected error during model deletion")
         return jsonify({"error": "An unexpected error occurred", "success": False}), 500
 
+
 @bp.route("/add-model", methods=["GET"])
 @login_required
 @admin_required
 def add_model_page():
     """Render the add model page."""
     return render_template("add_model.html")
+
 
 @bp.route("/models/default/<int:model_id>", methods=["POST"])
 @login_required
@@ -110,4 +118,50 @@ def set_default_model(model_id: int):
         return jsonify({"success": True})
     except Exception as e:
         logger.exception("Unexpected error setting default model")
+        return jsonify({"error": "An unexpected error occurred", "success": False}), 500
+
+
+@bp.route("/models/<int:model_id>/immutable-fields", methods=["GET"])
+@login_required
+def get_immutable_fields(model_id: int):
+    """Retrieve immutable fields for a model."""
+    try:
+        immutable_fields = Model.get_immutable_fields(model_id)
+        return jsonify(immutable_fields)
+    except Exception as e:
+        logger.error("Error retrieving immutable fields: %s", str(e))
+        return (
+            jsonify({"error": "An error occurred while retrieving immutable fields"}),
+            500,
+        )
+
+
+@bp.route("/models/<int:model_id>/versions", methods=["GET"])
+@login_required
+def get_version_history(model_id: int):
+    """Retrieve version history for a model."""
+    try:
+        versions = Model.get_version_history(model_id)
+        return jsonify(versions)
+    except Exception as e:
+        logger.error("Error retrieving version history: %s", str(e))
+        return (
+            jsonify({"error": "An error occurred while retrieving version history"}),
+            500,
+        )
+
+
+@bp.route("/models/<int:model_id>/revert/<int:version>", methods=["POST"])
+@login_required
+@admin_required
+def revert_to_version(model_id: int, version: int):
+    """Revert a model to a previous version."""
+    try:
+        Model.revert_to_version(model_id, version)
+        return jsonify({"success": True})
+    except ValueError as e:
+        logger.error("Error reverting model: %s", str(e))
+        return jsonify({"error": str(e), "success": False}), 400
+    except Exception as e:
+        logger.exception("Unexpected error during model revert")
         return jsonify({"error": "An unexpected error occurred", "success": False}), 500

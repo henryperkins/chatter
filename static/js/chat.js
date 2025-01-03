@@ -7,6 +7,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const modelSelect = document.getElementById('model-select');
     const editModelBtn = document.getElementById('edit-model-btn');
     const deleteModelBtn = document.getElementById('delete-model-btn');
+    const feedbackMessage = document.getElementById('feedback-message');
+
+    let chatId = sessionStorage.getItem('chat_id') || '';
 
     function adjustTextareaHeight(textarea) {
         textarea.style.height = 'auto';
@@ -24,21 +27,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 const conversations = await response.json();
                 renderConversations(conversations);
             } else {
-                showToast('Failed to load conversations', 'error');
+                showFeedback('Failed to load conversations.', 'error');
             }
         } catch (error) {
             console.error('Error loading conversations:', error);
-            showToast('Failed to load conversations', 'error');
+            showFeedback('Failed to load conversations.', 'error');
         }
     }
 
     function renderConversations(conversations) {
         conversationList.innerHTML = conversations.map(conv => `
             <div class="flex items-center px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 ${conv.id === chatId ? 'bg-gray-100' : ''}" data-id="${conv.id}">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+                </svg>
                 <span class="flex-grow">${conv.title || 'Untitled Conversation'}</span>
                 <button class="delete-conversation-btn" data-id="${conv.id}">
-                    <svg class="w-4 h-4 text-gray-500 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    <svg class="w-4 h-4 text-gray-500 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
                 </button>
             </div>
         `).join('');
@@ -60,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function loadConversation(conversationId) {
         try {
-            const response = await fetch(apiUrls.loadChat(conversationId));
+            const response = await fetch(`/load_chat/${conversationId}`);
             if (response.ok) {
                 const data = await response.json();
 
@@ -72,12 +79,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Update the session storage with the current chat_id
                 sessionStorage.setItem('chat_id', conversationId);
+                chatId = conversationId;
 
                 // Update the URL without reloading the page
                 history.pushState({}, '', `/chat_interface?chat_id=${conversationId}`);
 
-                // Optionally, update the UI to reflect the current chat
-                // For example, highlight the selected conversation in the sidebar
+                // Highlight the selected conversation in the sidebar
                 document.querySelectorAll('.conversation-item').forEach(item => {
                     item.classList.remove('bg-gray-100');
                 });
@@ -86,11 +93,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     currentConversationItem.classList.add('bg-gray-100');
                 }
             } else {
-                showToast('Failed to load conversation', 'error');
+                showFeedback('Failed to load conversation.', 'error');
             }
         } catch (error) {
             console.error('Error loading conversation:', error);
-            showToast('Failed to load conversation', 'error');
+            showFeedback('Failed to load conversation.', 'error');
         }
     }
 
@@ -98,10 +105,10 @@ document.addEventListener('DOMContentLoaded', function() {
         event.stopPropagation();
         if (confirm('Are you sure you want to delete this conversation?')) {
             try {
-                const response = await fetch(apiUrls.deleteChat(conversationId), {
+                const response = await fetch(`/delete_chat/${conversationId}`, {
                     method: 'DELETE',
                     headers: {
-                        'X-CSRFToken': getCSRFToken() // Include CSRF token
+                        'X-CSRFToken': getCSRFToken()
                     }
                 });
                 if (response.ok) {
@@ -112,14 +119,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     } else {
                         // Otherwise, just reload the conversations
                         await loadConversations();
-                        showToast('Conversation deleted', 'success');
+                        showFeedback('Conversation deleted.', 'success');
                     }
                 } else {
-                    showToast('Failed to delete conversation', 'error');
+                    showFeedback('Failed to delete conversation.', 'error');
                 }
             } catch (error) {
                 console.error('Error deleting conversation:', error);
-                showToast('Failed to delete conversation', 'error');
+                showFeedback('Failed to delete conversation.', 'error');
             }
         }
     }
@@ -127,14 +134,10 @@ document.addEventListener('DOMContentLoaded', function() {
     async function sendMessage() {
         const message = messageInput.value.trim();
         if (!message || message.length > 1000) {
-            if (!message) {
-                showToast("Message cannot be empty.", "error");
-            } else {
-                showToast("Message is too long. Maximum length is 1000 characters.", "error");
-            }
+            showFeedback(message ? "Message is too long. Maximum length is 1000 characters." : "Message cannot be empty.", "error");
             return;
         }
-    
+
         appendUserMessage(message);
         messageInput.value = '';
         adjustTextareaHeight(messageInput);
@@ -159,12 +162,12 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 const errorData = await response.json();
                 removeTypingIndicator();
-                showErrorInChat(errorData.error || 'An error occurred while processing your message.');
+                showFeedback(errorData.error || 'An error occurred while processing your message.', 'error');
             }
         } catch (error) {
             console.error('Error:', error);
             removeTypingIndicator();
-            showErrorInChat('An error occurred while sending the message.');
+            showFeedback('An error occurred while sending the message.', 'error');
         } finally {
             messageInput.disabled = false;
             sendButton.disabled = false;
@@ -180,10 +183,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
                     <p class="text-sm">${message}</p>
                 </div>
-                <span class="text-xs text-gray-500 leading-none">${formatTimestamp(new Date())}</span>
+                <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
             </div>
             <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
-                <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                <!-- User avatar placeholder -->
             </div>
         `;
         chatBox.appendChild(userMessageDiv);
@@ -195,13 +198,13 @@ document.addEventListener('DOMContentLoaded', function() {
         assistantMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs';
         assistantMessageDiv.innerHTML = `
             <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
-                <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                <!-- Assistant avatar placeholder -->
             </div>
             <div>
                 <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
-                    <p class="text-sm">${marked.parse(message)}</p>
+                    <p class="text-sm">${message}</p>
                 </div>
-                <span class="text-xs text-gray-500 leading-none">${formatTimestamp(new Date())}</span>
+                <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
             </div>
         `;
         chatBox.appendChild(assistantMessageDiv);
@@ -213,7 +216,7 @@ document.addEventListener('DOMContentLoaded', function() {
         loadingDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs typing-indicator';
         loadingDiv.innerHTML = `
             <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
-                <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                <!-- Assistant avatar placeholder -->
             </div>
             <div>
                 <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
@@ -233,66 +236,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function showErrorInChat(errorMessage) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs';
-        errorDiv.innerHTML = `
-            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
-                <svg class="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-            </div>
-            <div>
-                <div class="bg-red-300 p-3 rounded-r-lg rounded-bl-lg">
-                    <p class="text-sm text-red-800">${errorMessage}</p>
-                </div>
-            </div>
-        `;
-        chatBox.appendChild(errorDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    function formatTimestamp(date) {
-        const hours = date.getHours().toString().padStart(2, '0');
-        const minutes = date.getMinutes().toString().padStart(2, '0');
-        return `${hours}:${minutes}`;
-    }
-
-    if (sendButton) {
-        sendButton.addEventListener('click', sendMessage);
-    }
-
-    if (messageInput) {
-        messageInput.addEventListener('keyup', (event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                sendMessage();
-            }
-        });
-    }
-
-    function showToast(message, type = 'success') {
-        const toastContainer = document.getElementById('toast-container');
-        const toast = document.createElement('div');
-        toast.className = `toast-${type}`;
-        toast.textContent = message;
-        toastContainer.appendChild(toast);
-        setTimeout(() => {
-            toastContainer.removeChild(toast);
-        }, 3000);
-    }
-
-    async function loadModels() {
-        try {
-            const response = await fetch('/models');
-            const models = await response.json();
-            modelSelect.innerHTML = '<option value="">Select Model</option>' +
-                models.map(model => `
-                    <option value="${model.id}" ${model.is_default ? 'selected' : ''}>
-                        ${model.name} - Version ${model.version}
-                    </option>
-                `).join('');
-        } catch (error) {
-            console.error('Error loading models:', error);
-        }
+    function showFeedback(message, type) {
+        feedbackMessage.textContent = message;
+        feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${type === 'success' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700'}`;
+        feedbackMessage.classList.remove('hidden');
+        setTimeout(() => feedbackMessage.classList.add('hidden'), 3000);
     }
 
     function getCSRFToken() {
@@ -301,15 +249,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize
     loadConversations();
-    loadModels();
     adjustTextareaHeight(messageInput);
 });
-
-const sidebarToggle = document.getElementById('sidebar-toggle');
-const sidebar = document.querySelector('.sidebar');
-
-if (sidebarToggle && sidebar) {
-    sidebarToggle.addEventListener('click', function() {
-        sidebar.classList.toggle('hidden');
-    });
-}

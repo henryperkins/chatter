@@ -3,6 +3,7 @@
 import os
 from dotenv import load_dotenv
 from openai import AzureOpenAI
+import requests
 
 load_dotenv()
 
@@ -94,3 +95,23 @@ def initialize_client_from_model(model_config):
     )
 
     return client, deployment_name, temperature, max_tokens, max_completion_tokens
+
+
+def validate_api_endpoint(api_endpoint, api_key):
+    """Validate the API endpoint and key by making a test request.
+
+    Args:
+        api_endpoint (str): The API endpoint URL.
+        api_key (str): The API key.
+
+    Returns:
+        bool: True if the endpoint and key are valid, False otherwise.
+    """
+    try:
+        response = requests.get(
+            api_endpoint, headers={"Authorization": f"Bearer {api_key}"}, timeout=5
+        )
+        return response.status_code == 200
+    except Exception as e:
+        logger.error(f"API endpoint validation failed: {str(e)}")
+        return False

@@ -17,7 +17,7 @@
             <div class="flex flex-row items-center h-16 rounded-xl bg-white w-full px-4">
                 <div class="flex-grow ml-4">
                     <div class="relative w-full">
-                        <textarea id="message-input" class="flex w-full border rounded-xl focus:outline focus:outline-2 focus:outline-indigo-300 pl-4 h-10 resize-none" rows="1" placeholder="Type your message..."></textarea>
+                        <textarea id="message-input" class="flex w-full border rounded-xl focus:outline-none focus:border-indigo-300 pl-4 h-10 resize-none" rows="1" placeholder="Type your message..."></textarea>
                     </div>
                 </div>
                 <div class="ml-4">
@@ -29,12 +29,155 @@
         </div>
     </div>
 </div>
+
+<!-- Feedback Message -->
+<div id="feedback-message" class="hidden fixed bottom-4 right-4 p-4 rounded-lg"></div>
+
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-    // Set the chatId for the new chat. The actual value will be set when redirecting from /new_chat
-    const chatId = "{{ chat_id }}";
+document.addEventListener('DOMContentLoaded', function() {
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const feedbackMessage = document.getElementById('feedback-message');
+
+    function adjustTextareaHeight(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+    }
+
+    messageInput.addEventListener('input', function() {
+        adjustTextareaHeight(this);
+    });
+
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keyup', function(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+    });
+
+    async function sendMessage() {
+        const message = messageInput.value.trim();
+        if (!message || message.length > 1000) {
+            showFeedback(message ? "Message is too long. Maximum length is 1000 characters." : "Message cannot be empty.", "error");
+            return;
+        }
+
+        appendUserMessage(message);
+        messageInput.value = '';
+        adjustTextareaHeight(messageInput);
+        messageInput.disabled = true;
+        sendButton.disabled = true;
+        showTypingIndicator();
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ chat_id: chatId, message: message }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                removeTypingIndicator();
+                appendAssistantMessage(data.response);
+            } else {
+                const errorData = await response.json();
+                removeTypingIndicator();
+                showFeedback(errorData.error || 'An error occurred while processing your message.', 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            removeTypingIndicator();
+            showFeedback('An error occurred while sending the message.', 'error');
+        } finally {
+            messageInput.disabled = false;
+            sendButton.disabled = false;
+            messageInput.focus();
+        }
+    }
+
+    function appendUserMessage(message) {
+        const chatBox = document.getElementById('chat-box');
+        const userMessageDiv = document.createElement('div');
+        userMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end';
+        userMessageDiv.innerHTML = `
+            <div>
+                <div class="bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
+                    <p class="text-sm">${message}</p>
+                </div>
+                <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
+            </div>
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
+                <!-- User avatar placeholder -->
+            </div>
+        `;
+        chatBox.appendChild(userMessageDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function appendAssistantMessage(message) {
+        const chatBox = document.getElementById('chat-box');
+        const assistantMessageDiv = document.createElement('div');
+        assistantMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs';
+        assistantMessageDiv.innerHTML = `
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
+                <!-- Assistant avatar placeholder -->
+            </div>
+            <div>
+                <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
+                    <p class="text-sm">${message}</p>
+                </div>
+                <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
+            </div>
+        `;
+        chatBox.appendChild(assistantMessageDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function showTypingIndicator() {
+        const chatBox = document.getElementById('chat-box');
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs typing-indicator';
+        typingDiv.innerHTML = `
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
+                <!-- Assistant avatar placeholder -->
+            </div>
+            <div>
+                <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
+                    <p class="text-sm">...</p>
+                </div>
+                <span class="text-xs text-gray-500 leading-none">Typing...</span>
+            </div>
+        `;
+        chatBox.appendChild(typingDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function removeTypingIndicator() {
+        const chatBox = document.getElementById('chat-box');
+        const typingIndicator = chatBox.querySelector('.typing-indicator');
+        if (typingIndicator) {
+            chatBox.removeChild(typingIndicator);
+        }
+    }
+
+    function showFeedback(message, type) {
+        feedbackMessage.textContent = message;
+        feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${type === 'success' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700'}`;
+        feedbackMessage.classList.remove('hidden');
+        setTimeout(() => feedbackMessage.classList.add('hidden'), 3000);
+    }
+
+    function getCSRFToken() {
+        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    }
+});
 </script>
-<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% endblock %}
