@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container mx-auto px-4 py-8">
     <h1 class="text-2xl font-bold mb-4">Add a New Model</h1>
-    <form id="model-form">
+    <form id="model-form" method="POST" action="{{ url_for('model.create_model') }}">
         <div class="mb-4">
             <label for="model-name" class="block text-gray-700 text-sm font-bold mb-2">Name:</label>
             <input type="text" id="model-name" name="name" required pattern="^[\w\s\-]+$" title="Letters, numbers, spaces, underscores, and hyphens only." class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">

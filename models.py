@@ -259,7 +259,12 @@ class Model:
 
     @staticmethod
     def create(config):
-        Model.validate_model_config(config)
+        try:
+            Model.validate_model_config(config)
+        except ValueError as e:
+            logger.error("Validation failed: %s", str(e))
+            raise
+
         db = get_db()
         cursor = db.cursor()
         cursor.execute(
