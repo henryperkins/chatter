@@ -9,7 +9,7 @@ import logging
 import os
 from flask import Flask, jsonify
 from flask_login import LoginManager
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.exceptions import HTTPException
 
 from database import get_db, close_db, init_db, init_app
@@ -137,6 +137,14 @@ def handle_exception(e):
         jsonify(error="Internal server error", message="An unexpected error occurred."),
         500,
     )
+
+
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    """Handle CSRF errors."""
+
+    logger.warning("CSRF error: %s", e.description)
+    return jsonify({"error": "The form submission has expired or is invalid. Please refresh the page and try again."}), 400
 
 
 if __name__ == "__main__":

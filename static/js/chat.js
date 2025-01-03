@@ -22,7 +22,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function loadConversations() {
         try {
-            const response = await fetch('/conversations');
+            const response = await fetch('/conversations', {
+                headers: {
+                    'X-CSRFToken': getCSRFToken()
+                }
+            });
             if (response.ok) {
                 const conversations = await response.json();
                 renderConversations(conversations);
@@ -67,7 +71,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function loadConversation(conversationId) {
         try {
-            const response = await fetch(`/load_chat/${conversationId}`);
+            const response = await fetch(`/load_chat/${conversationId}`, {
+                headers: {
+                    'X-CSRFToken': getCSRFToken()
+                }
+            });
             if (response.ok) {
                 const data = await response.json();
 

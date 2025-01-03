@@ -6,8 +6,6 @@ import bcrypt
 import logging
 import os
 from forms import LoginForm, RegistrationForm
-from chat_utils import generate_new_chat_id
-from models import Chat
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +29,6 @@ def login():
             user_obj = User(user["id"], user["username"], user["email"], user["role"])
             session.clear()
             login_user(user_obj)
-
-            # Set a default chat_id in the session
-            chat_id = generate_new_chat_id()
-            Chat.create(chat_id, user_obj.id, "New Chat")
-            session["chat_id"] = chat_id
-
             return redirect(url_for("chat.chat_interface"))
         else:
             flash("Invalid username or password", "error")
@@ -52,15 +44,20 @@ def register():
         email = form.email.data.strip()
         password = form.password.data.strip()
 
-        # Flash form errors
-        for field_name, errors in form.errors.items():
-            for error in errors:
-                flash(f"{getattr(form, field_name).label.text}: {error}", "error")
-        # All new users have 'user' role; admins set manually
+        db = get_db()
+        existing_user = db.execute(
+            "SELECT id FROM users WHERE username = ? OR email = ?",
+            (username, email),
+        ).fetchone()
+
+        if existing_user:
+            flash("Username or email already exists", "error")
+            return render_template("register.html", form=form)
+
         hashed_password = bcrypt.hashpw(
             password.encode("utf-8"), bcrypt.gensalt(rounds=12)
         )
-        db = get_db()
+        # All new users have 'user' role; admins set manually
         db.execute(
             "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
             (username, email, hashed_password, "user"),
