@@ -168,7 +168,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': getCSRFToken()
+                    'X-CSRFToken': getCSRFToken() // Include CSRF token here
                 },
                 body: JSON.stringify({ chat_id: chatId, message: message }),
             });
