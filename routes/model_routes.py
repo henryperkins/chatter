@@ -59,6 +59,9 @@ def create_model():
     except ValueError as e:
         logger.error("Validation error during model creation: %s", str(e))
         return jsonify({"error": str(e), "success": False}), 400
+    except ValueError as e:
+        logger.error("Validation error during model creation: %s", str(e))
+        return jsonify({"error": str(e), "success": False}), 400
     except Exception as e:
         logger.exception("Unexpected error during model creation")
         return jsonify({"error": "An unexpected error occurred", "success": False}), 500

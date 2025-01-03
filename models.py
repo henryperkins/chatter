@@ -137,6 +137,23 @@ class Model:
         if existing_model and existing_model["id"] != config.get("id"):
             raise ValueError("Deployment name already exists. Please choose a different deployment name.")
 
+        # Validate 'name' uniqueness
+        db = get_db()
+        existing_model = db.execute(
+            "SELECT id FROM models WHERE name = ?",
+            (config["name"],)
+        ).fetchone()
+        if existing_model and existing_model["id"] != config.get("id"):
+            raise ValueError("Model name already exists. Please choose a different name.")
+
+        # Validate 'deployment_name' uniqueness
+        existing_model = db.execute(
+            "SELECT id FROM models WHERE deployment_name = ?",
+            (config["deployment_name"],)
+        ).fetchone()
+        if existing_model and existing_model["id"] != config.get("id"):
+            raise ValueError("Deployment name already exists. Please choose a different deployment name.")
+
         # Validate 'api_endpoint'
         parsed_url = urlparse(config["api_endpoint"])
         if not all([parsed_url.scheme, parsed_url.netloc]):

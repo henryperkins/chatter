@@ -287,15 +287,24 @@ def upload_files() -> dict:
         if not files or files[0].filename == "":
             return jsonify({"success": False, "error": "No files selected"}), 400
 
-        # Basic file validation (replace with more robust validation)
-        allowed_extensions = {
-            ".txt",
-            ".pdf",
-            ".docx",
-            ".jpg",
-            ".png",
-        }  # Example allowed file types
+        # Validate file extension
+        allowed_extensions = {".txt", ".pdf", ".docx", ".jpg", ".png"}
         max_file_size = 10 * 1024 * 1024  # 10 MB limit
+
+        for file in files:
+            filename = secure_filename(file.filename)
+            if not filename:
+                return jsonify({"success": False, "error": "Invalid filename."}), 400
+
+            ext = os.path.splitext(filename)[1].lower()
+            if ext not in allowed_extensions:
+                return jsonify({"success": False, "error": f"File type not allowed: {filename}."}), 400
+
+            file.seek(0, os.SEEK_END)
+            file_length = file.tell()
+            file.seek(0)
+            if file_length > max_file_size:
+                return jsonify({"success": False, "error": f"File too large: {filename}."}), 400
 
         uploaded_files = []
         for file in files:
