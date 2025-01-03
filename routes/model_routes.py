@@ -10,6 +10,7 @@ from flask_login import login_required, current_user
 from models import Model
 from decorators import admin_required
 import logging
+from forms import ModelForm
 
 bp = Blueprint("model", __name__)
 logger = logging.getLogger(__name__)
@@ -48,22 +49,36 @@ def get_models():
 @admin_required
 def create_model():
     """Create a new model."""
-    logger.info("Received request to create a model")
-    data = request.get_json()
-    if not data:
-        logger.error("Invalid request data")
-        return jsonify({"error": "Invalid request data", "success": False}), 400
+    form = ModelForm()
+    if form.validate_on_submit():
+        try:
+            data = {
+                "name": form.name.data,
+                "deployment_name": form.deployment_name.data,
+                "description": form.description.data,
+                "api_endpoint": form.api_endpoint.data,
+                "temperature": form.temperature.data,
+                "max_tokens": form.max_tokens.data,
+                "max_completion_tokens": form.max_completion_tokens.data,
+                "model_type": form.model_type.data,
+                "api_version": form.api_version.data,
+                "requires_o1_handling": form.requires_o1_handling.data,
+                "is_default": form.is_default.data
+            }
+            model_id = Model.create(data)
+            return jsonify({
+                "id": model_id,
+                "success": True,
+                "message": "Model created successfully"
+            })
+        except ValueError as e:
+            logger.error("Validation error: %s", str(e))
+            return jsonify({"error": str(e), "success": False}), 400
+        except Exception as e:
+            logger.exception("Error creating model")
+            return jsonify({"error": "An unexpected error occurred", "success": False}), 500
 
-    try:
-        model_id = Model.create(data)
-        logger.info("Model created successfully: %s", data["name"])
-        return jsonify({"id": model_id, "success": True})
-    except ValueError as e:
-        logger.error("Validation error during model creation: %s", str(e))
-        return jsonify({"error": str(e), "success": False}), 400
-    except Exception as e:
-        logger.exception("Unexpected error during model creation")
-        return jsonify({"error": "An unexpected error occurred", "success": False}), 500
+    return jsonify({"error": form.errors, "success": False}), 400
 
 
 @bp.route("/models/<int:model_id>", methods=["PUT"])
@@ -107,7 +122,8 @@ def delete_model(model_id: int):
 @admin_required
 def add_model_page():
     """Render the add model page."""
-    return render_template("add_model.html")
+    form = ModelForm()
+    return render_template("add_model.html", form=form)
 
 
 @bp.route("/models/default/<int:model_id>", methods=["POST"])

@@ -3,7 +3,7 @@
 {% block title %}Chat - Azure OpenAI{% endblock %}
 
 {% block content %}
-<div class="flex min-h-screen antialiased text-gray-800">
+<div class="flex min-h-screen antialiased text-gray-800" data-is-admin="{{ current_user.role == 'admin' }}">
     <div class="flex flex-col md:flex-row h-full w-full overflow-x-hidden">
         <!-- Sidebar -->
         <nav class="sidebar hidden md:block flex flex-col py-8 pl-6 pr-2 w-full md:w-64 bg-white flex-shrink-0">
@@ -56,7 +56,7 @@
                 <!-- Conversations List -->
                 <div class="mt-8 overflow-y-auto">
                     <h3 class="text-lg font-semibold mb-4">Chat History</h3>
-                    <div id="chat-list">
+                    <div id="chat-list" class="space-y-2">
                         <!-- Conversations will be dynamically loaded here -->
                     </div>
                 </div>
@@ -72,7 +72,7 @@
                         <div class="flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end">
                             <div>
                                 <div class="bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
-                                    <p class="text-sm">{{ message.content | e }}</p>
+                                    <div class="text-sm markdown-content">{{ message.content | e }}</div>
                                 </div>
                                 <span class="text-xs text-gray-500 leading-none">{{ message.timestamp }}</span>
                             </div>
@@ -87,7 +87,7 @@
                             </div>
                             <div>
                                 <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
-                                    <p class="text-sm">{{ message.content | e }}</p>
+                                    <div class="text-sm markdown-content">{{ message.content | e }}</div>
                                 </div>
                                 <span class="text-xs text-gray-500 leading-none">{{ message.timestamp }}</span>
                             </div>
@@ -120,243 +120,25 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 <script>
-    const chatId = "{{ chat_id }}";
-    const isAdmin = "{{ current_user.role }}" === 'admin';
+    function renderConversations(conversations) {
+        conversationList.innerHTML = conversations.map(conv => `
+            <div class="conversation-item flex items-center px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 ${conv.id === chatId ? 'bg-gray-100' : ''}" data-id="${conv.id}">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 
-    document.addEventListener('DOMContentLoaded', function() {
-        const modelSelect = document.getElementById('model-select');
-        const editModelBtn = document.getElementById('edit-model-btn');
-        const deleteModelBtn = document.getElementById('delete-model-btn');
-
-        // Load models and conversations
-        loadModels();
-        loadConversations();
-
-        // Admin functionality
-        if (isAdmin) {
-            if (modelSelect) {
-                modelSelect.addEventListener('change', function() {
-                    const selectedModelId = this.value;
-                    editModelBtn.dataset.modelId = selectedModelId;
-                    deleteModelBtn.dataset.modelId = selectedModelId;
-                });
-            }
-
-            if (editModelBtn) {
-                editModelBtn.addEventListener('click', function() {
-                    const modelId = this.dataset.modelId;
-                    if (modelId) {
-                        window.location.href = `/models/${modelId}/edit`;
-                    } else {
-                        showFeedback('Please select a model to edit.', 'error');
-                    }
-                });
-            }
-
-            if (deleteModelBtn) {
-                deleteModelBtn.addEventListener('click', function() {
-                    const modelId = this.dataset.modelId;
-                    if (modelId) {
-                        if (confirm('Are you sure you want to delete this model? Chats using this model will be migrated to the default model.')) {
-                            fetch(`/models/${modelId}`, {
-                                method: 'DELETE',
-                                headers: {
-                                    'X-CSRFToken': getCSRFToken()
-                                },
-                            })
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.success) {
-                                    showFeedback('Model deleted successfully.', 'success');
-                                    window.location.reload();
-                                } else {
-                                    showFeedback('Error: ' + (data.error || 'Failed to delete model.'), 'error');
-                                }
-                            })
-                            .catch(error => {
-                                console.error('Error:', error);
-                                showFeedback('An error occurred while deleting the model.', 'error');
-                            });
-                        }
-                    } else {
-                        showFeedback('Please select a model to delete.', 'error');
-                    }
-                });
-            }
-        }
-
-        // Send message functionality
-        document.getElementById('send-button').addEventListener('click', sendMessage);
-        document.getElementById('message-input').addEventListener('keyup', function(event) {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                sendMessage();
-            }
-        });
-    });
-
-    function loadModels() {
-        fetch('/models')
-            .then(response => response.json())
-            .then(models => {
-                const modelSelect = document.getElementById('model-select');
-                modelSelect.innerHTML = '<option value="">Select Model</option>' +
-                    models.map(model => `
-                        <option value="${model.id}" ${model.is_default ? 'selected' : ''}>
-                            ${model.name} - Version ${model.version}
-                        </option>
-                    `).join('');
-            })
-            .catch(error => {
-                console.error('Error loading models:', error);
-                showFeedback('Failed to load models.', 'error');
-            });
-    }
-
-    function loadConversations() {
-        fetch('/conversations')
-            .then(response => response.json())
-            .then(conversations => {
-                const chatList = document.getElementById('chat-list');
-                chatList.innerHTML = conversations.map(conv => `
-                    <div class="flex items-center px-3 py-2 rounded-lg cursor-pointer hover:bg-gray-100 ${conv.id === chatId ? 'bg-gray-100' : ''}" data-id="${conv.id}">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
-                        </svg>
-                        <span class="flex-grow">${conv.title || 'Untitled Conversation'}</span>
-                        <button class="delete-conversation-btn" data-id="${conv.id}">
-                            <svg class="w-4 h-4 text-gray-500 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                            </svg>
-                        </button>
-                    </div>
-                `).join('');
-            })
-            .catch(error => {
-                console.error('Error loading conversations:', error);
-                showFeedback('Failed to load conversations.', 'error');
-            });
-    }
-
-    function sendMessage() {
-        const messageInput = document.getElementById('message-input');
-        const message = messageInput.value.trim();
-        if (!message || message.length > 1000) {
-            showFeedback(message ? "Message is too long. Maximum length is 1000 characters." : "Message cannot be empty.", "error");
-            return;
-        }
-
-        appendUserMessage(message);
-        messageInput.value = '';
-        messageInput.disabled = true;
-        document.getElementById('send-button').disabled = true;
-        showTypingIndicator();
-
-        fetch('/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCSRFToken()
-            },
-            body: JSON.stringify({ chat_id: chatId, message: message }),
-        })
-        .then(response => response.json())
-        .then(data => {
-            removeTypingIndicator();
-            if (data.response) {
-                appendAssistantMessage(data.response);
-            } else {
-                showFeedback(data.error || 'An error occurred while processing your message.', 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            removeTypingIndicator();
-            showFeedback('An error occurred while sending the message.', 'error');
-        })
-        .finally(() => {
-            messageInput.disabled = false;
-            document.getElementById('send-button').disabled = false;
-            messageInput.focus();
-        });
-    }
-
-    function appendUserMessage(message) {
-        const chatBox = document.getElementById('chat-box');
-        const userMessageDiv = document.createElement('div');
-        userMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end';
-        userMessageDiv.innerHTML = `
-            <div>
-                <div class="bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
-                    <p class="text-sm">${message}</p>
-                </div>
-                <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+                </svg>
+                <span class="flex-grow">${conv.title || 'Untitled Conversation'}</span>
+                <button class="delete-conversation-btn" data-id="${conv.id}">
+                    <svg class="w-4 h-4 text-gray-500 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                </button>
             </div>
-            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
-                <!-- User avatar placeholder -->
-            </div>
-        `;
-        chatBox.appendChild(userMessageDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    function appendAssistantMessage(message) {
-        const chatBox = document.getElementById('chat-box');
-        const assistantMessageDiv = document.createElement('div');
-        assistantMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs';
-        assistantMessageDiv.innerHTML = `
-            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
-                <!-- Assistant avatar placeholder -->
-            </div>
-            <div>
-                <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
-                    <p class="text-sm">${message}</p>
-                </div>
-                <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
-            </div>
-        `;
-        chatBox.appendChild(assistantMessageDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    function showTypingIndicator() {
-        const chatBox = document.getElementById('chat-box');
-        const typingDiv = document.createElement('div');
-        typingDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs typing-indicator';
-        typingDiv.innerHTML = `
-            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
-                <!-- Assistant avatar placeholder -->
-            </div>
-            <div>
-                <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
-                    <p class="text-sm">...</p>
-                </div>
-                <span class="text-xs text-gray-500 leading-none">Typing...</span>
-            </div>
-        `;
-        chatBox.appendChild(typingDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    function removeTypingIndicator() {
-        const chatBox = document.getElementById('chat-box');
-        const typingIndicator = chatBox.querySelector('.typing-indicator');
-        if (typingIndicator) {
-            chatBox.removeChild(typingIndicator);
-        }
-    }
-
-    function showFeedback(message, type) {
-        const feedbackDiv = document.getElementById('feedback-message');
-        feedbackDiv.textContent = message;
-        feedbackDiv.className = `fixed bottom-4 right-4 p-4 rounded-lg ${type === 'success' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700'}`;
-        feedbackDiv.classList.remove('hidden');
-        setTimeout(() => feedbackDiv.classList.add('hidden'), 3000);
-    }
-
-    function getCSRFToken() {
-        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        `).join('');
     }
 </script>
 {% endblock %}
+

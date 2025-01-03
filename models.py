@@ -1,17 +1,19 @@
 """
 models.py
 
-This module contains classes and methods for managing users, models, and chat sessions in the database.
+This module contains classes and methods for managing users, models,
+and chat sessions in the database.
 """
 
-from database import get_db
 import logging
-import re
-from urllib.parse import urlparse
-from dataclasses import dataclass, field
-from typing import Optional
 import os
+from urllib.parse import urlparse
+from dataclasses import dataclass
+from typing import Optional, List, Dict, Union, Any
+
 import requests
+
+from database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -28,26 +30,38 @@ class User:
     role: str = "user"
 
     @staticmethod
-    def get_by_id(user_id):
+    def get_by_id(user_id: int) -> Optional["User"]:
+        """
+        Retrieve a user by ID from the database.
+        """
         db = get_db()
-        user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-        if user:
-            return User(user["id"], user["username"], user["email"], user["role"])
+        user_row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if user_row:
+            return User(
+                id=user_row["id"],
+                username=user_row["username"],
+                email=user_row["email"],
+                role=user_row["role"],
+            )
         return None
 
     @property
-    def is_authenticated(self):
+    def is_authenticated(self) -> bool:
+        """Indicates whether this user is authenticated."""
         return True
 
     @property
-    def is_active(self):
+    def is_active(self) -> bool:
+        """Indicates whether this user is active."""
         return True
 
     @property
-    def is_anonymous(self):
+    def is_anonymous(self) -> bool:
+        """Indicates whether this user is anonymous."""
         return False
 
-    def get_id(self):
+    def get_id(self) -> str:
+        """Return the user ID as a string."""
         return str(self.id)
 
 
@@ -70,44 +84,89 @@ class Model:
     requires_o1_handling: bool = False
     api_version: str = "2024-10-01-preview"
     version: int = 1
+    created_at: Optional[str] = None
 
-    def __post_init__(self):
-        # Ensure id is an integer
+    def __post_init__(self) -> None:
+        """
+        Validate or adjust fields after dataclass initialization.
+        """
         self.id = int(self.id)
 
     @staticmethod
-    def get_default():
+    def get_default() -> Optional["Model"]:
+        """
+        Retrieve the default model (where is_default = 1).
+        """
         db = get_db()
-        model = db.execute("SELECT * FROM models WHERE is_default = 1").fetchone()
-        if model:
-            return Model(**dict(model))
+        row = db.execute("SELECT * FROM models WHERE is_default = 1").fetchone()
+        if row:
+            return Model(**dict(row))
         return None
 
     @staticmethod
-    def validate_api_endpoint(api_endpoint, api_key):
+    def validate_api_endpoint(api_endpoint: str, api_key: Optional[str]) -> bool:
         """
-        Validate the API endpoint and key by making a test request.
+        Validate the given API endpoint and key.
+
+        Raises:
+            ValueError: If the endpoint or key is invalid.
         """
+        # Ensure we have a proper string.
+        if not api_endpoint:
+            raise ValueError("API endpoint is required and must be a non-empty string.")
+
+        parsed_url = urlparse(api_endpoint)
+        if not parsed_url.scheme or not parsed_url.netloc:
+            raise ValueError("Invalid API endpoint URL format.")
+
+        if parsed_url.scheme != "https":
+            raise ValueError("API endpoint must use HTTPS.")
+
+        if not parsed_url.netloc.endswith(".openai.azure.com"):
+            raise ValueError(
+                "API endpoint must be an Azure OpenAI domain (*.openai.azure.com)."
+            )
+
+        if not api_key:
+            raise ValueError(
+                "Azure OpenAI API key not found. "
+                "Please set AZURE_OPENAI_KEY environment variable."
+            )
+
         try:
             response = requests.get(
-                api_endpoint, headers={"Authorization": f"Bearer {api_key}"}, timeout=5
+                api_endpoint, headers={"api-key": api_key}, timeout=5
             )
-            return response.status_code == 200
-        except Exception as e:
-            logger.error(f"API endpoint validation failed: {str(e)}")
-            return False
+        except requests.RequestException as exc:
+            logger.error("API endpoint validation failed: %s", str(exc))
+            raise ValueError(
+                "Failed to connect to API endpoint: {0}".format(str(exc))
+            ) from exc
+
+        if response.status_code == 401:
+            raise ValueError("Invalid API key.")
+        if response.status_code == 404:
+            # Base URL valid even if specific path doesn't exist
+            return True
+        if response.status_code >= 400:
+            raise ValueError(
+                "API endpoint validation failed with status {0}".format(
+                    response.status_code
+                )
+            )
+        return True
 
     @staticmethod
-    def validate_model_config(config):
+    def validate_model_config(
+        config: Dict[str, Union[str, int, float, bool, None]]
+    ) -> None:
         """
-        Validates the required fields for a model configuration.
-
-        Args:
-            config (dict): Dictionary containing model configuration.
+        Validate the required fields for a model configuration.
 
         Raises:
             ValueError: If a required field is missing or invalid.
         """
+        db = get_db()
         required_fields = [
             "name",
             "deployment_name",
@@ -116,137 +175,148 @@ class Model:
             "model_type",
             "max_completion_tokens",
         ]
-        for field in required_fields:
-            if field not in config or not config[field]:
-                raise ValueError(f"Missing required field: {field}")
+        for field_name in required_fields:
+            val = config.get(field_name)
+            if not val:
+                raise ValueError("Missing required field: {0}".format(field_name))
+            if not isinstance(val, str) and field_name in ("name", "deployment_name"):
+                raise ValueError("Field {0} must be a string.".format(field_name))
 
-        # Validate 'name' uniqueness
-        db = get_db()
-        existing_model = db.execute(
-            "SELECT id FROM models WHERE name = ?",
-            (config["name"],)
+        # Unpack and cast to str to ensure urlparse compatibility
+        endpoint_value = str(config["api_endpoint"])
+
+        # Validate uniqueness: name
+        row_name = db.execute(
+            "SELECT id FROM models WHERE name = ?", (config["name"],)
         ).fetchone()
-        if existing_model and existing_model["id"] != config.get("id"):
-            raise ValueError("Model name already exists. Please choose a different name.")
+        if row_name and row_name["id"] != config.get("id"):
+            raise ValueError("Model name already exists. Choose a different name.")
 
-        # Validate 'deployment_name' uniqueness
-        existing_model = db.execute(
+        # Validate uniqueness: deployment_name
+        row_deploy = db.execute(
             "SELECT id FROM models WHERE deployment_name = ?",
-            (config["deployment_name"],)
+            (config["deployment_name"],),
         ).fetchone()
-        if existing_model and existing_model["id"] != config.get("id"):
-            raise ValueError("Deployment name already exists. Please choose a different deployment name.")
+        if row_deploy and row_deploy["id"] != config.get("id"):
+            raise ValueError("Deployment name already exists. Choose a different one.")
 
-        # Validate 'name' uniqueness
-        db = get_db()
-        existing_model = db.execute(
-            "SELECT id FROM models WHERE name = ?",
-            (config["name"],)
-        ).fetchone()
-        if existing_model and existing_model["id"] != config.get("id"):
-            raise ValueError("Model name already exists. Please choose a different name.")
+        # Validate 'api_version' is a string
+        api_version_val = str(config["api_version"])
 
-        # Validate 'deployment_name' uniqueness
-        existing_model = db.execute(
-            "SELECT id FROM models WHERE deployment_name = ?",
-            (config["deployment_name"],)
-        ).fetchone()
-        if existing_model and existing_model["id"] != config.get("id"):
-            raise ValueError("Deployment name already exists. Please choose a different deployment name.")
-
-        # Validate 'api_endpoint'
-        parsed_url = urlparse(config["api_endpoint"])
-        if not all([parsed_url.scheme, parsed_url.netloc]):
-            raise ValueError("Invalid API endpoint URL.")
-
-        # Validate 'api_version'
         valid_api_versions = ["2024-10-01-preview", "2024-12-01-preview"]
-        if config["api_version"] not in valid_api_versions:
+        if api_version_val not in valid_api_versions:
             raise ValueError("Invalid API version specified.")
 
         # Validate 'model_type'
-        valid_model_types = ["azure", "openai"]
-        if config["model_type"] not in valid_model_types:
+        model_type_val = str(config["model_type"])
+        valid_types = ["azure", "openai"]
+        if model_type_val not in valid_types:
             raise ValueError("Invalid model_type specified.")
 
-        # Validate 'temperature'
+        # Validate temperature
+        temp_val = config.get("temperature", 1.0)
+        if temp_val is None:
+            temp_val = 1.0
         try:
-            temperature = float(config.get("temperature", 1.0))
-            if not (0 <= temperature <= 2):
-                raise ValueError("Temperature must be between 0 and 2")
-        except ValueError:
-            raise ValueError("Temperature must be a number between 0 and 2")
+            temperature = float(temp_val)
+            if temperature < 0 or temperature > 2:
+                raise ValueError("Temperature must be between 0 and 2.")
+        except ValueError as exc:
+            raise ValueError("Temperature must be a number between 0 and 2.") from exc
 
-        # Validate 'max_tokens'
-        if "max_tokens" in config and config["max_tokens"] is not None:
+        # Validate max_tokens if present
+        max_tokens_val = config.get("max_tokens")
+        if max_tokens_val is not None:
             try:
-                max_tokens = int(config["max_tokens"])
+                max_tokens = int(max_tokens_val)
                 if max_tokens <= 0:
-                    raise ValueError("Max tokens must be a positive integer")
-            except ValueError:
-                raise ValueError("Max tokens must be a positive integer")
+                    raise ValueError("Max tokens must be a positive integer.")
+            except ValueError as exc:
+                raise ValueError("Max tokens must be a positive integer.") from exc
 
-        # Validate 'max_completion_tokens'
+        # Validate max_completion_tokens
+        mc_tokens_val = config["max_completion_tokens"]
         try:
-            max_completion_tokens = int(config["max_completion_tokens"])
-            if max_completion_tokens <= 0:
-                raise ValueError("Max completion tokens must be a positive integer")
-        except ValueError:
-            raise ValueError("Max completion tokens must be a positive integer")
+            mc_tokens = int(mc_tokens_val)
+            if mc_tokens <= 0:
+                raise ValueError("Max completion tokens must be a positive integer.")
+        except ValueError as exc:
+            raise ValueError(
+                "Max completion tokens must be a positive integer."
+            ) from exc
 
-        # Validate 'requires_o1_handling'
-        if not isinstance(config.get("requires_o1_handling", False), bool):
+        # Validate requires_o1_handling
+        o1_val = config.get("requires_o1_handling", False)
+        if not isinstance(o1_val, bool):
             raise ValueError("requires_o1_handling must be a boolean.")
 
-        # Validate 'version'
-        if "version" in config:
-            try:
-                version = int(config["version"])
-                if version <= 0:
-                    raise ValueError("Version must be a positive integer.")
-            except ValueError:
+        # Validate version
+        version_val = config.get("version", 1)
+        if version_val is None:
+            version_val = 1
+        try:
+            version_int = int(version_val)
+            if version_int <= 0:
                 raise ValueError("Version must be a positive integer.")
+        except ValueError as exc:
+            raise ValueError("Version must be a positive integer.") from exc
 
-        # Validate API endpoint and key
+        # Finally, check API endpoint connectivity
         api_key = os.getenv("AZURE_OPENAI_KEY")
-        if not Model.validate_api_endpoint(config["api_endpoint"], api_key):
-            raise ValueError("Invalid API endpoint or key.")
+        Model.validate_api_endpoint(endpoint_value, api_key)
 
     @staticmethod
-    def get_all(limit=10, offset=0):
+    def get_all(limit: int = 10, offset: int = 0) -> List["Model"]:
+        """
+        Retrieve all models from the database, optionally with limit/offset.
+        """
         db = get_db()
-        models = db.execute(
-            "SELECT * FROM models ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        rows = db.execute(
+            """
+            SELECT * FROM models
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+            """,
             (limit, offset),
         ).fetchall()
-        return [Model(**dict(model)) for model in models]
+        return [Model(**dict(r)) for r in rows]
 
     @staticmethod
-    def get_by_id(model_id):
+    def get_by_id(model_id: int) -> Optional["Model"]:
+        """
+        Retrieve a model by its ID.
+        """
         db = get_db()
-        model = db.execute("SELECT * FROM models WHERE id = ?", (model_id,)).fetchone()
-        if model:
-            return Model(**dict(model))
+        row = db.execute("SELECT * FROM models WHERE id = ?", (model_id,)).fetchone()
+        if row:
+            return Model(**dict(row))
         return None
 
     @staticmethod
-    def is_model_in_use(model_id):
+    def is_model_in_use(model_id: int) -> bool:
+        """
+        Check whether a model is currently in use (default or assigned to any chat).
+        """
         db = get_db()
-        # Check if the model is default
-        default_model = db.execute(
+        default_row = db.execute(
             "SELECT id FROM models WHERE is_default = 1"
         ).fetchone()
-        if default_model and default_model["id"] == model_id:
+        if default_row and default_row["id"] == model_id:
             return True
 
-        # Check if the model is associated with any chats
-        chat_count = db.execute(
-            "SELECT COUNT(*) FROM chats WHERE model_id = ?", (model_id,)
-        ).fetchone()[0]
-        return chat_count > 0
+        count_row = db.execute(
+            "SELECT COUNT(*) as c FROM chats WHERE model_id = ?",
+            (model_id,),
+        ).fetchone()
+        if count_row and count_row["c"] > 0:
+            return True
+        return False
 
     @staticmethod
-    def get_immutable_fields(model_id):
+    def get_immutable_fields(model_id: int) -> List[str]:
+        """
+        Return a list of fields that cannot be changed if the model is in use.
+        """
         if Model.is_model_in_use(model_id):
             return [
                 "name",
@@ -258,155 +328,206 @@ class Model:
         return []
 
     @staticmethod
-    def create(config):
-        try:
-            Model.validate_model_config(config)
-        except ValueError as e:
-            logger.error("Validation failed: %s", str(e))
-            raise
+    def create(config: Dict[str, Union[str, int, float, bool, None]]) -> int:
+        """
+        Create a new model using the provided config.
 
+        Returns:
+            int: The newly-created model's ID.
+        """
+        Model.validate_model_config(config)
         db = get_db()
         cursor = db.cursor()
         cursor.execute(
             """
             INSERT INTO models
-            (name, deployment_name, description, model_type, api_endpoint, temperature, max_tokens,
-             max_completion_tokens, is_default, requires_o1_handling, api_version, version)
+            (
+                name, deployment_name, description, model_type, api_endpoint,
+                temperature, max_tokens, max_completion_tokens, is_default,
+                requires_o1_handling, api_version, version
+            )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 config["name"],
                 config["deployment_name"],
                 config.get("description", ""),
-                config.get("model_type", "azure"),
-                config["api_endpoint"],
+                str(config["model_type"]),
+                str(config["api_endpoint"]),
                 float(config.get("temperature", 1.0)),
-                int(config.get("max_tokens")) if config.get("max_tokens") else None,
+                (int(config["max_tokens"]) if config.get("max_tokens") else None),
                 int(config["max_completion_tokens"]),
-                bool(config.get("is_default", 0)),
-                bool(config.get("requires_o1_handling", 0)),
-                config["api_version"],
+                bool(config.get("is_default", False)),
+                bool(config.get("requires_o1_handling", False)),
+                str(config["api_version"]),
                 int(config.get("version", 1)),
             ),
         )
-        model_id = cursor.lastrowid
+        model_id_val: Any = cursor.lastrowid
         db.commit()
-        logger.info(f"Model created: {config['name']} with ID {model_id}")
-        return model_id
+
+        if model_id_val is None:
+            raise ValueError("Model creation failed; no ID returned.")
+
+        model_id_int = int(model_id_val)
+        logger.info("Model created: %s (ID %d)", config["name"], model_id_int)
+        return model_id_int
 
     @staticmethod
-    def update(model_id, config):
+    def update(
+        model_id: int, config: Dict[str, Union[str, int, float, bool, None]]
+    ) -> None:
+        """
+        Update an existing model. If the model is in use, certain fields cannot change.
+        """
         Model.validate_model_config(config)
         db = get_db()
-        # Fetch current model data
+
         current_model = Model.get_by_id(model_id)
         if not current_model:
             raise ValueError("Model not found.")
 
-        # Check if the model is in use and prevent changing critical fields if so
+        # If the model is in use, ensure certain fields remain unchanged
         if Model.is_model_in_use(model_id):
-            immutable_fields = Model.get_immutable_fields(model_id)
-            for field in immutable_fields:
-                if getattr(current_model, field) != config[field]:
+            immutables = Model.get_immutable_fields(model_id)
+            for f_name in immutables:
+                current_val = getattr(current_model, f_name)
+                new_val = config[f_name]
+                if str(current_val) != str(new_val):
                     raise ValueError(
-                        f"Cannot change '{field}' of a model that is in use."
+                        "Cannot change '{0}' of a model in use.".format(f_name)
                     )
 
-        # Increment version if any changes are made
         new_version = current_model.version + 1
-
         db.execute(
             """
-            UPDATE models SET
-                name = ?, deployment_name = ?, description = ?, model_type = ?, api_endpoint = ?, temperature = ?,
-                max_tokens = ?, max_completion_tokens = ?, is_default = ?, requires_o1_handling = ?, api_version = ?, version = ?
+            UPDATE models
+            SET
+                name = ?,
+                deployment_name = ?,
+                description = ?,
+                model_type = ?,
+                api_endpoint = ?,
+                temperature = ?,
+                max_tokens = ?,
+                max_completion_tokens = ?,
+                is_default = ?,
+                requires_o1_handling = ?,
+                api_version = ?,
+                version = ?
             WHERE id = ?
             """,
             (
                 config["name"],
                 config["deployment_name"],
                 config.get("description", ""),
-                config.get("model_type", "azure"),
-                config["api_endpoint"],
+                str(config["model_type"]),
+                str(config["api_endpoint"]),
                 float(config.get("temperature", 1.0)),
-                int(config.get("max_tokens")) if config.get("max_tokens") else None,
+                (int(config["max_tokens"]) if config.get("max_tokens") else None),
                 int(config["max_completion_tokens"]),
-                bool(config.get("is_default", 0)),
-                bool(config.get("requires_o1_handling", 0)),
-                config["api_version"],
+                bool(config.get("is_default", False)),
+                bool(config.get("requires_o1_handling", False)),
+                str(config["api_version"]),
                 new_version,
                 model_id,
             ),
         )
         db.commit()
         logger.info(
-            f"Model updated: {config['name']} with ID {model_id} to version {new_version}"
+            "Model updated: %s (ID %d) to version %d",
+            config["name"],
+            model_id,
+            new_version,
         )
 
     @staticmethod
-    def delete(model_id, new_model_id=None):
+    def delete(model_id: int, new_model_id: Optional[int] = None) -> None:
+        """
+        Delete a model from the database.
+
+        If the model is in use, you must provide a new_model_id to migrate chats.
+        """
         if Model.is_model_in_use(model_id):
-            if not new_model_id:
+            if new_model_id is None:
                 raise ValueError(
-                    "Cannot delete a model that is in use. Provide a new model ID to migrate chats."
+                    "Cannot delete a model in use. Provide a new model ID to migrate chats."
                 )
             db = get_db()
-            # Migrate chats to the new model
             db.execute(
                 "UPDATE chats SET model_id = ? WHERE model_id = ?",
                 (new_model_id, model_id),
             )
             db.commit()
 
+        db = get_db()
         db.execute("DELETE FROM models WHERE id = ?", (model_id,))
         db.commit()
-        logger.info(f"Model deleted with ID {model_id}")
+        logger.info("Model deleted (ID %d)", model_id)
 
     @staticmethod
-    def set_default(model_id):
+    def set_default(model_id: int) -> None:
+        """
+        Set a model as the default (is_default=1), removing
+        the default flag from any previously default model.
+        """
         db = get_db()
-        # Get the current default model
         current_default = db.execute(
             "SELECT id FROM models WHERE is_default = 1"
         ).fetchone()
         if current_default and current_default["id"] != model_id:
-            # Mark the previous default model as non-default
             db.execute(
                 "UPDATE models SET is_default = 0 WHERE id = ?",
                 (current_default["id"],),
             )
 
-        # Set the new default model
         db.execute("UPDATE models SET is_default = 1 WHERE id = ?", (model_id,))
         db.commit()
-        logger.info(f"Model set as default: {model_id}")
+        logger.info("Model set as default (ID %d)", model_id)
 
     @staticmethod
-    def get_version_history(model_id):
+    def get_version_history(
+        model_id: int,
+    ) -> List[Dict[str, Union[str, int, float, bool]]]:
+        """
+        Retrieve the version history of a model from `model_versions` table.
+        """
         db = get_db()
         versions = db.execute(
             "SELECT * FROM model_versions WHERE model_id = ? ORDER BY version DESC",
             (model_id,),
         ).fetchall()
-        return [dict(version) for version in versions]
+        return [dict(vr) for vr in versions]
 
     @staticmethod
-    def revert_to_version(model_id, version):
+    def revert_to_version(model_id: int, version_num: int) -> None:
+        """
+        Revert a model to a specific version from `model_versions` table.
+        """
         db = get_db()
         version_data = db.execute(
             "SELECT * FROM model_versions WHERE model_id = ? AND version = ?",
-            (model_id, version),
+            (model_id, version_num),
         ).fetchone()
         if not version_data:
             raise ValueError("Version not found.")
 
-        # Update the model with the version data
         db.execute(
             """
-            UPDATE models SET
-                name = ?, deployment_name = ?, description = ?, model_type = ?, api_endpoint = ?,
-                temperature = ?, max_tokens = ?, max_completion_tokens = ?, is_default = ?,
-                requires_o1_handling = ?, api_version = ?, version = ?
+            UPDATE models
+            SET
+                name = ?,
+                deployment_name = ?,
+                description = ?,
+                model_type = ?,
+                api_endpoint = ?,
+                temperature = ?,
+                max_tokens = ?,
+                max_completion_tokens = ?,
+                is_default = ?,
+                requires_o1_handling = ?,
+                api_version = ?,
+                version = ?
             WHERE id = ?
             """,
             (
@@ -426,7 +547,7 @@ class Model:
             ),
         )
         db.commit()
-        logger.info(f"Model {model_id} reverted to version {version}")
+        logger.info("Model %d reverted to version %d", model_id, version_num)
 
 
 @dataclass
@@ -440,49 +561,70 @@ class Chat:
     title: str
     model_id: Optional[int] = None
 
-    def __post_init__(self):
-        # Ensure user_id is an integer
+    def __post_init__(self) -> None:
+        """Ensure user_id is an integer."""
         self.user_id = int(self.user_id)
 
     @staticmethod
-    def get_model(chat_id):
+    def get_model(chat_id: str) -> Optional[int]:
+        """
+        Get the model_id for a given chat, if any.
+        """
         db = get_db()
-        result = db.execute(
+        row = db.execute(
             "SELECT model_id FROM chats WHERE id = ?", (chat_id,)
         ).fetchone()
-        return result["model_id"] if result else None
+        if row:
+            return row["model_id"]
+        return None
 
     @staticmethod
-    def set_model(chat_id, model_id):
+    def set_model(chat_id: str, model_id: int) -> None:
+        """
+        Associate or switch the model for a given chat.
+        """
         db = get_db()
         db.execute("UPDATE chats SET model_id = ? WHERE id = ?", (model_id, chat_id))
         db.commit()
-        logger.info(f"Model set for chat {chat_id}: Model ID {model_id}")
+        logger.info("Model set for chat %s: Model ID %d", chat_id, model_id)
 
     @staticmethod
-    def get_by_id(chat_id):
+    def get_by_id(chat_id: str) -> Optional["Chat"]:
+        """
+        Retrieve a chat by its ID.
+        """
         db = get_db()
-        chat = db.execute("SELECT * FROM chats WHERE id = ?", (chat_id,)).fetchone()
-        if chat:
+        row = db.execute("SELECT * FROM chats WHERE id = ?", (chat_id,)).fetchone()
+        if row:
             return Chat(
-                chat["id"], chat["user_id"], chat["title"], chat.get("model_id")
+                id=row["id"],
+                user_id=row["user_id"],
+                title=row["title"],
+                model_id=row.get("model_id"),
             )
         return None
 
     @staticmethod
-    def get_user_chats(user_id):
+    def get_user_chats(user_id: int) -> List[Dict[str, Union[str, int]]]:
+        """
+        Retrieve all chats for a given user in descending order of creation.
+        """
         db = get_db()
-        chats = db.execute(
-            "SELECT * FROM chats WHERE user_id = ? ORDER BY created_at DESC", (user_id,)
+        chat_rows = db.execute(
+            "SELECT * FROM chats WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,),
         ).fetchall()
-        return [dict(chat) for chat in chats]
+        return [dict(cr) for cr in chat_rows]
 
     @staticmethod
-    def create(chat_id, user_id, title):
+    def create(chat_id: str, user_id: int, title: str) -> None:
+        """
+        Create a new chat record in the database.
+        """
         db = get_db()
         db.execute(
             "INSERT INTO chats (id, user_id, title) VALUES (?, ?, ?)",
             (chat_id, user_id, title),
         )
         db.commit()
-        logger.info(f"Chat created: {chat_id} for user {user_id}")
+        logger.info("Chat created: %s for user %d", chat_id, user_id)

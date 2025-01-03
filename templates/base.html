@@ -49,6 +49,9 @@
                 {% if current_user.is_authenticated %}
                     <span class="text-gray-700">Hello, {{ current_user.username }}!</span>
                     <a href="{{ url_for('auth.logout') }}" class="text-blue-600 hover:text-blue-800">Logout</a>
+                    {% if current_user.role == 'admin' %}
+                        <a href="{{ url_for('auth.manage_users') }}" class="ml-4 hover:text-gray-300">Manage Users</a>
+                    {% endif %}
                 {% else %}
                     <a href="{{ url_for('auth.login') }}" class="text-blue-600 hover:text-blue-800">Login</a>
                     <a href="{{ url_for('auth.register') }}" class="text-blue-600 hover:text-blue-800">Register</a>

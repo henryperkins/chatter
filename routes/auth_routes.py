@@ -1,7 +1,17 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session
-from flask_login import login_user, logout_user, current_user
+from flask import (
+    Blueprint,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    flash,
+    session,
+    jsonify,
+)
+from flask_login import login_user, logout_user, current_user, login_required
 from database import get_db
 from models import User
+from decorators import admin_required  # Add this import
 import bcrypt
 import logging
 import os
@@ -73,3 +83,27 @@ def logout():
     logout_user()
     session.clear()
     return redirect(url_for("auth.login"))
+
+@bp.route("/manage-users")
+@login_required
+@admin_required
+def manage_users():
+    """Admin interface for managing user roles."""
+    db = get_db()
+
+    users = db.execute("SELECT id, username, email, role FROM users").fetchall()
+    return render_template("manage_users.html", users=users)
+
+@bp.route("/api/users/<int:user_id>/role", methods=["PUT"])
+@login_required
+@admin_required
+def update_user_role(user_id):
+    """Update a user's role."""
+    new_role = request.json.get("role")
+    if new_role not in ["user", "admin"]:
+        return jsonify({"error": "Invalid role"}), 400
+
+    db = get_db()
+    db.execute("UPDATE users SET role = ? WHERE id = ?", (new_role, user_id))
+    db.commit()
+    return jsonify({"success": True})

@@ -1,3 +1,43 @@
+// Markdown Rendering Setup
+const renderer = new marked.Renderer();
+renderer.code = function(code, language) {
+    const escapedCode = code.replace(/</g, '<').replace(/>/g, '>');
+    return `
+        <div class="code-block">
+            <pre><code class="${language || ''}">${escapedCode}</code></pre>
+            <button class="copy-button" onclick="copyCode(this)">Copy</button>
+        </div>
+    `;
+};
+
+marked.setOptions({
+    breaks: true,
+    gfm: true,
+    sanitize: true,
+    renderer: renderer
+});
+
+function renderMarkdown(content) {
+    return marked.parse(content);
+}
+
+function copyCode(button) {
+    const code = button.previousElementSibling?.textContent;
+    if (code) {
+        navigator.clipboard.writeText(code)
+            .then(() => {
+                button.textContent = 'Copied!';
+                setTimeout(() => button.textContent = 'Copy', 2000);
+            })
+            .catch(err => {
+                console.error('Failed to copy:', err);
+                button.textContent = 'Failed';
+                setTimeout(() => button.textContent = 'Copy', 2000);
+            });
+    }
+}
+
+// Chat Functionality
 document.addEventListener('DOMContentLoaded', function() {
     const chatBox = document.getElementById('chat-box');
     const messageInput = document.getElementById('message-input');
@@ -10,7 +50,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const feedbackMessage = document.getElementById('feedback-message');
 
     let chatId = sessionStorage.getItem('chat_id') || '';
+    const isAdmin = document.body.dataset.isAdmin === 'true';
 
+    // Convert existing messages to markdown
+    document.querySelectorAll('.markdown-content').forEach(el => {
+        el.innerHTML = renderMarkdown(el.textContent);
+    });
+
+    // Textarea height adjustment
     function adjustTextareaHeight(textarea) {
         textarea.style.height = 'auto';
         textarea.style.height = (textarea.scrollHeight) + 'px';
@@ -20,6 +67,33 @@ document.addEventListener('DOMContentLoaded', function() {
         adjustTextareaHeight(this);
     });
 
+    // New Chat functionality
+    if (newChatBtn) {
+        newChatBtn.addEventListener('click', async function() {
+            try {
+                const response = await fetch('/new_chat', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken()
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        window.location.href = '/chat_interface';
+                    }
+                } else {
+                    showFeedback('Failed to create new chat', 'error');
+                }
+            } catch (error) {
+                console.error('Error creating new chat:', error);
+                showFeedback('Error creating new chat', 'error');
+            }
+        });
+    }
+
+    // Conversation Management
     async function loadConversations() {
         try {
             const response = await fetch('/conversations', {
@@ -55,20 +129,6 @@ document.addEventListener('DOMContentLoaded', function() {
         `).join('');
     }
 
-    conversationList.addEventListener('click', async function(event) {
-        const target = event.target;
-        const conversationItem = target.closest('div[data-id]');
-        const deleteBtn = target.closest('.delete-conversation-btn');
-
-        if (deleteBtn) {
-            const conversationId = deleteBtn.dataset.id;
-            await deleteConversation(conversationId, event);
-        } else if (conversationItem) {
-            const conversationId = conversationItem.dataset.id;
-            await loadConversation(conversationId);
-        }
-    });
-
     async function loadConversation(conversationId) {
         try {
             const response = await fetch(`/load_chat/${conversationId}`, {
@@ -76,82 +136,48 @@ document.addEventListener('DOMContentLoaded', function() {
                     'X-CSRFToken': getCSRFToken()
                 }
             });
+
             if (response.ok) {
                 const data = await response.json();
-
-                // Clear the current chat messages
                 chatBox.innerHTML = '';
 
-                // Append the messages to the chatbox
-                appendMessages(data.messages);
-
-                // Update the session storage with the current chat_id
+                // Update chat ID in session storage
                 sessionStorage.setItem('chat_id', conversationId);
                 chatId = conversationId;
 
-                // Update the URL without reloading the page
+                // Update messages
+                if (data.messages) {
+                    data.messages.forEach(msg => {
+                        if (msg.role === 'user') {
+                            appendUserMessage(msg.content, msg.timestamp);
+                        } else if (msg.role === 'assistant') {
+                            appendAssistantMessage(msg.content, msg.timestamp);
+                        }
+                    });
+                }
+
+                // Update URL without page reload
                 history.pushState({}, '', `/chat_interface?chat_id=${conversationId}`);
 
-                // Highlight the selected conversation in the sidebar
+                // Update visual selection
                 document.querySelectorAll('.conversation-item').forEach(item => {
                     item.classList.remove('bg-gray-100');
                 });
-                const currentConversationItem = document.querySelector(`.conversation-item[data-id="${conversationId}"]`);
+                const currentConversationItem = document.querySelector(`[data-id="${conversationId}"]`);
                 if (currentConversationItem) {
                     currentConversationItem.classList.add('bg-gray-100');
                 }
             } else {
                 const errorData = await response.json();
-                showFeedback(errorData.error || 'Failed to load conversation.', 'error');
+                showFeedback(errorData.error || 'Failed to load conversation', 'error');
             }
         } catch (error) {
             console.error('Error loading conversation:', error);
-            showFeedback('Failed to load conversation.', 'error');
+            showFeedback('Error loading conversation', 'error');
         }
     }
 
-    async function deleteConversation(conversationId, event) {
-        event.stopPropagation();
-        if (confirm('Are you sure you want to delete this conversation?')) {
-            try {
-                const response = await fetch(`/delete_chat/${conversationId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRFToken': getCSRFToken()
-                    }
-                });
-                if (response.ok) {
-                    // Check if the current chat is the one being deleted
-                    if (conversationId === chatId) {
-                        // Redirect to new chat only if the current chat is deleted
-                        window.location.href = '/new_chat';
-                    } else {
-                        // Otherwise, just reload the conversations
-                        await loadConversations();
-                        showFeedback('Conversation deleted.', 'success');
-                    }
-                } else {
-                   const errorData = await response.json();
-                   showFeedback(errorData.error || 'Failed to delete conversation.', 'error');
-                }
-            } catch (error) {
-                console.error('Error deleting conversation:', error);
-                showFeedback('Failed to delete conversation.', 'error');
-            }
-        }
-    }
-
-     function appendMessages(messages) {
-        messages.forEach(message => {
-            if (message.role === 'user') {
-                appendUserMessage(message.content, message.timestamp);
-            } else if (message.role === 'assistant') {
-                appendAssistantMessage(message.content, message.timestamp);
-            }
-        });
-       chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
+    // Message Handling
     async function sendMessage() {
         const message = messageInput.value.trim();
         if (!message) {
@@ -162,7 +188,6 @@ document.addEventListener('DOMContentLoaded', function() {
             showFeedback("Message is too long. Maximum length is 1000 characters.", "error");
             return;
         }
-
 
         appendUserMessage(message);
         messageInput.value = '';
@@ -176,7 +201,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': getCSRFToken() // Include CSRF token here
+                    'X-CSRFToken': getCSRFToken()
                 },
                 body: JSON.stringify({ chat_id: chatId, message: message }),
             });
@@ -191,8 +216,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } else {
                 const errorData = await response.json();
-                 removeTypingIndicator();
-                 showFeedback(errorData.error || 'An error occurred while processing your message.', 'error');
+                removeTypingIndicator();
+                showFeedback(errorData.error || 'An error occurred while processing your message.', 'error');
             }
         } catch (error) {
             console.error('Error:', error);
@@ -205,21 +230,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Message Display Functions
     function appendUserMessage(message, timestamp = null) {
         const userMessageDiv = document.createElement('div');
         userMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end';
-         const formattedTimestamp = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()
+        const formattedTimestamp = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
         userMessageDiv.innerHTML = `
             <div>
                 <div class="bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
-                    <p class="text-sm">${message}</p>
+                    <div class="text-sm markdown-content">${message}</div>
                 </div>
                 <span class="text-xs text-gray-500 leading-none">${formattedTimestamp}</span>
             </div>
-            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
-                <!-- User avatar placeholder -->
-            </div>
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
         `;
+        userMessageDiv.querySelector('.markdown-content').innerHTML = renderMarkdown(message);
         chatBox.appendChild(userMessageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
@@ -227,29 +252,27 @@ document.addEventListener('DOMContentLoaded', function() {
     function appendAssistantMessage(message, timestamp = null) {
         const assistantMessageDiv = document.createElement('div');
         assistantMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs';
-         const formattedTimestamp = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString()
+        const formattedTimestamp = timestamp ? new Date(timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
         assistantMessageDiv.innerHTML = `
-            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
-                <!-- Assistant avatar placeholder -->
-            </div>
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
             <div>
                 <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
-                    <p class="text-sm">${message}</p>
+                    <div class="text-sm markdown-content">${message}</div>
                 </div>
                 <span class="text-xs text-gray-500 leading-none">${formattedTimestamp}</span>
             </div>
         `;
+        assistantMessageDiv.querySelector('.markdown-content').innerHTML = renderMarkdown(message);
         chatBox.appendChild(assistantMessageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
+    // Typing Indicator
     function showTypingIndicator() {
-        const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs typing-indicator';
-        loadingDiv.innerHTML = `
-            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
-                <!-- Assistant avatar placeholder -->
-            </div>
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs typing-indicator';
+        typingDiv.innerHTML = `
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
             <div>
                 <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
                     <p class="text-sm">...</p>
@@ -257,7 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span class="text-xs text-gray-500 leading-none">Typing...</span>
             </div>
         `;
-        chatBox.appendChild(loadingDiv);
+        chatBox.appendChild(typingDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
@@ -268,47 +291,92 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Feedback Messages
     function showFeedback(message, type) {
         feedbackMessage.textContent = message;
-         feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${type === 'success' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700'}`;
+        feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${type === 'success' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700'}`;
         feedbackMessage.classList.remove('hidden');
         setTimeout(() => feedbackMessage.classList.add('hidden'), 3000);
     }
 
+    // Admin Model Management
+    if (isAdmin) {
+        if (modelSelect) {
+            modelSelect.addEventListener('change', function() {
+                const selectedModelId = this.value;
+                editModelBtn.dataset.modelId = selectedModelId;
+                deleteModelBtn.dataset.modelId = selectedModelId;
+            });
 
+            editModelBtn.addEventListener('click', function() {
+                const modelId = this.dataset.modelId;
+                if (modelId) {
+                    window.location.href = `/models/${modelId}/edit`;
+                } else {
+                    showFeedback('Please select a model to edit.', 'error');
+                }
+            });
+
+            deleteModelBtn.addEventListener('click', function() {
+                const modelId = this.dataset.modelId;
+                if (modelId) {
+                    if (confirm('Are you sure you want to delete this model? Chats using this model will be migrated to the default model.')) {
+                        fetch(`/models/${modelId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'X-CSRFToken': getCSRFToken()
+                            },
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                showFeedback('Model deleted successfully.', 'success');
+                                window.location.reload();
+                            } else {
+                                showFeedback('Error: ' + (data.error || 'Failed to delete model.'), 'error');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            showFeedback('An error occurred while deleting the model.', 'error');
+                        });
+                    }
+                } else {
+                    showFeedback('Please select a model to delete.', 'error');
+                }
+            });
+        }
+    }
+
+    // CSRF Token Helper
     function getCSRFToken() {
         return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     }
 
-     // Handle model selection change event.
-     if (modelSelect) {
-         modelSelect.addEventListener('change', async function() {
-            const selectedModelId = this.value;
-            try{
-            const response = await fetch(`/models/default/${selectedModelId}`, {
-                method: 'POST',
-                headers: {
-                  'X-CSRFToken': getCSRFToken()
-                }
-            });
-            if(response.ok) {
-                showFeedback('Default model updated.', 'success');
-                // You may want to reload models here, but not required.
+    // Initial Setup
+    loadConversations();
+    adjustTextareaHeight(messageInput);
 
-            }
-            else {
-                const errorData = await response.json();
-                showFeedback(errorData.error || "Failed to update default model.", "error");
-            }
-            } catch(error) {
-                 console.error('Error updating default model: ', error);
-                  showFeedback("Failed to update default model.", "error");
-            }
-        });
-    }
+    // Event Listeners
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keyup', function(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+    });
 
+    conversationList.addEventListener('click', async function(event) {
+        const target = event.target;
+        const conversationItem = target.closest('div[data-id]');
+        const deleteBtn = target.closest('.delete-conversation-btn');
 
-     // Initial setup
-     loadConversations();
-     adjustTextareaHeight(messageInput);
-     });
+        if (deleteBtn) {
+            const conversationId = deleteBtn.dataset.id;
+            await deleteConversation(conversationId, event);
+        } else if (conversationItem) {
+            const conversationId = conversationItem.dataset.id;
+            await loadConversation(conversationId);
+        }
+    });
+});
