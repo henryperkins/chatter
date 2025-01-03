@@ -46,52 +46,33 @@ def get_azure_client():
 
 
 def initialize_client_from_model(model_config):
-    """Initialize and return the client using model configuration.
-
-    Args:
-        model_config (dict): The model configuration dictionary.
-
-    Returns:
-        Tuple[AzureOpenAI, str, float, int, int]: The Azure OpenAI client, deployment name, temperature, max_tokens and max_completion_tokens.
-
-    Raises:
-        ValueError: If required fields are missing or if the model type is unsupported.
-    """
-    if not model_config:
-        raise ValueError("Model configuration is required.")
-
-    if model_config.get("model_type") != "azure":
-        raise ValueError(f"Unsupported model type: {model_config.get('model_type')}")
-
-    # Retrieve required configuration from the model config
+    """Initialize Azure OpenAI client from model configuration."""
     api_endpoint = model_config.get("api_endpoint")
+    api_key = model_config.get("api_key")
+    api_version = model_config.get("api_version")
     deployment_name = model_config.get("deployment_name")
-    api_version = model_config.get("api_version", "2024-12-01-preview")
-    temperature = model_config.get("temperature", 1.0)
+    temperature = model_config.get("temperature", 0.7)
     max_tokens = model_config.get("max_tokens")
     max_completion_tokens = model_config.get("max_completion_tokens")
     requires_o1_handling = model_config.get("requires_o1_handling", False)
 
-    # Handle o1-preview specific requirements
+    if not all([api_endpoint, api_key, api_version, deployment_name]):
+        raise ValueError("Missing required configuration parameters")
+
     if requires_o1_handling:
+        # Enforce o1-preview specific requirements
         api_version = "2024-12-01-preview"
-        temperature = 1
-        max_tokens = None  # max_tokens is not used for o1-preview
+        temperature = 1  # Fixed temperature for o1-preview models
+        max_tokens = None  # max_tokens is not used for o1-preview models
 
-    # Validate required configuration fields
-    if not all([api_endpoint, deployment_name]):
-        raise ValueError("Model configuration is missing required fields.")
-
-    # Retrieve API key from environment variable
-    api_key = os.getenv("AZURE_OPENAI_KEY")
-    if not api_key:
-        raise ValueError("AZURE_OPENAI_KEY environment variable not set.")
+        if not max_completion_tokens:
+            raise ValueError("max_completion_tokens is required for models requiring o1 handling")
 
     # Initialize the Azure OpenAI client
     client = AzureOpenAI(
         azure_endpoint=api_endpoint,
         api_key=api_key,
-        api_version=api_version,
+        api_version=api_version
     )
 
     return client, deployment_name, temperature, max_tokens, max_completion_tokens

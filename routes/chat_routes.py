@@ -20,8 +20,8 @@ from flask import (
     request,
     session,
     url_for,
-    Response,
 )
+from flask import Response
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from markupsafe import escape
@@ -31,7 +31,7 @@ from chat_utils import generate_new_chat_id, count_tokens
 from conversation_manager import ConversationManager
 from database import get_db
 from models import Chat, Model
-from azure_config import get_azure_client, initialize_client_from_model
+from azure_config import get_azure_client
 
 bp = Blueprint("chat", __name__)
 conversation_manager = ConversationManager()
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx", ".py", ".js", ".md", ".jpg", ".png"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
 MAX_FILE_CONTENT_LENGTH = 6000  # Characters
-MAX_INPUT_TOKENS = 4000 # Tokens
+MAX_INPUT_TOKENS = 4000  # Tokens
 
 
 @bp.route("/")
@@ -203,40 +203,57 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
     user_message = escape(user_message)
 
     try:
-        # Retrieve uploaded file contents associated with this chat
-        uploaded_contents = session.get('uploaded_files_content', {}).get(chat_id, [])
+        # Retrieve uploaded file contents from both session and request
+        session_files = session.get('uploaded_files_content', {}).get(chat_id, [])
+        request_files = data.get('files', [])
 
-        # Prepare the combined message
+        # Combine both sources of files
+        all_files = session_files + [
+            {'filename': f['name'], 'content': f['content']}
+            for f in request_files
+        ]
+
+        # Prepare the combined message with explicit file context
         combined_message = user_message
-        for file_info in uploaded_contents:
-            filename = escape(file_info['filename'])
-            content = escape(file_info['content'])
+        if all_files:
+            combined_message += "\n\n--- Files Attached ---\n"
+            combined_message += "Here are the contents of the files I'm sharing with you:\n"
 
-            # Append the file content to the user's message
-            combined_message += f"\n\n[Content from file '{filename}']\n{content}"
-        
+            for file_info in all_files:
+                filename = escape(file_info['filename'])
+                content = escape(file_info['content'])
+
+                # Format file content as part of the user's message
+                combined_message += f"\n### File: {filename}\n"
+                combined_message += "```\n"
+                combined_message += content
+                combined_message += "\n```\n"
+                combined_message += "Please analyze this file content and incorporate it into your response.\n"
+
         combined_message_tokens = count_tokens(combined_message)
         if combined_message_tokens > MAX_INPUT_TOKENS:
             return jsonify({"error": "The combined message exceeds the maximum allowed length."}), 400
 
+        # Initialize session dictionary if it doesn't exist
+        if 'uploaded_files_content' not in session:
+            session['uploaded_files_content'] = {}
+        if chat_id not in session['uploaded_files_content']:
+            session['uploaded_files_content'][chat_id] = []
+
         # Clear the uploaded contents after use
         session['uploaded_files_content'][chat_id] = []
 
-        # For o1-preview, only one user message is allowed, so we send the combined 
-message
+        # For o1-preview, only one user message is allowed, so we send the combined message
         api_messages = [{"role": "user", "content": combined_message}]
 
         # Initialize the model parameters
         client, deployment_name = get_azure_client()
-        temperature = 1  # o1-preview requires temperature to be 1
-        max_completion_tokens = 500  # Adjust as needed or retrieve from model config
 
-        # Prepare the API parameters
+        # Prepare the API parameters for o1-preview
         api_params = {
             "model": deployment_name,
             "messages": api_messages,
-            "temperature": temperature,
-            "max_completion_tokens": max_completion_tokens,
+            "temperature": 1  # Fixed at 1 for o1-preview
         }
 
         # Send the request to the AI model
@@ -248,7 +265,8 @@ message
             if response.choices and response.choices[0].message
             else "The assistant was unable to generate a response."
         )
-        model_response = escape(model_response)
+        # Only escape user input, not model responses
+        model_response = model_response
 
         logger.info("Response from the model: %s", model_response)
 
@@ -257,10 +275,10 @@ message
         conversation_manager.add_message(chat_id, "assistant", model_response)
 
         # Log usage
-        usage_info = getattr(response, "usage", None)
-        prompt_tokens = usage_info.prompt_tokens if usage_info else 0
-        completion_tokens = usage_info.completion_tokens if usage_info else 0
-        total_tokens = usage_info.total_tokens if usage_info else 0
+        usage_info = response.usage if hasattr(response, "usage") else None
+        prompt_tokens = getattr(usage_info, "prompt_tokens", 0)
+        completion_tokens = getattr(usage_info, "completion_tokens", 0)
+        total_tokens = getattr(usage_info, "total_tokens", 0)
         logger.info(
             "API usage - Prompt: %d, Completion: %d, Total: %d",
             prompt_tokens,

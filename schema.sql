@@ -69,6 +69,15 @@ CREATE TABLE IF NOT EXISTS model_versions (
     FOREIGN KEY (model_id) REFERENCES models (id) ON DELETE CASCADE
 );
 
+-- Uploaded Files table
+CREATE TABLE IF NOT EXISTS uploaded_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    filepath TEXT NOT NULL,
+    FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
+);
+
 -- Indexes for faster queries
 CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats (user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id);

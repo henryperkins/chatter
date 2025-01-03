@@ -22,7 +22,6 @@ from wtforms.validators import (
     ValidationError,
 )
 from models import Model
-import re
 from database import get_db  # Import to access the database in validation methods
 
 
@@ -103,6 +102,14 @@ class ModelForm(FlaskForm):
                 raise ValidationError("Invalid API endpoint")
         except ValueError as e:
             raise ValidationError(str(e))
+
+    def validate_max_completion_tokens(self, field):
+        if self.requires_o1_handling.data and not field.data:
+            raise ValidationError("max_completion_tokens is required for models that require o1 handling")
+
+    def validate_api_version(self, field):
+        if self.requires_o1_handling.data and field.data != "2024-12-01-preview":
+            raise ValidationError("API Version must be '2024-12-01-preview' for models requiring o1 handling")
 
 
 class StrongPassword:

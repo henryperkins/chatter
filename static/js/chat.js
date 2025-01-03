@@ -180,14 +180,32 @@ document.addEventListener('DOMContentLoaded', function() {
     // Message Handling
     async function sendMessage() {
         const message = messageInput.value.trim();
-        if (!message) {
-            showFeedback("Message cannot be empty.", "error");
+        if (!message && !document.querySelector('#file-list').children.length) {
+            showFeedback("Please enter a message or upload files.", "error");
             return;
         }
         if (message.length > 1000) {
             showFeedback("Message is too long. Maximum length is 1000 characters.", "error");
             return;
         }
+
+        // Get uploaded file contents
+        const fileContents = [];
+        const fileList = document.querySelectorAll('#file-list div');
+        fileList.forEach(fileDiv => {
+            const fileName = fileDiv.textContent
+                .replace('×', '') // Remove the remove button text
+                .trim();
+
+            // Get content from sessionStorage
+            const fileData = JSON.parse(sessionStorage.getItem(`file_${fileName}`));
+            if (fileData) {
+                fileContents.push({
+                    name: fileName,
+                    content: fileData.content
+                });
+            }
+        });
 
         appendUserMessage(message);
         messageInput.value = '';
@@ -203,7 +221,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCSRFToken()
                 },
-                body: JSON.stringify({ chat_id: chatId, message: message }),
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    message: message,
+                    files: fileContents
+                }),
             });
 
             if (response.ok) {
@@ -352,6 +374,86 @@ document.addEventListener('DOMContentLoaded', function() {
     function getCSRFToken() {
         return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     }
+
+    // File Upload Handling
+    const fileInput = document.getElementById('file-input');
+    const uploadButton = document.getElementById('upload-button');
+
+    uploadButton.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', async function() {
+        if (!this.files || this.files.length === 0) return;
+
+        const formData = new FormData();
+        for (const file of this.files) {
+            formData.append('file', file);
+        }
+
+        uploadButton.disabled = true;
+        uploadButton.innerHTML = `
+            <div class="flex items-center">
+                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Uploading...
+            </div>
+        `;
+
+        try {
+            const response = await fetch('/upload', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: formData
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    showFeedback('Files uploaded successfully!', 'success');
+                    // Show uploaded files
+                    const uploadedFilesDiv = document.getElementById('uploaded-files');
+                    const fileListDiv = document.getElementById('file-list');
+                    fileListDiv.innerHTML = ''; // Clear previous files
+
+                    Array.from(this.files).forEach(file => {
+                        const fileDiv = document.createElement('div');
+                        fileDiv.className = 'flex items-center bg-white px-2 py-1 rounded border text-sm';
+                        fileDiv.innerHTML = `
+                            <svg class="w-4 h-4 mr-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                            </svg>
+                            ${file.name}
+                            <button class="ml-2 text-red-500 hover:text-red-700" onclick="removeFile(this)">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        `;
+                        fileListDiv.appendChild(fileDiv);
+                    });
+
+                    uploadedFilesDiv.classList.remove('hidden');
+                } else {
+                    showFeedback(data.error || 'Failed to upload files', 'error');
+                }
+            } else {
+                const errorData = await response.json();
+                showFeedback(errorData.error || 'Failed to upload files', 'error');
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            showFeedback('An error occurred during upload', 'error');
+        } finally {
+            uploadButton.disabled = false;
+            uploadButton.innerHTML = `
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                </svg>
+                Upload
+            `;
+            fileInput.value = ''; // Clear input
+        }
+    });
 
     // Initial Setup
     loadConversations();

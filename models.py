@@ -628,3 +628,40 @@ class Chat:
         )
         db.commit()
         logger.info("Chat created: %s for user %d", chat_id, user_id)
+
+
+@dataclass
+class UploadedFile:
+    """Represents an uploaded file associated with a chat."""
+
+    id: int
+    chat_id: str
+    filename: str
+    filepath: str
+
+    @staticmethod
+    def create(chat_id: str, filename: str, filepath: str) -> None:
+        """Insert a new uploaded file record into the database."""
+        db = get_db()
+        db.execute(
+            "INSERT INTO uploaded_files (chat_id, filename, filepath) VALUES (?, ?, ?)",
+            (chat_id, filename, filepath)
+        )
+        db.commit()
+
+    @staticmethod
+    def get_by_chat_and_filename(chat_id: str, filename: str) -> Optional['UploadedFile']:
+        """Retrieve an uploaded file by chat ID and filename."""
+        db = get_db()
+        row = db.execute(
+            "SELECT * FROM uploaded_files WHERE chat_id = ? AND filename = ?",
+            (chat_id, filename)
+        ).fetchone()
+        if row:
+            return UploadedFile(
+                id=row['id'],
+                chat_id=row['chat_id'],
+                filename=row['filename'],
+                filepath=row['filepath']
+            )
+        return None

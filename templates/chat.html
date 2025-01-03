@@ -96,8 +96,23 @@
                 {% endfor %}
             </div>
 
+            <!-- Uploaded Files List -->
+            <div id="uploaded-files" class="hidden bg-gray-50 p-2 border-b">
+                <div class="text-sm text-gray-500 mb-1">Uploaded files:</div>
+                <div id="file-list" class="flex flex-wrap gap-2"></div>
+            </div>
+
             <!-- Message Input -->
             <div class="flex flex-row items-center h-16 rounded-xl bg-white w-full px-4">
+                <div class="flex items-center mr-4">
+                    <input type="file" id="file-input" class="hidden" multiple accept=".txt,.pdf,.docx,.py,.js,.md,.jpg,.png">
+                    <button id="upload-button" class="flex items-center justify-center bg-gray-500 hover:bg-gray-600 rounded-xl text-white px-4 py-2 flex-shrink-0 focus:outline focus:outline-2 focus:outline-gray-300">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                        </svg>
+                        Upload
+                    </button>
+                </div>
                 <div class="flex-grow ml-4">
                     <div class="relative w-full">
                         <label for="message-input" class="sr-only">Type your message</label>
