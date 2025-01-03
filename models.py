@@ -120,17 +120,22 @@ class Model:
             if field not in config or not config[field]:
                 raise ValueError(f"Missing required field: {field}")
 
-        # Validate 'name'
-        if not re.match(r"^[\w\s\-]+$", config["name"]):
-            raise ValueError(
-                "Model name can only contain letters, numbers, spaces, underscores, and hyphens."
-            )
+        # Validate 'name' uniqueness
+        db = get_db()
+        existing_model = db.execute(
+            "SELECT id FROM models WHERE name = ?",
+            (config["name"],)
+        ).fetchone()
+        if existing_model and existing_model["id"] != config.get("id"):
+            raise ValueError("Model name already exists. Please choose a different name.")
 
-        # Validate 'deployment_name'
-        if not re.match(r"^[\w\-]+$", config["deployment_name"]):
-            raise ValueError(
-                "Deployment name can only contain letters, numbers, underscores, and hyphens."
-            )
+        # Validate 'deployment_name' uniqueness
+        existing_model = db.execute(
+            "SELECT id FROM models WHERE deployment_name = ?",
+            (config["deployment_name"],)
+        ).fetchone()
+        if existing_model and existing_model["id"] != config.get("id"):
+            raise ValueError("Deployment name already exists. Please choose a different deployment name.")
 
         # Validate 'api_endpoint'
         parsed_url = urlparse(config["api_endpoint"])

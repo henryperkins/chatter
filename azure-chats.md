@@ -358,7 +358,7 @@ To implement robust server-side validation for all inputs and enhance user feedb
 
       function showFeedback(message, type) {
           feedbackMessage.textContent = message;
-          feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
+          feedbackMessage.className = `p-4 rounded-lg mt-4 ${type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
           feedbackMessage.classList.remove('hidden');
           setTimeout(() => feedbackMessage.classList.add('hidden'), 5000);
       }

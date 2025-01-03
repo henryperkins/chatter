@@ -9,6 +9,7 @@ from wtforms.validators import (
     ValidationError,
 )
 import re
+from database import get_db  # Import to access the database in validation methods
 
 
 class StrongPassword(object):
@@ -65,3 +66,17 @@ class RegistrationForm(FlaskForm):
             EqualTo("password", message="Passwords must match."),
         ],
     )
+
+    def validate_username(self, field):
+        username = field.data.strip()
+        db = get_db()
+        existing_user = db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if existing_user:
+            raise ValidationError("Username already exists. Please choose a different username.")
+
+    def validate_email(self, field):
+        email = field.data.strip()
+        db = get_db()
+        existing_user = db.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+        if existing_user:
+            raise ValidationError("Email already registered. Please use a different email.")

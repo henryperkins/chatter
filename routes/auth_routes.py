@@ -44,15 +44,10 @@ def register():
         email = form.email.data.strip()
         password = form.password.data.strip()
 
-        db = get_db()
-        existing_user = db.execute(
-            "SELECT id FROM users WHERE username = ? OR email = ?",
-            (username, email),
-        ).fetchone()
-
-        if existing_user:
-            flash("Username or email already exists", "error")
-            return render_template("register.html", form=form)
+        # Flash form errors
+        for field_name, errors in form.errors.items():
+            for error in errors:
+                flash(f"{getattr(form, field_name).label.text}: {error}", "error")
 
         hashed_password = bcrypt.hashpw(
             password.encode("utf-8"), bcrypt.gensalt(rounds=12)
