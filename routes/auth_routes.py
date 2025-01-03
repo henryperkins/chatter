@@ -6,6 +6,8 @@ import bcrypt
 import logging
 import os
 from forms import LoginForm, RegistrationForm
+from chat_utils import generate_new_chat_id
+from models import Chat
 
 logger = logging.getLogger(__name__)
 
