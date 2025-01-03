@@ -48,17 +48,16 @@ def get_models():
 @admin_required
 def create_model():
     """Create a new model."""
+    logger.info("Received request to create a model")
     data = request.get_json()
     if not data:
+        logger.error("Invalid request data")
         return jsonify({"error": "Invalid request data", "success": False}), 400
 
     try:
         model_id = Model.create(data)
         logger.info("Model created successfully: %s", data["name"])
         return jsonify({"id": model_id, "success": True})
-    except ValueError as e:
-        logger.error("Validation error during model creation: %s", str(e))
-        return jsonify({"error": str(e), "success": False}), 400
     except ValueError as e:
         logger.error("Validation error during model creation: %s", str(e))
         return jsonify({"error": str(e), "success": False}), 400
