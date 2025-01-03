@@ -64,10 +64,11 @@
     <div id="feedback-message" class="hidden mt-4"></div>
 </div>
 
-<script>
+<script type="module">
+import { showFeedback, getCSRFToken } from '/static/js/chat.js';
+
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('model-form');
-    const feedbackMessage = document.getElementById('feedback-message');
 
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -92,32 +93,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify(data)
             });
 
-            if (response.ok) {
+            const result = await response.json();
+
+            if (response.ok && result.success) {
                 showFeedback('Model added successfully!', 'success');
                 setTimeout(() => window.location.href = '/chat_interface', 2000);
             } else {
-                const error = await response.json();
-                showFeedback('Error: ' + (error.error || 'Failed to add model.'), 'error');
+                showFeedback('Error: ' + (result.error || 'Failed to add model.'), 'error');
             }
         } catch (error) {
             showFeedback('Error: ' + error.message, 'error');
         }
     });
-
-    document.getElementById('cancel-model-btn').addEventListener('click', function() {
-        window.location.href = '/chat_interface';
-    });
-
-    function showFeedback(message, type) {
-        feedbackMessage.textContent = message;
-        feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${type === 'success' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700'}`;
-        feedbackMessage.classList.remove('hidden');
-        setTimeout(() => feedbackMessage.classList.add('hidden'), 3000);
-    }
-
-    function getCSRFToken() {
-        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    }
 });
 </script>
 {% endblock %}
