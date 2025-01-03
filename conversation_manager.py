@@ -33,6 +33,7 @@ class ConversationManager:
             "SELECT role, content FROM messages WHERE chat_id = ? ORDER BY timestamp",
             (chat_id,),
         ).fetchall()
+        # Include all messages, including 'system' messages
         return [{"role": msg["role"], "content": msg["content"]} for msg in messages]
 
     def add_message(self, chat_id: str, role: str, content: str) -> None:
@@ -40,7 +41,7 @@ class ConversationManager:
 
         Args:
             chat_id (str): The unique identifier for the chat session.
-            role (str): The role of the sender ('user' or 'assistant').
+            role (str): The role of the sender ('user', 'assistant', 'system').
             content (str): The message content.
         """
         db = get_db()

@@ -27,7 +27,7 @@ from werkzeug.utils import secure_filename
 from markupsafe import escape
 
 from chat_api import scrape_data
-from chat_utils import generate_new_chat_id
+from chat_utils import generate_new_chat_id, count_tokens
 from conversation_manager import ConversationManager
 from database import get_db
 from models import Chat, Model
@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx", ".py", ".js", ".md", ".jpg", ".png"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
 MAX_FILE_CONTENT_LENGTH = 6000  # Characters
+MAX_INPUT_TOKENS = 4000 # Tokens
 
 
 @bp.route("/")
@@ -111,7 +112,10 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         return jsonify({"error": "Chat not found or access denied"}), 403
 
     messages = conversation_manager.get_context(chat_id)
-    return jsonify({"messages": messages})
+    # Exclude 'system' messages from being sent to the frontend
+    messages_to_send = [msg for msg in messages if msg['role'] != 'system']
+
+    return jsonify({"messages": messages_to_send})
 
 
 @bp.route("/delete_chat/<chat_id>", methods=["DELETE"])
@@ -189,84 +193,87 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         return jsonify({"error": "Invalid request data"}), 400
 
     user_message = data.get("message")
+
+    # Input sanitization
     if not user_message:
         return jsonify({"error": "Message cannot be empty."}), 400
     if len(user_message) > 1000:
         return jsonify({"error": "Message is too long. Max length is 1000 chars."}), 400
 
     user_message = escape(user_message)
-    conversation_manager.add_message(chat_id, "user", user_message)
 
     try:
-        # Retrieve uploaded file content associated with this chat
-        uploaded_contents = session.get("uploaded_files_content", {}).get(chat_id, [])
+        # Retrieve uploaded file contents associated with this chat
+        uploaded_contents = session.get('uploaded_files_content', {}).get(chat_id, [])
 
-        # Convert uploaded contents into user messages
-        file_context_messages = []
+        # Prepare the combined message
+        combined_message = user_message
         for file_info in uploaded_contents:
-            # Format file content as a user message
-            filename = escape(file_info["filename"])
-            content = escape(file_info["content"])
-            
-            # Include the file and its contents in the user message
-            if len(content) > MAX_FILE_CONTENT_LENGTH:
-               content = content[:MAX_FILE_CONTENT_LENGTH] + "\n...[Content truncated]"
-           
-            file_message = f"User uploaded a file '{filename}' with the following content:\n{content}"
-            file_context_messages.append({"role": "user", "content": file_message})
+            filename = escape(file_info['filename'])
+            content = escape(file_info['content'])
+
+            # Append the file content to the user's message
+            combined_message += f"\n\n[Content from file '{filename}']\n{content}"
+        
+        combined_message_tokens = count_tokens(combined_message)
+        if combined_message_tokens > MAX_INPUT_TOKENS:
+            return jsonify({"error": "The combined message exceeds the maximum allowed length."}), 400
 
         # Clear the uploaded contents after use
-        session["uploaded_files_content"][chat_id] = []
+        session['uploaded_files_content'][chat_id] = []
 
-        # Retrieve conversation history and inject file content at the start
-        messages = conversation_manager.get_context(chat_id)
-        if file_context_messages:
-            messages = file_context_messages + messages
+        # For o1-preview, only one user message is allowed, so we send the combined 
+message
+        api_messages = [{"role": "user", "content": combined_message}]
 
-        # Retrieve the selected model or use the default
-        selected_model_id = session.get("selected_model_id")
-        model = Model.get_by_id(selected_model_id)
+        # Initialize the model parameters
+        client, deployment_name = get_azure_client()
+        temperature = 1  # o1-preview requires temperature to be 1
+        max_completion_tokens = 500  # Adjust as needed or retrieve from model config
 
-        if model:
-            client, deployment_name, temperature, max_tokens, max_completion_tokens = initialize_client_from_model(model.__dict__)
-        else:
-            client, deployment_name = get_azure_client()
-            default_model = Model.get_default()
-            temperature = 1.0 if not default_model or not default_model.requires_o1_handling else 1
-            max_tokens = 500 if not default_model else None
-
-        # Filter only user/assistant messages for API call
-        api_messages = [
-            {"role": msg["role"], "content": msg["content"]}
-            for msg in messages if msg["role"] in ["user", "assistant"]
-        ]
-
+        # Prepare the API parameters
         api_params = {
             "model": deployment_name,
             "messages": api_messages,
             "temperature": temperature,
+            "max_completion_tokens": max_completion_tokens,
         }
 
-        if max_tokens is not None:
-            api_params["max_tokens"] = max_tokens
-
+        # Send the request to the AI model
         response = client.chat.completions.create(**api_params)
 
-        # Extract the response from the model
+        # Extract the model response
         model_response = (
-            response.choices[0].message.content if response.choices and response.choices[0].message
+            response.choices[0].message.content
+            if response.choices and response.choices[0].message
             else "The assistant was unable to generate a response."
         )
         model_response = escape(model_response)
 
         logger.info("Response from the model: %s", model_response)
 
+        # Add the user's message and model's response to the conversation history
+        conversation_manager.add_message(chat_id, "user", user_message)
         conversation_manager.add_message(chat_id, "assistant", model_response)
+
+        # Log usage
+        usage_info = getattr(response, "usage", None)
+        prompt_tokens = usage_info.prompt_tokens if usage_info else 0
+        completion_tokens = usage_info.completion_tokens if usage_info else 0
+        total_tokens = usage_info.total_tokens if usage_info else 0
+        logger.info(
+            "API usage - Prompt: %d, Completion: %d, Total: %d",
+            prompt_tokens,
+            completion_tokens,
+            total_tokens,
+        )
 
         return jsonify({"response": model_response})
 
     except Exception as ex:
-        logger.exception("An unexpected error occurred while handling the chat message: %s", ex)
+        logger.exception(
+            "An unexpected error occurred while handling the chat message: %s", ex
+        )
         return (
             jsonify({"error": "An unexpected error occurred. Please try again later."}),
             500,
