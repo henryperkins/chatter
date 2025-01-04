@@ -142,7 +142,7 @@
     <!-- Scripts -->
     {% block scripts %}
     <!-- Main JavaScript for your chat functionalities -->
-    <script type="module" src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
     {% endblock %}
 
     <!-- Extra Scripts (useful if child templates need additional scripts) -->
