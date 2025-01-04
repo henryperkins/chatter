@@ -3,152 +3,179 @@
 {% block title %}Add Model - Azure OpenAI{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-4">Add a New Model</h1>
-    <form id="model-form" method="POST" action="{{ url_for('model.create_model') }}">
+<div class="container mx-auto px-4 py-6">
+    <!-- Page Header -->
+    <h1 class="text-3xl font-bold text-gray-800 mb-6">Add a New AI Model</h1>
+
+    <!-- Form -->
+    <form id="add-model-form" method="POST" action="{{ url_for('model.create_model') }}">
         {{ form.hidden_tag() }}
 
+        <!-- Model Name -->
         <div class="mb-4">
-            {{ form.name.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.name(class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline") }}
+            {{ form.name.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
+            {{ form.name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.name.errors %}
-                <p class="text-red-500 text-xs mt-1">{{ form.name.errors[0] }}</p>
+                <p class="text-sm text-red-500 mt-1">{{ form.name.errors[0] }}</p>
             {% endif %}
         </div>
 
+        <!-- Deployment Name -->
         <div class="mb-4">
-            {{ form.deployment_name.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.deployment_name(class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline") }}
+            {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
+            {{ form.deployment_name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.deployment_name.errors %}
-                <p class="text-red-500 text-xs mt-1">{{ form.deployment_name.errors[0] }}</p>
+                <p class="text-sm text-red-500 mt-1">{{ form.deployment_name.errors[0] }}</p>
             {% endif %}
         </div>
 
+        <!-- Description -->
         <div class="mb-4">
-            {{ form.description.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.description(class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline") }}
+            {{ form.description.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
+            {{ form.description(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.description.errors %}
-                <p class="text-red-500 text-xs mt-1">{{ form.description.errors[0] }}</p>
+                <p class="text-sm text-red-500 mt-1">{{ form.description.errors[0] }}</p>
             {% endif %}
         </div>
 
+        <!-- API Endpoint -->
         <div class="mb-4">
-            {{ form.api_endpoint.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.api_endpoint(class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline") }}
+            {{ form.api_endpoint.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
+            {{ form.api_endpoint(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.api_endpoint.errors %}
-                <p class="text-red-500 text-xs mt-1">{{ form.api_endpoint.errors[0] }}</p>
+                <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
             {% endif %}
         </div>
 
+        <!-- Model Type -->
         <div class="mb-4">
-            {{ form.model_type.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.model_type(class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline") }}
+            {{ form.model_type.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
+            {{ form.model_type(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.model_type.errors %}
-                <p class="text-red-500 text-xs mt-1">{{ form.model_type.errors[0] }}</p>
+                <p class="text-sm text-red-500 mt-1">{{ form.model_type.errors[0] }}</p>
             {% endif %}
         </div>
 
+        <!-- Temperature -->
+        <div class="mb-4">
+            {{ form.temperature.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
+            {{ form.temperature(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+            {% if form.temperature.errors %}
+                <p class="text-sm text-red-500 mt-1">{{ form.temperature.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Max Tokens -->
         <div class="grid grid-cols-2 gap-4">
             <div class="mb-4">
-                {{ form.temperature.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-                {{ form.temperature(class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline") }}
-                {% if form.temperature.errors %}
-                    <p class="text-red-500 text-xs mt-1">{{ form.temperature.errors[0] }}</p>
+                {{ form.max_tokens.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
+                {{ form.max_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                {% if form.max_tokens.errors %}
+                    <p class="text-sm text-red-500 mt-1">{{ form.max_tokens.errors[0] }}</p>
                 {% endif %}
             </div>
 
             <div class="mb-4">
-                {{ form.max_tokens.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-                {{ form.max_tokens(class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline") }}
-                {% if form.max_tokens.errors %}
-                    <p class="text-red-500 text-xs mt-1">{{ form.max_tokens.errors[0] }}</p>
+                {{ form.max_completion_tokens.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
+                {{ form.max_completion_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                {% if form.max_completion_tokens.errors %}
+                    <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
                 {% endif %}
             </div>
         </div>
 
+        <!-- API Version -->
         <div class="mb-4">
-            {{ form.max_completion_tokens.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.max_completion_tokens(class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline") }}
-            {% if form.max_completion_tokens.errors %}
-                <p class="text-red-500 text-xs mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
-            {% endif %}
-        </div>
-
-        <div class="mb-4">
-            {{ form.api_version.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.api_version(class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline") }}
+            {{ form.api_version.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
+            {{ form.api_version(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.api_version.errors %}
-                <p class="text-red-500 text-xs mt-1">{{ form.api_version.errors[0] }}</p>
+                <p class="text-sm text-red-500 mt-1">{{ form.api_version.errors[0] }}</p>
             {% endif %}
         </div>
 
+        <!-- Requires o1-preview Handling -->
         <div class="mb-4">
-            <label class="flex items-center">
-                {{ form.requires_o1_handling(class="form-checkbox h-5 w-5 text-blue-600") }}
-                <span class="ml-2">{{ form.requires_o1_handling.label.text }}</span>
+            <label class="inline-flex items-center">
+                {{ form.requires_o1_handling(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2") }}
+                <span class="ml-2 text-sm text-gray-700 font-medium">
+                    {{ form.requires_o1_handling.label.text }}
+                </span>
+            </label>
+            <!-- If you need any disclaimers about the o1-preview constraints, you can include them here. -->
+            {# e.g. "Note: Temperature must be set to 1, system messages are unsupported, etc." #}
+        </div>
+
+        <!-- Default Model Option -->
+        <div class="mb-6">
+            <label class="inline-flex items-center">
+                {{ form.is_default(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2") }}
+                <span class="ml-2 text-sm text-gray-700 font-medium">
+                    {{ form.is_default.label.text }}
+                </span>
             </label>
         </div>
 
-        <div class="mb-4">
-            <label class="flex items-center">
-                {{ form.is_default(class="form-checkbox h-5 w-5 text-blue-600") }}
-                <span class="ml-2">{{ form.is_default.label.text }}</span>
-            </label>
-        </div>
-
-        <input type="hidden" id="model-version" name="version" value="1">
-
+        <!-- Submit Button -->
         <div class="flex space-x-4">
-            <button type="submit" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+            <button
+                type="submit"
+                class="px-4 py-2 bg-green-500 text-white rounded-lg shadow-lg font-medium hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
                 Add Model
             </button>
-            <button type="button" id="cancel-model-btn" class="bg-gray-500 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+            <a
+                href="{{ url_for('chat.chat_interface') }}"
+                class="px-4 py-2 bg-gray-500 text-white rounded-lg shadow-lg font-medium hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+            >
                 Cancel
-            </button>
+            </a>
         </div>
     </form>
-
-    <!-- Feedback Message -->
-    <div id="feedback-message" class="hidden mt-4"></div>
 </div>
 
+<!-- Feedback Message -->
+<div id="feedback-message" class="hidden fixed bottom-4 right-4 p-4 rounded-lg"></div>
+
+<!-- JavaScript for Form Submission -->
 <script type="module">
-import { showFeedback, getCSRFToken } from '/static/js/chat.js';
+    import { showFeedback, getCSRFToken } from "/static/js/chat.js";
 
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('model-form');
-    const cancelBtn = document.getElementById('cancel-model-btn');
+    document.addEventListener("DOMContentLoaded", function () {
+        const form = document.getElementById("add-model-form");
 
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
 
-        try {
-            const response = await fetch('/models', {
-                method: 'POST',
-                body: new FormData(form),
-                headers: {
-                    'X-CSRF-Token': getCSRFToken()
+            try {
+                const submitButton = form.querySelector("button[type='submit']");
+                submitButton.disabled = true; // Prevent duplicate submissions
+
+                const response = await fetch(form.action, {
+                    method: "POST",
+                    body: new FormData(form),
+                    headers: {
+                        "X-CSRF-Token": getCSRFToken(),
+                    },
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showFeedback(data.message || "Model created successfully", "success");
+                    // Optionally redirect the user after a brief delay
+                    setTimeout(() => {
+                        window.location.href = "{{ url_for('chat.chat_interface') }}";
+                    }, 1500);
+                } else {
+                    showFeedback(data.error || "Failed to create the model", "error");
+                    submitButton.disabled = false; // Re-enable button in case of error
                 }
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                showFeedback('Model created successfully', 'success');
-                setTimeout(() => {
-                    window.location.href = '/chat_interface';
-                }, 1500);
-            } else {
-                showFeedback(data.error || 'Error creating model', 'error');
+            } catch (error) {
+                console.error("Error:", error);
+                showFeedback("An unexpected error occurred. Please try again.", "error");
+                form.querySelector("button[type='submit']").disabled = false;
             }
-        } catch (error) {
-            showFeedback('An error occurred', 'error');
-        }
+        });
     });
-
-    cancelBtn.addEventListener('click', () => {
-        window.location.href = '/chat_interface';
-    });
-});
 </script>
 {% endblock %}
