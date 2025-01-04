@@ -205,7 +205,7 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
 
     data = request.form
     user_message = data.get("message", "").strip()
-    uploaded_files = request.files.getlist("files")
+    uploaded_files = request.files.getlist("files[]")
 
     # Validate user input
     if not user_message and not uploaded_files:
@@ -310,6 +310,8 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                 combined_message += "```\n"
                 combined_message += file["content"]
                 combined_message += "\n```\n"
+
+            combined_message += "\nPlease analyze the files above and provide your insights."
 
         # Check total tokens
         total_tokens = count_tokens(combined_message)

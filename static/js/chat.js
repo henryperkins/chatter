@@ -64,6 +64,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         uploadedFiles = uploadedFiles.concat(validFiles);
         renderFileList();
+        showFeedback(`${files.length} file(s) uploaded successfully.`, "success");
     }
 
     function renderFileList() {
@@ -89,7 +90,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // Show/hide uploaded files section
         if (uploadedFilesDiv) {
-            uploadedFilesDiv.classList.toggle("hidden", uploadedFiles.length === 0);
+            if (uploadedFiles.length > 0) {
+                uploadedFilesDiv.classList.remove("hidden");
+            } else {
+                uploadedFilesDiv.classList.add("hidden");
+            }
         }
 
         // Add remove button event listeners
@@ -120,7 +125,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const formData = new FormData();
         formData.append("message", message);
         uploadedFiles.forEach((file) => {
-            formData.append("files", file);
+            formData.append("files[]", file);
         });
 
         sendButton.disabled = true;
