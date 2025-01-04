@@ -6,10 +6,10 @@ including sending chat messages and getting responses, as well as web scraping.
 """
 
 import logging
-from typing import Optional
+from typing import Optional, List, Dict
 import requests
 from bs4 import BeautifulSoup
-from openai import AzureOpenAI, OpenAIError
+from openai import OpenAIError
 
 from azure_config import get_azure_client, initialize_client_from_model
 from models import Model
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_azure_response(
-    messages: list[dict[str, str]],
+    messages: List[Dict[str, str]],
     deployment_name: str,
     selected_model_id: Optional[int] = None,
     max_completion_tokens: Optional[int] = None,
@@ -41,10 +41,16 @@ def get_azure_response(
         Exception: If any other error occurs.
     """
     try:
-        client, deployment_name = get_azure_client()
-        temperature = None
-        max_tokens = None
+        # By default, we retrieve a client and a default deployment_name
+        # in case selected_model_id is None.
+        client, default_deployment = get_azure_client()
 
+        # Initialize defaults.
+        temperature = 0.7
+        max_tokens = None
+        requires_o1_handling = False
+
+        # If a specific model is selected, fetch its info from the DB.
         if selected_model_id:
             model = Model.get_by_id(selected_model_id)
             if model:
@@ -55,14 +61,30 @@ def get_azure_response(
                     max_tokens,
                     max_completion_tokens,
                 ) = initialize_client_from_model(model.__dict__)
+                requires_o1_handling = getattr(model, "requires_o1_handling", False)
             else:
-                raise ValueError("Selected model not found")
+                raise ValueError("Selected model not found.")
+        else:
+            # Fallback if no specific model is found or passed
+            if not deployment_name:
+                deployment_name = default_deployment
 
-        api_messages = [
-            {"role": msg["role"], "content": msg["content"]}
-            for msg in messages
-            if msg["role"] in ["user", "assistant"]
-        ]
+        # For older o1-preview models:
+        # 1) We must exclude system messages.
+        # 2) We must enforce temperature=1.
+        # 3) We do NOT pass 'max_tokens' or 'stream' parameters.
+        if requires_o1_handling:
+            temperature = 1
+            api_messages = [
+                {"role": msg["role"], "content": msg["content"]}
+                for msg in messages
+                if msg["role"] in ["user", "assistant"]
+            ]
+        else:
+            # For standard models, you can include system messages if needed.
+            api_messages = [
+                {"role": msg["role"], "content": msg["content"]} for msg in messages
+            ]
 
         # Prepare the parameters for the API call
         api_params = {
@@ -71,20 +93,27 @@ def get_azure_response(
             "temperature": temperature,
         }
 
+        # If your code or route logic sets max_completion_tokens,
+        # pass it along to the API.
         if max_completion_tokens is not None:
             api_params["max_completion_tokens"] = max_completion_tokens
 
-        # Include max_tokens only if it's not None and the model doesn't require o1 handling
-        if max_tokens is not None and not (model and model.requires_o1_handling):
+        # Include max_tokens only if it's not None and the model is not o1-preview.
+        if max_tokens is not None and not requires_o1_handling:
             api_params["max_tokens"] = max_tokens
 
+        # Create the chat completion request
         response = client.chat.completions.create(**api_params)
 
-        model_response = (
-            response.choices[0].message.content
-            if response.choices[0].message
-            else "The assistant was unable to generate a response. Please try again or rephrase your input."
-        )
+        # Extract model response
+        if response.choices and response.choices[0].message:
+            model_response = response.choices[0].message.content
+        else:
+            model_response = (
+                "The assistant was unable to generate a response. "
+                "Please try again or rephrase your input."
+            )
+
         logger.info("Response received from the model: %s", model_response)
         return model_response
 
@@ -131,7 +160,11 @@ def scrape_weather(location: str) -> str:
     """
     url = f"https://www.google.com/search?q=weather+{location}"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/91.0.4472.124 Safari/537.36"
+        )
     }
     try:
         response = requests.get(url, headers=headers, timeout=10)
@@ -163,7 +196,11 @@ def scrape_search(search_term: str) -> str:
     """
     url = f"https://www.google.com/search?q={search_term}"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/91.0.4472.124 Safari/537.36"
+        )
     }
     try:
         response = requests.get(url, headers=headers, timeout=10)
@@ -173,6 +210,8 @@ def scrape_search(search_term: str) -> str:
         return "Could not retrieve search results due to a network error."
 
     soup = BeautifulSoup(response.text, "html.parser")
+    # This selector is Google-dependent and may vary over time.
     results = soup.find_all("div", class_="BNeawe s3v9rd AP7Wnd")
     search_results = [result.text for result in results[:3]]
+
     return "Search results:\n" + "\n".join(search_results)
