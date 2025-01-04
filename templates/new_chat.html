@@ -7,7 +7,7 @@
     <div class="flex flex-row h-full w-full overflow-x-hidden">
         <!-- Main Chat Area -->
         <div class="flex flex-col flex-auto h-full p-6">
-            <div id="chat-box" class="flex flex-col flex-grow h-full mb-4 overflow-y-auto">
+            <div class="flex flex-col flex-grow h-full mb-4 overflow-y-auto">
                 <div class="text-center text-gray-500">
                     <p>This is a new chat. Start typing to begin!</p>
                 </div>
@@ -41,14 +41,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
     const feedbackMessage = document.getElementById('feedback-message');
-    const chatBox = document.getElementById('chat-box');
-
 
     function adjustTextareaHeight(textarea) {
         textarea.style.height = 'auto';
         textarea.style.height = (textarea.scrollHeight) + 'px';
     }
-
 
     messageInput.addEventListener('input', function() {
         adjustTextareaHeight(this);
@@ -83,8 +80,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCSRFToken()
                 },
-                  body: JSON.stringify({ message: message }),
-
+                body: JSON.stringify({ chat_id: chatId, message: message }),
             });
 
             if (response.ok) {
@@ -108,12 +104,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function appendUserMessage(message) {
+        const chatBox = document.getElementById('chat-box');
         const userMessageDiv = document.createElement('div');
         userMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end';
-         userMessageDiv.innerHTML = `
+        userMessageDiv.innerHTML = `
             <div>
                 <div class="bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
-                   <div class="text-sm markdown-content"></div>
+                    <p class="text-sm">${message}</p>
                 </div>
                 <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
             </div>
@@ -121,14 +118,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 <!-- User avatar placeholder -->
             </div>
         `;
-       userMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
-
         chatBox.appendChild(userMessageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     function appendAssistantMessage(message) {
-
+        const chatBox = document.getElementById('chat-box');
         const assistantMessageDiv = document.createElement('div');
         assistantMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs';
         assistantMessageDiv.innerHTML = `
@@ -137,18 +132,17 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
             <div>
                 <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
-                 <div class="text-sm markdown-content"></div>
+                    <p class="text-sm">${message}</p>
                 </div>
                 <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
             </div>
         `;
-       assistantMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
-
         chatBox.appendChild(assistantMessageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     function showTypingIndicator() {
+        const chatBox = document.getElementById('chat-box');
         const typingDiv = document.createElement('div');
         typingDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs typing-indicator';
         typingDiv.innerHTML = `
@@ -167,6 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function removeTypingIndicator() {
+        const chatBox = document.getElementById('chat-box');
         const typingIndicator = chatBox.querySelector('.typing-indicator');
         if (typingIndicator) {
             chatBox.removeChild(typingIndicator);
