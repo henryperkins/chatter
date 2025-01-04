@@ -144,6 +144,63 @@ class Model:
         logger.info("Model set as default (ID %d)", model_id)
 
     @staticmethod
+    def create(data: Dict[str, Any]) -> int:
+        """
+        Create a new model record in the database.
+
+        Args:
+            data (dict): A dictionary containing model attributes.
+
+        Returns:
+            int: The ID of the newly created model.
+        """
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            """
+            INSERT INTO models (
+                name,
+                deployment_name,
+                description,
+                api_endpoint,
+                api_version,
+                temperature,
+                max_tokens,
+                max_completion_tokens,
+                model_type,
+                requires_o1_handling,
+                is_default
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                data['name'],
+                data['deployment_name'],
+                data.get('description', ''),
+                data['api_endpoint'],
+                data['api_version'],
+                data['temperature'],
+                data.get('max_tokens'),
+                data['max_completion_tokens'],
+                data['model_type'],
+                data.get('requires_o1_handling', False),
+                data.get('is_default', False),
+            )
+        )
+        db.commit()
+        model_id = cursor.lastrowid
+
+        # If the new model is set as default, unset default on other models
+        if data.get('is_default', False):
+            db.execute(
+                "UPDATE models SET is_default = 0 WHERE id != ?",
+                (model_id,)
+            )
+            db.commit()
+
+        logger.info(f"Model created with ID: {model_id}")
+        return model_id
+
+    @staticmethod
     def validate_model_config(config: Dict[str, Union[str, int, float, bool, None]]) -> None:
         """
         Validate the required fields for a model configuration.
