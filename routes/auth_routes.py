@@ -111,4 +111,4 @@ def init_auth_routes(limiter):
         db = get_db()
         db.execute("UPDATE users SET role = ? WHERE id = ?", (new_role, user_id))
         db.commit()
-        return jsonify({"success": True}")
+        return jsonify({"success": True})
