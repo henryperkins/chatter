@@ -336,10 +336,8 @@ if (newChatBtn) {
             if (response.ok) {
                 const data = await response.json();
                 if (data.success) {
-                    // If you want to pass the new chat ID via URL:
-                    // window.location.href = `/chat_interface?chat_id=${data.chat_id}`;
-                    // Otherwise, rely on session-based approach:
-                    window.location.href = "/chat_interface";
+                    // Pass the newly created chat_id to the URL
+                    window.location.href = `/chat_interface?chat_id=${data.chat_id}`;
                 }
             } else {
                 showFeedback("Failed to create a new chat.", "error");
