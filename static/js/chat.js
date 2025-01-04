@@ -35,7 +35,7 @@ document.addEventListener("DOMContentLoaded", function () {
         textarea.style.height = `${textarea.scrollHeight}px`;
     }
 
-    function showFeedback(message, type = "success") {
+    export function showFeedback(message, type = "success") {
         feedbackMessage.textContent = message;
         feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${
             type === "success"
@@ -50,7 +50,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return DOMPurify.sanitize(marked.parse(content));
     }
 
-    function getCSRFToken() {
+    export function getCSRFToken() {
         return document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
     }
 
@@ -124,6 +124,12 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
+        // Append the user's message to the chat window
+        appendUserMessage(message);
+        messageInput.value = "";
+        adjustTextareaHeight(messageInput);
+
+
         const formData = new FormData();
         formData.append("message", message);
         uploadedFiles.forEach((file) => {
@@ -152,8 +158,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (data.response) {
                 appendAssistantMessage(data.response);
-                messageInput.value = "";
-                adjustTextareaHeight(messageInput);
                 uploadedFiles = [];
                 renderFileList();
             }
@@ -239,37 +243,14 @@ document.addEventListener("DOMContentLoaded", function () {
     if (modelSelect && editModelButton) {
         modelSelect.addEventListener("change", function() {
             const selectedModelId = this.value;
-            editModelButton.dataset.modelId = selectedModelId;
-            editModelButton.disabled = !selectedModelId;
-        });
-
-        editModelButton.addEventListener("click", async () => {
-            const modelId = editModelButton.dataset.modelId;
-            if (!modelId) return;
-
-            try {
-                const response = await fetch(`/models/${modelId}`, {
-                    method: "PUT",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": getCSRFToken()
-                    },
-                    body: JSON.stringify({
-                        name: document.getElementById("model-name")?.value,
-                        description: document.getElementById("model-description")?.value
-                    })
-                });
-
-                if (response.ok) {
-                    showFeedback("Model updated successfully", "success");
-                } else {
-                    const errorData = await response.json();
-                    showFeedback(errorData.error || "Failed to update model", "error");
-                }
-            } catch (error) {
-                console.error("Error updating model:", error);
-                showFeedback("An error occurred while updating the model", "error");
+             if (selectedModelId) {
+                editModelButton.href = `/edit-model/${selectedModelId}`;
+                editModelButton.disabled = false;
+            } else {
+                 editModelButton.href = "#";
+                editModelButton.disabled = true;
             }
+           
         });
     }
 
