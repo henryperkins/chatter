@@ -106,7 +106,7 @@ class ModelForm(FlaskForm):
             raise ValidationError("Azure OpenAI API key is not found in environment variables.")
 
         try:
-            if not Model.validate_api_endpoint(field.data, api_key):
+            if not validate_api_endpoint(field.data, api_key):
                 raise ValidationError("Invalid or unreachable Azure OpenAI endpoint.")
         except ValueError as ex:
             raise ValidationError(str(ex))
