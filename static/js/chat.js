@@ -39,9 +39,32 @@ function adjustTextareaHeight(textarea) {
     textarea.style.height = `${textarea.scrollHeight}px`;
 }
 
+// Initialize markdown-it with Prism.js highlighting
+const defaultLanguage = "plaintext";
+
+const md = window.markdownit({
+    html: false,
+    linkify: true,
+    typographer: true,
+    highlight: function(str, lang) {
+        if (lang && Prism.languages[lang]) {
+            return `<pre class="language-${lang}"><code >${Prism.highlight(str, Prism.languages[lang], lang)}</code></pre>`;
+        } else {
+            return `<pre class="language-${defaultLanguage}"><code>${Prism.highlight(str, Prism.languages[defaultLanguage], defaultLanguage)}</code></pre>`;
+        }
+    },
+});
+
+// Render Markdown content safely
 function renderMarkdown(content) {
-    return DOMPurify.sanitize(marked.parse(content));
+    const html = md.render(content);
+    return DOMPurify.sanitize(html, {
+        USE_PROFILES: { html: true },
+        ALLOWED_TAGS: DOMPurify.DEFAULTS.ALLOWED_TAGS.concat(["img", "pre", "code"]),
+        ALLOWED_ATTR: DOMPurify.DEFAULTS.ALLOWED_ATTR.concat(["class", "style", "src"]),
+    });
 }
+
 
 // Show feedback to the user (re-usable)
 function showFeedback(message, type = "success") {
@@ -59,7 +82,7 @@ function showFeedback(message, type = "success") {
 // Retrieve the CSRF token from a meta tag if your Flask app uses CSRF protection
 function getCSRFToken() {
     const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
-    return csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") : '';
+    return csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") : "";
 }
 
 // File Handling Functions
@@ -240,12 +263,13 @@ function appendUserMessage(message) {
     userMessageDiv.innerHTML = `
         <div>
             <div class="bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
-                <div class="text-sm markdown-content">${message}</div>
+                <div class="text-sm markdown-content"></div>
             </div>
             <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
         </div>
         <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
     `;
+    // Use renderMarkdown here for the message content
     userMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
     chatBox.appendChild(userMessageDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
@@ -258,15 +282,17 @@ function appendAssistantMessage(message) {
         <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
         <div>
             <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
-                <div class="text-sm markdown-content">${message}</div>
+                <div class="text-sm markdown-content"></div>
             </div>
             <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
         </div>
     `;
+  // Use renderMarkdown here for the message content
     assistantMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
     chatBox.appendChild(assistantMessageDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
 }
+
 
 // Event Listeners
 if (messageInput) {
