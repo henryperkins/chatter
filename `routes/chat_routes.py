@@ -1,4 +1,3 @@
-```python
 import logging
 import os
 import uuid
@@ -361,5 +360,3 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             jsonify({"error": "An unexpected error occurred. Please try again later."}),
             500,
         )
-```
-

@@ -1,4 +1,3 @@
-```javascript
 // Constants for file handling
 let uploadedFiles = [];
 const MAX_FILES = 5;
@@ -233,7 +232,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (modelSelect && editModelButton) {
         modelSelect.addEventListener("change", function() {
             const selectedModelId = this.value;
-             if (selectedModelId) {
+            if (selectedModelId) {
                 editModelButton.dataset.modelId = selectedModelId;
                 editModelButton.disabled = false;
             } else {
@@ -327,4 +326,3 @@ export function showFeedback(message, type = "success") {
 export function getCSRFToken() {
     return document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
 }
-```
