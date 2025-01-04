@@ -15,10 +15,14 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
 
     <!-- Required Libraries -->
-    <!-- Marked for Markdown parsing -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- markdown-it for Markdown parsing -->
+    <script 
+src="https://cdn.jsdelivr.net/npm/markdown-it/dist/markdown-it.min.js"></script>
     <!-- DOMPurify for cleaning user-supplied or external HTML content -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.3.8/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
+     <!-- Prism.js stylesheet -->
+    <link rel="stylesheet" 
+href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
 
     <!-- API URLs for JavaScript -->
     <script>
@@ -143,6 +147,16 @@
     {% block scripts %}
     <!-- Main JavaScript for your chat functionalities (no type="module") -->
     <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+        <!-- Prism.js core -->
+        <script 
+src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+        <!-- Include languages you need -->
+        <script 
+src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js
+"></script>
+        <script 
+src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.mi
+n.js"></script>
     {% endblock %}
 
     <!-- Extra Scripts (useful if child templates need additional scripts) -->
