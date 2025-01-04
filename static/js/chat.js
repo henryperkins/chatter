@@ -48,9 +48,9 @@ const md = window.markdownit({
     typographer: true,
     highlight: function(str, lang) {
         if (lang && Prism.languages[lang]) {
-            return `<pre class="language-${lang}"><code >${Prism.highlight(str, Prism.languages[lang], lang)}</code></pre>`;
+            return `<pre class="language-${lang}"><code>${Prism.highlight(str, Prism.languages[lang], lang)}</code></pre>`;
         } else {
-            return `<pre class="language-${defaultLanguage}"><code>${Prism.highlight(str, Prism.languages[defaultLanguage], defaultLanguage)}</code></pre>`;
+            return `<pre class="language-plaintext"><code>${Prism.highlight(str, Prism.languages.plaintext, 'plaintext')}</code></pre>`;
         }
     },
 });
@@ -374,6 +374,9 @@ if (newChatBtn) {
         }
     });
 }
+
+window.showFeedback = showFeedback;
+window.getCSRFToken = getCSRFToken;
 
 // Drag and Drop
 const dropZone = document.getElementById("drop-zone");
