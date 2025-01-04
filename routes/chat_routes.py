@@ -195,3 +195,51 @@ def scrape() -> Union[Response, Tuple[Response, int]]:
         return jsonify({"error": "An error occurred during scraping"}), 500
 
 
+@bp.route("/chat", methods=["POST"])
+@login_required
+def handle_chat() -> Union[Response, Tuple[Response, int]]:
+    """Handle incoming chat messages and return AI responses."""
+    logger.debug("Received chat message")
+    chat_id = session.get("chat_id")
+    if not chat_id:
+        logger.error("Chat ID not found in session")
+        return jsonify({"error": "Chat ID not found."}), 400
+
+    data = request.form
+    user_message = data.get("message", "").strip()
+
+    if not user_message:
+        return jsonify({"error": "Message cannot be empty."}), 400
+
+    user_message = bleach.clean(user_message)
+
+    # Add the user's message to the conversation history
+    conversation_manager.add_message(chat_id, "user", user_message)
+
+    # Retrieve the conversation history
+    history = conversation_manager.get_context(chat_id)
+
+    # Prepare messages for the AI model
+    client, deployment_name = get_azure_client()
+    api_params = {
+        "model": deployment_name,
+        "messages": history,
+        "temperature": 1,
+    }
+
+    try:
+        response = client.chat.completions.create(**api_params)
+        model_response = (
+            response.choices[0].message.content
+            if response.choices and response.choices[0].message
+            else "The assistant was unable to generate a response."
+        )
+
+        # Add the assistant's response to the conversation history
+        conversation_manager.add_message(chat_id, "assistant", model_response)
+
+        return jsonify({"response": model_response})
+
+    except Exception as ex:
+        logger.exception("Error during chat handling: %s", ex)
+        return jsonify({"error": "An unexpected error occurred."}), 500
