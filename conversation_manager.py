@@ -24,18 +24,19 @@ def count_tokens(text: str) -> int:
     """
     try:
         encoding = tiktoken.encoding_for_model(MODEL_NAME)
-        return len(encoding.encode(text))
-    except Exception as e:
-        logger.error(f"Error counting tokens: {e}")
-        # Return a conservative estimate if token counting fails
-        return len(text) // 4  # Rough approximation
+    except KeyError:
+        encoding = tiktoken.get_encoding("cl100k_base")
+    return len(encoding.encode(text))
 
 
 class ConversationManager:
     """Manages conversations by storing and retrieving messages from the database."""
 
     def __init__(self):
-        self.encoding = tiktoken.encoding_for_model(MODEL_NAME)
+        try:
+            self.encoding = tiktoken.encoding_for_model(MODEL_NAME)
+        except KeyError:
+            self.encoding = tiktoken.get_encoding("cl100k_base")
 
     def get_context(
         self, chat_id: str, include_system: bool = False
