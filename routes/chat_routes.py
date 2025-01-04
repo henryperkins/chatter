@@ -54,6 +54,11 @@ encoding = tiktoken.encoding_for_model("gpt-4")  # Or whichever model you're usi
 # --- Helper Functions ---
 
 
+def allowed_file(filename):
+    """Check if the file has an allowed extension."""
+    return os.path.splitext(filename)[1].lower() in ALLOWED_EXTENSIONS
+
+
 def truncate_message(message, max_tokens):
     """Truncates a message to a specified number of tokens."""
     tokens = encoding.encode(message)
@@ -221,6 +226,12 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         for uploaded_file in uploaded_files:
             filename = secure_filename(uploaded_file.filename)
             if not filename:
+                continue
+
+            # Validate file extension
+            if not allowed_file(filename):
+                excluded_files.append(filename)
+                logger.warning(f"File {filename} has an invalid extension.")
                 continue
 
             # Validate MIME type

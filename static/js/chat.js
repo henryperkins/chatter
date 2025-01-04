@@ -62,7 +62,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         uploadedFiles = uploadedFiles.concat(validFiles);
         renderFileList();
-        showFeedback(`${files.length} file(s) uploaded successfully.`, "success");
+        showFeedback(`${validFiles.length} file(s) uploaded successfully.`, "success");
     }
 
     function renderFileList() {
@@ -129,36 +129,59 @@ document.addEventListener("DOMContentLoaded", function () {
         sendButton.disabled = true;
         messageInput.disabled = true;
 
+        // Show the upload progress bar
+        if (uploadedFiles.length > 0) {
+            uploadProgress.classList.remove("hidden");
+            uploadProgressBar.style.width = "0%";
+        }
+
         try {
-            const response = await fetch("/chat", {
-                method: "POST",
-                body: formData, // Removed headers from fetch options
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "/chat", true);
+
+            xhr.upload.addEventListener("progress", function(event) {
+                if (event.lengthComputable) {
+                    const percentComplete = (event.loaded / event.total) * 100;
+                    uploadProgressBar.style.width = `${percentComplete}%`;
+                }
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                showFeedback(errorData.error || "An error occurred.", "error");
-                return;
-            }
+            xhr.addEventListener("load", function() {
+                uploadProgress.classList.add("hidden");
+                sendButton.disabled = false;
+                messageInput.disabled = false;
 
-            const data = await response.json();
+                if (xhr.status === 200) {
+                    const data = JSON.parse(xhr.responseText);
+                    if (data.response) {
+                        appendAssistantMessage(data.response);
+                        uploadedFiles = [];
+                        renderFileList();
+                    }
+                    if (data.excluded_files && data.excluded_files.length > 0) {
+                        showFeedback(`The following files were excluded: ${data.excluded_files.join(", ")}`, "error");
+                    }
+                } else {
+                    const errorData = JSON.parse(xhr.responseText);
+                    showFeedback(errorData.error || "An error occurred.", "error");
+                }
+            });
 
-            if (data.response) {
-                appendAssistantMessage(data.response);
-                uploadedFiles = [];
-                renderFileList();
-            }
+            xhr.addEventListener("error", function() {
+                uploadProgress.classList.add("hidden");
+                sendButton.disabled = false;
+                messageInput.disabled = false;
+                showFeedback("An error occurred while sending the message.", "error");
+            });
 
-            if (data.excluded_files?.length > 0) {
-                showFeedback(`The following files were excluded: ${data.excluded_files.join(", ")}`, "error");
-            }
+            xhr.send(formData);
 
         } catch (error) {
             console.error("Error sending message:", error);
-            showFeedback("An error occurred. Please try again later.", "error");
-        } finally {
+            uploadProgress.classList.add("hidden");
             sendButton.disabled = false;
             messageInput.disabled = false;
+            showFeedback("An error occurred. Please try again later.", "error");
         }
     }
 
