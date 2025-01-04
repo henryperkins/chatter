@@ -102,7 +102,7 @@ def validate_api_endpoint(api_endpoint, api_key, deployment_name, api_version):
         # Make a test request to the API
         response = requests.post(
             test_url,
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers={"api-key": api_key},  # Use "api-key" header instead of "Authorization"
             json={"messages": [{"role": "user", "content": "Test message"}], "max_tokens": 1},
             timeout=5,
         )
