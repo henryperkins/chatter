@@ -105,7 +105,9 @@ def load_user(user_id: str) -> User | None:
     - User instance if found; None otherwise.
     """
     db = get_db()
-    user = db.execute("SELECT * FROM users WHERE id = ?", (int(user_id),)).fetchone()
+    user = db.execute(
+        "SELECT id, username, email, role FROM users WHERE id = ?", (int(user_id),)
+    ).fetchone()
     if user:
         return User(**dict(user))
     return None
