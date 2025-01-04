@@ -37,7 +37,7 @@ const editModelButton = document.getElementById("edit-model-btn");
 function adjustTextareaHeight(textarea) {
     textarea.style.height = "auto";
     textarea.style.height = `${textarea.scrollHeight}px`;
-}
+    });
 
 // Initialize markdown-it with Prism.js highlighting
 const defaultLanguage = "plaintext";
@@ -269,7 +269,7 @@ function appendUserMessage(message) {
         </div>
         <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
     `;
-    // Use renderMarkdown here for the message content
+    // Use renderMarkdown to render the message content
     userMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
     chatBox.appendChild(userMessageDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
@@ -311,7 +311,7 @@ if (messageInput) {
 }
 
 if (sendButton) {
-    console.log("sendButton found"); // Debug statement
+    console.log("sendButton found");
     sendButton.addEventListener("click", sendMessage);
 } else {
     console.error("sendButton not found");
@@ -330,8 +330,9 @@ if (fileInput && uploadButton) {
 
 // Model Selection and Editing
 if (modelSelect && editModelButton) {
-    modelSelect.addEventListener("change", function() {
-        const selectedModelId = this.value;
+    // Function to update the edit button state
+    function updateEditButtonState() {
+        const selectedModelId = modelSelect.value;
         if (selectedModelId) {
             editModelButton.dataset.modelId = selectedModelId;
             editModelButton.disabled = false;
@@ -339,6 +340,13 @@ if (modelSelect && editModelButton) {
             delete editModelButton.dataset.modelId;
             editModelButton.disabled = true;
         }
+    }
+
+    // Initial state on page load
+    updateEditButtonState();
+
+    modelSelect.addEventListener("change", function() {
+        updateEditButtonState();
     });
 
     editModelButton.addEventListener("click", function() {
