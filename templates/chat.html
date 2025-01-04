@@ -22,9 +22,8 @@
             <div class="p-4 space-y-4">
                 <!-- New Chat Button -->
                 <!--
-                  Removed the inline onclick in favor of the JavaScript listener in chat.js.
-                  The 'newChatBtn' event listener in chat.js will send a POST request to /new_chat
-                  and handle any feedback or errors.
+                  This button is wired up in chat.js. It sends a POST to /new_chat and,
+                  upon success, redirects to /chat_interface?chat_id=... so that the new chat is properly loaded.
                 -->
                 <button
                     id="new-chat-btn"
@@ -103,6 +102,10 @@
                 <!-- Chat List -->
                 <div id="chat-list" class="space-y-2">
                     {% for conversation in conversations %}
+                        <!--
+                          Each conversation link passes chat_id to /chat_interface,
+                          enabling the server to load that specific conversation.
+                        -->
                         <a
                             href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
                             class="
