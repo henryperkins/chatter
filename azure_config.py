@@ -103,7 +103,10 @@ def validate_api_endpoint(api_endpoint, api_key, deployment_name, api_version):
         response = requests.post(
             test_url,
             headers={"api-key": api_key},  # Use "api-key" header instead of "Authorization"
-            json={"messages": [{"role": "user", "content": "Test message"}], "max_tokens": 1},
+            json={
+                "messages": [{"role": "user", "content": "Test message"}],
+                "max_completion_tokens": 1  # Use 'max_completion_tokens' instead of 'max_tokens'
+            },
             timeout=5,
         )
         logger.debug(f"Validation response: {response.status_code} - {response.text}")
