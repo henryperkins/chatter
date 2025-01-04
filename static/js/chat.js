@@ -244,13 +244,20 @@ document.addEventListener("DOMContentLoaded", function () {
         modelSelect.addEventListener("change", function() {
             const selectedModelId = this.value;
              if (selectedModelId) {
-                editModelButton.href = `/edit-model/${selectedModelId}`;
+                editModelButton.dataset.modelId = selectedModelId;
                 editModelButton.disabled = false;
             } else {
-                 editModelButton.href = "#";
+                delete editModelButton.dataset.modelId;
                 editModelButton.disabled = true;
             }
-           
+               
+        });
+
+        editModelButton.addEventListener("click", function() {
+            const modelId = this.dataset.modelId;
+            if (modelId) {
+                window.location.href = `/edit-model/${modelId}`;
+            }
         });
     }
 
