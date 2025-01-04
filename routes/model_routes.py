@@ -5,7 +5,7 @@ This module defines the routes for managing AI models, including
 creating, updating, deleting, and retrieving models, as well as
 """
 
-from flask import Blueprint, jsonify, request, render_template
+from flask import Blueprint, jsonify, request, render_template, redirect, url_for, flash
 from flask_login import login_required, current_user
 from models import Model
 from decorators import admin_required
@@ -124,6 +124,40 @@ def add_model_page():
     """Render the add model page."""
     form = ModelForm()
     return render_template("add_model.html", form=form)
+
+@bp.route("/edit-model/<int:model_id>", methods=["GET", "POST"])
+@login_required
+@admin_required
+def edit_model_page(model_id):
+    model = Model.get_by_id(model_id)
+    if not model:
+        flash("Model not found", "error")
+        return redirect(url_for('chat.chat_interface'))
+    
+    form = ModelForm(obj=model)
+
+    if form.validate_on_submit():
+        data = {
+            "name": form.name.data,
+            "deployment_name": form.deployment_name.data,
+            "description": form.description.data,
+            "api_endpoint": form.api_endpoint.data,
+            "temperature": form.temperature.data,
+            "max_tokens": form.max_tokens.data,
+            "max_completion_tokens": form.max_completion_tokens.data,
+            "model_type": form.model_type.data,
+            "api_version": form.api_version.data,
+            "requires_o1_handling": form.requires_o1_handling.data,
+            "is_default": form.is_default.data
+        }
+        try:
+            Model.update(model_id, data)
+            flash("Model updated successfully", "success")
+            return redirect(url_for('chat.chat_interface'))
+        except ValueError as e:
+            flash(str(e), "error")
+
+    return render_template("edit_model.html", form=form, model=model)
 
 
 @bp.route("/models/default/<int:model_id>", methods=["POST"])
