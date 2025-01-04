@@ -1,10 +1,11 @@
+```python
 import logging
 import os
 import uuid
 import imghdr
 from typing import Union, Tuple
 
-import bleach  # Add this import
+import bleach
 from flask import (
     Blueprint,
     jsonify,
@@ -33,7 +34,6 @@ logger = logging.getLogger(__name__)
 
 # Constants
 ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx", ".py", ".js", ".md", ".jpg", ".png"}
-# Allowed MIME types corresponding to the allowed extensions
 ALLOWED_MIME_TYPES = {
     "text/plain",
     "application/pdf",
@@ -113,7 +113,7 @@ def chat_interface() -> str:
         chat_id=chat_id,
         messages=messages,
         models=models,
-        now=datetime.now,  # Add this line to provide the now function
+        now=datetime.now,
     )
 
 
@@ -318,8 +318,13 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         if total_tokens > MAX_INPUT_TOKENS:
             combined_message = truncate_message(combined_message, MAX_INPUT_TOKENS)
 
+        # Retrieve the conversation history
+        history = conversation_manager.get_context(chat_id)
+        # Append the new user message with uploaded file contents
+        history.append({"role": "user", "content": combined_message})
+
         # Prepare messages for the AI model
-        api_messages = [{"role": "user", "content": combined_message}]
+        api_messages = history
 
         # Initialize the model parameters
         client, deployment_name = get_azure_client()
@@ -374,3 +379,4 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             jsonify({"error": "An unexpected error occurred. Please try again later."}),
             500,
         )
+```
