@@ -4,7 +4,7 @@ import os
 from openai import AzureOpenAI
 import requests
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Any
 
 # Initialize logger
 logger = logging.getLogger(__name__)
