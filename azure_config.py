@@ -78,20 +78,33 @@ def initialize_client_from_model(model_config):
     return client, deployment_name, temperature, max_tokens, max_completion_tokens
 
 
-def validate_api_endpoint(api_endpoint, api_key):
-    """Validate the API endpoint and key by making a test request.
+def validate_api_endpoint(api_endpoint, api_key, deployment_name, api_version):
+    """Validate the API endpoint, deployment name, and key by making a test request.
 
     Args:
-        api_endpoint (str): The API endpoint URL.
+        api_endpoint (str): The base API endpoint URL (e.g., https://<instance_name>.openai.azure.com).
         api_key (str): The API key.
+        deployment_name (str): The deployment name for the model.
+        api_version (str): The API version (e.g., 2024-12-01-preview).
 
     Returns:
-        bool: True if the endpoint and key are valid, False otherwise.
+        bool: True if the endpoint, deployment name, and key are valid, False otherwise.
     """
     try:
-        response = requests.get(
-            api_endpoint, headers={"Authorization": f"Bearer {api_key}"}, timeout=5
+        # Construct the full URL for validation
+        test_url = f"{api_endpoint.rstrip('/')}/openai/deployments/{deployment_name}/chat/completions?api-version={api_version}"
+        logger.debug(f"Validating API endpoint: {test_url}")
+
+        # Make a test request to the API
+        response = requests.post(
+            test_url,
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={"messages": [{"role": "user", "content": "Test message"}], "max_tokens": 1},
+            timeout=5,
         )
+        logger.debug(f"Validation response: {response.status_code} - {response.text}")
+
+        # Return True if the response status code is 200
         return response.status_code == 200
     except Exception as e:
         logger.error(f"API endpoint validation failed: {str(e)}")

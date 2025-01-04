@@ -102,11 +102,14 @@ class ModelForm(FlaskForm):
         Validate the API endpoint structure and connectivity.
         """
         api_key = os.getenv("AZURE_OPENAI_KEY")
+        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
+        deployment_name = self.deployment_name.data  # Retrieve deployment name from the form
+
         if not api_key:
             raise ValidationError("Azure OpenAI API key is not found in environment variables.")
 
         try:
-            if not validate_api_endpoint(field.data, api_key):
+            if not validate_api_endpoint(field.data, api_key, deployment_name, api_version):
                 raise ValidationError("Invalid or unreachable Azure OpenAI endpoint.")
         except ValueError as ex:
             raise ValidationError(str(ex))
