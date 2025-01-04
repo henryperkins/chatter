@@ -22,7 +22,7 @@ from wtforms.validators import (
     ValidationError,
 )
 from azure_config import validate_api_endpoint  # Import the correct function
-from database import get_db  # For database queries in custom validations
+from database import db_connection  # Use the centralized context manager
 
 
 # ----- MODEL FORM -----
@@ -180,16 +180,16 @@ class RegistrationForm(FlaskForm):
 
     # --- Custom Validators for Unique Username and Email ---
     def validate_username(self, field):
-        db = get_db()
-        user = db.execute("SELECT id FROM users WHERE username = ?", (field.data,)).fetchone()
-        if user:
-            raise ValidationError("Username already exists. Please choose a different username.")
+        with db_connection() as db:
+            user = db.execute("SELECT id FROM users WHERE username = ?", (field.data,)).fetchone()
+            if user:
+                raise ValidationError("Username already exists. Please choose a different username.")
 
     def validate_email(self, field):
-        db = get_db()
-        user = db.execute("SELECT id FROM users WHERE email = ?", (field.data,)).fetchone()
-        if user:
-            raise ValidationError("A user with this email address already exists.")
+        with db_connection() as db:
+            user = db.execute("SELECT id FROM users WHERE email = ?", (field.data,)).fetchone()
+            if user:
+                raise ValidationError("A user with this email address already exists.")
 
 
 # ----- USER LOGIN FORM -----
