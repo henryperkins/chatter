@@ -117,7 +117,7 @@
     <!-- Scripts -->
     {% block scripts %}
     <!-- Core application scripts -->
-    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    <script type="module" src="{{ url_for('static', filename='js/chat.js') }}"></script>
     {% endblock %}
 
     <!-- Extra Scripts -->
