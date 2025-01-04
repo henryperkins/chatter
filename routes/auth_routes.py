@@ -8,6 +8,7 @@ from decorators import admin_required
 import bcrypt
 import logging
 from forms import LoginForm, RegistrationForm
+import uuid
 
 # Define the blueprint
 bp = Blueprint("auth", __name__)
