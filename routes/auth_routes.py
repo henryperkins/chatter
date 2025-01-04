@@ -8,6 +8,7 @@ from decorators import admin_required
 import bcrypt
 import logging
 from forms import LoginForm, RegistrationForm
+from app import limiter  # Import limiter from app.py
 
 # Define the blueprint
 bp = Blueprint("auth", __name__)
@@ -15,11 +16,8 @@ logger = logging.getLogger(__name__)
 
 # Login route with rate-limiting
 @bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("5/minute")  # Apply the limiter decorator here
 def login():
-    # Import limiter dynamically to avoid circular imports
-    from app import limiter
-    login = limiter.limit("5/minute")(login)
-
     if current_user.is_authenticated:
         return redirect(url_for("chat.chat_interface"))  # Redirect if user is already logged in
 
