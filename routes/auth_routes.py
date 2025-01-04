@@ -90,6 +90,42 @@ def init_auth_routes(limiter):
         session.clear()
         return redirect(url_for("auth.login"))
 
+    # Forgot Password route
+    @bp.route("/forgot_password", methods=["GET", "POST"])
+    def forgot_password():
+        """
+        Handle the forgot password functionality.
+        """
+        if request.method == "POST":
+            email = request.form.get("email").strip()
+
+            # Validate email
+            if not email:
+                flash("Email is required.", "error")
+                return render_template("forgot_password.html")
+
+            db = get_db()
+            user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+
+            if not user:
+                flash("No account found with that email address.", "error")
+                return render_template("forgot_password.html")
+
+            # Generate a password reset token (for simplicity, using a UUID here)
+            reset_token = str(uuid.uuid4())
+            db.execute(
+                "UPDATE users SET reset_token = ?, reset_token_expiry = datetime('now', '+1 hour') WHERE email = ?",
+                (reset_token, email),
+            )
+            db.commit()
+
+            # Send the reset token to the user's email (mocked here)
+            logger.info(f"Password reset token for {email}: {reset_token}")
+            flash("A password reset link has been sent to your email.", "success")
+            return redirect(url_for("auth.login"))
+
+        return render_template("forgot_password.html")
+
     # Manage users route (admin-only access)
     @bp.route("/manage-users")
     @login_required

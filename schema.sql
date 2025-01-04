@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'user', -- 'user' or 'admin'
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    reset_token TEXT DEFAULT NULL, -- Token for password reset
+    reset_token_expiry TIMESTAMP DEFAULT NULL -- Expiry for the reset token
 );
 
 -- =============================
