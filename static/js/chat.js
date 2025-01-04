@@ -158,7 +158,7 @@ function renderFileList() {
 
 // Message Handling Functions
 async function sendMessage() {
-    console.log("sendMessage called"); // Debug statement
+    console.log("sendMessage called!"); // Debug statement
 
     const message = messageInput.value.trim();
 
