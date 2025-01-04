@@ -1,7 +1,7 @@
 import logging
 import os
 import uuid
-import imghdr
+import mimetypes
 from typing import Union, Tuple
 
 import bleach
@@ -14,16 +14,16 @@ from flask import (
     session,
     url_for,
     Response,
+    current_app,
 )
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
-from markupsafe import escape
 from datetime import datetime
 from chat_api import scrape_data
 from chat_utils import generate_new_chat_id, count_tokens
 from conversation_manager import ConversationManager
 from database import get_db
-from models import Chat, Model
+from models import Chat, Model, UploadedFile
 from azure_config import get_azure_client
 import tiktoken
 
@@ -32,7 +32,7 @@ conversation_manager = ConversationManager()
 logger = logging.getLogger(__name__)
 
 # Constants
-ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx", ".py", ".js", ".md", ".jpg", ".png"}
+ALLOWED_EXTENSIONS = {'.txt', '.pdf', '.docx', '.py', '.js', '.md', '.jpg', '.png'}
 ALLOWED_MIME_TYPES = {
     "text/plain",
     "application/pdf",
@@ -205,18 +205,82 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         logger.error("Chat ID not found in session")
         return jsonify({"error": "Chat ID not found."}), 400
 
-    data = request.form
-    user_message = data.get("message", "").strip()
+    # Retrieve message from form data
+    user_message = request.form.get("message", "").strip()
 
-    if not user_message:
-        return jsonify({"error": "Message cannot be empty."}), 400
+    if not user_message and 'files[]' not in request.files:
+        return jsonify({"error": "Message or files are required."}), 400
 
-    user_message = bleach.clean(user_message)
+    # Handle uploaded files
+    uploaded_files = request.files.getlist("files[]")
+    included_files = []
+    excluded_files = []
 
-    # Add the user's message to the conversation history
-    conversation_manager.add_message(chat_id, "user", user_message)
+    for file in uploaded_files:
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
 
-    # Retrieve the conversation history
+            # Get MIME type
+            mime_type = file.mimetype
+
+            # Validate MIME type
+            if mime_type not in ALLOWED_MIME_TYPES:
+                logger.warning(f"File {filename} has disallowed MIME type {mime_type}.")
+                excluded_files.append(filename)
+                continue
+
+            # Check file size
+            file.seek(0, os.SEEK_END)
+            file_length = file.tell()
+            file.seek(0)
+            if file_length > MAX_FILE_SIZE:
+                logger.warning(f"File {filename} exceeds the maximum size limit.")
+                excluded_files.append(filename)
+                continue
+
+            # Save the file to the upload folder
+            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+            try:
+                file.save(file_path)
+            except Exception as e:
+                logger.error(f"Error saving file {filename}: {e}")
+                excluded_files.append(filename)
+                continue
+
+            # Read file content if applicable
+            if mime_type.startswith('text/'):
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        file_content = f.read()
+                except Exception as e:
+                    logger.error(f"Error reading file {filename}: {e}")
+                    excluded_files.append(filename)
+                    continue
+
+                # Truncate file content if necessary
+                truncated_content = truncate_message(file_content, MAX_FILE_CONTENT_LENGTH)
+
+                # Add file content to conversation as a system message
+                conversation_manager.add_message(chat_id, "system", f"Content of file '{filename}':\n{truncated_content}")
+
+            else:
+                logger.info(f"Skipping reading content for non-text file: {filename}")
+
+            # Record the file as included
+            included_files.append(filename)
+
+            # Save file information to the database
+            UploadedFile.create(chat_id, filename, file_path)
+        else:
+            excluded_files.append(file.filename)
+
+    # Process user message
+    if user_message:
+        # Sanitize user input
+        user_message = bleach.clean(user_message)
+        conversation_manager.add_message(chat_id, "user", user_message)
+
+    # Retrieve conversation history
     history = conversation_manager.get_context(chat_id)
 
     # Prepare messages for the AI model
@@ -235,10 +299,15 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             else "The assistant was unable to generate a response."
         )
 
-        # Add the assistant's response to the conversation history
+        # Add assistant's response to conversation history
         conversation_manager.add_message(chat_id, "assistant", model_response)
 
-        return jsonify({"response": model_response})
+        # Prepare response data
+        response_data = {"response": model_response}
+        if excluded_files:
+            response_data["excluded_files"] = excluded_files
+
+        return jsonify(response_data)
 
     except Exception as ex:
         logger.exception("Error during chat handling: %s", ex)

@@ -37,6 +37,13 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=60),  # Adjust as needed
 )
 
+# Set the upload folder and maximum content length
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'uploads')
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB total request size
+
+# Ensure the upload directory exists
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
