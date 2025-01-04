@@ -35,11 +35,9 @@ document.addEventListener("DOMContentLoaded", function () {
         textarea.style.height = `${textarea.scrollHeight}px`;
     }
 
-
     function renderMarkdown(content) {
         return DOMPurify.sanitize(marked.parse(content));
     }
-
 
     // File Handling Functions
     function handleFileUpload(files) {
@@ -121,12 +119,12 @@ document.addEventListener("DOMContentLoaded", function () {
         messageInput.value = "";
         adjustTextareaHeight(messageInput);
 
-
         const formData = new FormData();
         formData.append("message", message);
         uploadedFiles.forEach((file) => {
             formData.append("files[]", file);
         });
+        formData.append("csrf_token", getCSRFToken()); // Added CSRF token to form data
 
         sendButton.disabled = true;
         messageInput.disabled = true;
@@ -134,10 +132,7 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
             const response = await fetch("/chat", {
                 method: "POST",
-                headers: {
-                    "X-CSRFToken": getCSRFToken(),
-                },
-                body: formData,
+                body: formData, // Removed headers from fetch options
             });
 
             if (!response.ok) {
@@ -235,14 +230,13 @@ document.addEventListener("DOMContentLoaded", function () {
     if (modelSelect && editModelButton) {
         modelSelect.addEventListener("change", function() {
             const selectedModelId = this.value;
-             if (selectedModelId) {
+            if (selectedModelId) {
                 editModelButton.dataset.modelId = selectedModelId;
                 editModelButton.disabled = false;
             } else {
                 delete editModelButton.dataset.modelId;
                 editModelButton.disabled = true;
             }
-               
         });
 
         editModelButton.addEventListener("click", function() {
