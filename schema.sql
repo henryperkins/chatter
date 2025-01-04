@@ -2,7 +2,7 @@
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS chats (
 
 -- Messages table
 CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     chat_id TEXT NOT NULL,
     role TEXT NOT NULL,
     content TEXT NOT NULL,
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS messages (
 
 -- Models table
 CREATE TABLE IF NOT EXISTS models (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     name TEXT UNIQUE NOT NULL,
     deployment_name TEXT UNIQUE NOT NULL,
     description TEXT,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS models (
 
 -- Model Versions table (for version history)
 CREATE TABLE IF NOT EXISTS model_versions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     model_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     deployment_name TEXT NOT NULL,
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS model_versions (
 
 -- Uploaded Files table
 CREATE TABLE IF NOT EXISTS uploaded_files (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     chat_id TEXT NOT NULL,
     filename TEXT NOT NULL,
     filepath TEXT NOT NULL,
