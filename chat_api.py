@@ -6,7 +6,7 @@ including sending chat messages and getting responses, as well as web scraping.
 """
 
 import logging
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 import requests
 from bs4 import BeautifulSoup
 from openai import OpenAIError
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 def get_azure_response(
     messages: List[Dict[str, str]],
-    deployment_name: str,
+    deployment_name: Optional[str] = None,
     selected_model_id: Optional[int] = None,
     max_completion_tokens: Optional[int] = None,
 ) -> str:
@@ -28,7 +28,8 @@ def get_azure_response(
 
     Args:
         messages: List of message dictionaries with 'role' and 'content' keys.
-        deployment_name: The name of the deployment (model) to use.
+        deployment_name: The name of the deployment (model) to use. If not provided,
+            the default deployment will be used.
         selected_model_id: The ID of the selected model (optional).
         max_completion_tokens: The maximum number of completion tokens to generate.
 
@@ -41,16 +42,15 @@ def get_azure_response(
         Exception: If any other error occurs.
     """
     try:
-        # By default, we retrieve a client and a default deployment_name
-        # in case selected_model_id is None.
-        client, default_deployment = get_azure_client()
+        # Retrieve the cached client and deployment name
+        client, deployment_name = get_azure_client(deployment_name)
 
-        # Initialize defaults.
+        # Initialize defaults
         temperature = 0.7
         max_tokens = None
         requires_o1_handling = False
 
-        # If a specific model is selected, fetch its info from the DB.
+        # If a specific model is selected, fetch its info from the DB
         if selected_model_id:
             model = Model.get_by_id(selected_model_id)
             if model:
@@ -64,10 +64,6 @@ def get_azure_response(
                 requires_o1_handling = getattr(model, "requires_o1_handling", False)
             else:
                 raise ValueError("Selected model not found.")
-        else:
-            # Fallback if no specific model is found or passed
-            if not deployment_name:
-                deployment_name = default_deployment
 
         # For older o1-preview models:
         # 1) We must exclude system messages.
@@ -81,7 +77,7 @@ def get_azure_response(
                 if msg["role"] in ["user", "assistant"]
             ]
         else:
-            # For standard models, you can include system messages if needed.
+            # For standard models, you can include system messages if needed
             api_messages = [
                 {"role": msg["role"], "content": msg["content"]} for msg in messages
             ]
@@ -94,11 +90,11 @@ def get_azure_response(
         }
 
         # If your code or route logic sets max_completion_tokens,
-        # pass it along to the API.
+        # pass it along to the API
         if max_completion_tokens is not None:
             api_params["max_completion_tokens"] = max_completion_tokens
 
-        # Include max_tokens only if it's not None and the model is not o1-preview.
+        # Include max_tokens only if it's not None and the model is not o1-preview
         if max_tokens is not None and not requires_o1_handling:
             api_params["max_tokens"] = max_tokens
 

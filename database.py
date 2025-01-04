@@ -5,6 +5,7 @@ from flask import g, current_app
 import click
 from flask.cli import with_appcontext
 from datetime import datetime
+from contextlib import contextmanager
 
 
 def get_db():
@@ -29,11 +30,28 @@ def close_db(e=None):
         db.close()
 
 
+@contextmanager
+def db_connection():
+    """
+    Context manager for handling database connections.
+    Automatically commits transactions and closes the connection.
+    """
+    db = get_db()
+    try:
+        yield db
+        db.commit()  # Commit the transaction if no errors occur
+    except Exception as e:
+        db.rollback()  # Rollback the transaction on error
+        raise e
+    finally:
+        close_db()  # Ensure the connection is closed
+
+
 def init_db():
     """Initialize the database using the schema.sql file."""
-    db = get_db()
-    with current_app.open_resource("schema.sql") as f:
-        db.executescript(f.read().decode("utf8"))
+    with db_connection() as db:
+        with current_app.open_resource("schema.sql") as f:
+            db.executescript(f.read().decode("utf8"))
 
 
 @click.command("init-db")

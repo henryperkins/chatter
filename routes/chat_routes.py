@@ -20,10 +20,10 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
-from chat_api import scrape_data
+from chat_api import scrape_data, get_azure_response
 from chat_utils import generate_new_chat_id, count_tokens
 from conversation_manager import ConversationManager
-from database import get_db
+from database import db_connection  # Use the centralized context manager
 from models import Chat, Model, UploadedFile
 from azure_config import get_azure_client
 import tiktoken
@@ -109,7 +109,6 @@ def chat_interface() -> str:
 
     if chat_id:
         # 2. Verify chat ownership
-        #    This method can be implemented in `Chat` or via direct DB calls
         if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
             logger.warning("Unauthorized access attempt to chat %s", chat_id)
             return "Chat not found or access denied", 403
@@ -142,44 +141,42 @@ def chat_interface() -> str:
 @login_required
 def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Load and return the messages for a specific chat."""
-    db = get_db()
-    # Verify chat ownership
-    chat = db.execute(
-        "SELECT id FROM chats WHERE id = ? AND user_id = ?",
-        (chat_id, current_user.id),
-    ).fetchone()
+    with db_connection() as db:
+        # Verify chat ownership
+        chat = db.execute(
+            "SELECT id FROM chats WHERE id = ? AND user_id = ?",
+            (chat_id, current_user.id),
+        ).fetchone()
 
-    if not chat:
-        logger.warning("Unauthorized access attempt to chat %s", chat_id)
-        return jsonify({"error": "Chat not found or access denied"}), 403
+        if not chat:
+            logger.warning("Unauthorized access attempt to chat %s", chat_id)
+            return jsonify({"error": "Chat not found or access denied"}), 403
 
-    messages = conversation_manager.get_context(chat_id)
-    # Exclude 'system' messages from being sent to the frontend
-    messages_to_send = [msg for msg in messages if msg["role"] != "system"]
-    return jsonify({"messages": messages_to_send})
+        messages = conversation_manager.get_context(chat_id)
+        # Exclude 'system' messages from being sent to the frontend
+        messages_to_send = [msg for msg in messages if msg["role"] != "system"]
+        return jsonify({"messages": messages_to_send})
 
 
 @bp.route("/delete_chat/<chat_id>", methods=["DELETE"])
 @login_required
 def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Delete a chat and its associated messages."""
-    db = get_db()
-    chat_to_delete = db.execute(
-        "SELECT user_id FROM chats WHERE id = ?", (chat_id,)
-    ).fetchone()
+    with db_connection() as db:
+        chat_to_delete = db.execute(
+            "SELECT user_id FROM chats WHERE id = ?", (chat_id,)
+        ).fetchone()
 
-    if not chat_to_delete or int(chat_to_delete["user_id"]) != int(current_user.id):
-        logger.warning(
-            "Attempt to delete non-existent or unauthorized chat: %s", chat_id
-        )
-        return jsonify({"error": "Chat not found or access denied"}), 403
+        if not chat_to_delete or int(chat_to_delete["user_id"]) != int(current_user.id):
+            logger.warning(
+                "Attempt to delete non-existent or unauthorized chat: %s", chat_id
+            )
+            return jsonify({"error": "Chat not found or access denied"}), 403
 
-    db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
-    db.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
-    db.commit()
-
-    logger.info("Chat %s deleted successfully", chat_id)
-    return jsonify({"success": True})
+        db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
+        db.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
+        logger.info("Chat %s deleted successfully", chat_id)
+        return jsonify({"success": True})
 
 
 @bp.route("/conversations", methods=["GET"])
@@ -314,24 +311,13 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         include_system=not requires_o1_handling
     )
 
-    # Prepare messages for the Azure OpenAI model
-    client, deployment_name = get_azure_client()
-
-    # Force temperature=1 if requires_o1_handling
-    temperature_setting = 1 if requires_o1_handling else (model_obj.temperature if model_obj else 1)
-
-    api_params = {
-        "model": deployment_name,
-        "messages": history,
-        "temperature": temperature_setting,
-    }
-
+    # Get the Azure OpenAI response
     try:
-        response = client.chat.completions.create(**api_params)
-        model_response = (
-            response.choices[0].message.content
-            if response.choices and response.choices[0].message
-            else "The assistant was unable to generate a response."
+        model_response = get_azure_response(
+            messages=history,
+            deployment_name=model_obj.deployment_name if model_obj else None,
+            selected_model_id=model_id,
+            max_completion_tokens=model_obj.max_completion_tokens if model_obj else None,
         )
 
         # Add assistant's response to conversation history

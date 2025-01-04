@@ -5,6 +5,7 @@ This module defines the routes for managing AI models, including
 creating, updating, deleting, and retrieving models.
 """
 
+import logging
 from flask import (
     Blueprint,
     jsonify,
@@ -15,9 +16,9 @@ from flask import (
     flash,
 )
 from flask_login import login_required, current_user
+from database import db_connection  # Use the centralized context manager
 from models import Model
 from decorators import admin_required
-import logging
 from forms import ModelForm
 
 bp = Blueprint("model", __name__)
@@ -55,10 +56,6 @@ def get_models():
                     "requires_o1_handling": m.requires_o1_handling,
                     "api_version": m.api_version,
                     "version": m.version,
-                    # Optionally, you could include more fields if relevant
-                    # "temperature": m.temperature,
-                    # "max_tokens": m.max_tokens,
-                    # "max_completion_tokens": m.max_completion_tokens,
                 }
             )
         return jsonify(model_list)

@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Union, Any
 
-from database import get_db
+from database import db_connection  # Use the centralized context manager
 import requests
 
 logger = logging.getLogger(__name__)
@@ -33,11 +33,11 @@ class User:
         """
         Retrieve a user by ID from the database.
         """
-        db = get_db()
-        user_row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-        if user_row:
-            return User(**dict(user_row))
-        return None
+        with db_connection() as db:
+            user_row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+            if user_row:
+                return User(**dict(user_row))
+            return None
 
     @property
     def is_authenticated(self) -> bool:
@@ -91,57 +91,55 @@ class Model:
         """
         Retrieve the default model (where `is_default=1`).
         """
-        db = get_db()
-        row = db.execute("SELECT * FROM models WHERE is_default = 1").fetchone()
-        if row:
-            return Model(**dict(row))
-        return None
+        with db_connection() as db:
+            row = db.execute("SELECT * FROM models WHERE is_default = 1").fetchone()
+            if row:
+                return Model(**dict(row))
+            return None
 
     @staticmethod
     def get_by_id(model_id: int) -> Optional["Model"]:
         """
         Retrieve a model by its ID.
         """
-        db = get_db()
-        row = db.execute("SELECT * FROM models WHERE id = ?", (model_id,)).fetchone()
-        if row:
-            return Model(**dict(row))
-        return None
+        with db_connection() as db:
+            row = db.execute("SELECT * FROM models WHERE id = ?", (model_id,)).fetchone()
+            if row:
+                return Model(**dict(row))
+            return None
 
     @staticmethod
     def get_all(limit: int = 10, offset: int = 0) -> List["Model"]:
         """
         Retrieve all models from the database, optionally paginated.
         """
-        db = get_db()
-        rows = db.execute(
-            "SELECT * FROM models ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            (limit, offset),
-        ).fetchall()
-        return [Model(**dict(row)) for row in rows]
+        with db_connection() as db:
+            rows = db.execute(
+                "SELECT * FROM models ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
+            return [Model(**dict(row)) for row in rows]
 
     @staticmethod
     def set_default(model_id: int):
         """
         Set a model as the default, and remove the default status from any other model.
         """
-        db = get_db()
+        with db_connection() as db:
+            # Reset the current default model
+            db.execute("UPDATE models SET is_default = 0 WHERE is_default = 1")
 
-        # Reset the current default model
-        db.execute("UPDATE models SET is_default = 0 WHERE is_default = 1")
+            # Set the new model as default
+            db.execute("UPDATE models SET is_default = 1 WHERE id = ?", (model_id,))
 
-        # Set the new model as default
-        db.execute("UPDATE models SET is_default = 1 WHERE id = ?", (model_id,))
-        db.commit()
+            # Ensure only one default model exists
+            duplicate_check = db.execute(
+                "SELECT COUNT(*) as count FROM models WHERE is_default = 1"
+            ).fetchone()
+            if duplicate_check["count"] > 1:
+                raise ValueError("More than one default model exists.")
 
-        # Ensure only one default model exists
-        duplicate_check = db.execute(
-            "SELECT COUNT(*) as count FROM models WHERE is_default = 1"
-        ).fetchone()
-        if duplicate_check["count"] > 1:
-            raise ValueError("More than one default model exists.")
-
-        logger.info("Model set as default (ID %d)", model_id)
+            logger.info("Model set as default (ID %d)", model_id)
 
     @staticmethod
     def create(data: Dict[str, Any]) -> int:
@@ -154,51 +152,49 @@ class Model:
         Returns:
             int: The ID of the newly created model.
         """
-        db = get_db()
-        cursor = db.cursor()
-        cursor.execute(
-            """
-            INSERT INTO models (
-                name,
-                deployment_name,
-                description,
-                api_endpoint,
-                api_version,
-                temperature,
-                max_tokens,
-                max_completion_tokens,
-                model_type,
-                requires_o1_handling,
-                is_default
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                data['name'],
-                data['deployment_name'],
-                data.get('description', ''),
-                data['api_endpoint'],
-                data['api_version'],
-                data['temperature'],
-                data.get('max_tokens'),
-                data['max_completion_tokens'],
-                data['model_type'],
-                data.get('requires_o1_handling', False),
-                data.get('is_default', False),
+        with db_connection() as db:
+            cursor = db.cursor()
+            cursor.execute(
+                """
+                INSERT INTO models (
+                    name,
+                    deployment_name,
+                    description,
+                    api_endpoint,
+                    api_version,
+                    temperature,
+                    max_tokens,
+                    max_completion_tokens,
+                    model_type,
+                    requires_o1_handling,
+                    is_default
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    data['name'],
+                    data['deployment_name'],
+                    data.get('description', ''),
+                    data['api_endpoint'],
+                    data['api_version'],
+                    data['temperature'],
+                    data.get('max_tokens'),
+                    data['max_completion_tokens'],
+                    data['model_type'],
+                    data.get('requires_o1_handling', False),
+                    data.get('is_default', False),
+                )
             )
-        )
-        db.commit()
-        model_id = cursor.lastrowid
+            model_id = cursor.lastrowid
 
-        # If the new model is set as default, unset default on other models
-        if data.get('is_default', False):
-            db.execute(
-                "UPDATE models SET is_default = 0 WHERE id != ?",
-                (model_id,)
-            )
-            db.commit()
+            # If the new model is set as default, unset default on other models
+            if data.get('is_default', False):
+                db.execute(
+                    "UPDATE models SET is_default = 0 WHERE id != ?",
+                    (model_id,)
+                )
 
-        logger.info(f"Model created with ID: {model_id}")
-        return model_id
+            logger.info(f"Model created with ID: {model_id}")
+            return model_id
 
     @staticmethod
     def validate_model_config(config: Dict[str, Union[str, int, float, bool, None]]) -> None:
@@ -254,21 +250,21 @@ class Chat:
         """
         Verify that the chat belongs to the specified user.
         """
-        db = get_db()
-        chat = db.execute(
-            "SELECT id FROM chats WHERE id = ? AND user_id = ?",
-            (chat_id, user_id),
-        ).fetchone()
-        return chat is not None
+        with db_connection() as db:
+            chat = db.execute(
+                "SELECT id FROM chats WHERE id = ? AND user_id = ?",
+                (chat_id, user_id),
+            ).fetchone()
+            return chat is not None
 
     @staticmethod
     def is_title_default(chat_id: str) -> bool:
         """
         Check whether a chat has the default title.
         """
-        db = get_db()
-        row = db.execute("SELECT title FROM chats WHERE id = ?", (chat_id,)).fetchone()
-        return bool(row) and row["title"] == "New Chat"
+        with db_connection() as db:
+            row = db.execute("SELECT title FROM chats WHERE id = ?", (chat_id,)).fetchone()
+            return bool(row) and row["title"] == "New Chat"
 
     @staticmethod
     def update_title(chat_id: str, new_title: str) -> None:
@@ -278,29 +274,28 @@ class Chat:
         if not new_title.strip():
             raise ValueError("Chat title cannot be empty.")
         new_title = new_title.strip()[:50]  # Limit to 50 characters
-        db = get_db()
-        db.execute(
-            "UPDATE chats SET title = ? WHERE id = ?",
-            (new_title, chat_id),
-        )
-        db.commit()
+        with db_connection() as db:
+            db.execute(
+                "UPDATE chats SET title = ? WHERE id = ?",
+                (new_title, chat_id),
+            )
 
     @staticmethod
     def get_user_chats(user_id: int, limit: int = 10, offset: int = 0) -> List[Dict[str, Union[str, int]]]:
         """
         Retrieve paginated chat history for a user.
         """
-        db = get_db()
-        chats = db.execute(
-            """
-            SELECT * FROM chats 
-            WHERE user_id = ?
-            ORDER BY created_at DESC
-            LIMIT ? OFFSET ?
-            """,
-            (user_id, limit, offset),
-        ).fetchall()
-        return [dict(chat) for chat in chats]
+        with db_connection() as db:
+            chats = db.execute(
+                """
+                SELECT * FROM chats 
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (user_id, limit, offset),
+            ).fetchall()
+            return [dict(chat) for chat in chats]
 
     @staticmethod
     def create(chat_id: str, user_id: int, title: str = "New Chat") -> None:
@@ -309,24 +304,22 @@ class Chat:
         """
         if len(title) > 50:
             title = title[:50]
-        db = get_db()
-        db.execute(
-            "INSERT INTO chats (id, user_id, title) VALUES (?, ?, ?)",
-            (chat_id, user_id, title),
-        )
-        db.commit()
-        logger.info("Chat created: %s for user %d", chat_id, user_id)
+        with db_connection() as db:
+            db.execute(
+                "INSERT INTO chats (id, user_id, title) VALUES (?, ?, ?)",
+                (chat_id, user_id, title),
+            )
+            logger.info("Chat created: %s for user %d", chat_id, user_id)
 
     @staticmethod
     def delete(chat_id: str) -> None:
         """
         Delete a chat and its associated messages efficiently.
         """
-        db = get_db()
-        db.execute("PRAGMA foreign_keys = ON;")  # Enable cascading deletion
-        db.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
-        db.commit()
-        logger.info("Chat deleted: %s", chat_id)
+        with db_connection() as db:
+            db.execute("PRAGMA foreign_keys = ON;")  # Enable cascading deletion
+            db.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
+            logger.info("Chat deleted: %s", chat_id)
 
     @staticmethod
     def get_model(chat_id: str) -> Optional[int]:
@@ -336,12 +329,12 @@ class Chat:
         Returns:
             The model_id if set, otherwise None.
         """
-        db = get_db()
-        row = db.execute(
-            "SELECT model_id FROM chats WHERE id = ?",
-            (chat_id,),
-        ).fetchone()
-        return row["model_id"] if row else None
+        with db_connection() as db:
+            row = db.execute(
+                "SELECT model_id FROM chats WHERE id = ?",
+                (chat_id,),
+            ).fetchone()
+            return row["model_id"] if row else None
 
 
 @dataclass
@@ -360,26 +353,25 @@ class UploadedFile:
         """
         Insert a new uploaded file record into the database.
         """
-        db = get_db()
-        db.execute(
-            "INSERT INTO uploaded_files (chat_id, filename, filepath) VALUES (?, ?, ?)",
-            (chat_id, filename, filepath),
-        )
-        db.commit()
+        with db_connection() as db:
+            db.execute(
+                "INSERT INTO uploaded_files (chat_id, filename, filepath) VALUES (?, ?, ?)",
+                (chat_id, filename, filepath),
+            )
 
     @staticmethod
     def get_by_chat_and_filename(chat_id: str, filename: str) -> Optional["UploadedFile"]:
         """
         Retrieve an uploaded file by chat ID and filename.
         """
-        db = get_db()
-        row = db.execute(
-            "SELECT * FROM uploaded_files WHERE chat_id = ? AND filename = ?",
-            (chat_id, filename),
-        ).fetchone()
-        if row:
-            return UploadedFile(**dict(row))
-        return None
+        with db_connection() as db:
+            row = db.execute(
+                "SELECT * FROM uploaded_files WHERE chat_id = ? AND filename = ?",
+                (chat_id, filename),
+            ).fetchone()
+            if row:
+                return UploadedFile(**dict(row))
+            return None
 
     @staticmethod
     def delete_by_chat_ids(chat_ids: List[str]) -> None:
@@ -388,9 +380,8 @@ class UploadedFile:
         """
         if not chat_ids:
             return
-        db = get_db()
-        placeholders = ",".join("?" for _ in chat_ids)
-        query = f"DELETE FROM uploaded_files WHERE chat_id IN ({placeholders})"
-        db.execute(query, chat_ids)
-        db.commit()
-        logger.info("Deleted uploaded files for chats: %s", ", ".join(chat_ids))
+        with db_connection() as db:
+            placeholders = ",".join("?" for _ in chat_ids)
+            query = f"DELETE FROM uploaded_files WHERE chat_id IN ({placeholders})"
+            db.execute(query, chat_ids)
+            logger.info("Deleted uploaded files for chats: %s", ", ".join(chat_ids))
