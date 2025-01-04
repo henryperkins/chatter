@@ -64,9 +64,12 @@ init_app(app)
 
 # Register blueprints (with delayed imports to avoid circular imports)
 def register_blueprints(app):
-    from routes.auth_routes import bp as auth_bp
+    from routes.auth_routes import bp as auth_bp, init_auth_routes
     from routes.chat_routes import bp as chat_bp
     from routes.model_routes import bp as model_bp
+
+    # Initialize auth routes with limiter
+    init_auth_routes(limiter)
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(chat_bp)
