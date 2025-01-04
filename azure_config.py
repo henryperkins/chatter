@@ -4,6 +4,10 @@ import os
 from dotenv import load_dotenv
 from openai import AzureOpenAI
 import requests
+import logging  # Add logging module
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
