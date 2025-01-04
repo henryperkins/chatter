@@ -272,6 +272,8 @@ function appendUserMessage(message) {
     // Use renderMarkdown to render the message content
     userMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
     chatBox.appendChild(userMessageDiv);
+    // Highlight code blocks after adding to DOM
+    Prism.highlightAllUnder(userMessageDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
 }
 
@@ -290,6 +292,8 @@ function appendAssistantMessage(message) {
   // Use renderMarkdown here for the message content
     assistantMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
     chatBox.appendChild(assistantMessageDiv);
+    // Highlight code blocks after adding to DOM
+    Prism.highlightAllUnder(assistantMessageDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
 }
 
@@ -311,7 +315,7 @@ if (messageInput) {
 }
 
 if (sendButton) {
-    console.log("sendButton found");
+    console.log("sendButton found"); // Debug statement
     sendButton.addEventListener("click", sendMessage);
 } else {
     console.error("sendButton not found");
