@@ -20,7 +20,7 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from datetime import datetime
 
-from chat_api import scrape_data
+from chat_api import scrape_data, get_azure_response
 from chat_utils import generate_new_chat_id, count_tokens
 from conversation_manager import ConversationManager
 from database import db_connection  # Use the centralized context manager
@@ -311,24 +311,13 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         include_system=not requires_o1_handling
     )
 
-    # Prepare messages for the Azure OpenAI model
-    client, deployment_name = get_azure_client()
-
-    # Force temperature=1 if requires_o1_handling
-    temperature_setting = 1 if requires_o1_handling else (model_obj.temperature if model_obj else 1)
-
-    api_params = {
-        "model": deployment_name,
-        "messages": history,
-        "temperature": temperature_setting,
-    }
-
+    # Get the Azure OpenAI response
     try:
-        response = client.chat.completions.create(**api_params)
-        model_response = (
-            response.choices[0].message.content
-            if response.choices and response.choices[0].message
-            else "The assistant was unable to generate a response."
+        model_response = get_azure_response(
+            messages=history,
+            deployment_name=model_obj.deployment_name if model_obj else None,
+            selected_model_id=model_id,
+            max_completion_tokens=model_obj.max_completion_tokens if model_obj else None,
         )
 
         # Add assistant's response to conversation history
