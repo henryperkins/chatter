@@ -35,24 +35,11 @@ document.addEventListener("DOMContentLoaded", function () {
         textarea.style.height = `${textarea.scrollHeight}px`;
     }
 
-    export function showFeedback(message, type = "success") {
-        feedbackMessage.textContent = message;
-        feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${
-            type === "success"
-                ? "bg-green-100 border-green-400 text-green-700"
-                : "bg-red-100 border-red-400 text-red-700"
-        }`;
-        feedbackMessage.classList.remove("hidden");
-        setTimeout(() => feedbackMessage.classList.add("hidden"), 3000);
-    }
 
     function renderMarkdown(content) {
         return DOMPurify.sanitize(marked.parse(content));
     }
 
-    export function getCSRFToken() {
-        return document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
-    }
 
     // File Handling Functions
     function handleFileUpload(files) {
@@ -321,3 +308,20 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 });
+
+// Exported functions moved outside the DOMContentLoaded function
+export function showFeedback(message, type = "success") {
+    const feedbackMessage = document.getElementById("feedback-message");
+    feedbackMessage.textContent = message;
+    feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${
+        type === "success"
+            ? "bg-green-100 border-green-400 text-green-700"
+            : "bg-red-100 border-red-400 text-red-700"
+    }`;
+    feedbackMessage.classList.remove("hidden");
+    setTimeout(() => feedbackMessage.classList.add("hidden"), 3000);
+}
+
+export function getCSRFToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+}
