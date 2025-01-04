@@ -1,35 +1,32 @@
 from flask import (
-    Blueprint,
-    render_template,
-    request,
-    redirect,
-    url_for,
-    flash,
-    session,
-    jsonify,
+    Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 )
 from flask_login import login_user, logout_user, current_user, login_required
 from database import get_db
 from models import User
-from decorators import admin_required  # Add this import
+from decorators import admin_required
 import bcrypt
 import logging
 import os
 from forms import LoginForm, RegistrationForm
+
+# Import flask-limiter objects if you want to rate-limit
+from app import limiter
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("auth", __name__)
 
 @bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("5/minute")  # Example rate limit: 5 logins per minute per IP
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("chat.chat_interface"))
+    
     form = LoginForm()
     if form.validate_on_submit():
         username = form.username.data.strip()
         password = form.password.data.strip()
-
         db = get_db()
         user = db.execute(
             "SELECT * FROM users WHERE username = ?", (username,)
@@ -39,9 +36,12 @@ def login():
             user_obj = User(user["id"], user["username"], user["email"], user["role"])
             session.clear()
             login_user(user_obj)
+            logger.info(f"User {user['id']} logged in successfully.")
             return redirect(url_for("chat.chat_interface"))
         else:
+            logger.warning(f"Failed login attempt for username: {username}")
             flash("Invalid username or password", "error")
+    
     return render_template("login.html", form=form)
 
 @bp.route("/register", methods=["GET", "POST"])
