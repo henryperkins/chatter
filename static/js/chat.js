@@ -3,14 +3,14 @@ let uploadedFiles = [];
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_FILE_TYPES = [
-    'text/plain',
-    'application/pdf',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'text/x-python',
-    'application/javascript',
-    'text/markdown',
-    'image/jpeg',
-    'image/png'
+    "text/plain",
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/x-python",
+    "application/javascript",
+    "text/markdown",
+    "image/jpeg",
+    "image/png",
 ];
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -29,6 +29,17 @@ document.addEventListener("DOMContentLoaded", function () {
     const modelSelect = document.getElementById("model-select");
     const editModelButton = document.getElementById("edit-model-btn");
 
+    // Optional: If you're storing chat_id in the URL rather than session,
+    // you can retrieve it here. E.g.:
+    // const urlParams = new URLSearchParams(window.location.search);
+    // const chatId = urlParams.get("chat_id");
+    //
+    // If you're still using session-based chat_id from the server side,
+    // you can omit this and rely on your existing setup.
+    // 
+    // For demonstration, let's keep it as a fallback:
+    const chatId = new URLSearchParams(window.location.search).get("chat_id");
+
     // Helper Functions
     function adjustTextareaHeight(textarea) {
         textarea.style.height = "auto";
@@ -39,15 +50,35 @@ document.addEventListener("DOMContentLoaded", function () {
         return DOMPurify.sanitize(marked.parse(content));
     }
 
+    // Show feedback to the user (re-usable)
+    function showFeedback(message, type = "success") {
+        const feedbackMessage = document.getElementById("feedback-message");
+        feedbackMessage.textContent = message;
+        feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${
+            type === "success"
+                ? "bg-green-100 border border-green-400 text-green-700"
+                : "bg-red-100 border border-red-400 text-red-700"
+        }`;
+        feedbackMessage.classList.remove("hidden");
+        setTimeout(() => feedbackMessage.classList.add("hidden"), 3000);
+    }
+
+    // Retrieve the CSRF token from a meta tag if your Flask app uses CSRF protection
+    function getCSRFToken() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+    }
+
     // File Handling Functions
     function handleFileUpload(files) {
         const filesArray = Array.from(files);
 
+        // Check total count
         if (uploadedFiles.length + filesArray.length > MAX_FILES) {
             showFeedback(`You can upload up to ${MAX_FILES} files at a time.`, "error");
             return;
         }
 
+        // Validate file type & size
         const validFiles = filesArray.filter((file) => {
             if (!ALLOWED_FILE_TYPES.includes(file.type)) {
                 showFeedback(`File type not allowed: ${file.name}`, "error");
@@ -62,7 +93,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
         uploadedFiles = uploadedFiles.concat(validFiles);
         renderFileList();
-        showFeedback(`${validFiles.length} file(s) uploaded successfully.`, "success");
+
+        if (validFiles.length > 0) {
+            showFeedback(`${validFiles.length} file(s) queued for upload.`, "success");
+        }
     }
 
     function renderFileList() {
@@ -86,7 +120,7 @@ document.addEventListener("DOMContentLoaded", function () {
             fileListDiv.appendChild(fileDiv);
         });
 
-        // Show/hide uploaded files section
+        // Show/hide uploaded files container
         if (uploadedFilesDiv) {
             if (uploadedFiles.length > 0) {
                 uploadedFilesDiv.classList.remove("hidden");
@@ -95,7 +129,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         }
 
-        // Add remove button event listeners
+        // Attach event listeners for removing files
         document.querySelectorAll(".remove-file-button").forEach((button) => {
             button.addEventListener("click", function() {
                 const index = parseInt(this.dataset.index);
@@ -109,35 +143,44 @@ document.addEventListener("DOMContentLoaded", function () {
     async function sendMessage() {
         const message = messageInput.value.trim();
 
+        // Check if either a message or files are present
         if (!message && uploadedFiles.length === 0) {
             showFeedback("Please enter a message or upload files.", "error");
             return;
         }
 
-        // Append the user's message to the chat window
-        appendUserMessage(message);
-        messageInput.value = "";
-        adjustTextareaHeight(messageInput);
+        // Append the user's message to the chat window if not empty
+        if (message) {
+            appendUserMessage(message);
+            messageInput.value = "";
+            adjustTextareaHeight(messageInput);
+        }
 
+        // Prepare form data
         const formData = new FormData();
         formData.append("message", message);
         uploadedFiles.forEach((file) => {
             formData.append("files[]", file);
         });
-        formData.append("csrf_token", getCSRFToken()); // Added CSRF token to form data
+        formData.append("csrf_token", getCSRFToken());
 
         sendButton.disabled = true;
         messageInput.disabled = true;
 
-        // Show the upload progress bar
+        // Show the upload progress bar if there are files
         if (uploadedFiles.length > 0) {
             uploadProgress.classList.remove("hidden");
             uploadProgressBar.style.width = "0%";
         }
 
+        // If using URL-based chat_id:
+        // const sendMessageUrl = `/chat?chat_id=${chatId}`;
+        // If using session-based approach (default from your code):
+        const sendMessageUrl = "/chat";
+
         try {
             const xhr = new XMLHttpRequest();
-            xhr.open("POST", "/chat", true);
+            xhr.open("POST", sendMessageUrl, true);
 
             xhr.upload.addEventListener("progress", function(event) {
                 if (event.lengthComputable) {
@@ -155,15 +198,25 @@ document.addEventListener("DOMContentLoaded", function () {
                     const data = JSON.parse(xhr.responseText);
                     if (data.response) {
                         appendAssistantMessage(data.response);
+                        // Clear the file list on success
                         uploadedFiles = [];
                         renderFileList();
                     }
                     if (data.excluded_files && data.excluded_files.length > 0) {
-                        showFeedback(`The following files were excluded: ${data.excluded_files.join(", ")}`, "error");
+                        showFeedback(
+                            `Some files were excluded: ${data.excluded_files.join(", ")}`,
+                            "error"
+                        );
                     }
                 } else {
-                    const errorData = JSON.parse(xhr.responseText);
-                    showFeedback(errorData.error || "An error occurred.", "error");
+                    let errorMsg = "An error occurred.";
+                    try {
+                        const errorData = JSON.parse(xhr.responseText);
+                        errorMsg = errorData.error || errorMsg;
+                    } catch (parseErr) {
+                        // fallback
+                    }
+                    showFeedback(errorMsg, "error");
                 }
             });
 
@@ -175,7 +228,6 @@ document.addEventListener("DOMContentLoaded", function () {
             });
 
             xhr.send(formData);
-
         } catch (error) {
             console.error("Error sending message:", error);
             uploadProgress.classList.add("hidden");
@@ -224,7 +276,6 @@ document.addEventListener("DOMContentLoaded", function () {
         messageInput.addEventListener("input", function() {
             adjustTextareaHeight(this);
         });
-
         messageInput.addEventListener("keyup", (e) => {
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -241,7 +292,6 @@ document.addEventListener("DOMContentLoaded", function () {
         uploadButton.addEventListener("click", () => {
             fileInput.click();
         });
-
         fileInput.addEventListener("change", function() {
             if (this.files && this.files.length > 0) {
                 handleFileUpload(this.files);
@@ -283,6 +333,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success) {
+                        // If you want to pass the new chat ID via URL:
+                        // window.location.href = `/chat_interface?chat_id=${data.chat_id}`;
+                        // Otherwise, rely on session-based approach:
                         window.location.href = "/chat_interface";
                     }
                 } else {
@@ -330,20 +383,3 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 });
-
-// Exported functions moved outside the DOMContentLoaded function
-export function showFeedback(message, type = "success") {
-    const feedbackMessage = document.getElementById("feedback-message");
-    feedbackMessage.textContent = message;
-    feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${
-        type === "success"
-            ? "bg-green-100 border-green-400 text-green-700"
-            : "bg-red-100 border-red-400 text-red-700"
-    }`;
-    feedbackMessage.classList.remove("hidden");
-    setTimeout(() => feedbackMessage.classList.add("hidden"), 3000);
-}
-
-export function getCSRFToken() {
-    return document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
-}
