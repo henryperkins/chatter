@@ -19,6 +19,7 @@ from flask import (
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from datetime import datetime
+
 from chat_api import scrape_data
 from chat_utils import generate_new_chat_id, count_tokens
 from conversation_manager import ConversationManager
@@ -87,7 +88,9 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
     logger.info("New chat created with ID: %s", chat_id)
 
     if request.method == "POST":
+        # Return JSON if invoked via AJAX (POST)
         return jsonify({"success": True, "chat_id": chat_id})
+    # Otherwise, you can render a template if it's a GET request
     return render_template("new_chat.html")
 
 
@@ -96,23 +99,41 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
 def chat_interface() -> str:
     """
     Render the main chat interface page.
-    If no chat_id in session, create a new one.
+    1. Retrieve chat_id from URL parameters (chat_id=...) or the session.
+    2. Verify ownership if chat_id is found.
+    3. If no valid chat_id, create a new one and save to session.
+    4. Load messages, models, and optionally the user's conversation list.
     """
-    chat_id = session.get("chat_id")
-    if not chat_id:
+    # 1. Retrieve from URL or session
+    chat_id = request.args.get("chat_id") or session.get("chat_id")
+
+    if chat_id:
+        # 2. Verify chat ownership
+        #    This method can be implemented in `Chat` or via direct DB calls
+        if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
+            logger.warning("Unauthorized access attempt to chat %s", chat_id)
+            return "Chat not found or access denied", 403
+
+        session["chat_id"] = chat_id  # Update session with the valid chat_id
+    else:
+        # 3. No chat_id at all -> create new
         chat_id = generate_new_chat_id()
         user_id = int(current_user.id)
         Chat.create(chat_id, user_id, "New Chat")
         session["chat_id"] = chat_id
 
+    # 4. Load messages for this chat
     messages = conversation_manager.get_context(chat_id)
     models = Model.get_all()
+    # If you want a conversation list in the sidebar, you can do:
+    conversations = Chat.get_user_chats(current_user.id)
 
     return render_template(
         "chat.html",
         chat_id=chat_id,
         messages=messages,
         models=models,
+        conversations=conversations,  # Include this if your template expects it
         now=datetime.now,
     )
 
@@ -195,6 +216,7 @@ def scrape() -> Union[Response, Tuple[Response, int]]:
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
     """Handle incoming chat messages and return AI responses."""
     logger.debug("Received chat message")
+
     chat_id = session.get("chat_id")
     if not chat_id:
         logger.error("Chat ID not found in session.")
@@ -244,7 +266,7 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                 excluded_files.append(filename)
                 continue
 
-            # Read file content if applicable
+            # If it's a text file, read content and add to conversation
             if mime_type.startswith('text/'):
                 try:
                     with open(file_path, 'r', encoding='utf-8') as f:
@@ -296,8 +318,7 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
     client, deployment_name = get_azure_client()
 
     # Force temperature=1 if requires_o1_handling
-    # (o1-preview requires temp=1, no streaming)
-    temperature_setting = 1 if requires_o1_handling else model_obj.temperature if model_obj else 1
+    temperature_setting = 1 if requires_o1_handling else (model_obj.temperature if model_obj else 1)
 
     api_params = {
         "model": deployment_name,
