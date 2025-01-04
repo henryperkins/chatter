@@ -4,7 +4,7 @@ import uuid
 import imghdr
 from typing import Union, Tuple
 
-import bleach
+import bleach  # Add this import
 from flask import (
     Blueprint,
     jsonify,
@@ -18,7 +18,7 @@ from flask import (
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from markupsafe import escape
-
+from datetime import datetime
 from chat_api import scrape_data
 from chat_utils import generate_new_chat_id, count_tokens
 from conversation_manager import ConversationManager
@@ -96,7 +96,7 @@ def new_chat_route() -> Response:
 
 @bp.route("/chat_interface")
 @login_required
-def chat_interface() -> Union[str, Response]:
+def chat_interface() -> str:
     """Render the main chat interface page."""
     chat_id = session.get("chat_id")
     if not chat_id:
@@ -104,13 +104,16 @@ def chat_interface() -> Union[str, Response]:
         user_id = int(current_user.id)
         Chat.create(chat_id, user_id, "New Chat")
         session["chat_id"] = chat_id
-        logger.info("New chat created with ID: %s", chat_id)
 
     messages = conversation_manager.get_context(chat_id)
     models = Model.get_all()
 
     return render_template(
-        "chat.html", chat_id=chat_id, messages=messages, models=models
+        "chat.html",
+        chat_id=chat_id,
+        messages=messages,
+        models=models,
+        now=datetime.now,  # Add this line to provide the now function
     )
 
 
