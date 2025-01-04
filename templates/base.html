@@ -141,7 +141,7 @@
 
     <!-- Scripts -->
     {% block scripts %}
-    <!-- Main JavaScript for your chat functionalities -->
+    <!-- Main JavaScript for your chat functionalities (no type="module") -->
     <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
     {% endblock %}
 

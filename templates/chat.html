@@ -21,6 +21,11 @@
         >
             <div class="p-4 space-y-4">
                 <!-- New Chat Button -->
+                <!--
+                  Removed the inline onclick in favor of the JavaScript listener in chat.js.
+                  The 'newChatBtn' event listener in chat.js will send a POST request to /new_chat
+                  and handle any feedback or errors.
+                -->
                 <button
                     id="new-chat-btn"
                     class="
@@ -29,7 +34,6 @@
                         px-4 py-2 rounded-lg
                         focus:outline-none focus:ring-2 focus:ring-blue-500
                     "
-                    onclick="location.href='{{ url_for('chat.new_chat_route') }}'"
                 >
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path

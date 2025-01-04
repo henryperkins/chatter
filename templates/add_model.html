@@ -14,7 +14,8 @@
         <!-- Model Name -->
         <div class="mb-4">
             {{ form.name.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+            {{ form.name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
+                                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.name.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.name.errors[0] }}</p>
             {% endif %}
@@ -23,7 +24,8 @@
         <!-- Deployment Name -->
         <div class="mb-4">
             {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.deployment_name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+            {{ form.deployment_name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
+                                            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.deployment_name.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.deployment_name.errors[0] }}</p>
             {% endif %}
@@ -32,7 +34,8 @@
         <!-- Description -->
         <div class="mb-4">
             {{ form.description.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.description(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+            {{ form.description(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
+                                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.description.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.description.errors[0] }}</p>
             {% endif %}
@@ -41,7 +44,8 @@
         <!-- API Endpoint -->
         <div class="mb-4">
             {{ form.api_endpoint.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.api_endpoint(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+            {{ form.api_endpoint(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
+                                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.api_endpoint.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
             {% endif %}
@@ -50,7 +54,8 @@
         <!-- Model Type -->
         <div class="mb-4">
             {{ form.model_type.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.model_type(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+            {{ form.model_type(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
+                                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.model_type.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.model_type.errors[0] }}</p>
             {% endif %}
@@ -59,17 +64,19 @@
         <!-- Temperature -->
         <div class="mb-4">
             {{ form.temperature.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.temperature(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+            {{ form.temperature(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
+                                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.temperature.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.temperature.errors[0] }}</p>
             {% endif %}
         </div>
 
-        <!-- Max Tokens -->
+        <!-- Max Tokens / Max Completion Tokens -->
         <div class="grid grid-cols-2 gap-4">
             <div class="mb-4">
                 {{ form.max_tokens.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-                {{ form.max_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                {{ form.max_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
+                                            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
                 {% if form.max_tokens.errors %}
                     <p class="text-sm text-red-500 mt-1">{{ form.max_tokens.errors[0] }}</p>
                 {% endif %}
@@ -77,7 +84,8 @@
 
             <div class="mb-4">
                 {{ form.max_completion_tokens.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-                {{ form.max_completion_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                {{ form.max_completion_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
+                                                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
                 {% if form.max_completion_tokens.errors %}
                     <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
                 {% endif %}
@@ -87,7 +95,8 @@
         <!-- API Version -->
         <div class="mb-4">
             {{ form.api_version.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.api_version(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+            {{ form.api_version(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
+                                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.api_version.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.api_version.errors[0] }}</p>
             {% endif %}
@@ -101,8 +110,6 @@
                     {{ form.requires_o1_handling.label.text }}
                 </span>
             </label>
-            <!-- If you need any disclaimers about the o1-preview constraints, you can include them here. -->
-            {# e.g. "Note: Temperature must be set to 1, system messages are unsupported, etc." #}
         </div>
 
         <!-- Default Model Option -->
@@ -119,13 +126,15 @@
         <div class="flex space-x-4">
             <button
                 type="submit"
-                class="px-4 py-2 bg-green-500 text-white rounded-lg shadow-lg font-medium hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
+                class="px-4 py-2 bg-green-500 text-white rounded-lg shadow-lg font-medium hover:bg-green-600 
+                       focus:outline-none focus:ring-2 focus:ring-green-500"
             >
                 Add Model
             </button>
             <a
                 href="{{ url_for('chat.chat_interface') }}"
-                class="px-4 py-2 bg-gray-500 text-white rounded-lg shadow-lg font-medium hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                class="px-4 py-2 bg-gray-500 text-white rounded-lg shadow-lg font-medium hover:bg-gray-600 
+                       focus:outline-none focus:ring-2 focus:ring-gray-500"
             >
                 Cancel
             </a>
@@ -137,45 +146,48 @@
 <div id="feedback-message" class="hidden fixed bottom-4 right-4 p-4 rounded-lg"></div>
 
 <!-- JavaScript for Form Submission -->
-<script type="module">
-    import { showFeedback, getCSRFToken } from "/static/js/chat.js";
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("add-model-form");
 
-    document.addEventListener("DOMContentLoaded", function () {
-        const form = document.getElementById("add-model-form");
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
 
-        form.addEventListener("submit", async (e) => {
-            e.preventDefault();
+        // Using the globally-defined functions from chat.js:
+        // window.getCSRFToken() and window.showFeedback()
 
-            try {
-                const submitButton = form.querySelector("button[type='submit']");
-                submitButton.disabled = true; // Prevent duplicate submissions
+        const { getCSRFToken, showFeedback } = window;
 
-                const response = await fetch(form.action, {
-                    method: "POST",
-                    body: new FormData(form),
-                    headers: {
-                        "X-CSRF-Token": getCSRFToken(),
-                    },
-                });
+        try {
+            const submitButton = form.querySelector("button[type='submit']");
+            submitButton.disabled = true; // Prevent duplicate submissions
 
-                const data = await response.json();
+            const response = await fetch(form.action, {
+                method: "POST",
+                body: new FormData(form),
+                headers: {
+                    "X-CSRF-Token": getCSRFToken(), // Attach the CSRF token
+                },
+            });
 
-                if (response.ok) {
-                    showFeedback(data.message || "Model created successfully", "success");
-                    // Optionally redirect the user after a brief delay
-                    setTimeout(() => {
-                        window.location.href = "{{ url_for('chat.chat_interface') }}";
-                    }, 1500);
-                } else {
-                    showFeedback(data.error || "Failed to create the model", "error");
-                    submitButton.disabled = false; // Re-enable button in case of error
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                showFeedback("An unexpected error occurred. Please try again.", "error");
-                form.querySelector("button[type='submit']").disabled = false;
+            const data = await response.json();
+
+            if (response.ok) {
+                showFeedback(data.message || "Model created successfully", "success");
+                // Optionally redirect the user after a brief delay
+                setTimeout(() => {
+                    window.location.href = "{{ url_for('chat.chat_interface') }}";
+                }, 1500);
+            } else {
+                showFeedback(data.error || "Failed to create the model", "error");
+                submitButton.disabled = false; // Re-enable button in case of error
             }
-        });
+        } catch (error) {
+            console.error("Error:", error);
+            window.showFeedback("An unexpected error occurred. Please try again.", "error");
+            form.querySelector("button[type='submit']").disabled = false;
+        }
     });
+});
 </script>
 {% endblock %}

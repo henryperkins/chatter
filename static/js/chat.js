@@ -1,5 +1,8 @@
 /* static/js/chat.js */
 
+// Debug statement to confirm the file is loaded
+console.log("chat.js loaded");
+
 // Constants for file handling
 let uploadedFiles = [];
 const MAX_FILES = 5;
@@ -55,7 +58,8 @@ function showFeedback(message, type = "success") {
 
 // Retrieve the CSRF token from a meta tag if your Flask app uses CSRF protection
 function getCSRFToken() {
-    return document.querySelector('meta[name="csrf-token"]')?.getAttribute("content");
+    const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
+    return csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") : '';
 }
 
 // File Handling Functions
@@ -131,6 +135,8 @@ function renderFileList() {
 
 // Message Handling Functions
 async function sendMessage() {
+    console.log("sendMessage called"); // Debug statement
+
     const message = messageInput.value.trim();
 
     // Check if either a message or files are present
@@ -152,7 +158,8 @@ async function sendMessage() {
     uploadedFiles.forEach((file) => {
         formData.append("files[]", file);
     });
-    formData.append("csrf_token", getCSRFToken());
+    // Remove CSRF token from form data, as we include it in headers
+    // formData.append("csrf_token", getCSRFToken()); // Removed per instructions
 
     sendButton.disabled = true;
     messageInput.disabled = true;
@@ -163,14 +170,14 @@ async function sendMessage() {
         uploadProgressBar.style.width = "0%";
     }
 
-    // If using URL-based chat_id:
-    // const sendMessageUrl = `/chat?chat_id=${chatId}`;
-    // If using session-based approach (default from your code):
     const sendMessageUrl = "/chat";
 
     try {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", sendMessageUrl, true);
+
+        // Add the CSRF token to the request headers
+        xhr.setRequestHeader("X-CSRFToken", getCSRFToken());
 
         xhr.upload.addEventListener("progress", function(event) {
             if (event.lengthComputable) {
@@ -263,6 +270,7 @@ function appendAssistantMessage(message) {
 
 // Event Listeners
 if (messageInput) {
+    console.log("messageInput found"); // Debug statement
     messageInput.addEventListener("input", function() {
         adjustTextareaHeight(this);
     });
@@ -272,10 +280,15 @@ if (messageInput) {
             sendMessage();
         }
     });
+} else {
+    console.error("messageInput not found");
 }
 
 if (sendButton) {
+    console.log("sendButton found"); // Debug statement
     sendButton.addEventListener("click", sendMessage);
+} else {
+    console.error("sendButton not found");
 }
 
 if (fileInput && uploadButton) {
