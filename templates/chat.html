@@ -96,6 +96,11 @@
                 {% endfor %}
             </div>
 
+            <!-- Drag-and-Drop File Upload -->
+            <div id="drop-zone" class="hidden bg-gray-100 border-2 border-dashed border-gray-400 rounded-lg p-4 text-center mb-4">
+                <p class="text-gray-500">Drop files here to upload</p>
+            </div>
+
             <!-- Uploaded Files List -->
             <div id="uploaded-files" class="hidden bg-gray-50 p-2 border-b">
                 <div class="text-sm text-gray-500 mb-1">Uploaded files:</div>
@@ -148,7 +153,7 @@
                 <span class="flex-grow">${conv.title || 'Untitled Conversation'}</span>
                 <button class="delete-conversation-btn" data-id="${conv.id}">
                     <svg class="w-4 h-4 text-gray-500 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 001-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                     </svg>
                 </button>
             </div>

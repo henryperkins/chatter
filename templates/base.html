@@ -23,7 +23,7 @@
             setModel: function(modelId) {
                 return `/models/default/${modelId}`;
             },
-            upload: "{{ url_for('chat.upload_files') }}",
+            // Remove the 'upload' URL since file handling is in chat route
             scrape: "{{ url_for('chat.scrape') }}",
             deleteModel: function(modelId) {
                 return `/models/${modelId}`;

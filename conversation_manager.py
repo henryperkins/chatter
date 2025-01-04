@@ -1,29 +1,34 @@
-# conversation_manager.py
-
 import logging
-from typing import Dict, List
-from database import get_db
 import os
-from chat_utils import count_tokens
+from typing import Dict, List
+
+import tiktoken
+from database import get_db
 
 logger = logging.getLogger(__name__)
 
-# Retrieve max_messages and max_tokens from environment variables, with default values
+# Configurable Environment Variables (with defaults)
 MAX_MESSAGES = int(os.getenv("MAX_MESSAGES", "20"))
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "3500"))
+MAX_MESSAGE_TOKENS = int(os.getenv("MAX_MESSAGE_TOKENS", "500"))
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")  # Model for tiktoken
 
 
 class ConversationManager:
     """Manages conversations by storing and retrieving messages from the database."""
 
     def __init__(self):
-        pass
+        self.encoding = tiktoken.encoding_for_model(MODEL_NAME)
+        # Consider establishing a DB connection here if appropriate for your app
 
-    def get_context(self, chat_id: str) -> List[Dict[str, str]]:
+    def get_context(
+        self, chat_id: str, include_system: bool = False
+    ) -> List[Dict[str, str]]:
         """Retrieve the conversation context for a specific chat ID.
 
         Args:
             chat_id (str): The unique identifier for the chat session.
+            include_system (bool): Whether to include system messages. Defaults to False.
 
         Returns:
             List[Dict[str, str]]: A list of message dictionaries containing 'role' and 'content'.
@@ -33,8 +38,17 @@ class ConversationManager:
             "SELECT role, content FROM messages WHERE chat_id = ? ORDER BY timestamp",
             (chat_id,),
         ).fetchall()
-        # Include all messages, including 'system' messages
-        return [{"role": msg["role"], "content": msg["content"]} for msg in messages]
+
+        if include_system:
+            return [
+                {"role": msg["role"], "content": msg["content"]} for msg in messages
+            ]
+        else:
+            return [
+                {"role": msg["role"], "content": msg["content"]}
+                for msg in messages
+                if msg["role"] != "system"
+            ]
 
     def add_message(self, chat_id: str, role: str, content: str) -> None:
         """Add a message to the conversation context.
@@ -45,13 +59,21 @@ class ConversationManager:
             content (str): The message content.
         """
         db = get_db()
-        db.execute(
-            "INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)",
-            (chat_id, role, content),
-        )
-        db.commit()
-        self.trim_context(chat_id)
-        logger.debug(f"Added message to chat {chat_id}: {role}: {content[:50]}...")
+
+        # Truncate the message if it's too long
+        content = self.truncate_message(content, max_tokens=MAX_MESSAGE_TOKENS)
+
+        try:
+            db.execute(
+                "INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)",
+                (chat_id, role, content),
+            )
+            db.commit()
+            self.trim_context(chat_id)
+            logger.debug(f"Added message to chat {chat_id}: {role}: {content[:50]}...")
+        except Exception as e:
+            logger.error(f"Error adding message to chat {chat_id}: {e}")
+            # Potentially handle the error (e.g., rollback, raise a custom exception)
 
     def clear_context(self, chat_id: str) -> None:
         """Clear the conversation context for a specific chat ID.
@@ -60,9 +82,12 @@ class ConversationManager:
             chat_id (str): The unique identifier for the chat session.
         """
         db = get_db()
-        db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
-        db.commit()
-        logger.debug(f"Cleared context for chat {chat_id}")
+        try:
+            db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
+            db.commit()
+            logger.debug(f"Cleared context for chat {chat_id}")
+        except Exception as e:
+            logger.error(f"Error clearing context for chat {chat_id}: {e}")
 
     def trim_context(
         self,
@@ -85,25 +110,27 @@ class ConversationManager:
 
         # Trim based on number of messages
         if len(messages) > max_messages:
-            excess = len(messages) - max_messages
-            db.execute(
-                """
-                DELETE FROM messages
-                WHERE id IN (
-                    SELECT id
-                    FROM messages
-                    WHERE chat_id = ?
-                    ORDER BY timestamp ASC
-                    LIMIT ?
+            excess_messages = len(messages) - max_messages
+            try:
+                db.execute(
+                    """
+                    DELETE FROM messages
+                    WHERE id IN (
+                        SELECT id
+                        FROM messages
+                        WHERE chat_id = ?
+                        ORDER BY timestamp ASC
+                        LIMIT ?
+                    )
+                    """,
+                    (chat_id, excess_messages),
                 )
-                """,
-                (chat_id, excess),
-            )
-            db.commit()
-            logger.debug(
-                f"Trimmed context for chat {chat_id} "
-                f"to the most recent {max_messages} messages"
-            )
+                db.commit()
+                logger.debug(
+                    f"Trimmed messages for chat {chat_id}. Retained the most recent {max_messages} messages."
+                )
+            except Exception as e:
+                logger.error(f"Error trimming messages for chat {chat_id}: {e}")
 
         # Trim based on token count
         total_tokens = sum(count_tokens(msg["content"]) for msg in messages)
@@ -114,12 +141,17 @@ class ConversationManager:
             ).fetchone()
 
             if oldest_message:
-                db.execute("DELETE FROM messages WHERE id = ?", (oldest_message["id"],))
-                db.commit()
-                total_tokens -= count_tokens(oldest_message["content"])
-                logger.debug(
-                    f"Trimmed context for chat {chat_id} due to exceeding token limit"
-                )
+                try:
+                    db.execute(
+                        "DELETE FROM messages WHERE id = ?", (oldest_message["id"],)
+                    )
+                    db.commit()
+                    total_tokens -= count_tokens(oldest_message["content"])
+                    logger.debug(
+                        f"Trimmed tokens for chat {chat_id} due to exceeding token limit. Tokens left: {total_tokens}."
+                    )
+                except Exception as e:
+                    logger.error(f"Error trimming tokens for chat {chat_id}: {e}")
             else:
                 break  # No more messages to trim
 
@@ -136,7 +168,7 @@ class ConversationManager:
             (model_id, chat_id),
         )
         db.commit()
-        logger.info(f"Model set for chat {chat_id}: Model ID {model_id}")
+        logger.info(f"Set model for chat {chat_id}: Model ID {model_id}")
 
     def get_model(self, chat_id: str) -> int:
         """Retrieve the model ID for a specific chat ID.
@@ -154,6 +186,43 @@ class ConversationManager:
         ).fetchone()
         return chat["model_id"] if chat and chat["model_id"] is not None else None
 
+    def truncate_message(self, message: str, max_tokens: int) -> str:
+        """Truncate a message to fit within the maximum token limit.
+
+        Args:
+            message (str): The message to truncate.
+            max_tokens (int): The maximum number of tokens the message can have.
+
+        Returns:
+            str: The truncated message.
+        """
+        tokens = self.encoding.encode(message)
+        if len(tokens) > max_tokens:
+            truncated_tokens = tokens[:max_tokens]
+            truncated_message = self.encoding.decode(truncated_tokens)
+            truncated_message += "\n\n[Note: The input was truncated.]"
+            logger.warning(
+                f"Message truncated to {max_tokens} tokens. Original tokens: {len(tokens)}."
+            )
+            return truncated_message
+        return message
+
+    def get_usage_stats(self, chat_id: str) -> Dict[str, int]:
+        """Retrieve usage statistics for a specific chat.
+
+        Args:
+            chat_id (str): The unique identifier for the chat session.
+
+        Returns:
+            Dict[str, int]: A dictionary containing usage statistics (e.g., tokens count).
+        """
+        messages = self.get_context(chat_id)
+        total_tokens = sum(count_tokens(msg["content"]) for msg in messages)
+        return {
+            "total_messages": len(messages),
+            "total_tokens": total_tokens,
+        }
+
     def migrate_chats(self, old_model_id: int, new_model_id: int) -> None:
         """Migrate chats from one model to another.
 
@@ -167,20 +236,4 @@ class ConversationManager:
             (new_model_id, old_model_id),
         )
         db.commit()
-        logger.info(f"Migrated chats from model {old_model_id} to model {new_model_id}")
-
-    def get_usage_stats(self, chat_id: str) -> Dict[str, int]:
-        """Retrieve usage statistics for a specific chat.
-
-        Args:
-            chat_id (str): The unique identifier for the chat session.
-
-        Returns:
-            Dict[str, int]: A dictionary containing usage statistics (e.g., token count).
-        """
-        messages = self.get_context(chat_id)
-        total_tokens = sum(count_tokens(msg["content"]) for msg in messages)
-        return {
-            "total_messages": len(messages),
-            "total_tokens": total_tokens,
-        }
+        logger.info(f"Chats migrated from model {old_model_id} to model {new_model_id}")

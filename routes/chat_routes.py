@@ -1,17 +1,10 @@
-"""
-chat_routes.py
-
-This module defines the routes for the chat interface, including
-handling new chats, loading chats, deleting chats, and sending messages.
-It also includes file upload functionality and integrates uploaded files
-into the chat context.
-"""
-
 import logging
 import os
 import uuid
 import imghdr
 from typing import Union, Tuple
+
+import bleach
 from flask import (
     Blueprint,
     jsonify,
@@ -20,8 +13,8 @@ from flask import (
     request,
     session,
     url_for,
+    Response,
 )
-from flask import Response
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from markupsafe import escape
@@ -32,6 +25,7 @@ from conversation_manager import ConversationManager
 from database import get_db
 from models import Chat, Model
 from azure_config import get_azure_client
+import tiktoken
 
 bp = Blueprint("chat", __name__)
 conversation_manager = ConversationManager()
@@ -39,26 +33,55 @@ logger = logging.getLogger(__name__)
 
 # Constants
 ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx", ".py", ".js", ".md", ".jpg", ".png"}
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
+# Allowed MIME types corresponding to the allowed extensions
+ALLOWED_MIME_TYPES = {
+    "text/plain",
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/x-python",
+    "application/javascript",
+    "text/markdown",
+    "image/jpeg",
+    "image/png",
+}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB per file
+MAX_TOTAL_FILE_SIZE = 50 * 1024 * 1024  # 50 MB for total files
 MAX_FILE_CONTENT_LENGTH = 6000  # Characters
-MAX_INPUT_TOKENS = 4000  # Tokens
+MAX_INPUT_TOKENS = 4000  # Azure OpenAI token limit
+
+# Initialize tokenizer
+encoding = tiktoken.encoding_for_model("gpt-4")  # Or whichever model you're using
+
+# --- Helper Functions ---
+
+
+def truncate_message(message, max_tokens):
+    """Truncates a message to a specified number of tokens."""
+    tokens = encoding.encode(message)
+    if len(tokens) > max_tokens:
+        truncated_tokens = tokens[:max_tokens]
+        truncated_message = encoding.decode(truncated_tokens)
+        truncated_message += (
+            "\n\n[Note: The input was too long and has been truncated.]"
+        )
+        return truncated_message
+    return message
+
+
+# --- Routes ---
 
 
 @bp.route("/")
 @login_required
 def index() -> Response:
-    """
-    Redirect to the chat interface.
-    """
+    """Redirect to the chat interface."""
     return redirect(url_for("chat.chat_interface"))
 
 
 @bp.route("/new_chat", methods=["GET", "POST"])
 @login_required
 def new_chat_route() -> Response:
-    """
-    Create a new chat and return success JSON.
-    """
+    """Create a new chat and return success JSON."""
     chat_id = generate_new_chat_id()
     user_id = int(current_user.id)
 
@@ -74,10 +97,7 @@ def new_chat_route() -> Response:
 @bp.route("/chat_interface")
 @login_required
 def chat_interface() -> Union[str, Response]:
-    """
-    Render the main chat interface page.
-    Returns an HTML template as a string (implicitly converted to a Response).
-    """
+    """Render the main chat interface page."""
     chat_id = session.get("chat_id")
     if not chat_id:
         chat_id = generate_new_chat_id()
@@ -97,9 +117,7 @@ def chat_interface() -> Union[str, Response]:
 @bp.route("/load_chat/<chat_id>")
 @login_required
 def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
-    """
-    Load and return the messages for a specific chat.
-    """
+    """Load and return the messages for a specific chat."""
     db = get_db()
     # Verify chat ownership
     chat = db.execute(
@@ -113,7 +131,7 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 
     messages = conversation_manager.get_context(chat_id)
     # Exclude 'system' messages from being sent to the frontend
-    messages_to_send = [msg for msg in messages if msg['role'] != 'system']
+    messages_to_send = [msg for msg in messages if msg["role"] != "system"]
 
     return jsonify({"messages": messages_to_send})
 
@@ -121,9 +139,7 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 @bp.route("/delete_chat/<chat_id>", methods=["DELETE"])
 @login_required
 def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
-    """
-    Delete a chat and its associated messages.
-    """
+    """Delete a chat and its associated messages."""
     db = get_db()
     chat_to_delete = db.execute(
         "SELECT user_id FROM chats WHERE id = ?", (chat_id,)
@@ -146,9 +162,7 @@ def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 @bp.route("/conversations", methods=["GET"])
 @login_required
 def get_conversations() -> Response:
-    """
-    Retrieve all conversations for the current user.
-    """
+    """Retrieve all conversations for the current user."""
     user_id = int(current_user.id)
     conversations = Chat.get_user_chats(user_id)
     return jsonify(conversations)
@@ -157,9 +171,7 @@ def get_conversations() -> Response:
 @bp.route("/scrape", methods=["POST"])
 @login_required
 def scrape() -> Union[Response, Tuple[Response, int]]:
-    """
-    Handle web scraping requests.
-    """
+    """Handle web scraping requests."""
     data = request.get_json()
     query = data.get("query")
     if not query:
@@ -180,7 +192,7 @@ def scrape() -> Union[Response, Tuple[Response, int]]:
 @login_required
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
     """
-    Handle incoming chat messages and return AI responses.
+    Handle incoming chat messages, integrate uploaded files, and return AI responses.
     """
     logger.debug("Received chat message")
     chat_id = session.get("chat_id")
@@ -188,72 +200,130 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         logger.error("Chat ID not found in session")
         return jsonify({"error": "Chat ID not found."}), 400
 
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Invalid request data"}), 400
+    data = request.form
+    user_message = data.get("message", "").strip()
+    uploaded_files = request.files.getlist("files")
 
-    user_message = data.get("message")
-
-    # Input sanitization
-    if not user_message:
+    # Validate user input
+    if not user_message and not uploaded_files:
         return jsonify({"error": "Message cannot be empty."}), 400
-    if len(user_message) > 1000:
-        return jsonify({"error": "Message is too long. Max length is 1000 chars."}), 400
 
-    user_message = escape(user_message)
+    # Sanitize user message
+    user_message = bleach.clean(user_message)
 
     try:
-        # Retrieve uploaded file contents from both session and request
-        session_files = session.get('uploaded_files_content', {}).get(chat_id, [])
-        request_files = data.get('files', [])
+        file_contents = []
+        excluded_files = []
+        total_size = 0
 
-        # Combine both sources of files
-        all_files = session_files + [
-            {'filename': f['name'], 'content': f['content']}
-            for f in request_files
-        ]
+        for uploaded_file in uploaded_files:
+            filename = secure_filename(uploaded_file.filename)
+            if not filename:
+                continue
 
-        # Prepare the combined message with explicit file context
+            # Validate MIME type
+            if uploaded_file.mimetype not in ALLOWED_MIME_TYPES:
+                excluded_files.append(filename)
+                logger.warning(
+                    f"File {filename} has an invalid MIME type: {uploaded_file.mimetype}"
+                )
+                continue
+
+            file_content = uploaded_file.read()
+            file_size = len(file_content)
+            total_size += file_size
+
+            # Validate file size
+            if file_size > MAX_FILE_SIZE:
+                excluded_files.append(filename)
+                logger.warning(f"File {filename} exceeds the 10MB limit.")
+                continue
+
+            # Validate total file size
+            if total_size > MAX_TOTAL_FILE_SIZE:
+                return (
+                    jsonify(
+                        {
+                            "error": "Total size of all uploaded files exceeds 50MB limit."
+                        }
+                    ),
+                    400,
+                )
+
+            try:
+                # Attempt to decode as UTF-8
+                content = file_content.decode("utf-8", errors="ignore")
+
+                # Sanitize content using bleach, allowing only code-related tags and specific attributes
+                allowed_tags = [
+                    "code",
+                    "pre",
+                    "b",
+                    "i",
+                    "u",
+                    "strike",
+                    "br",
+                    "p",
+                    "h1",
+                    "h2",
+                    "h3",
+                    "h4",
+                    "h5",
+                    "h6",
+                    "ul",
+                    "ol",
+                    "li",
+                    "a",
+                    "img",
+                ]
+                allowed_attributes = {
+                    "a": ["href", "title", "target"],
+                    "img": ["src", "alt"],
+                }
+                content = bleach.clean(
+                    content, tags=allowed_tags, attributes=allowed_attributes
+                )
+
+                # Truncate if necessary
+                if len(content) > MAX_FILE_CONTENT_LENGTH:
+                    content = (
+                        content[:MAX_FILE_CONTENT_LENGTH] + "\n...[Content truncated]"
+                    )
+
+                file_contents.append({"filename": filename, "content": content})
+
+            except UnicodeDecodeError:
+                logger.error(f"Error decoding file {filename} as UTF-8.")
+                excluded_files.append(filename)
+
+        # Append file contents to the user message
         combined_message = user_message
-        if all_files:
-            combined_message += "\n\n--- Files Attached ---\n"
-            combined_message += "Here are the contents of the files I'm sharing with you:\n"
-
-            for file_info in all_files:
-                filename = escape(file_info['filename'])
-                content = escape(file_info['content'])
-
-                # Format file content as part of the user's message
-                combined_message += f"\n### File: {filename}\n"
+        if file_contents:
+            combined_message += (
+                "\n\nPlease consider the following files in your response:\n"
+            )
+            for file in file_contents:
+                combined_message += f"\n### File: {file['filename']}\n"
                 combined_message += "```\n"
-                combined_message += content
+                combined_message += file["content"]
                 combined_message += "\n```\n"
-                combined_message += "Please analyze this file content and incorporate it into your response.\n"
 
-        combined_message_tokens = count_tokens(combined_message)
-        if combined_message_tokens > MAX_INPUT_TOKENS:
-            return jsonify({"error": "The combined message exceeds the maximum allowed length."}), 400
+        # Check total tokens
+        total_tokens = count_tokens(combined_message)
+        if total_tokens > MAX_INPUT_TOKENS:
+            combined_message = truncate_message(combined_message, MAX_INPUT_TOKENS)
 
-        # Initialize session dictionary if it doesn't exist
-        if 'uploaded_files_content' not in session:
-            session['uploaded_files_content'] = {}
-        if chat_id not in session['uploaded_files_content']:
-            session['uploaded_files_content'][chat_id] = []
-
-        # Clear the uploaded contents after use
-        session['uploaded_files_content'][chat_id] = []
-
-        # For o1-preview, only one user message is allowed, so we send the combined message
+        # Prepare messages for the AI model
         api_messages = [{"role": "user", "content": combined_message}]
 
         # Initialize the model parameters
         client, deployment_name = get_azure_client()
 
-        # Prepare the API parameters for o1-preview
+        # Prepare the API parameters
         api_params = {
             "model": deployment_name,
             "messages": api_messages,
-            "temperature": 1  # Fixed at 1 for o1-preview
+            "temperature": 1,
         }
 
         # Send the request to the AI model
@@ -265,8 +335,6 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             if response.choices and response.choices[0].message
             else "The assistant was unable to generate a response."
         )
-        # Only escape user input, not model responses
-        model_response = model_response
 
         logger.info("Response from the model: %s", model_response)
 
@@ -286,7 +354,12 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             total_tokens,
         )
 
-        return jsonify({"response": model_response})
+        # Prepare response data
+        response_data = {"response": model_response}
+        if excluded_files:
+            response_data["excluded_files"] = excluded_files
+
+        return jsonify(response_data)
 
     except Exception as ex:
         logger.exception(
@@ -296,79 +369,3 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             jsonify({"error": "An unexpected error occurred. Please try again later."}),
             500,
         )
-
-
-@bp.route("/upload", methods=["POST"])
-@login_required
-def upload_files() -> Union[Response, Tuple[Response, int]]:
-    """
-    Handle file uploads securely and store file contents for use in chats.
-    """
-    try:
-        if "file" not in request.files:
-            return jsonify({"success": False, "error": "No file part in the request."}), 400
-
-        files = request.files.getlist("file")
-        if not files or files[0].filename == "":
-            return jsonify({"success": False, "error": "No files selected."}), 400
-
-        uploaded_files = []
-        uploaded_contents = []
-
-        for file in files:
-            if not file.filename:
-                continue
-
-            filename = secure_filename(file.filename)
-            if not filename:
-                continue
-
-            ext = os.path.splitext(filename)[1].lower()
-            if ext not in ALLOWED_EXTENSIONS:
-                return jsonify({"success": False, "error": f"Invalid file type: {filename}."}), 400
-
-            file_content = file.read()
-            file_size = len(file_content)
-            if file_size > MAX_FILE_SIZE:
-                return jsonify({"success": False, "error": f"File too large: {filename}."}), 400
-
-            if ext in {".jpg", ".png"}:
-                image_type = imghdr.what(None, h=file_content)
-                if image_type not in {"jpeg", "png"}:
-                    return jsonify({"success": False, "error": f"Invalid image file: {filename}."}), 400
-
-            user_directory = os.path.join("uploads", str(current_user.id))
-            os.makedirs(user_directory, exist_ok=True)
-
-            unique_filename = f"{uuid.uuid4().hex}_{filename}"
-            file_path = os.path.join(user_directory, unique_filename)
-            with open(file_path, "wb") as f:
-                f.write(file_content)
-
-            uploaded_files.append(unique_filename)
-
-            if ext in {".txt", ".pdf", ".docx", ".py", ".js", ".md"}:
-                try:
-                    file_text = file_content.decode('utf-8', errors='ignore')
-                    if len(file_text) > MAX_FILE_CONTENT_LENGTH:
-                        file_text = file_text[:MAX_FILE_CONTENT_LENGTH] + "\n...[Content truncated]"
-                    uploaded_contents.append({"filename": filename, "content": file_text})
-                except Exception as e:
-                    logger.warning(f"Could not decode file {filename}: {e}")
-
-        chat_id = session.get('chat_id')
-        if not chat_id:
-            chat_id = generate_new_chat_id()
-            user_id = int(current_user.id)
-            Chat.create(chat_id, user_id, "New Chat")
-            session['chat_id'] = chat_id
-
-        if 'uploaded_files_content' not in session:
-            session['uploaded_files_content'] = {}
-        session['uploaded_files_content'][chat_id] = uploaded_contents
-
-        return jsonify({"success": True, "files": uploaded_files}), 200
-
-    except Exception as ex:
-        logger.exception("Error during file upload: %s", ex)
-        return jsonify({"success": False, "error": "An error occurred during file upload."}), 500

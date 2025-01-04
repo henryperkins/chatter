@@ -2,7 +2,7 @@
 model_routes.py
 
 This module defines the routes for managing AI models, including
-creating, updating, deleting, and retrieving models.
+creating, updating, deleting, and retrieving models, as well as
 """
 
 from flask import Blueprint, jsonify, request, render_template
