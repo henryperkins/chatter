@@ -15,7 +15,8 @@
         <div class="mb-4">
             {{ form.name.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
             {{ form.name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                                focus:outline-none focus:ring-2 focus:ring-blue-500 
+                                focus:border-transparent") }}
             {% if form.name.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.name.errors[0] }}</p>
             {% endif %}
@@ -25,7 +26,8 @@
         <div class="mb-4">
             {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
             {{ form.deployment_name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                                            focus:outline-none focus:ring-2 focus:ring-blue-500 
+                                            focus:border-transparent") }}
             {% if form.deployment_name.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.deployment_name.errors[0] }}</p>
             {% endif %}
@@ -35,7 +37,8 @@
         <div class="mb-4">
             {{ form.description.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
             {{ form.description(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                                        focus:outline-none focus:ring-2 focus:ring-blue-500 
+                                        focus:border-transparent") }}
             {% if form.description.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.description.errors[0] }}</p>
             {% endif %}
@@ -45,7 +48,8 @@
         <div class="mb-4">
             {{ form.api_endpoint.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
             {{ form.api_endpoint(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                                         focus:outline-none focus:ring-2 focus:ring-blue-500 
+                                         focus:border-transparent") }}
             {% if form.api_endpoint.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
             {% endif %}
@@ -55,7 +59,8 @@
         <div class="mb-4">
             {{ form.model_type.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
             {{ form.model_type(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                                        focus:outline-none focus:ring-2 focus:ring-blue-500 
+                                        focus:border-transparent") }}
             {% if form.model_type.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.model_type.errors[0] }}</p>
             {% endif %}
@@ -65,27 +70,29 @@
         <div class="mb-4">
             {{ form.temperature.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
             {{ form.temperature(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                                        focus:outline-none focus:ring-2 focus:ring-blue-500 
+                                        focus:border-transparent") }}
             {% if form.temperature.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.temperature.errors[0] }}</p>
             {% endif %}
         </div>
 
-        <!-- Max Tokens / Max Completion Tokens -->
+        <!-- Max Tokens and Max Completion Tokens -->
         <div class="grid grid-cols-2 gap-4">
             <div class="mb-4">
                 {{ form.max_tokens.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
                 {{ form.max_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                                            focus:outline-none focus:ring-2 focus:ring-blue-500 
+                                            focus:border-transparent") }}
                 {% if form.max_tokens.errors %}
                     <p class="text-sm text-red-500 mt-1">{{ form.max_tokens.errors[0] }}</p>
                 {% endif %}
             </div>
-
             <div class="mb-4">
                 {{ form.max_completion_tokens.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
                 {{ form.max_completion_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                                                    focus:outline-none focus:ring-2 focus:ring-blue-500 
+                                                    focus:border-transparent") }}
                 {% if form.max_completion_tokens.errors %}
                     <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
                 {% endif %}
@@ -96,7 +103,8 @@
         <div class="mb-4">
             {{ form.api_version.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
             {{ form.api_version(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
+                                         focus:outline-none focus:ring-2 focus:ring-blue-500 
+                                         focus:border-transparent") }}
             {% if form.api_version.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.api_version.errors[0] }}</p>
             {% endif %}
@@ -105,7 +113,8 @@
         <!-- Requires o1-preview Handling -->
         <div class="mb-4">
             <label class="inline-flex items-center">
-                {{ form.requires_o1_handling(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2") }}
+                {{ form.requires_o1_handling(class="h-5 w-5 text-blue-600 form-checkbox 
+                                               focus:ring-blue-500 focus:ring-2") }}
                 <span class="ml-2 text-sm text-gray-700 font-medium">
                     {{ form.requires_o1_handling.label.text }}
                 </span>
@@ -115,26 +124,27 @@
         <!-- Default Model Option -->
         <div class="mb-6">
             <label class="inline-flex items-center">
-                {{ form.is_default(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2") }}
+                {{ form.is_default(class="h-5 w-5 text-blue-600 form-checkbox 
+                                      focus:ring-blue-500 focus:ring-2") }}
                 <span class="ml-2 text-sm text-gray-700 font-medium">
                     {{ form.is_default.label.text }}
                 </span>
             </label>
         </div>
 
-        <!-- Submit Button -->
+        <!-- Submit & Cancel -->
         <div class="flex space-x-4">
             <button
                 type="submit"
-                class="px-4 py-2 bg-green-500 text-white rounded-lg shadow-lg font-medium hover:bg-green-600 
-                       focus:outline-none focus:ring-2 focus:ring-green-500"
+                class="px-4 py-2 bg-green-500 text-white rounded-lg shadow-lg font-medium 
+                       hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
             >
                 Add Model
             </button>
             <a
                 href="{{ url_for('chat.chat_interface') }}"
-                class="px-4 py-2 bg-gray-500 text-white rounded-lg shadow-lg font-medium hover:bg-gray-600 
-                       focus:outline-none focus:ring-2 focus:ring-gray-500"
+                class="px-4 py-2 bg-gray-500 text-white rounded-lg shadow-lg font-medium 
+                       hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
             >
                 Cancel
             </a>
@@ -143,47 +153,50 @@
 </div>
 
 <!-- Feedback Message -->
-<div id="feedback-message" class="hidden fixed bottom-4 right-4 p-4 rounded-lg"></div>
+<div
+    id="feedback-message"
+    class="hidden fixed bottom-4 right-4 p-4 rounded-lg"
+></div>
 
-<!-- JavaScript for Form Submission -->
+<!-- JavaScript for handling form submission without "type=module" -->
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+document.addEventListener("DOMContentLoaded", function() {
     const form = document.getElementById("add-model-form");
 
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        // Using the globally-defined functions from chat.js:
-        // window.getCSRFToken() and window.showFeedback()
-
+        // Because chat.js attaches these to the window, we can reference them directly:
         const { getCSRFToken, showFeedback } = window;
 
         try {
             const submitButton = form.querySelector("button[type='submit']");
-            submitButton.disabled = true; // Prevent duplicate submissions
+            submitButton.disabled = true; // prevent duplicate submissions
+
+            const formData = new FormData(form);
 
             const response = await fetch(form.action, {
                 method: "POST",
-                body: new FormData(form),
+                body: formData,
                 headers: {
-                    "X-CSRF-Token": getCSRFToken(), // Attach the CSRF token
-                },
+                    "X-CSRFToken": getCSRFToken()
+                }
             });
 
             const data = await response.json();
 
             if (response.ok) {
                 showFeedback(data.message || "Model created successfully", "success");
-                // Optionally redirect the user after a brief delay
+                // Optionally redirect after a delay:
                 setTimeout(() => {
                     window.location.href = "{{ url_for('chat.chat_interface') }}";
                 }, 1500);
             } else {
                 showFeedback(data.error || "Failed to create the model", "error");
-                submitButton.disabled = false; // Re-enable button in case of error
+                submitButton.disabled = false; 
             }
-        } catch (error) {
-            console.error("Error:", error);
+        } catch (err) {
+            console.error("Error:", err);
             window.showFeedback("An unexpected error occurred. Please try again.", "error");
             form.querySelector("button[type='submit']").disabled = false;
         }
