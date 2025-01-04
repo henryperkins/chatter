@@ -21,7 +21,7 @@ from wtforms.validators import (
     Regexp,
     ValidationError,
 )
-from models import Model  # Import the model classes for validation
+from azure_config import validate_api_endpoint  # Import the correct function
 from database import get_db  # For database queries in custom validations
 
 
