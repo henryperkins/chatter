@@ -51,28 +51,21 @@ MAX_INPUT_TOKENS = 4000  # Azure OpenAI token limit
 # Initialize tokenizer
 encoding = tiktoken.encoding_for_model("gpt-4")  # Or whichever model you're using
 
-# --- Helper Functions ---
 
-
-def allowed_file(filename):
+def allowed_file(filename: str) -> bool:
     """Check if the file has an allowed extension."""
     return os.path.splitext(filename)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def truncate_message(message, max_tokens):
-    """Truncates a message to a specified number of tokens."""
+def truncate_message(message: str, max_tokens: int) -> str:
+    """Truncates a message to a specified number of tokens using tiktoken."""
     tokens = encoding.encode(message)
     if len(tokens) > max_tokens:
         truncated_tokens = tokens[:max_tokens]
         truncated_message = encoding.decode(truncated_tokens)
-        truncated_message += (
-            "\n\n[Note: The input was too long and has been truncated.]"
-        )
+        truncated_message += "\n\n[Note: The input was too long and has been truncated.]"
         return truncated_message
     return message
-
-
-# --- Routes ---
 
 
 @bp.route("/")
@@ -84,7 +77,7 @@ def index() -> Response:
 
 @bp.route("/new_chat", methods=["GET", "POST"])
 @login_required
-def new_chat_route() -> Response:
+def new_chat_route() -> Union[Response, Tuple[Response, int]]:
     """Create a new chat and return success JSON."""
     chat_id = generate_new_chat_id()
     user_id = int(current_user.id)
@@ -101,7 +94,10 @@ def new_chat_route() -> Response:
 @bp.route("/chat_interface")
 @login_required
 def chat_interface() -> str:
-    """Render the main chat interface page."""
+    """
+    Render the main chat interface page.
+    If no chat_id in session, create a new one.
+    """
     chat_id = session.get("chat_id")
     if not chat_id:
         chat_id = generate_new_chat_id()
@@ -139,7 +135,6 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     messages = conversation_manager.get_context(chat_id)
     # Exclude 'system' messages from being sent to the frontend
     messages_to_send = [msg for msg in messages if msg["role"] != "system"]
-
     return jsonify({"messages": messages_to_send})
 
 
@@ -202,12 +197,16 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
     logger.debug("Received chat message")
     chat_id = session.get("chat_id")
     if not chat_id:
-        logger.error("Chat ID not found in session")
+        logger.error("Chat ID not found in session.")
         return jsonify({"error": "Chat ID not found."}), 400
 
-    # Retrieve message from form data
-    user_message = request.form.get("message", "").strip()
+    # Retrieve the model for this chat, if any
+    model_id = Chat.get_model(chat_id)
+    model_obj = Model.get_by_id(model_id) if model_id else Model.get_default()
+    requires_o1_handling = model_obj.requires_o1_handling if model_obj else False
 
+    # Retrieve user message
+    user_message = request.form.get("message", "").strip()
     if not user_message and 'files[]' not in request.files:
         return jsonify({"error": "Message or files are required."}), 400
 
@@ -219,8 +218,6 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
     for file in uploaded_files:
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-
-            # Get MIME type
             mime_type = file.mimetype
 
             # Validate MIME type
@@ -257,38 +254,55 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                     excluded_files.append(filename)
                     continue
 
-                # Truncate file content if necessary
+                # Truncate file content to avoid excessive tokens
                 truncated_content = truncate_message(file_content, MAX_FILE_CONTENT_LENGTH)
 
                 # Add file content to conversation as a system message
-                conversation_manager.add_message(chat_id, "system", f"Content of file '{filename}':\n{truncated_content}")
-
+                conversation_manager.add_message(
+                    chat_id,
+                    "system",
+                    f"Content of file '{filename}':\n{truncated_content}"
+                )
             else:
                 logger.info(f"Skipping reading content for non-text file: {filename}")
 
-            # Record the file as included
             included_files.append(filename)
-
-            # Save file information to the database
             UploadedFile.create(chat_id, filename, file_path)
         else:
-            excluded_files.append(file.filename)
+            if file:
+                excluded_files.append(file.filename)
 
     # Process user message
     if user_message:
-        # Sanitize user input
+        # Sanitize input
         user_message = bleach.clean(user_message)
+
         conversation_manager.add_message(chat_id, "user", user_message)
 
-    # Retrieve conversation history
-    history = conversation_manager.get_context(chat_id)
+        # Update chat title if it's still "New Chat"
+        if Chat.is_title_default(chat_id):
+            # Use the first line (up to 50 characters) of user_message
+            new_title = user_message.split("\n")[0][:50]
+            Chat.update_title(chat_id, new_title)
 
-    # Prepare messages for the AI model
+    # Retrieve conversation history
+    # If requires_o1_handling == True, exclude system messages
+    history = conversation_manager.get_context(
+        chat_id,
+        include_system=not requires_o1_handling
+    )
+
+    # Prepare messages for the Azure OpenAI model
     client, deployment_name = get_azure_client()
+
+    # Force temperature=1 if requires_o1_handling
+    # (o1-preview requires temp=1, no streaming)
+    temperature_setting = 1 if requires_o1_handling else model_obj.temperature if model_obj else 1
+
     api_params = {
         "model": deployment_name,
         "messages": history,
-        "temperature": 1,
+        "temperature": temperature_setting,
     }
 
     try:
@@ -302,7 +316,6 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         # Add assistant's response to conversation history
         conversation_manager.add_message(chat_id, "assistant", model_response)
 
-        # Prepare response data
         response_data = {"response": model_response}
         if excluded_files:
             response_data["excluded_files"] = excluded_files
