@@ -185,12 +185,12 @@ class Model:
             )
         model_id = cursor.lastrowid
 
-            # If the new model is set as default, unset default on other models
-            if data.get('is_default', False):
-                db.execute(
-                    "UPDATE models SET is_default = 0 WHERE id != ?",
-                    (model_id,)
-                )
+        # If the new model is set as default, unset default on other models
+        if data.get('is_default', False):
+            db.execute(
+                "UPDATE models SET is_default = 0 WHERE id != ?",
+                (model_id,)
+            )
 
             logger.info("Model created with ID: %d", model_id)
             return model_id
