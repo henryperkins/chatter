@@ -32,13 +32,14 @@ source venv/bin/activate  # Linux/Mac
 pip install -r requirements.txt
 ```
 
-4. Create a .env file:
-   - Copy .env.template to .env
-   - Fill in your Azure OpenAI credentials:
-     - AZURE_OPENAI_ENDPOINT
-     - AZURE_OPENAI_KEY
-     - AZURE_OPENAI_API_VERSION
-     - AZURE_OPENAI_DEPLOYMENT_NAME
+4. Create a `.env` file:
+
+   - Copy `.env.example` to `.env`:
+     ```bash
+     cp .env.example .env  # For Linux/Mac
+     copy .env.example .env  # For Windows
+     ```
+   - Fill in your Azure OpenAI credentials and other required configuration variables in the `.env` file.
 
 ## Running the Application
 
@@ -63,3 +64,33 @@ python app.py
   - Only user messages are supported (no system messages)
   - Streaming is not supported
   - Uses API version 2024-12-01-preview
+
+## Security
+
+- **Important:** Never commit your `.env` file or any file containing sensitive information like API keys or secrets.
+- Regenerate any keys that might have been exposed in previous commits to ensure the security of your application.
+
+## Cleaning Up Exposed Secrets
+
+If you have accidentally committed sensitive information:
+
+1. **Remove the file from Git tracking:**
+   ```bash
+   git rm --cached .env
+   ```
+
+2. **Clean the file from your Git history:**
+   - Use the [BFG Repo-Cleaner](https://rtyley.github.io/bfg-repo-cleaner/) or the `git filter-repo` tool to remove the file from your repository's history.
+   - Follow the tool's documentation carefully to ensure all traces are removed.
+
+3. **Force push the cleaned history to GitHub:**
+   ```bash
+   git push origin --force --all
+   ```
+
+   > **Warning:** Force pushing can overwrite commits on the remote repository. Ensure you coordinate with any collaborators before doing this.
+
+4. **Regenerate your API keys and secrets:**
+   - Log in to your Azure portal and regenerate your Azure OpenAI Key.
+   - Update your `.env` file with the new credentials.
+
