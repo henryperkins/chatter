@@ -67,7 +67,14 @@ login_manager.login_view = "auth.login"
 csrf = CSRFProtect(app)
 
 # Flask-Limiter for rate limiting
-limiter = Limiter(get_remote_address, app=app)
+from flask_limiter.util import get_remote_address
+from flask_limiter.storage.redis import RedisStorage
+
+redis_url = os.getenv("REDIS_URL", None)
+if redis_url:
+    limiter = Limiter(get_remote_address, app=app, storage=RedisStorage(redis_url))
+else:
+    limiter = Limiter(get_remote_address, app=app)
 
 # Database initialization
 init_app(app)
