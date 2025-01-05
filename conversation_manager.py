@@ -27,7 +27,7 @@ class ConversationManager:
 
     def __init__(self):
         try:
-            self.encoding = tiktoken.encoding_for_model(MODE_NAME)
+            self.encoding = tiktoken.encoding_for_model(MODEL_NAME)
         except KeyError:
             self.encoding = tiktoken.get_encoding("cl100k_base")
 
