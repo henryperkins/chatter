@@ -203,7 +203,7 @@ class Model:
 
         Args:
             model_id (int): The ID of the model to update.
-            data (dict): A dictionary containing the updated model attributes.
+            data (Mapping[str, Any]): A dictionary containing the updated model attributes.
         """
         with db_connection() as db:
             # 1. Validate the data (optional, but recommended)
