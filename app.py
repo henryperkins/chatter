@@ -9,6 +9,7 @@ import os
 from datetime import timedelta
 
 from flask import Flask, jsonify
+from dotenv import load_dotenv  # Ensure dotenv is imported
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from werkzeug.exceptions import HTTPException
@@ -22,6 +23,7 @@ from models import User
 app = Flask(__name__)
 
 # --- CONFIGURATION ---
+load_dotenv()  # Load environment variables from .env file
 
 # Load environment variables and secrets
 # --- LOGGING CONFIGURATION ---
