@@ -183,7 +183,6 @@ class Model:
                 data.get("is_default", False),
                 data.get("version", 1),  # Set default version to 1 if not provided
             )
-        )
         model_id = cursor.lastrowid
 
             # If the new model is set as default, unset default on other models
