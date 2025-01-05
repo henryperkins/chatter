@@ -9,7 +9,7 @@ import logging
 import os
 from urllib.parse import urlparse
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Union, Any, Mapping
+from typing import Optional, List, Union, Any, Mapping, Dict
 
 from database import db_connection  # Use the centralized context manager
 import requests
