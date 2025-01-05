@@ -1,8 +1,16 @@
 import logging
 import os
 from typing import Dict, List
+
 import tiktoken
 from database import db_connection  # Use the centralized context manager
+import logging
+import os
+from typing import Dict, List
+
+import tiktoken
+from database import db_connection  # Use the centralized context manager
+
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +39,7 @@ class ConversationManager:
 
     def calculate_total_tokens(self, messages: List[Dict[str, str]]) -> int:
         """
-        Calculate the total number of tokens in the conversation, 
+        Calculate the total number of tokens in the conversation,
         accounting for the overhead tokens per message and start/end tokens.
         """
         total_tokens = 0
@@ -47,11 +55,11 @@ class ConversationManager:
     def get_context(self, chat_id: str, include_system: bool = False) -> List[Dict[str, str]]:
         """
         Retrieve the conversation context for a specific chat ID.
-        
+
         Args:
             chat_id (str): The unique identifier for the chat session.
             include_system (bool): Whether to include system messages. Defaults to False.
-        
+
         Returns:
             A list of message dictionaries with 'role' and 'content'.
         """
@@ -59,9 +67,9 @@ class ConversationManager:
             # Explicitly order by timestamp ascending
             messages = db.execute(
                 """
-                SELECT id, role, content 
-                FROM messages 
-                WHERE chat_id = ? 
+                SELECT id, role, content
+                FROM messages
+                WHERE chat_id = ?
                 ORDER BY timestamp ASC
                 """,
                 (chat_id,),
@@ -81,37 +89,40 @@ class ConversationManager:
 
     def add_message(self, chat_id: str, role: str, content: str) -> None:
         """
-        Add a message to the conversation context, ensuring it doesn't exceed 
+        Add a message to the conversation context, ensuring it doesn't exceed
         MAX_MESSAGE_TOKENS (accounting for overhead).
         """
         # Truncate the message if it's too long
-        # We subtract 4 tokens to account for overhead in the message
-        # if you want to be extra conservative.
         content = self.truncate_message(content, max_tokens=MAX_MESSAGE_TOKENS)
 
-        with db_connection() as db:
-            db.execute(
-                "INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)",
-                (chat_id, role, content),
-            )
-            self.trim_context(chat_id)
-            logger.debug(f"Added message to chat {chat_id}: {role}: {content[:50]}...")
+        try:
+            with db_connection() as db:
+                # Insert new message
+                db.execute(
+                    "INSERT INTO messages (chat_id, role, content) VALUES (?, ?, ?)",
+                    (chat_id, role, content),
+                )
 
-    def clear_context(self, chat_id: str) -> None:
-        """Clear the conversation context for a specific chat ID."""
-        with db_connection() as db:
-            db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
-            logger.debug(f"Cleared context for chat {chat_id}")
+                # Get all messages including the new one
+                messages = db.execute(
+                    """
+                    SELECT id, role, content
+                    FROM messages
+                    WHERE chat_id = ?
+                    ORDER BY timestamp ASC
+                    """,
+                    (chat_id,),
+                ).fetchall()
 
-    def trim_context(self, chat_id: str) -> None:
-        """Trim the conversation context to stay within both message and token limits."""
-        with db_connection() as db:
-            messages = self.get_context(chat_id, include_system=True)
+                # Convert to message dicts
+                message_dicts = [
+                    {"id": msg["id"], "role": msg["role"], "content": msg["content"]}
+                    for msg in messages
+                ]
 
-            # 1. Trim based on number of messages
-            if len(messages) > MAX_MESSAGES:
-                excess_messages = len(messages) - MAX_MESSAGES
-                try:
+                # 1. Trim based on number of messages
+                if len(message_dicts) > MAX_MESSAGES:
+                    excess = len(message_dicts) - MAX_MESSAGES
                     db.execute(
                         """
                         DELETE FROM messages
@@ -122,41 +133,33 @@ class ConversationManager:
                             LIMIT ?
                         )
                         """,
-                        (chat_id, excess_messages),
+                        (chat_id, excess),
                     )
-                    # Reload messages since some have been deleted
-                    messages = self.get_context(chat_id, include_system=True)
-                except Exception as e:
-                    logger.error(f"Error trimming messages for chat {chat_id}: {e}")
-                    return
+                    # Remove excess messages from our local list
+                    message_dicts = message_dicts[excess:]
 
-            # 2. Trim based on total token count
-            total_tokens = self.calculate_total_tokens(messages)
-            while total_tokens > MAX_TOKENS and messages:
-                tokens_to_remove = total_tokens - MAX_TOKENS
-                cumulative_tokens = 0
-                messages_to_remove = []
+                # 2. Trim based on total token count
+                total_tokens = self.calculate_total_tokens(message_dicts)
+                while total_tokens > MAX_TOKENS and message_dicts:
+                    # Remove oldest message
+                    msg_to_remove = message_dicts.pop(0)
+                    db.execute(
+                        "DELETE FROM messages WHERE id = ?",
+                        (msg_to_remove["id"],)
+                    )
+                    # Recalculate tokens
+                    total_tokens = self.calculate_total_tokens(message_dicts)
 
-                # Accumulate enough messages from the oldest until we've removed enough tokens
-                for msg in messages:
-                    # Overhead for each message: 4 tokens + content
-                    msg_tokens = 4 + count_tokens(msg["content"])
-                    cumulative_tokens += msg_tokens
-                    messages_to_remove.append(msg["id"])
-                    if cumulative_tokens >= tokens_to_remove:
-                        break
+                logger.debug(f"Added message to chat {chat_id}: {role}: {content[:50]}...")
+        except Exception as e:
+            logger.error(f"Error adding message to chat {chat_id}: {e}")
+            raise
 
-                try:
-                    placeholders = ",".join(["?"] * len(messages_to_remove))
-                    query = f"DELETE FROM messages WHERE id IN ({placeholders})"
-                    db.execute(query, messages_to_remove)
-
-                    # Re-fetch and recalculate token count
-                    messages = self.get_context(chat_id, include_system=True)
-                    total_tokens = self.calculate_total_tokens(messages)
-                except Exception as e:
-                    logger.error(f"Error trimming tokens for chat {chat_id}: {e}")
-                    break
+    def clear_context(self, chat_id: str) -> None:
+        """Clear the conversation context for a specific chat ID."""
+        with db_connection() as db:
+            db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
+            logger.debug(f"Cleared context for chat {chat_id}")
 
     def truncate_message(self, message: str, max_tokens: int) -> str:
         """Truncate a message to fit within the maximum token limit."""

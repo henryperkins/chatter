@@ -58,11 +58,19 @@ const md = window.markdownit({
 // Render Markdown content safely
 function renderMarkdown(content) {
     const html = md.render(content);
-    return DOMPurify.sanitize(html, {
-        USE_PROFILES: { html: true },
-        ALLOWED_TAGS: DOMPurify.DEFAULTS.ALLOWED_TAGS.concat(["img", "pre", "code"]),
-        ALLOWED_ATTR: DOMPurify.DEFAULTS.ALLOWED_ATTR.concat(["class", "style", "src"]),
-    });
+
+    // Check if DOMPurify is available
+    if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
+        return DOMPurify.sanitize(html, {
+            USE_PROFILES: { html: true },
+            ALLOWED_TAGS: ['p', 'strong', 'em', 'br', 'ul', 'ol', 'li', 'a', 'img', 'pre', 'code'],
+            ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'class', 'style']
+        });
+    }
+
+    // Fallback basic sanitization
+    return html.replace(/<script.*?>.*?<\/script>/gi, '')
+               .replace(/on\w+="[^"]*"/gi, '');
 }
 
 
@@ -157,15 +165,20 @@ function renderFileList() {
 }
 
 // Message Handling Functions
-async function sendMessage() {
+async function sendMessage(e) {
     console.log("sendMessage called!"); // Debug statement
+
+    // Prevent default form submission if this is triggered by a form
+    if (e && e.preventDefault) {
+        e.preventDefault();
+    }
 
     const message = messageInput.value.trim();
 
     // Check if either a message or files are present
     if (!message && uploadedFiles.length === 0) {
         showFeedback("Please enter a message or upload files.", "error");
-        return;
+        return false;
     }
 
     // Append the user's message to the chat window if not empty
@@ -320,9 +333,24 @@ if (messageInput) {
 
 if (sendButton) {
     console.log("sendButton found"); // Debug statement
-    sendButton.addEventListener("click", sendMessage);
+    sendButton.addEventListener("click", (e) => {
+        console.log("Send button clicked");
+        sendMessage(e);
+    });
 } else {
     console.error("sendButton not found");
+}
+
+// Handle form submission if the send button is inside a form
+const chatForm = document.getElementById("chat-form");
+if (chatForm) {
+    console.log("chatForm found");
+    chatForm.addEventListener("submit", (e) => {
+        console.log("Form submitted");
+        sendMessage(e);
+    });
+} else {
+    console.log("chatForm not found");
 }
 
 if (fileInput && uploadButton) {

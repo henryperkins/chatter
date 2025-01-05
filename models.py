@@ -6,13 +6,10 @@ chats, and files in the database.
 """
 
 import logging
-import os
-from urllib.parse import urlparse
 from dataclasses import dataclass
 from typing import Optional, List, Union, Any, Mapping, Dict
 
 from database import db_connection  # Use the centralized context manager
-import requests
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +139,7 @@ class Model:
             logger.info("Model set as default (ID %d)", model_id)
 
     @staticmethod
-    def create(data: Dict[str, Any]) -> int:
+    def create(data: Dict[str, Any]) -> Optional[int]:
         """
         Create a new model record in the database.
 
@@ -150,7 +147,10 @@ class Model:
             data (dict): A dictionary containing model attributes.
 
         Returns:
-            int: The ID of the newly created model.
+            Optional[int]: The ID of the newly created model, or None if creation failed.
+
+        Raises:
+            ValueError: If required fields are missing or invalid
         """
         with db_connection() as db:
             cursor = db.cursor()
@@ -167,36 +167,42 @@ class Model:
                     max_completion_tokens,
                     model_type,
                     requires_o1_handling,
-                    is_default
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    is_default,
+                    version
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                data["name"],
-                data["deployment_name"],
-                data.get("description", ""),
-                data["api_endpoint"],
-                data["api_version"],
-                data["temperature"],
-                data.get("max_tokens"),
-                data["max_completion_tokens"],
-                data["model_type"],
-                data.get("requires_o1_handling", False),
-                data.get("is_default", False),
-                data.get("version", 1),  # Set default version to 1 if not provided
+                (
+                    data["name"],
+                    data["deployment_name"],
+                    data.get("description", ""),
+                    data["api_endpoint"],
+                    data["api_version"],
+                    data["temperature"],
+                    data.get("max_tokens"),
+                    data["max_completion_tokens"],
+                    data["model_type"],
+                    data.get("requires_o1_handling", False),
+                    data.get("is_default", False),
+                    data.get("version", 1)
+                )
             )
-        model_id = cursor.lastrowid
+            model_id = cursor.lastrowid
+            if model_id is None:
+                logger.error("Failed to create model - no ID returned")
+                return None
 
-        # If the new model is set as default, unset default on other models
-        if data.get('is_default', False):
-            db.execute(
-                "UPDATE models SET is_default = 0 WHERE id != ?",
-                (model_id,)
-            )
+            # If the new model is set as default, unset default on other models
+            if data.get('is_default', False):
+                db.execute(
+                    "UPDATE models SET is_default = 0 WHERE id != ?",
+                    (model_id,)
+                )
 
             logger.info("Model created with ID: %d", model_id)
             return model_id
 
     @staticmethod
-    def update(model_id: int,  Dict[str, Any]) -> None:
+    def update(model_id: int, data: Dict[str, Any]) -> None:
         """
         Update an existing model's attributes in the database.
 
@@ -330,7 +336,7 @@ class Chat:
         with db_connection() as db:
             chats = db.execute(
                 """
-                SELECT * FROM chats 
+                SELECT * FROM chats
                 WHERE user_id = ?
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
@@ -367,7 +373,7 @@ class Chat:
     def get_model(chat_id: str) -> Optional[int]:
         """
         Retrieve the model ID associated with a given chat.
-        
+
         Returns:
             The model_id if set, otherwise None.
         """

@@ -1,14 +1,16 @@
 # database.py
 
 import sqlite3
-from flask import g, current_app
+import time
+from typing import Optional, Iterator
+from flask import g, current_app, Flask
 import click
 from flask.cli import with_appcontext
 from datetime import datetime
 from contextlib import contextmanager
 
 
-def get_db():
+def get_db() -> sqlite3.Connection:
     """Open a new database connection if there is none yet for the current application context."""
     if "db" not in g:
         # Register a converter for timestamps
@@ -23,28 +25,101 @@ def get_db():
     return g.db
 
 
-def close_db(e=None):
+def close_db(e: Optional[BaseException] = None) -> None:
     """Close the database connection if it exists."""
     db = g.pop("db", None)
     if db is not None:
         db.close()
 
 
+class DatabaseConnectionManager:
+    """Manages database connections with retry logic and state tracking"""
+
+    def __init__(self) -> None:
+        self.connection: Optional[sqlite3.Connection] = None
+        self.retry_count: int = 3
+        self.retry_delay: float = 1.0
+
+    def create_connection(self) -> sqlite3.Connection:
+        """Create a new database connection"""
+        return sqlite3.connect(
+            current_app.config.get("DATABASE", "chat_app.db"),
+            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+            check_same_thread=False,
+            timeout=30.0
+        )
+
+    def get_connection(self) -> sqlite3.Connection:
+        """Get a working database connection with retry logic"""
+        for attempt in range(self.retry_count):
+            try:
+                if self.connection is None:
+                    self.connection = self.create_connection()
+                    self.connection.row_factory = sqlite3.Row
+
+                # Test connection
+                self.connection.execute("SELECT 1").fetchone()
+                return self.connection
+
+            except sqlite3.Error:
+                if attempt == self.retry_count - 1:
+                    raise
+                if self.connection:
+                    try:
+                        self.connection.close()
+                    except sqlite3.Error:
+                        pass
+                    self.connection = None
+                time.sleep(self.retry_delay)
+        raise sqlite3.Error("Failed to establish database connection")
+
+    def close(self) -> None:
+        """Close the connection if it exists"""
+        if self.connection:
+            try:
+                self.connection.close()
+            except sqlite3.Error:
+                pass
+            self.connection = None
+
 @contextmanager
-def db_connection():
+def db_connection() -> Iterator[sqlite3.Connection]:
     """
-    Context manager for handling database connections.
-    Automatically commits transactions and closes the connection.
+    Context manager for handling database connections with retry logic.
+    Automatically commits transactions and handles rollbacks on errors.
     """
-    db = get_db()
+    manager = DatabaseConnectionManager()
+    connection = None
     try:
-        yield db
-        db.commit()  # Commit the transaction if no errors occur
+        connection = manager.get_connection()
+
+        # Start transaction
+        connection.isolation_level = "DEFERRED"
+        connection.execute("BEGIN")
+
+        yield connection
+
+        # Commit if no errors
+        connection.execute("COMMIT")
+
+    except sqlite3.Error as e:
+        if connection:
+            try:
+                connection.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+        current_app.logger.error(f"Database error: {str(e)}")
+        raise e
     except Exception as e:
-        db.rollback()  # Rollback the transaction on error
+        if connection:
+            try:
+                connection.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+        current_app.logger.error(f"Unexpected error: {str(e)}")
         raise e
     finally:
-        close_db()  # Ensure the connection is closed
+        manager.close()
 
 
 def init_db():
@@ -62,7 +137,7 @@ def init_db_command():
     click.echo("Initialized the database.")
 
 
-def init_app(app):
+def init_app(app: Flask) -> None:
     """Register database functions with the Flask app."""
     app.teardown_appcontext(close_db)
     app.cli.add_command(init_db_command)
