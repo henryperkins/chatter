@@ -75,7 +75,11 @@ from limits.storage.redis import RedisStorage
 redis_url = os.getenv("REDIS_URL", None)
 if redis_url:
     try:
-        limiter = Limiter(get_remote_address, app=app, storage=RedisStorage(redis_url))
+        limiter = Limiter(
+            get_remote_address,
+            app=app,
+            storage_uri=redis_url
+        )
         logger.info("Flask-Limiter is configured to use Redis.")
     except Exception as e:
         logger.error(f"Failed to configure Redis for Flask-Limiter: {e}")
