@@ -65,33 +65,38 @@ def get_azure_response(
             else:
                 raise ValueError("Selected model not found.")
 
-        # For older o1-preview models:
-        # 1) We must exclude system messages.
-        # 2) We must enforce temperature=1.
-        # 3) We do NOT pass 'max_tokens' or 'stream' parameters.
+        # Adjust messages and parameters based on whether special handling is required
         if requires_o1_handling:
+            # For o1-preview models:
+            # 1) Exclude system messages
+            # 2) Enforce temperature = 1
+            # 3) Use 'max_completion_tokens'
             api_messages = [
                 {"role": msg["role"], "content": msg["content"]}
                 for msg in messages
                 if msg["role"] in ["user", "assistant"]
             ]
+            # Enforce temperature = 1 (but do not include in api_params)
             temperature = 1
+            # Prepare API parameters without 'temperature' and 'max_tokens'
+            api_params = {
+                "model": deployment_name,
+                "messages": api_messages,
+                "max_completion_tokens": max_completion_tokens,
+            }
         else:
-            # For standard models, you can include system messages if needed
+            # For standard models, include system messages and parameters
             api_messages = [
                 {"role": msg["role"], "content": msg["content"]} for msg in messages
             ]
-
-        # Prepare the parameters for the API call
-        api_params = {
-            "model": deployment_name,
-            "messages": api_messages,
-            "temperature": temperature,
-        }
-
-        # Include max_tokens only if it's not None and the model is not o1-preview
-        if max_tokens is not None and not requires_o1_handling:
-            api_params["max_tokens"] = max_tokens
+            # Prepare API parameters including 'temperature' and 'max_tokens' if available
+            api_params = {
+                "model": deployment_name,
+                "messages": api_messages,
+                "temperature": temperature,
+            }
+            if max_tokens is not None:
+                api_params["max_tokens"] = max_tokens
 
         # Create the chat completion request
         response = client.chat.completions.create(**api_params)
