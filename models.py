@@ -197,7 +197,7 @@ class Model:
             return model_id
 
     @staticmethod
-    def update(model_id: int,  Mapping[str, Any]) -> None:
+    def update(model_id: int,  Dict[str, Any]) -> None:
         """
         Update an existing model's attributes in the database.
 
