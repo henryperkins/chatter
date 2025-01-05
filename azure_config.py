@@ -1,3 +1,4 @@
+```python
 # azure_config.py
 
 import os
@@ -97,7 +98,7 @@ def initialize_client_from_model(
     if requires_o1_handling:
         # Enforce o1-preview specific requirements
         api_version = "2024-12-01-preview"
-        temperature = None  # Exclude temperature for o1-preview models
+        temperature = None  # Do not set temperature
         max_tokens = None  # max_tokens is not used for o1-preview models
 
         if not max_completion_tokens:
@@ -156,3 +157,4 @@ def validate_api_endpoint(
     except Exception as e:
         logger.error(f"API endpoint validation failed: {str(e)}")
         return False
+```

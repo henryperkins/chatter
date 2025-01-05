@@ -1,3 +1,4 @@
+```python
 """
 chat_api.py
 
@@ -69,14 +70,12 @@ def get_azure_response(
         if requires_o1_handling:
             # For o1-preview models:
             # 1) Exclude system messages
-            # 2) Do not include 'temperature' in API request
-            # 3) Use 'max_completion_tokens'
             api_messages = [
                 {"role": msg["role"], "content": msg["content"]}
                 for msg in messages
                 if msg["role"] in ["user", "assistant"]
             ]
-            # Prepare API parameters without 'temperature' and 'max_tokens'
+            # Prepare API parameters WITHOUT 'temperature' and 'max_tokens'
             api_params = {
                 "model": deployment_name,
                 "messages": api_messages,
@@ -90,16 +89,14 @@ def get_azure_response(
             api_params = {
                 "model": deployment_name,
                 "messages": api_messages,
-                "temperature": temperature,
             }
+            if temperature is not None:
+                api_params["temperature"] = temperature
             if max_tokens is not None:
                 api_params["max_tokens"] = max_tokens
 
-        # Explicitly exclude 'temperature' for o1-preview models
-        if requires_o1_handling:
-            response = client.chat.completions.create(**api_params, temperature=None)
-        else:
-            response = client.chat.completions.create(**api_params)
+        # Make the API call without 'temperature' when using o1-preview models
+        response = client.chat.completions.create(**api_params)
 
         # Extract model response
         if response.choices and response.choices[0].message:
@@ -211,3 +208,4 @@ def scrape_search(search_term: str) -> str:
     search_results = [result.text for result in results[:3]]
 
     return "Search results:\n" + "\n".join(search_results)
+```
