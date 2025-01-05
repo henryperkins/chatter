@@ -62,6 +62,7 @@ limiter = Limiter(get_remote_address, app=app)
 # Database initialization
 init_app(app)
 
+
 # Register blueprints (with delayed imports to avoid circular imports)
 def register_blueprints(app):
     from routes.auth_routes import bp as auth_bp, init_auth_routes
@@ -74,6 +75,7 @@ def register_blueprints(app):
     app.register_blueprint(auth_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(model_bp)
+
 
 register_blueprints(app)
 
@@ -120,6 +122,7 @@ app.teardown_appcontext(close_db)
 
 # --- ERROR HANDLERS ---
 
+
 @app.errorhandler(400)
 def bad_request(error):
     """
@@ -133,10 +136,13 @@ def forbidden(error):
     """
     Handle HTTP 403 Forbidden errors.
     """
-    return jsonify(
-        error="Forbidden",
-        message="You don't have permission to access this resource.",
-    ), 403
+    return (
+        jsonify(
+            error="Forbidden",
+            message="You don't have permission to access this resource.",
+        ),
+        403,
+    )
 
 
 @app.errorhandler(404)
@@ -187,7 +193,10 @@ def handle_csrf_error(e):
     """
     logger.warning("CSRF error: %s", e.description)
     return (
-        jsonify(error="CSRF Error", message="This request is invalid. Refresh the page and try again."),
+        jsonify(
+            error="CSRF Error",
+            message="This request is invalid. Refresh the page and try again.",
+        ),
         400,
     )
 
