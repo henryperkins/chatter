@@ -98,6 +98,30 @@ CREATE TABLE IF NOT EXISTS uploaded_files (
 );
 
 -- =============================
+-- RAG INDEXING TABLE
+-- =============================
+CREATE TABLE IF NOT EXISTS rag_index (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id TEXT NOT NULL, -- Unique identifier for the document
+    content TEXT NOT NULL, -- Content of the document
+    embedding BLOB NOT NULL, -- Embedding vector for the document
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- =============================
+-- RAG STORAGE TABLE
+-- =============================
+CREATE TABLE IF NOT EXISTS rag_storage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id TEXT NOT NULL, -- Foreign key referencing chats table
+    document_id TEXT NOT NULL, -- Foreign key referencing rag_index table
+    relevance_score REAL NOT NULL, -- Relevance score of the document for the chat
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE,
+    FOREIGN KEY (document_id) REFERENCES rag_index (document_id) ON DELETE CASCADE
+);
+
+-- =============================
 -- INDEXES FOR PERFORMANCE
 -- =============================
 CREATE INDEX IF NOT EXISTS idx_users_username ON users (username); -- Speeds up username lookups
@@ -106,3 +130,5 @@ CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id); -- Speeds
 CREATE INDEX IF NOT EXISTS idx_models_is_default ON models (is_default); -- Ensures fast lookup of default model
 CREATE INDEX IF NOT EXISTS idx_uploaded_files_chat_id ON uploaded_files (chat_id); -- Speeds up file lookups by chat
 CREATE INDEX IF NOT EXISTS idx_model_versions_model_id ON model_versions (model_id); -- Speeds up version history lookups
+CREATE INDEX IF NOT EXISTS idx_rag_index_document_id ON rag_index (document_id); -- Speeds up document lookups in RAG index
+CREATE INDEX IF NOT EXISTS idx_rag_storage_chat_id ON rag_storage (chat_id); -- Speeds up document lookups in RAG storage

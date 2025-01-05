@@ -10,12 +10,14 @@ from typing import Optional, List, Dict, Tuple
 import requests
 from bs4 import BeautifulSoup
 from openai import OpenAIError
-
+import spacy
 from azure_config import get_azure_client, initialize_client_from_model
 from models import Model
 
 logger = logging.getLogger(__name__)
 
+# Load spaCy model for semantic search
+nlp = spacy.load("en_core_web_md")
 
 def get_azure_response(
     messages: List[Dict[str, str]],
@@ -211,3 +213,45 @@ def scrape_search(search_term: str) -> str:
     search_results = [result.text for result in results[:3]]
 
     return "Search results:\n" + "\n".join(search_results)
+
+def perform_hybrid_search(query: str) -> List[str]:
+    """
+    Perform a hybrid search using Azure Search and the OpenAI client.
+
+    Args:
+        query: The search query.
+
+    Returns:
+        A list of relevant documents.
+    """
+    # Placeholder implementation for hybrid search
+    # Replace this with actual code to perform hybrid search using Azure Search and OpenAI client
+    return ["Document 1", "Document 2", "Document 3"]
+
+def semantic_search(query: str) -> List[str]:
+    """
+    Perform semantic search using spaCy.
+
+    Args:
+        query: The search query.
+
+    Returns:
+        A list of relevant documents.
+    """
+    # Placeholder implementation for semantic search
+    # Replace this with actual code to perform semantic search using spaCy
+    return ["Document 1", "Document 2", "Document 3"]
+
+def export_conversation(chat_id: str) -> str:
+    """
+    Export a conversation in JSON format.
+
+    Args:
+        chat_id: The ID of the chat to export.
+
+    Returns:
+        The exported conversation as a JSON string.
+    """
+    # Placeholder implementation for exporting conversation
+    # Replace this with actual code to export conversation in JSON format
+    return '{"chat_id": "123", "messages": [{"role": "user", "content": "Hello"}, {"role": "assistant", "content": "Hi"}]}'

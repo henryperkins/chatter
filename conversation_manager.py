@@ -4,13 +4,7 @@ from typing import Dict, List
 
 import tiktoken
 from database import db_connection  # Use the centralized context manager
-import logging
-import os
-from typing import Dict, List
-
-import tiktoken
-from database import db_connection  # Use the centralized context manager
-
+from azure_config import retrieve_relevant_documents  # Import the RAG function
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +27,7 @@ class ConversationManager:
 
     def __init__(self):
         try:
-            self.encoding = tiktoken.encoding_for_model(MODEL_NAME)
+            self.encoding = tiktoken.encoding_for_model(MODE_NAME)
         except KeyError:
             self.encoding = tiktoken.get_encoding("cl100k_base")
 
@@ -182,3 +176,15 @@ class ConversationManager:
             "total_messages": len(messages),
             "total_tokens": total_tokens,
         }
+
+    def retrieve_rag_context(self, query: str) -> List[str]:
+        """
+        Retrieve relevant documents for RAG based on the user's query.
+
+        Args:
+            query (str): The user's query.
+
+        Returns:
+            A list of relevant documents.
+        """
+        return retrieve_relevant_documents(query)
