@@ -170,21 +170,21 @@ class Model:
                     is_default
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (
-                    data['name'],
-                    data['deployment_name'],
-                    data.get('description', ''),
-                    data['api_endpoint'],
-                    data['api_version'],
-                    data['temperature'],
-                    data.get('max_tokens'),
-                    data['max_completion_tokens'],
-                    data['model_type'],
-                    data.get('requires_o1_handling', False),
-                    data.get('is_default', False),
-                )
+                data["name"],
+                data["deployment_name"],
+                data.get("description", ""),
+                data["api_endpoint"],
+                data["api_version"],
+                data["temperature"],
+                data.get("max_tokens"),
+                data["max_completion_tokens"],
+                data["model_type"],
+                data.get("requires_o1_handling", False),
+                data.get("is_default", False),
+                data.get("version", 1),  # Set default version to 1 if not provided
             )
-            model_id = cursor.lastrowid
+        )
+        model_id = cursor.lastrowid
 
             # If the new model is set as default, unset default on other models
             if data.get('is_default', False):
