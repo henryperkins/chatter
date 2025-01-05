@@ -68,7 +68,7 @@ csrf = CSRFProtect(app)
 
 # Flask-Limiter for rate limiting
 from flask_limiter.util import get_remote_address
-from flask_limiter.storage.redis import RedisStorage
+from limits.storage.redis import RedisStorage
 
 redis_url = os.getenv("REDIS_URL", None)
 if redis_url:
