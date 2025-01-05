@@ -24,7 +24,9 @@ app = Flask(__name__)
 # --- CONFIGURATION ---
 
 # Load environment variables and secrets
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "your-secret-key")
+if not os.environ.get("SECRET_KEY"):
+    raise RuntimeError("SECRET_KEY environment variable is not set. Please configure it before running the application.")
+app.config["SECRET_KEY"] = os.environ["SECRET_KEY"]
 app.config["DATABASE"] = os.environ.get("DATABASE", "chat_app.db")
 app.config["LOGGING_LEVEL"] = logging.DEBUG  # Change to logging.INFO in production
 app.config["LOGGING_FORMAT"] = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
