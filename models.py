@@ -9,7 +9,7 @@ import logging
 import os
 from urllib.parse import urlparse
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Union, Any
+from typing import Optional, List, Dict, Union, Any, Mapping
 
 from database import db_connection  # Use the centralized context manager
 import requests
@@ -197,7 +197,7 @@ class Model:
             return model_id
 
     @staticmethod
-    def update(model_id: int,  Dict[str, Any]) -> None:
+    def update(model_id: int,  Mapping[str, Any]) -> None:
         """
         Update an existing model's attributes in the database.
 
@@ -240,7 +240,7 @@ class Model:
             logger.info("Model updated (ID %d)", model_id)
 
     @staticmethod
-    def validate_model_config(config: Dict[str, Union[str, int, float, bool, None]]) -> None:
+    def validate_model_config(config: Mapping[str, Any]) -> None:
         """
         Validate the required fields for a model configuration.
 
