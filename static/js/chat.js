@@ -210,6 +210,7 @@ async function sendMessage() {
         });
 
         xhr.addEventListener("load", function() {
+            // Re-enable the send button and message input
             uploadProgress.classList.add("hidden");
             sendButton.disabled = false;
             messageInput.disabled = false;
@@ -241,6 +242,7 @@ async function sendMessage() {
         });
 
         xhr.addEventListener("error", function() {
+            // Re-enable the send button and message input
             uploadProgress.classList.add("hidden");
             sendButton.disabled = false;
             messageInput.disabled = false;
@@ -250,6 +252,7 @@ async function sendMessage() {
         xhr.send(formData);
     } catch (error) {
         console.error("Error sending message:", error);
+        // Re-enable the send button and message input
         uploadProgress.classList.add("hidden");
         sendButton.disabled = false;
         messageInput.disabled = false;
@@ -290,6 +293,7 @@ function appendAssistantMessage(message) {
         </div>
     `;
   // Use renderMarkdown here for the message content
+    // Use renderMarkdown here for the message content
     assistantMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
     chatBox.appendChild(assistantMessageDiv);
     // Highlight code blocks after adding to DOM
@@ -356,6 +360,7 @@ if (modelSelect && editModelButton) {
     editModelButton.addEventListener("click", function() {
         const modelId = this.dataset.modelId;
         if (modelId) {
+            // Correctly construct the URL for redirection
             window.location.href = `/edit-model/${modelId}`;
         }
     });
