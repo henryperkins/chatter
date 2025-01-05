@@ -34,7 +34,8 @@ logger = logging.getLogger(__name__)
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
 if app.config["SECRET_KEY"] == "dev-secret-key":
-    logger.warning("Using default SECRET_KEY. This is insecure and should not be used in production.")
+    logger.error("SECRET_KEY is not set! This will cause session-related features to fail.")
+    raise RuntimeError("SECRET_KEY must be set in the environment or .env file.")
 app.config["DATABASE"] = os.environ.get("DATABASE", "chat_app.db")
 app.config["LOGGING_LEVEL"] = logging.DEBUG  # Change to logging.INFO in production
 app.config["LOGGING_FORMAT"] = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -74,6 +75,9 @@ redis_url = os.getenv("REDIS_URL", None)
 if redis_url:
     limiter = Limiter(get_remote_address, app=app, storage=RedisStorage(redis_url))
 else:
+    logger.warning(
+        "Using in-memory storage for Flask-Limiter. This is not recommended for production."
+    )
     limiter = Limiter(get_remote_address, app=app)
 
 # Database initialization
