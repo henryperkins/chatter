@@ -37,7 +37,7 @@ const editModelButton = document.getElementById("edit-model-btn");
 function adjustTextareaHeight(textarea) {
     textarea.style.height = "auto";
     textarea.style.height = `${textarea.scrollHeight}px`;
-    });
+}
 
 // Initialize markdown-it with Prism.js highlighting
 const defaultLanguage = "plaintext";
