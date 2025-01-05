@@ -33,7 +33,9 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
     if not deployment_name:
         deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
         if not deployment_name:
-            raise ValueError("Default deployment name not found in environment variables.")
+            raise ValueError(
+                "Default deployment name not found in environment variables."
+            )
 
     # If the client for this deployment is already cached, return it
     if deployment_name in _clients:
@@ -42,7 +44,9 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
     # Retrieve Azure OpenAI configuration from environment variables
     azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
     api_key = os.getenv("AZURE_OPENAI_KEY")
-    api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")  # Default to o1-preview
+    api_version = os.getenv(
+        "AZURE_OPENAI_API_VERSION", "2024-12-01-preview"
+    )  # Default to o1-preview
 
     # Validate required configuration variables
     if not all([azure_endpoint, api_key, deployment_name]):
@@ -63,7 +67,9 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
     return client, deployment_name
 
 
-def initialize_client_from_model(model_config: Dict[str, Any]) -> Tuple[AzureOpenAI, str, float, Optional[int], int]:
+def initialize_client_from_model(
+    model_config: Dict[str, Any]
+) -> Tuple[AzureOpenAI, str, float, Optional[int], int]:
     """Initialize Azure OpenAI client from model configuration.
 
     Args:
@@ -95,19 +101,21 @@ def initialize_client_from_model(model_config: Dict[str, Any]) -> Tuple[AzureOpe
         max_tokens = None  # max_tokens is not used for o1-preview models
 
         if not max_completion_tokens:
-            raise ValueError("max_completion_tokens is required for models requiring o1 handling")
+            raise ValueError(
+                "max_completion_tokens is required for models requiring o1 handling"
+            )
 
     # Initialize the Azure OpenAI client
     client = AzureOpenAI(
-        azure_endpoint=api_endpoint,
-        api_key=api_key,
-        api_version=api_version
+        azure_endpoint=api_endpoint, api_key=api_key, api_version=api_version
     )
 
     return client, deployment_name, temperature, max_tokens, max_completion_tokens
 
 
-def validate_api_endpoint(api_endpoint: str, api_key: str, deployment_name: str, api_version: str) -> bool:
+def validate_api_endpoint(
+    api_endpoint: str, api_key: str, deployment_name: str, api_version: str
+) -> bool:
     """Validate the API endpoint, deployment name, and key by making a test request.
 
     Args:
@@ -127,10 +135,12 @@ def validate_api_endpoint(api_endpoint: str, api_key: str, deployment_name: str,
         # Make a test request to the API
         response = requests.post(
             test_url,
-            headers={"api-key": api_key},  # Use "api-key" header instead of "Authorization"
+            headers={
+                "api-key": api_key
+            },  # Use "api-key" header instead of "Authorization"
             json={
                 "messages": [{"role": "user", "content": "Test message"}],
-                "max_completion_tokens": 1  # Use 'max_completion_tokens' instead of 'max_tokens'
+                "max_completion_tokens": 1,  # Use 'max_completion_tokens' instead of 'max_tokens'
             },
             timeout=5,
         )

@@ -31,7 +31,9 @@ class User:
         Retrieve a user by ID from the database.
         """
         with db_connection() as db:
-            user_row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+            user_row = db.execute(
+                "SELECT * FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
             if user_row:
                 return User(**dict(user_row))
             return None
@@ -100,7 +102,9 @@ class Model:
         Retrieve a model by its ID.
         """
         with db_connection() as db:
-            row = db.execute("SELECT * FROM models WHERE id = ?", (model_id,)).fetchone()
+            row = db.execute(
+                "SELECT * FROM models WHERE id = ?", (model_id,)
+            ).fetchone()
             if row:
                 return Model(**dict(row))
             return None
@@ -183,8 +187,8 @@ class Model:
                     data["model_type"],
                     data.get("requires_o1_handling", False),
                     data.get("is_default", False),
-                    data.get("version", 1)
-                )
+                    data.get("version", 1),
+                ),
             )
             model_id = cursor.lastrowid
             if model_id is None:
@@ -192,10 +196,9 @@ class Model:
                 return None
 
             # If the new model is set as default, unset default on other models
-            if data.get('is_default', False):
+            if data.get("is_default", False):
                 db.execute(
-                    "UPDATE models SET is_default = 0 WHERE id != ?",
-                    (model_id,)
+                    "UPDATE models SET is_default = 0 WHERE id != ?", (model_id,)
                 )
 
             logger.info("Model created with ID: %d", model_id)
@@ -240,7 +243,9 @@ class Model:
 
             # 6. Handle default model logic (if applicable)
             if data.get("is_default"):
-                db.execute("UPDATE models SET is_default = 0 WHERE id != ?", (model_id,))
+                db.execute(
+                    "UPDATE models SET is_default = 0 WHERE id != ?", (model_id,)
+                )
 
             logger.info("Model updated (ID %d)", model_id)
 
@@ -253,8 +258,12 @@ class Model:
             ValueError: If a required field is missing or invalid.
         """
         required_fields = [
-            "name", "deployment_name", "api_endpoint", "api_version",
-            "model_type", "max_completion_tokens"
+            "name",
+            "deployment_name",
+            "api_endpoint",
+            "api_version",
+            "model_type",
+            "max_completion_tokens",
         ]
 
         for field_name in required_fields:
@@ -264,7 +273,10 @@ class Model:
 
         # Validate API endpoint
         api_endpoint = config["api_endpoint"]
-        if not api_endpoint.startswith("https://") or "openai.azure.com" not in api_endpoint:
+        if (
+            not api_endpoint.startswith("https://")
+            or "openai.azure.com" not in api_endpoint
+        ):
             raise ValueError("Invalid Azure OpenAI API endpoint.")
 
         # Validate temperature
@@ -311,7 +323,9 @@ class Chat:
         Check whether a chat has the default title.
         """
         with db_connection() as db:
-            row = db.execute("SELECT title FROM chats WHERE id = ?", (chat_id,)).fetchone()
+            row = db.execute(
+                "SELECT title FROM chats WHERE id = ?", (chat_id,)
+            ).fetchone()
             return bool(row) and row["title"] == "New Chat"
 
     @staticmethod
@@ -329,7 +343,9 @@ class Chat:
             )
 
     @staticmethod
-    def get_user_chats(user_id: int, limit: int = 10, offset: int = 0) -> List[Dict[str, Union[str, int]]]:
+    def get_user_chats(
+        user_id: int, limit: int = 10, offset: int = 0
+    ) -> List[Dict[str, Union[str, int]]]:
         """
         Retrieve paginated chat history for a user.
         """
@@ -408,7 +424,9 @@ class UploadedFile:
             )
 
     @staticmethod
-    def get_by_chat_and_filename(chat_id: str, filename: str) -> Optional["UploadedFile"]:
+    def get_by_chat_and_filename(
+        chat_id: str, filename: str
+    ) -> Optional["UploadedFile"]:
         """
         Retrieve an uploaded file by chat ID and filename.
         """
