@@ -6,7 +6,7 @@ including sending chat messages and getting responses, as well as web scraping.
 """
 
 import logging
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict
 import requests
 from bs4 import BeautifulSoup
 from openai import OpenAIError
@@ -70,12 +70,12 @@ def get_azure_response(
         # 2) We must enforce temperature=1.
         # 3) We do NOT pass 'max_tokens' or 'stream' parameters.
         if requires_o1_handling:
-            temperature = 1
             api_messages = [
                 {"role": msg["role"], "content": msg["content"]}
                 for msg in messages
                 if msg["role"] in ["user", "assistant"]
             ]
+            temperature = 1
         else:
             # For standard models, you can include system messages if needed
             api_messages = [
@@ -88,11 +88,6 @@ def get_azure_response(
             "messages": api_messages,
             "temperature": temperature,
         }
-
-        # If your code or route logic sets max_completion_tokens,
-        # pass it along to the API
-        if max_completion_tokens is not None:
-            api_params["max_completion_tokens"] = max_completion_tokens
 
         # Include max_tokens only if it's not None and the model is not o1-preview
         if max_tokens is not None and not requires_o1_handling:

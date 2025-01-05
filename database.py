@@ -92,41 +92,37 @@ def db_connection() -> Iterator[sqlite3.Connection]:
     connection = None
     try:
         connection = manager.get_connection()
-
-        # Start transaction
-        connection.isolation_level = "DEFERRED"
         connection.execute("BEGIN")
 
         yield connection
 
-        # Commit if no errors
-        connection.execute("COMMIT")
+        if connection.in_transaction:
+            connection.commit()
 
     except sqlite3.Error as e:
-        if connection:
+        if connection and connection.in_transaction:
             try:
-                connection.execute("ROLLBACK")
+                connection.rollback()
             except sqlite3.Error:
                 pass
         current_app.logger.error(f"Database error: {str(e)}")
-        raise e
-    except Exception as e:
-        if connection:
-            try:
-                connection.execute("ROLLBACK")
-            except sqlite3.Error:
-                pass
-        current_app.logger.error(f"Unexpected error: {str(e)}")
-        raise e
+        raise
     finally:
-        manager.close()
+        if connection:
+            manager.close()
 
 
 def init_db():
     """Initialize the database using the schema.sql file."""
-    with db_connection() as db:
-        with current_app.open_resource("schema.sql") as f:
-            db.executescript(f.read().decode("utf8"))
+    try:
+        with db_connection() as db:
+            with current_app.open_resource("schema.sql") as f:
+                script = f.read().decode("utf8")
+                db.executescript(script)
+            current_app.logger.info("Database initialized successfully")
+    except Exception as e:
+        current_app.logger.error(f"Failed to initialize database: {e}")
+        raise
 
 
 @click.command("init-db")

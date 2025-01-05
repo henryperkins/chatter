@@ -10,7 +10,7 @@
 
          <div class="mb-4">
             {{ form.name.label(class="block text-gray-700 text-sm font-bold mb-2") }}
-            {{ form.name(class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline", value=model.name) }}
+            {{ form.name(class="form-input w-full rounded-lg shadow-sm", value=model.name) }}
             {% if form.name.errors %}
                 <p class="text-red-500 text-xs mt-1">{{ form.name.errors[0] }}</p>
             {% endif %}
@@ -66,7 +66,7 @@
                 {% endif %}
             </div>
         </div>
-        
+
 
         <div class="mb-4">
             {{ form.max_completion_tokens.label(class="block text-gray-700 text-sm font-bold mb-2") }}
@@ -75,7 +75,7 @@
                 <p class="text-red-500 text-xs mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
             {% endif %}
         </div>
-        
+
         <div class="mb-4">
             {{ form.api_version.label(class="block text-gray-700 text-sm font-bold mb-2") }}
             {{ form.api_version(class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline", value=model.api_version) }}
@@ -83,7 +83,7 @@
                 <p class="text-red-500 text-xs mt-1">{{ form.api_version.errors[0] }}</p>
             {% endif %}
         </div>
-    
+
 
         <div class="mb-4">
             <label class="flex items-center">
