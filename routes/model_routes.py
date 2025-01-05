@@ -213,11 +213,12 @@ def edit_model_page(model_id):
             "is_default": form.is_default.data,
         }
         try:
-            Model.update(model_id, data)
-            flash("Model updated successfully", "success")
-            return redirect(url_for("chat.chat_interface"))
-        except ValueError as e:
-            flash(str(e), "error")
+            try:
+                Model.update(model_id, data)
+                flash("Model updated successfully", "success")
+                return redirect(url_for("chat.chat_interface"))
+            except ValueError as e:
+                flash(str(e), "error")
 
     return render_template("edit_model.html", form=form, model=model)
 
