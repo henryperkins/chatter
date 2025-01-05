@@ -193,8 +193,51 @@ class Model:
                     (model_id,)
                 )
 
-            logger.info(f"Model created with ID: {model_id}")
+            logger.info("Model created with ID: %d", model_id)
             return model_id
+
+    @staticmethod
+    def update(model_id: int,  Dict[str, Any]) -> None:
+        """
+        Update an existing model's attributes in the database.
+
+        Args:
+            model_id (int): The ID of the model to update.
+            data (dict): A dictionary containing the updated model attributes.
+        """
+        with db_connection() as db:
+            # 1. Validate the data (optional, but recommended)
+            Model.validate_model_config(data)
+
+            # 2. Fetch the existing model
+            model = Model.get_by_id(model_id)
+            if not model:
+                raise ValueError(f"Model with ID {model_id} not found.")
+
+            # 3. Update model attributes
+            for key, value in data.items():
+                setattr(model, key, value)
+
+            # 4. Build the SQL UPDATE statement dynamically
+            set_clause = ", ".join(f"{key} = ?" for key in data)
+            placeholders = list(data.values())
+            placeholders.append(model_id)  # Add model_id for the WHERE clause
+
+            # 5. Execute the update
+            db.execute(
+                f"""
+                UPDATE models
+                SET {set_clause}
+                WHERE id = ?
+                """,
+                tuple(placeholders),
+            )
+
+            # 6. Handle default model logic (if applicable)
+            if data.get("is_default"):
+                db.execute("UPDATE models SET is_default = 0 WHERE id != ?", (model_id,))
+
+            logger.info("Model updated (ID %d)", model_id)
 
     @staticmethod
     def validate_model_config(config: Dict[str, Union[str, int, float, bool, None]]) -> None:
