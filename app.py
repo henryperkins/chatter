@@ -24,6 +24,14 @@ app = Flask(__name__)
 # --- CONFIGURATION ---
 
 # Load environment variables and secrets
+# --- LOGGING CONFIGURATION ---
+logging.basicConfig(
+    level=logging.DEBUG,  # Default to DEBUG; can be overridden by app.config
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],
+)
+logger = logging.getLogger(__name__)
+
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
 if app.config["SECRET_KEY"] == "dev-secret-key":
     logger.warning("Using default SECRET_KEY. This is insecure and should not be used in production.")
