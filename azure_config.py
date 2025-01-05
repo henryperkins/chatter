@@ -69,15 +69,15 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
 
 def initialize_client_from_model(
     model_config: Dict[str, Any]
-) -> Tuple[AzureOpenAI, str, float, Optional[int], int]:
+) -> Tuple[AzureOpenAI, str, Optional[float], Optional[int], int]:
     """Initialize Azure OpenAI client from model configuration.
 
     Args:
         model_config (Dict[str, Any]): A dictionary containing model attributes.
 
     Returns:
-        Tuple[AzureOpenAI, str, float, Optional[int], int]: The client, deployment name,
-            temperature, max_tokens, and max_completion_tokens.
+        Tuple[AzureOpenAI, str, Optional[float], Optional[int], int]: The client, deployment name,
+            temperature (or None), max_tokens, and max_completion_tokens.
 
     Raises:
         ValueError: If required configuration parameters are missing.
@@ -97,7 +97,7 @@ def initialize_client_from_model(
     if requires_o1_handling:
         # Enforce o1-preview specific requirements
         api_version = "2024-12-01-preview"
-        temperature = 1  # Fixed temperature for o1-preview models
+        temperature = None  # Exclude temperature for o1-preview models
         max_tokens = None  # max_tokens is not used for o1-preview models
 
         if not max_completion_tokens:
@@ -132,16 +132,21 @@ def validate_api_endpoint(
         test_url = f"{api_endpoint.rstrip('/')}/openai/deployments/{deployment_name}/chat/completions?api-version={api_version}"
         logger.debug(f"Validating API endpoint: {test_url}")
 
+        # Prepare the test request payload
+        test_payload = {
+            "messages": [{"role": "user", "content": "Test message"}],
+            "max_completion_tokens": 1,
+        }
+
+        # Exclude unnecessary parameters for o1-preview models
+        if api_version == "2024-12-01-preview":
+            test_payload.pop("temperature", None)  # Ensure temperature is not included
+
         # Make a test request to the API
         response = requests.post(
             test_url,
-            headers={
-                "api-key": api_key
-            },  # Use "api-key" header instead of "Authorization"
-            json={
-                "messages": [{"role": "user", "content": "Test message"}],
-                "max_completion_tokens": 1,  # Use 'max_completion_tokens' instead of 'max_tokens'
-            },
+            headers={"api-key": api_key},
+            json=test_payload,
             timeout=5,
         )
         logger.debug(f"Validation response: {response.status_code} - {response.text}")

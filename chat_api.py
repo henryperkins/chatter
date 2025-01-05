@@ -50,7 +50,7 @@ def get_azure_response(
         max_tokens = None
         requires_o1_handling = False
 
-        # If a specific model is selected, fetch its info from the DB
+        # If a specific model is selected, fetch its info from the database
         if selected_model_id:
             model = Model.get_by_id(selected_model_id)
             if model:
@@ -69,15 +69,13 @@ def get_azure_response(
         if requires_o1_handling:
             # For o1-preview models:
             # 1) Exclude system messages
-            # 2) Enforce temperature = 1
+            # 2) Do not include 'temperature' in API request
             # 3) Use 'max_completion_tokens'
             api_messages = [
                 {"role": msg["role"], "content": msg["content"]}
                 for msg in messages
                 if msg["role"] in ["user", "assistant"]
             ]
-            # Enforce temperature = 1 (but do not include in api_params)
-            temperature = 1
             # Prepare API parameters without 'temperature' and 'max_tokens'
             api_params = {
                 "model": deployment_name,
@@ -89,7 +87,6 @@ def get_azure_response(
             api_messages = [
                 {"role": msg["role"], "content": msg["content"]} for msg in messages
             ]
-            # Prepare API parameters including 'temperature' and 'max_tokens' if available
             api_params = {
                 "model": deployment_name,
                 "messages": api_messages,
@@ -98,8 +95,11 @@ def get_azure_response(
             if max_tokens is not None:
                 api_params["max_tokens"] = max_tokens
 
-        # Create the chat completion request
-        response = client.chat.completions.create(**api_params)
+        # Explicitly exclude 'temperature' for o1-preview models
+        if requires_o1_handling:
+            response = client.chat.completions.create(**api_params, temperature=None)
+        else:
+            response = client.chat.completions.create(**api_params)
 
         # Extract model response
         if response.choices and response.choices[0].message:
