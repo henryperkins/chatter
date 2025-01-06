@@ -4,9 +4,9 @@
 {% block title %}Chat - Azure OpenAI{% endblock %}
 
 {% block content %}
-<!-- Main container -->
+<!-- Main container: use dark classes if you enable dark mode in tailwind.config.js -->
 <div class="flex flex-col h-screen bg-white dark:bg-gray-900">
-    <!-- Mobile Toggle -->
+    <!-- Mobile Toggle (optional): Add a button to show/hide sidebar on small screens -->
     <button
       class="md:hidden bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-4 py-2"
       onclick="toggleSidebar()"
@@ -22,17 +22,31 @@
         >
             <div class="p-4 space-y-4">
                 <!-- New Chat Button -->
+                <!--
+                  This button is wired up in chat.js. It sends a POST to /new_chat and,
+                  upon success, redirects to /chat_interface?chat_id=... so that the new chat is properly loaded.
+                -->
                 <button
                     id="new-chat-btn"
-                    class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    class="
+                        w-full flex items-center justify-center
+                        bg-blue-600 hover:bg-blue-700 text-white
+                        px-4 py-2 rounded-lg
+                        focus:outline-none focus:ring-2 focus:ring-blue-500
+                    "
                 >
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M12 4v16m8-8H4"
+                        />
                     </svg>
                     New Chat
                 </button>
 
-                <!-- Model Selection -->
+                <!-- Model Selection (optional) -->
                 {% if models %}
                     <div>
                         <label for="model-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -40,10 +54,17 @@
                         </label>
                         <select
                             id="model-select"
-                            class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
+                            class="
+                                w-full border-gray-300 rounded-md shadow-sm
+                                focus:border-blue-500 focus:ring-blue-500
+                                dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200
+                            "
                         >
                             {% for model in models %}
-                                <option value="{{ model.id }}" {% if model.is_default %}selected{% endif %}>
+                                <option
+                                    value="{{ model.id }}"
+                                    {% if model.is_default %}selected{% endif %}
+                                >
                                     {{ model.name }}{% if model.is_default %} (Default){% endif %}
                                 </option>
                             {% endfor %}
@@ -54,20 +75,33 @@
                 <!-- Admin-Only Buttons -->
                 {% if current_user.role == 'admin' %}
                     <div class="space-y-2">
-                        <a href="{{ url_for('model.add_model_page') }}"
-                           class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-green-500">
+                        <a
+                            href="{{ url_for('model.add_model_page') }}"
+                            class="
+                                block w-full bg-green-500 hover:bg-green-600 text-white
+                                px-4 py-2 rounded-lg text-center
+                                focus:outline-none focus:ring-2 focus:ring-green-500
+                            "
+                        >
                             Add Model
                         </a>
-                        <button id="edit-model-btn"
-                                class="block w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-center disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                disabled>
+                        <button
+                            id="edit-model-btn"
+                            class="
+                                block w-full bg-yellow-500 hover:bg-yellow-600 text-white
+                                px-4 py-2 rounded-lg text-center
+                                disabled:opacity-50 disabled:pointer-events-none
+                                focus:outline-none focus:ring-2 focus:ring-yellow-500
+                            "
+                            disabled
+                        >
                             Edit Model
                         </button>
                     </div>
                 {% endif %}
 
                 <!-- Chat List -->
-                <div class="space-y-4">
+                <div id="chat-list" class="space-y-4">
                     {% set ns = namespace(current_date=None) %}
                     {% for conversation in conversations|sort(attribute='timestamp', reverse=True) %}
                         {% set chat_date = conversation.timestamp.strftime('%Y-%m-%d') %}
@@ -102,7 +136,8 @@
                                     title="Delete chat">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                </svg>
+                                </path>
+                            </svg>
                             </button>
                         </div>
                     {% endfor %}
@@ -113,15 +148,25 @@
         <!-- MAIN CHAT AREA -->
         <div class="flex-1 flex flex-col">
             <!-- Messages Container -->
-            <div id="chat-box"
-                 class="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-white dark:bg-gray-900">
+            <div
+                id="chat-box"
+                class="
+                    flex-1 overflow-y-auto px-4 py-6 space-y-4
+                    bg-white dark:bg-gray-900
+                "
+            >
                 {% for message in messages %}
                     {% if message.role == 'user' %}
-                        <!-- User message -->
+                        <!-- User message (right-aligned) -->
                         <div class="flex justify-end">
                             <div class="max-w-lg text-right">
-                                <div class="bg-blue-600 text-white px-4 py-2 rounded-lg">
-                                    <p class="text-sm">{{ message.content }}</p>
+                                <div
+                                  class="
+                                    bg-blue-600 text-white px-4 py-2 rounded-lg
+                                    focus:outline-none focus:ring-2 focus:ring-blue-500
+                                  "
+                                >
+                                    <p class="text-sm">{{ message.content | safe }}</p>
                                 </div>
                                 <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
                                     {% if message.timestamp %}
@@ -133,12 +178,12 @@
                             </div>
                         </div>
                     {% else %}
-                        <!-- Assistant message -->
+                        <!-- Assistant or system message (left-aligned) -->
                         <div class="flex">
                             <div class="max-w-lg">
                                 <div class="bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-lg">
                                     <div class="prose dark:prose-invert prose-sm max-w-none">
-                                        {{ message.content }}
+                                        {{ message.content | safe }}
                                     </div>
                                 </div>
                                 <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
@@ -154,9 +199,11 @@
                 {% endfor %}
             </div>
 
-            <!-- FILE UPLOAD AREA -->
-            <div id="uploaded-files"
-                 class="hidden px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+            <!-- FILE UPLOAD AREA (Hidden by default) -->
+            <div
+                id="uploaded-files"
+                class="hidden px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700"
+            >
                 <h3 class="text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
                     Uploaded Files
                 </h3>
@@ -164,30 +211,55 @@
             </div>
 
             <!-- INPUT AREA -->
-            <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-900">
-                <div class="flex items-end space-x-3 message-input-area">
+            <div
+                class="
+                    border-t border-gray-200 dark:border-gray-700
+                    px-4 py-3 bg-white dark:bg-gray-900
+                "
+            >
+                <div class="flex items-end space-x-3">
                     <!-- Upload Button -->
-                    <button id="upload-button"
-                            class="p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center"
-                            aria-label="Upload files">
+                    <button
+                        id="upload-button"
+                        class="
+                            p-2 rounded-lg text-gray-500 dark:text-gray-300
+                            hover:bg-gray-100 dark:hover:bg-gray-800
+                            focus:outline-none focus:ring-2 focus:ring-blue-500
+                            flex items-center
+                        "
+                        aria-label="Upload files"
+                    >
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                        </svg>
+                        </path>
                         <span>Upload</span>
                     </button>
                     <input type="file" id="file-input" class="hidden" multiple>
 
-                    <!-- Message Input -->
+                    <!-- Textarea for user message -->
                     <div class="flex-1">
-                        <textarea id="message-input"
-                                  class="w-full px-3 py-2 resize-none border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 focus:border-transparent"
-                                  placeholder="Type your message..."
-                                  rows="1"></textarea>
+                        <textarea
+                            id="message-input"
+                            class="
+                                w-full px-3 py-2 resize-none border border-gray-300
+                                rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
+                                dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200
+                                focus:border-transparent
+                            "
+                            placeholder="Type your message..."
+                            rows="1"
+                        ></textarea>
                     </div>
 
                     <!-- Send Button -->
-                    <button id="send-button"
-                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button
+                        id="send-button"
+                        class="
+                            px-4 py-2 bg-blue-600 text-white rounded-lg
+                            hover:bg-blue-700 flex items-center
+                            focus:outline-none focus:ring-2 focus:ring-blue-500
+                        "
+                    >
                         <span>Send</span>
                     </button>
                 </div>
@@ -196,9 +268,15 @@
     </div>
 </div>
 
-<!-- DROP ZONE -->
-<div id="drop-zone"
-     class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+<!-- DROP ZONE (File Drag/Drop) -->
+<div
+    id="drop-zone"
+    class="
+        fixed inset-0 bg-black bg-opacity-50 z-50
+        hidden
+    "
+    style="display: none"
+>
     <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl text-center">
         <p class="text-xl font-semibold text-gray-800 dark:text-gray-100">
             Drop files here
@@ -210,50 +288,58 @@
 </div>
 
 <!-- UPLOAD PROGRESS -->
-<div id="upload-progress"
-     class="hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 w-64">
+<div
+    id="upload-progress"
+    class="
+        hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800
+        rounded-lg shadow-lg p-4 w-64
+    "
+>
     <div class="text-sm mb-2 text-gray-800 dark:text-gray-100">
         Uploading files...
     </div>
     <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-        <div id="upload-progress-bar"
-             class="bg-blue-600 h-2 rounded-full"
-             style="width: 0%"></div>
+        <div
+            id="upload-progress-bar"
+            class="bg-blue-600 h-2 rounded-full"
+            style="width: 0%"
+        ></div>
     </div>
 </div>
 
 <!-- BOTTOM NAVIGATION BAR -->
-<div class="bottom-nav">
-    <div class="bottom-nav-item">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M13 5v6h6"></path>
+<div class="bottom-nav fixed bottom-0 left-0 right-0 bg-white shadow-inner flex justify-around py-2">
+    <a href="{{ url_for('chat.chat_interface') }}" class="flex flex-col items-center text-gray-700 {% if request.endpoint == 'chat.chat_interface' %}text-blue-600{% endif %}">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <title>Home</title>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h18M3 6h18M3 18h18" />
         </svg>
         <span class="text-xs">Home</span>
-    </div>
-    <div class="bottom-nav-item active">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+    </a>
+    {% if not current_user.is_authenticated %}
+    <a href="{{ url_for('auth.login') }}" class="flex flex-col items-center text-gray-700 {% if request.endpoint == 'auth.login' %}text-blue-600{% endif %}">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <title>Login</title>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
         </svg>
-        <span class="text-xs">Chat</span>
-    </div>
-    <div class="bottom-nav-item">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"></path>
+        <span class="text-xs">Login</span>
+    </a>
+    <a href="{{ url_for('auth.register') }}" class="flex flex-col items-center text-gray-700 {% if request.endpoint == 'auth.register' %}text-blue-600{% endif %}">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <title>Register</title>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
         </svg>
-        <span class="text-xs">History</span>
-    </div>
-    <div class="bottom-nav-item">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+        <span class="text-xs">Register</span>
+    </a>
+    {% else %}
+    <a href="{{ url_for('auth.logout') }}" class="flex flex-col items-center text-gray-700 {% if request.endpoint == 'auth.logout' %}text-blue-600{% endif %}">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <title>Logout</title>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
         </svg>
-        <span class="text-xs">Upload</span>
-    </div>
-    <div class="bottom-nav-item">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-        </svg>
-        <span class="text-xs">Menu</span>
-    </div>
+        <span class="text-xs">Logout</span>
+    </a>
+    {% endif %}
 </div>
 
 {% endblock %}
@@ -286,6 +372,7 @@
 </style>
 
 <script>
+// Optional toggleSidebar logic for smaller screens
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
     sidebar.classList.toggle('hidden');
@@ -332,9 +419,11 @@ function deleteChat(chatId) {
 
 // Auto-expand textarea
 const messageInput = document.getElementById('message-input');
-messageInput.addEventListener('input', function() {
-    this.style.height = 'auto';
-    this.style.height = (this.scrollHeight) + 'px';
-});
+if (messageInput) {
+    messageInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+}
 </script>
 {% endblock %}
