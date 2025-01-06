@@ -8,8 +8,9 @@ from flask import Flask, jsonify
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from flask_limiter.util import get_remote_address
+from werkzeug.exceptions import HTTPException
 from flask_limiter import Limiter
-from database import get_db, close_db, init_db, init_app
+from database import get_db, close_db, init_db, init_app, db_connection
 from models import User
 from extensions import limiter, login_manager, csrf
 from routes.auth_routes import bp as auth_bp
