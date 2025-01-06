@@ -1,7 +1,4 @@
-/* static/js/chat.js */
-
-// Debug statement to confirm the file is loaded
-console.log("chat.js loaded");
+// static/js/chat.js
 
 // Constants for file handling
 let uploadedFiles = [];
@@ -72,7 +69,6 @@ function renderMarkdown(content) {
     return html.replace(/<script.*?>.*?<\/script>/gi, '')
                .replace(/on\w+="[^"]*"/gi, '');
 }
-
 
 // Show feedback to the user (re-usable)
 function showFeedback(message, type = "success") {
@@ -166,8 +162,6 @@ function renderFileList() {
 
 // Message Handling Functions
 async function sendMessage(e) {
-    console.log("sendMessage called!"); // Debug statement
-
     // Prevent default form submission if this is triggered by a form
     if (e && e.preventDefault) {
         e.preventDefault();
@@ -194,8 +188,6 @@ async function sendMessage(e) {
     uploadedFiles.forEach((file) => {
         formData.append("files[]", file);
     });
-    // Remove CSRF token from form data, as we include it in headers
-    // formData.append("csrf_token", getCSRFToken()); // Removed per instructions
 
     sendButton.disabled = true;
     messageInput.disabled = true;
@@ -305,8 +297,7 @@ function appendAssistantMessage(message) {
             <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
         </div>
     `;
-  // Use renderMarkdown here for the message content
-    // Use renderMarkdown here for the message content
+    // Use renderMarkdown for the message content
     assistantMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
     chatBox.appendChild(assistantMessageDiv);
     // Highlight code blocks after adding to DOM
@@ -314,10 +305,8 @@ function appendAssistantMessage(message) {
     chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-
 // Event Listeners
 if (messageInput) {
-    console.log("messageInput found"); // Debug statement
     messageInput.addEventListener("input", function() {
         adjustTextareaHeight(this);
     });
@@ -327,30 +316,20 @@ if (messageInput) {
             sendMessage();
         }
     });
-} else {
-    console.error("messageInput not found");
 }
 
 if (sendButton) {
-    console.log("sendButton found"); // Debug statement
     sendButton.addEventListener("click", (e) => {
-        console.log("Send button clicked");
         sendMessage(e);
     });
-} else {
-    console.error("sendButton not found");
 }
 
 // Handle form submission if the send button is inside a form
 const chatForm = document.getElementById("chat-form");
 if (chatForm) {
-    console.log("chatForm found");
     chatForm.addEventListener("submit", (e) => {
-        console.log("Form submitted");
         sendMessage(e);
     });
-} else {
-    console.log("chatForm not found");
 }
 
 if (fileInput && uploadButton) {
@@ -485,23 +464,20 @@ function handleMobileInteractions() {
         const yDiff = yDown - yUp;
 
         if (Math.abs(xDiff) > Math.abs(yDiff)) {
-                    if (xDiff > 0) {
-                        // Left swipe
-                        console.log("Left swipe detected");
-                    } else {
-                        // Right swipe
-                        console.log("Right swipe detected");
-                    }
-                }
-        else if (yDiff > 0) {
-                        // Up swipe
-                        console.log("Up swipe detected");
-                    }
-        else {
-                        // Down swipe
-                        console.log("Down swipe detected");
-                    }
-
+            if (xDiff > 0) {
+                // Left swipe
+                console.log("Left swipe detected");
+            } else {
+                // Right swipe
+                console.log("Right swipe detected");
+            }
+        } else if (yDiff > 0) {
+            // Up swipe
+            console.log("Up swipe detected");
+        } else {
+            // Down swipe
+            console.log("Down swipe detected");
+        }
 
         // Reset values
         xDown = null;

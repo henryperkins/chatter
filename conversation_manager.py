@@ -4,13 +4,6 @@ from typing import Dict, List
 
 import tiktoken
 from database import db_connection  # Use the centralized context manager
-import logging
-import os
-from typing import Dict, List
-
-import tiktoken
-from database import db_connection  # Use the centralized context manager
-
 
 logger = logging.getLogger(__name__)
 

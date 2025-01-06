@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 _clients: Dict[str, AzureOpenAI] = {}
 _deployments: Dict[str, str] = {}
 
-
 def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI, str]:
     """Retrieve the Azure OpenAI client and deployment name.
 
@@ -45,8 +44,8 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
     azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
     api_key = os.getenv("AZURE_OPENAI_KEY")
     api_version = os.getenv(
-        "AZURE_OPENAI_API_VERSION", "2024-12-01-preview"
-    )  # Default to o1-preview
+        "AZURE_OPENAI_API_VERSION", "2023-10-01-preview"
+    )  # Use a valid current API version
 
     # Validate required configuration variables
     if not all([azure_endpoint, api_key, deployment_name]):
@@ -72,7 +71,6 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
 
     return client, deployment_name
 
-
 def initialize_client_from_model(
     model_config: Dict[str, Any]
 ) -> Tuple[AzureOpenAI, str, Optional[float], Optional[int], int, bool]:
@@ -90,7 +88,7 @@ def initialize_client_from_model(
     """
     api_endpoint: str = str(model_config.get("api_endpoint"))
     api_key: str = str(model_config.get("api_key"))
-    api_version: str = str(model_config.get("api_version"))
+    api_version: str = str(model_config.get("api_version", "2023-10-01-preview"))  # Updated to valid version
     deployment_name: str = str(model_config.get("deployment_name"))
     temperature: Optional[float] = (
         float(model_config.get("temperature", 0.7))
@@ -121,8 +119,8 @@ def initialize_client_from_model(
 
     if requires_o1_handling:
         # Enforce o1-preview specific requirements
-        if api_version != "2024-12-01-preview":
-            api_version = "2024-12-01-preview"  # Override to correct version
+        if api_version != "2023-10-01-preview":
+            api_version = "2023-10-01-preview"  # Override to correct version
         temperature = 1  # Set temperature to 1 as required
         max_tokens = None  # max_tokens is not used for o1-preview models
 
@@ -140,7 +138,6 @@ def initialize_client_from_model(
         requires_o1_handling,
     )
 
-
 def validate_api_endpoint(
     api_endpoint: str, api_key: str, deployment_name: str, api_version: str
 ) -> bool:
@@ -150,7 +147,7 @@ def validate_api_endpoint(
         api_endpoint (str): The base API endpoint URL (e.g., https://<instance_name>.openai.azure.com).
         api_key (str): The API key.
         deployment_name (str): The deployment name for the model.
-        api_version (str): The API version (e.g., 2024-12-01-preview).
+        api_version (str): The API version (e.g., 2023-10-01-preview).
 
     Returns:
         bool: True if the endpoint, deployment name, and key are valid, False otherwise.
@@ -167,7 +164,7 @@ def validate_api_endpoint(
         }
 
         # Exclude unnecessary parameters for o1-preview models
-        if api_version == "2024-12-01-preview":
+        if api_version == "2023-10-01-preview":
             test_payload.pop("temperature", None)  # Ensure temperature is not included
 
         # Make a test request to the API
