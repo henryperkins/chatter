@@ -485,22 +485,23 @@ function handleMobileInteractions() {
         const yDiff = yDown - yUp;
 
         if (Math.abs(xDiff) > Math.abs(yDiff)) {
-            if (xDiff > 0) {
-                // Left swipe
-                console.log("Left swipe detected");
-            } else {
-                // Right swipe
-                console.log("Right swipe detected");
-            }
-        } else {
-            if (yDiff > 0) {
-                // Up swipe
-                console.log("Up swipe detected");
-            } else {
-                // Down swipe
-                console.log("Down swipe detected");
-            }
-        }
+                    if (xDiff > 0) {
+                        // Left swipe
+                        console.log("Left swipe detected");
+                    } else {
+                        // Right swipe
+                        console.log("Right swipe detected");
+                    }
+                }
+        else if (yDiff > 0) {
+                        // Up swipe
+                        console.log("Up swipe detected");
+                    }
+        else {
+                        // Down swipe
+                        console.log("Down swipe detected");
+                    }
+
 
         // Reset values
         xDown = null;
