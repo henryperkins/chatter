@@ -4,7 +4,7 @@ import os
 import logging
 from datetime import timedelta
 from dotenv import load_dotenv
-from flask import Flask, jsonify
+from flask import Flask, jsonify, redirect, url_for
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect, CSRFError
 from flask_limiter.util import get_remote_address
@@ -71,7 +71,7 @@ init_app(app)
 
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix="/auth")
-app.register_blueprint(chat_bp, url_prefix="/chat")
+app.register_blueprint(chat_bp)
 app.register_blueprint(model_bp, url_prefix="/models")
 
 # Initialize database tables
@@ -187,6 +187,11 @@ def handle_exception(e):
         ),
         500,
     )
+
+# Redirect root URL to chat interface
+@app.route("/")
+def index():
+    return redirect(url_for("chat.chat_interface"))
 
 # --- APPLICATION ENTRY POINT ---
 
