@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS model_versions (
     api_version TEXT,
     version INTEGER, -- Model version number
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (model_id) REFERENCES models (id) ON DELETE CASCADE
+    FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE CASCADE
 );
 
 -- =============================
