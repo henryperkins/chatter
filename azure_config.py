@@ -63,7 +63,7 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
     client = AzureOpenAI(
         api_key=api_key,
         azure_endpoint=str(azure_endpoint),  # Ensure string type
-        api_version=api_version
+        api_version=api_version,
     )
 
     # Cache the client and deployment name
@@ -92,7 +92,11 @@ def initialize_client_from_model(
     api_key: str = str(model_config.get("api_key"))
     api_version: str = str(model_config.get("api_version"))
     deployment_name: str = str(model_config.get("deployment_name"))
-    temperature: Optional[float] = float(model_config.get("temperature", 0.7)) if model_config.get("temperature") is not None else None
+    temperature: Optional[float] = (
+        float(model_config.get("temperature", 0.7))
+        if model_config.get("temperature") is not None
+        else None
+    )
     max_tokens: Optional[int] = None
     if model_config.get("max_tokens") is not None:
         try:
@@ -108,7 +112,7 @@ def initialize_client_from_model(
         "api_key": api_key,
         "api_version": api_version,
         "deployment_name": deployment_name,
-        "max_completion_tokens": max_completion_tokens
+        "max_completion_tokens": max_completion_tokens,
     }
 
     for field_name, value in required_fields.items():
@@ -117,7 +121,8 @@ def initialize_client_from_model(
 
     if requires_o1_handling:
         # Enforce o1-preview specific requirements
-        api_version = "2024-12-01-preview"
+        if api_version != "2024-12-01-preview":
+            api_version = "2024-12-01-preview"  # Override to correct version
         temperature = None  # Do not set temperature
         max_tokens = None  # max_tokens is not used for o1-preview models
 
@@ -132,7 +137,7 @@ def initialize_client_from_model(
         temperature,
         max_tokens,
         max_completion_tokens,
-        requires_o1_handling
+        requires_o1_handling,
     )
 
 

@@ -82,6 +82,10 @@ def get_azure_response(
                 for msg in messages
                 if msg["role"] in ["user", "assistant"]
             ]
+            # Ensure max_completion_tokens is set to a default if None
+            if max_completion_tokens is None:
+                max_completion_tokens = 500  # Set a default value
+
             # Prepare API parameters WITHOUT 'temperature' and 'max_tokens'
             api_params = {
                 "model": deployment_name,
