@@ -46,69 +46,63 @@ def get_azure_response(
         client, deployment_name = get_azure_client(deployment_name)
 
         # Initialize defaults
-        temperature = 0.7
-        max_tokens = None
-        requires_o1_handling = False
-
-        # Models that require special handling
-        special_models = ['o1-preview']
+        api_params = {
+            "model": deployment_name,
+            "messages": [],  # Will be populated based on model type
+            "max_completion_tokens": max_completion_tokens or 500  # Default if not provided
+        }
 
         # If a specific model is selected, fetch its info from the database
         if selected_model_id:
             model = Model.get_by_id(selected_model_id)
-            if model:
-                (
-                    client,
-                    deployment_name,
-                    temperature,
-                    max_tokens,
-                    max_completion_tokens,
-                    requires_o1_handling,
-                ) = initialize_client_from_model(model.__dict__)
-            else:
+            if not model:
                 raise ValueError("Selected model not found.")
+
+            (
+                client,
+                deployment_name,
+                temperature,
+                max_tokens,
+                max_completion_tokens,
+                requires_o1_handling,
+            ) = initialize_client_from_model(model.__dict__)
+
+            # Update api_params with model-specific values
+            api_params["model"] = deployment_name
+            if max_completion_tokens:
+                api_params["max_completion_tokens"] = max_completion_tokens
         else:
-            # Determine if the model requires special handling based on deployment name
+            # Default behavior without specific model
             requires_o1_handling = any(
-                model_name in deployment_name for model_name in special_models
+                model_name in deployment_name
+                for model_name in ['o1-preview']
             )
+            temperature = 1 if requires_o1_handling else 0.7
 
-        # Adjust messages and parameters based on whether special handling is required
+        # Filter messages based on model requirements
+        api_messages = [
+            {"role": msg["role"], "content": msg["content"]}
+            for msg in messages
+            if not requires_o1_handling or msg["role"] != "system"
+        ]
+        api_params["messages"] = api_messages
+
+        # Set temperature and tokens based on model type
         if requires_o1_handling:
-            # For o1-preview models:
-            # 1) Exclude system messages
-            api_messages = [
-                {"role": msg["role"], "content": msg["content"]}
-                for msg in messages
-                if msg["role"] in ["user", "assistant"]
-            ]
-            # Ensure max_completion_tokens is set to a default if None
-            if max_completion_tokens is None:
-                max_completion_tokens = 500  # Set a default value
-
-            # Prepare API parameters WITH 'temperature' set to 1
-            api_params = {
-                "model": deployment_name,
-                "messages": api_messages,
-                "max_completion_tokens": max_completion_tokens,
-                "temperature": 1,  # Set temperature to 1 as required
-            }
+            api_params["temperature"] = 1  # Required for o1-preview
+            # Remove max_tokens if present, use max_completion_tokens
+            api_params.pop("max_tokens", None)
         else:
-            # For standard models, include system messages and parameters
-            api_messages = [
-                {"role": msg["role"], "content": msg["content"]} for msg in messages
-            ]
-            api_params = {
-                "model": deployment_name,
-                "messages": api_messages,
-            }
             if temperature is not None:
                 api_params["temperature"] = temperature
             if max_tokens is not None:
                 api_params["max_tokens"] = max_tokens
 
-        # Make the API call
-        response = client.chat.completions.create(**api_params)
+        # Make the API call (no streaming for o1-preview)
+        response = client.chat.completions.create(
+            **api_params,
+            stream=False if requires_o1_handling else None
+        )
 
         # Extract model response
         if response.choices and response.choices[0].message:

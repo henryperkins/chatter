@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS model_versions (
     api_version TEXT,
     version INTEGER, -- Model version number
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (model_id) REFERENCES models (id) ON DELETE CASCADE
+    FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE CASCADE
 );
 
 -- =============================
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS chats (
     id TEXT PRIMARY KEY, -- UUID for uniquely identifying chat sessions
     user_id INTEGER NOT NULL, -- Foreign key referencing users table
     title TEXT NOT NULL DEFAULT 'New Chat', -- Title of the chat (updated after first message)
-    model_id INTEGER DEFAULT NULL, -- Foreign key referencing chosen model for the chat
+    model_id INTEGER DEFAULT NULL, -- Foreign key referencing models table
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     FOREIGN KEY (model_id) REFERENCES models (id) ON DELETE RESTRICT

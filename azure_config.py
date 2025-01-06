@@ -4,14 +4,42 @@ import os
 from openai import AzureOpenAI
 import requests
 import logging
-from typing import Dict, Optional, Tuple, Any, Union, List
+from typing import Dict, Optional, Tuple, Any, Union
 
 # Initialize logger
 logger = logging.getLogger(__name__)
 
-# Cache for multiple clients and deployments
-_clients: Dict[str, AzureOpenAI] = {}
-_deployments: Dict[str, str] = {}
+
+def validate_o1_preview_config(model_config: Dict[str, Any]) -> None:
+    """Validate configuration for o1-preview models.
+
+    Args:
+        model_config (Dict[str, Any]): The model configuration dictionary.
+
+    Raises:
+        ValueError: If the configuration violates o1-preview requirements.
+    """
+    if not model_config.get("requires_o1_handling"):
+        return
+
+    messages = model_config.get("messages", [])
+    if not messages:
+        return
+
+    # Check for system messages
+    if any(
+        msg.get("role") == "system"
+        for msg in messages
+    ):
+        raise ValueError("o1-preview models do not support system messages")
+
+    # Check other requirements
+    if model_config.get("stream"):
+        raise ValueError("o1-preview models do not support streaming")
+    if model_config.get("max_tokens"):
+        raise ValueError("o1-preview models use max_completion_tokens instead of max_tokens")
+    if model_config.get("temperature") not in (None, 1, 1.0):
+        raise ValueError("o1-preview models require temperature=1")
 
 
 def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI, str]:
@@ -27,8 +55,6 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
     Raises:
         ValueError: If required environment variables are missing.
     """
-    global _clients, _deployments
-
     # If no deployment name is provided, use the default from environment variables
     if not deployment_name:
         deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
@@ -37,16 +63,12 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
                 "Default deployment name not found in environment variables."
             )
 
-    # If the client for this deployment is already cached, return it
-    if deployment_name in _clients:
-        return _clients[deployment_name], deployment_name
-
     # Retrieve Azure OpenAI configuration from environment variables
     azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
     api_key = os.getenv("AZURE_OPENAI_KEY")
     api_version = os.getenv(
         "AZURE_OPENAI_API_VERSION", "2024-12-01-preview"
-    )  # Default to o1-preview
+    )  # Updated to latest o1-preview version
 
     # Validate required configuration variables
     if not all([azure_endpoint, api_key, deployment_name]):
@@ -66,10 +88,6 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
         api_version=api_version,
     )
 
-    # Cache the client and deployment name
-    _clients[deployment_name] = client
-    _deployments[deployment_name] = deployment_name
-
     return client, deployment_name
 
 
@@ -80,17 +98,31 @@ def initialize_client_from_model(
 
     Args:
         model_config (Dict[str, Any]): A dictionary containing model attributes.
+            For o1-preview models (when requires_o1_handling is True):
+            - API version must be in YYYY-MM-DD-preview format
+            - System messages are not supported and will be filtered out
+            - Streaming is not supported and will be disabled
+            - Temperature must be 1
+            - Uses max_completion_tokens instead of max_tokens
+
+            Expected message structure:
+            messages: list[dict[str, str]] containing:
+            - role: "user" or "assistant" (no "system")
+            - content: The message text
 
     Returns:
         Tuple[AzureOpenAI, str, Optional[float], Optional[int], int, bool]: The client, deployment name,
             temperature (or None), max_tokens, max_completion_tokens, and requires_o1_handling flag.
 
     Raises:
-        ValueError: If required configuration parameters are missing.
+        ValueError: If required configuration parameters are missing or if o1-preview requirements
+            are violated (see validate_o1_preview_config for specific validations).
     """
     api_endpoint: str = str(model_config.get("api_endpoint"))
     api_key: str = str(model_config.get("api_key"))
-    api_version: str = str(model_config.get("api_version"))
+    api_version: str = str(
+        model_config.get("api_version", "2024-02-15-preview")
+    )  # Using latest preview version
     deployment_name: str = str(model_config.get("deployment_name"))
     temperature: Optional[float] = (
         float(model_config.get("temperature", 0.7))
@@ -106,14 +138,19 @@ def initialize_client_from_model(
     max_completion_tokens: int = int(model_config.get("max_completion_tokens", 500))
     requires_o1_handling: bool = bool(model_config.get("requires_o1_handling", False))
 
-    # Validate required fields with type annotations
-    required_fields: Dict[str, Union[str, int]] = {
+    # Validate required fields
+    required_fields = {
         "api_endpoint": api_endpoint,
         "api_key": api_key,
         "api_version": api_version,
         "deployment_name": deployment_name,
-        "max_completion_tokens": max_completion_tokens,
+        "max_completion_tokens": max_completion_tokens
     }
+
+    # Ensure API version is correct for o1-preview
+    if requires_o1_handling and api_version != "2024-12-01-preview":
+        logger.warning("Updating API version to 2024-12-01-preview for o1-preview model")
+        api_version = "2024-12-01-preview"
 
     for field_name, value in required_fields.items():
         if not value:
@@ -121,10 +158,22 @@ def initialize_client_from_model(
 
     if requires_o1_handling:
         # Enforce o1-preview specific requirements
-        if api_version != "2024-12-01-preview":
-            api_version = "2024-12-01-preview"  # Override to correct version
-        temperature = 1  # Set temperature to 1 as required
-        max_tokens = None  # max_tokens is not used for o1-preview models
+        api_version = "2024-12-01-preview"  # Must use this specific version
+        temperature = 1  # Temperature must be 1 for o1-preview
+        max_tokens = None  # Use max_completion_tokens instead of max_tokens
+        # Validate and update o1-preview configuration
+        validate_o1_preview_config(model_config)
+
+        # Filter out system messages if present
+        messages = model_config.get("messages", [])
+        if messages:
+            model_config["messages"] = [
+                msg for msg in messages
+                if msg.get("role") != "system"
+            ]
+        if model_config.get("stream", False):
+            # Disable streaming for o1-preview
+            model_config["stream"] = False
 
     # Initialize the Azure OpenAI client
     client = AzureOpenAI(
@@ -150,25 +199,36 @@ def validate_api_endpoint(
         api_endpoint (str): The base API endpoint URL (e.g., https://<instance_name>.openai.azure.com).
         api_key (str): The API key.
         deployment_name (str): The deployment name for the model.
-        api_version (str): The API version (e.g., 2024-12-01-preview).
+        api_version (str): The API version (e.g., 2023-10-01-preview).
 
     Returns:
         bool: True if the endpoint, deployment name, and key are valid, False otherwise.
     """
     try:
         # Construct the full URL for validation
-        test_url = f"{api_endpoint.rstrip('/')}/openai/deployments/{deployment_name}/chat/completions?api-version={api_version}"
-        logger.debug(f"Validating API endpoint: {test_url}")
+        test_url = (
+            f"{api_endpoint.rstrip('/')}/openai/deployments/"
+            f"{deployment_name}/chat/completions?api-version={api_version}"
+        )
+        logger.debug("Validating API endpoint and deployment.")
 
         # Prepare the test request payload with type annotations
-        test_payload: Dict[str, Union[List[Dict[str, str]], int]] = {
+        test_payload: Dict[str, Any] = {
             "messages": [{"role": "user", "content": "Test message"}],
-            "max_completion_tokens": 1,
+            "max_completion_tokens": 1
         }
 
-        # Exclude unnecessary parameters for o1-preview models
-        if api_version == "2024-12-01-preview":
-            test_payload.pop("temperature", None)  # Ensure temperature is not included
+        # Configure payload for o1-preview models
+        if api_version.endswith("-preview"):
+            test_payload["temperature"] = 1.0  # Required for o1-preview
+            test_payload.pop("max_tokens", None)  # Remove max_tokens if present
+            # Filter out system messages
+            messages = test_payload.get("messages", [])
+            if messages:
+                test_payload["messages"] = [
+                    msg for msg in messages
+                    if msg.get("role") != "system"
+                ]
 
         # Make a test request to the API
         response = requests.post(
@@ -177,9 +237,10 @@ def validate_api_endpoint(
             json=test_payload,
             timeout=5,
         )
-        logger.debug(f"Validation response: {response.status_code} - {response.text}")
 
-        # Return True if the response status code is 200
+        logger.debug(f"Validation response status code: {response.status_code}")
+
+        # Return True if the response status code indicates success
         return response.status_code == 200
     except Exception as e:
         logger.error(f"API endpoint validation failed: {str(e)}")
