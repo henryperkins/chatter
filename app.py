@@ -6,7 +6,7 @@ from datetime import timedelta
 from dotenv import load_dotenv
 from flask import Flask, jsonify
 from flask_login import LoginManager
-from flask_wtf.csrf import CSRFProtect
+from flask_wtf.csrf import CSRFProtect, CSRFError
 from flask_limiter.util import get_remote_address
 from flask_limiter import Limiter
 from database import get_db, close_db, init_db, init_app
