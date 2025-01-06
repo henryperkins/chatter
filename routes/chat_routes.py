@@ -1,7 +1,5 @@
 import logging
 import os
-import uuid
-import mimetypes
 from typing import Union, Tuple
 
 import bleach
@@ -21,11 +19,10 @@ from werkzeug.utils import secure_filename
 from datetime import datetime
 
 from chat_api import scrape_data, get_azure_response
-from chat_utils import generate_new_chat_id, count_tokens
+from chat_utils import generate_new_chat_id
 from conversation_manager import ConversationManager
 from database import db_connection  # Use the centralized context manager
 from models import Chat, Model, UploadedFile
-from azure_config import get_azure_client
 import tiktoken
 
 bp = Blueprint("chat", __name__)
@@ -276,11 +273,11 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                 # Truncate file content to avoid excessive tokens
                 truncated_content = truncate_message(file_content, MAX_FILE_CONTENT_LENGTH)
 
-                # Add file content to conversation as a system message
+                # Add file content to conversation as an assistant message
                 conversation_manager.add_message(
                     chat_id,
-                    "system",
-                    f"Content of file '{filename}':\n{truncated_content}"
+                    "assistant",
+                    f"Here is the content of the file '{filename}':\n{truncated_content}"
                 )
             else:
                 logger.info(f"Skipping reading content for non-text file: {filename}")

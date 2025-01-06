@@ -285,7 +285,9 @@ class Model:
         if not config.get("requires_o1_handling", False):
             temperature = config.get("temperature")
             if temperature is not None and not (0 <= float(temperature) <= 2):
-                raise ValueError("Temperature must be between 0 and 2 or NULL for o1-preview models")
+                raise ValueError(
+                    "Temperature must be between 0 and 2 or NULL for o1-preview models"
+                )
 
         # Validate max_tokens
         max_tokens = config.get("max_tokens", None)
