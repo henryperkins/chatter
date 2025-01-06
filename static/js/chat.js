@@ -60,14 +60,16 @@ function renderMarkdown(content) {
     if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
         return DOMPurify.sanitize(html, {
             USE_PROFILES: { html: true },
-            ALLOWED_TAGS: ['p', 'strong', 'em', 'br', 'ul', 'ol', 'li', 'a', 'img', 'pre', 'code'],
-            ALLOWED_ATTR: ['href', 'target', 'rel', 'src', 'alt', 'class', 'style']
+            ALLOWED_TAGS: ['p', 'strong', 'em', 'br', 'ul', 'ol', 'li', 'a', 'pre', 'code'],
+            ALLOWED_ATTR: ['href', 'target', 'rel', 'class']
         });
+    } else {
+        // Fallback: Render content as plain text to prevent XSS
+        console.warn('DOMPurify is not available. Rendering content as plain text.');
+        const div = document.createElement('div');
+        div.textContent = content;
+        return div.innerHTML;
     }
-
-    // Fallback basic sanitization
-    return html.replace(/<script.*?>.*?<\/script>/gi, '')
-               .replace(/on\w+="[^"]*"/gi, '');
 }
 
 // Show feedback to the user (re-usable)
