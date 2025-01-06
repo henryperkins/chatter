@@ -316,12 +316,16 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
 
     # Get the Azure OpenAI response
     try:
-        model_response = get_azure_response(
-            messages=history,
-            deployment_name=model_obj.deployment_name if model_obj else None,
-            selected_model_id=model_id,
-            max_completion_tokens=model_obj.max_completion_tokens if model_obj else None,
-        )
+        # Prepare model configuration
+        model_config = {
+            "messages": history,
+            "deployment_name": model_obj.deployment_name if model_obj else None,
+            "selected_model_id": model_id,
+            "max_completion_tokens": model_obj.max_completion_tokens if model_obj else None,
+        }
+
+        # Get response from Azure OpenAI
+        model_response = get_azure_response(**model_config)
 
         # Add assistant's response to conversation history
         conversation_manager.add_message(chat_id, "assistant", model_response)

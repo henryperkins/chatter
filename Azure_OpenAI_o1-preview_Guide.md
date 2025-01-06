@@ -16,7 +16,7 @@ from openai import AzureOpenAI
 load_dotenv()
 azure_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
 api_key = os.getenv('AZURE_OPENAI_KEY')
-api_version = os.getenv('AZURE_OPENAI_API_VERSION', '2024-10-01-preview')
+api_version = os.getenv('AZURE_OPENAI_API_VERSION', '2024-12-01-preview')
 
 client = AzureOpenAI(
     azure_endpoint=azure_endpoint,
@@ -32,7 +32,8 @@ Make a simple API call to validate your setup.
 response = client.chat.completions.create(
     model="gpt-35-turbo",
     messages=[{"role": "user", "content": "Hello"}],
-    max_tokens=10
+    temperature=1,
+    max_completion_tokens=10
 )
 print("Connection successful!")
 print(response.choices[0].message.content)
@@ -117,7 +118,8 @@ def managed_completion(prompt: str, max_tokens: int = 4000):
     response = client.chat.completions.create(
         model="gpt-4",
         messages=[{"role": "user", "content": optimized_prompt}],
-        max_tokens=max_tokens
+        temperature=1,
+        max_completion_tokens=max_tokens
     )
     return response.choices[0].message.content
 ```
@@ -781,22 +783,22 @@ class ChatResponse(BaseModel):
     model: str
     choices: List[ChatChoice]
     usage: ChatUsage
-    
+
 class RunCompletionUsage(BaseModel):
   prompt_tokens: int
   completion_tokens: int
   total_tokens: int
-  
+
 class RunObject(BaseModel):
   id: str
   object: str = Field("thread.run")
   status: str
   usage: Optional[RunCompletionUsage] = None
-  
+
 class ThreadMessageTextContent(BaseModel):
     value: str
     annotations: List[Any]
-    
+
 class ThreadMessageContent(BaseModel):
     type: str
     text: Optional[ThreadMessageTextContent] = None
@@ -806,8 +808,8 @@ class MessageObject(BaseModel):
   object: str = Field("thread.message")
   role: str
   content: List[ThreadMessageContent]
-  
-  
+
+
 class ResponseValidator:
     def __init__(self):
         self.validators: Dict[str, Any] = {

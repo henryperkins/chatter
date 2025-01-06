@@ -1,3 +1,4 @@
+<!-- templates/chat.html -->
 {% extends "base.html" %}
 
 {% block title %}Chat - Azure OpenAI{% endblock %}
@@ -67,8 +68,8 @@
 
                 <!-- Chat List -->
                 <div class="space-y-4">
-                    {% set ns = namespace(current_date=none) %}
-                    {% for conversation in conversations|sort(attribute='timestamp', reverse=true) %}
+                    {% set ns = namespace(current_date=None) %}
+                    {% for conversation in conversations|sort(attribute='timestamp', reverse=True) %}
                         {% set chat_date = conversation.timestamp.strftime('%Y-%m-%d') %}
 
                         {% if chat_date != ns.current_date %}
@@ -120,7 +121,7 @@
                         <div class="flex justify-end">
                             <div class="max-w-lg text-right">
                                 <div class="bg-blue-600 text-white px-4 py-2 rounded-lg">
-                                    <p class="text-sm">{{ message.content | safe }}</p>
+                                    <p class="text-sm">{{ message.content }}</p>
                                 </div>
                                 <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
                                     {% if message.timestamp %}
@@ -137,7 +138,7 @@
                             <div class="max-w-lg">
                                 <div class="bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-lg">
                                     <div class="prose dark:prose-invert prose-sm max-w-none">
-                                        {{ message.content | safe }}
+                                        {{ message.content }}
                                     </div>
                                 </div>
                                 <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
@@ -164,7 +165,7 @@
 
             <!-- INPUT AREA -->
             <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-900">
-                <div class="flex items-end space-x-3">
+                <div class="flex items-end space-x-3 message-input-area">
                     <!-- Upload Button -->
                     <button id="upload-button"
                             class="p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center"
@@ -220,6 +221,10 @@
              style="width: 0%"></div>
     </div>
 </div>
+
+<!-- Feedback Message -->
+<div id="feedback-message" class="hidden"></div>
+
 {% endblock %}
 
 {% block extra_head %}
