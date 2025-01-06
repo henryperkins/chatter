@@ -10,7 +10,7 @@ from flask_login import login_user, logout_user, current_user, login_required
 from database import db_connection  # Use the centralized context manager
 from models import User
 from decorators import admin_required
-from forms import LoginForm, RegistrationForm
+from forms import LoginForm, RegistrationForm, ResetPasswordForm
 from extensions import limiter
 
 # Define the blueprint
@@ -104,6 +104,37 @@ def forgot_password():
         if not email:
             flash("Email is required.", "error")
             return render_template("forgot_password.html")
+
+        # Reset Password route
+        @bp.route("/reset_password/<token>", methods=["GET", "POST"])
+        @limiter.limit("5 per minute")
+        def reset_password(token):
+            """
+            Handle the password reset using the provided token.
+            """
+            form = ResetPasswordForm()
+            with db_connection() as db:
+                user = db.execute(
+                    "SELECT * FROM users WHERE reset_token = ? AND reset_token_expiry > datetime('now')",
+                    (token,),
+                ).fetchone()
+
+                if not user:
+                    flash("Invalid or expired reset token.", "error")
+                    return redirect(url_for("auth.login"))
+
+                if form.validate_on_submit():
+                    password = form.password.data.strip()
+                    hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12))
+
+                    db.execute(
+                        "UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?",
+                        (hashed_password, user["id"]),
+                    )
+                    flash("Your password has been reset successfully.", "success")
+                    return redirect(url_for("auth.login"))
+
+            return render_template("reset_password.html", form=form, token=token)
 
         with db_connection() as db:
             user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()

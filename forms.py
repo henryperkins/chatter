@@ -199,3 +199,23 @@ class ModelForm(FlaskForm):
             raise ValidationError(
                 "API Version must be '2024-12-01-preview' for o1-preview models."
             )
+
+class ResetPasswordForm(FlaskForm):
+    """
+    Form for resetting user password.
+    """
+    password = PasswordField(
+        "New Password",
+        validators=[
+            DataRequired(),
+            Length(min=6),
+        ],
+    )
+    confirm_password = PasswordField(
+        "Confirm New Password",
+        validators=[
+            DataRequired(),
+            EqualTo("password", message="Passwords must match."),
+        ],
+    )
+    submit = SubmitField("Reset Password")
