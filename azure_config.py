@@ -9,10 +9,6 @@ from typing import Dict, Optional, Tuple, Any, Union, List
 # Initialize logger
 logger = logging.getLogger(__name__)
 
-# Cache for multiple clients and deployments
-_clients: Dict[str, AzureOpenAI] = {}
-_deployments: Dict[str, str] = {}
-
 def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI, str]:
     """Retrieve the Azure OpenAI client and deployment name.
 
@@ -26,8 +22,6 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
     Raises:
         ValueError: If required environment variables are missing.
     """
-    global _clients, _deployments
-
     # If no deployment name is provided, use the default from environment variables
     if not deployment_name:
         deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
@@ -35,10 +29,6 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
             raise ValueError(
                 "Default deployment name not found in environment variables."
             )
-
-    # If the client for this deployment is already cached, return it
-    if deployment_name in _clients:
-        return _clients[deployment_name], deployment_name
 
     # Retrieve Azure OpenAI configuration from environment variables
     azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
@@ -64,10 +54,6 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
         azure_endpoint=str(azure_endpoint),  # Ensure string type
         api_version=api_version,
     )
-
-    # Cache the client and deployment name
-    _clients[deployment_name] = client
-    _deployments[deployment_name] = deployment_name
 
     return client, deployment_name
 
@@ -154,8 +140,11 @@ def validate_api_endpoint(
     """
     try:
         # Construct the full URL for validation
-        test_url = f"{api_endpoint.rstrip('/')}/openai/deployments/{deployment_name}/chat/completions?api-version={api_version}"
-        logger.debug(f"Validating API endpoint: {test_url}")
+        test_url = (
+            f"{api_endpoint.rstrip('/')}/openai/deployments/"
+            f"{deployment_name}/chat/completions?api-version={api_version}"
+        )
+        logger.debug("Validating API endpoint and deployment.")
 
         # Prepare the test request payload with type annotations
         test_payload: Dict[str, Union[List[Dict[str, str]], int]] = {
@@ -174,9 +163,10 @@ def validate_api_endpoint(
             json=test_payload,
             timeout=5,
         )
-        logger.debug(f"Validation response: {response.status_code} - {response.text}")
 
-        # Return True if the response status code is 200
+        logger.debug(f"Validation response status code: {response.status_code}")
+
+        # Return True if the response status code indicates success
         return response.status_code == 200
     except Exception as e:
         logger.error(f"API endpoint validation failed: {str(e)}")
