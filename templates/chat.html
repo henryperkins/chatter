@@ -1,3 +1,4 @@
+<!-- templates/chat.html -->
 {% extends "base.html" %}
 
 {% block title %}Chat - Azure OpenAI{% endblock %}
@@ -17,7 +18,7 @@
         <!-- SIDEBAR -->
         <nav
           id="sidebar"
-          class="hidden md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700"
+          class="hidden md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto"
         >
             <div class="p-4 space-y-4">
                 <!-- New Chat Button -->
@@ -100,23 +101,45 @@
                 {% endif %}
 
                 <!-- Chat List -->
-                <div id="chat-list" class="space-y-2">
-                    {% for conversation in conversations %}
-                        <!--
-                          Each conversation link passes chat_id to /chat_interface,
-                          enabling the server to load that specific conversation.
-                        -->
-                        <a
-                            href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
-                            class="
-                                block p-2 rounded
-                                hover:bg-gray-200 dark:hover:bg-gray-700
-                                {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}
-                                focus:outline-none focus:ring-2 focus:ring-blue-500
-                            "
-                        >
-                            {{ conversation.title }}
-                        </a>
+                <div id="chat-list" class="space-y-4">
+                    {% set ns = namespace(current_date=None) %}
+                    {% for conversation in conversations|sort(attribute='timestamp', reverse=True) %}
+                        {% set chat_date = conversation.timestamp.strftime('%Y-%m-%d') %}
+
+                        {% if chat_date != ns.current_date %}
+                            {% set ns.current_date = chat_date %}
+                            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider pt-4 first:pt-0">
+                                {% if chat_date == today %}
+                                    Today
+                                {% elif chat_date == yesterday %}
+                                    Yesterday
+                                {% else %}
+                                    {{ conversation.timestamp.strftime('%B %d, %Y') }}
+                                {% endif %}
+                            </div>
+                        {% endif %}
+
+                        <div class="relative group">
+                            <a href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
+                               class="block p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %} focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                        {{ conversation.title }}
+                                    </span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ conversation.timestamp.strftime('%I:%M %p') }}
+                                    </span>
+                                </div>
+                            </a>
+                            <button onclick="deleteChat('{{ conversation.id }}')"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center h-8 w-8 rounded-full hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400"
+                                    title="Delete chat">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </path>
+                            </svg>
+                            </button>
+                        </div>
                     {% endfor %}
                 </div>
             </div>
@@ -207,13 +230,8 @@
                         aria-label="Upload files"
                     >
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M12 4v16m8-8H4"
-                            />
-                        </svg>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </path>
                         <span>Upload</span>
                     </button>
                     <input type="file" id="file-input" class="hidden" multiple>
@@ -290,58 +308,122 @@
 </div>
 
 <!-- BOTTOM NAVIGATION BAR -->
-<div class="bottom-nav">
-    <div class="bottom-nav-item">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M13 5v6h6"></path>
+<div class="bottom-nav fixed bottom-0 left-0 right-0 bg-white shadow-inner flex justify-around py-2">
+    <a href="{{ url_for('chat.chat_interface') }}" class="flex flex-col items-center text-gray-700 {% if request.endpoint == 'chat.chat_interface' %}text-blue-600{% endif %}">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <title>Home</title>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12h18M3 6h18M3 18h18" />
         </svg>
         <span class="text-xs">Home</span>
-    </div>
-    <div class="bottom-nav-item active">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+    </a>
+    {% if not current_user.is_authenticated %}
+    <a href="{{ url_for('auth.login') }}" class="flex flex-col items-center text-gray-700 {% if request.endpoint == 'auth.login' %}text-blue-600{% endif %}">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <title>Login</title>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
         </svg>
-        <span class="text-xs">Chat</span>
-    </div>
-    <div class="bottom-nav-item">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"></path>
+        <span class="text-xs">Login</span>
+    </a>
+    <a href="{{ url_for('auth.register') }}" class="flex flex-col items-center text-gray-700 {% if request.endpoint == 'auth.register' %}text-blue-600{% endif %}">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <title>Register</title>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
         </svg>
-        <span class="text-xs">History</span>
-    </div>
-    <div class="bottom-nav-item">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+        <span class="text-xs">Register</span>
+    </a>
+    {% else %}
+    <a href="{{ url_for('auth.logout') }}" class="flex flex-col items-center text-gray-700 {% if request.endpoint == 'auth.logout' %}text-blue-600{% endif %}">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <title>Logout</title>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
         </svg>
-        <span class="text-xs">Upload</span>
-    </div>
-    <div class="bottom-nav-item">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-        </svg>
-        <span class="text-xs">Menu</span>
-    </div>
+        <span class="text-xs">Logout</span>
+    </a>
+    {% endif %}
 </div>
 
 {% endblock %}
 
 {% block extra_head %}
 <style>
-/* If you want a dashed border highlight on dragover, for example */
 .drop-zone-active {
     border: 2px dashed #4A90E2;
     background-color: rgba(74, 144, 226, 0.1);
 }
+
+/* Smooth transitions */
+.chat-item-enter {
+    opacity: 0;
+    transform: translateX(-20px);
+}
+.chat-item-enter-active {
+    opacity: 1;
+    transform: translateX(0);
+    transition: opacity 300ms, transform 300ms;
+}
+.chat-item-exit {
+    opacity: 1;
+}
+.chat-item-exit-active {
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: opacity 300ms, transform 300ms;
+}
 </style>
+
 <script>
 // Optional toggleSidebar logic for smaller screens
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
-    if (sidebar.classList.contains('hidden')) {
-        sidebar.classList.remove('hidden');
-    } else {
-        sidebar.classList.add('hidden');
+    sidebar.classList.toggle('hidden');
+}
+
+function deleteChat(chatId) {
+    if (confirm('Are you sure you want to delete this chat?')) {
+        fetch(`/delete_chat/${chatId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // If we're currently viewing the deleted chat, redirect to a new chat
+                if (window.location.href.includes(chatId)) {
+                    window.location.href = '/chat_interface';
+                } else {
+                    // Otherwise just remove the chat from the list with animation
+                    const chatElement = document.querySelector(`a[href*="${chatId}"]`).parentElement;
+                    chatElement.classList.add('chat-item-exit');
+                    setTimeout(() => {
+                        chatElement.remove();
+                        // Check if the date group is now empty
+                        const dateGroup = chatElement.previousElementSibling;
+                        if (dateGroup && dateGroup.classList.contains('text-xs') && !dateGroup.nextElementSibling) {
+                            dateGroup.remove();
+                        }
+                    }, 300);
+                }
+            } else {
+                alert('Failed to delete chat');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while deleting the chat');
+        });
     }
+}
+
+// Auto-expand textarea
+const messageInput = document.getElementById('message-input');
+if (messageInput) {
+    messageInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
 }
 </script>
 {% endblock %}
