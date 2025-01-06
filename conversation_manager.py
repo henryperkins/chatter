@@ -4,6 +4,7 @@ from typing import Dict, List
 
 import tiktoken
 from database import db_connection  # Use the centralized context manager
+from chat_utils import count_tokens  # Import the count_tokens function
 
 logger = logging.getLogger(__name__)
 
@@ -12,14 +13,6 @@ MAX_MESSAGES = int(os.getenv("MAX_MESSAGES", "20"))
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "3500"))
 MAX_MESSAGE_TOKENS = int(os.getenv("MAX_MESSAGE_TOKENS", "500"))
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")  # Model for tiktoken
-
-def count_tokens(text: str) -> int:
-    """Count the number of tokens in a text string using tiktoken."""
-    try:
-        encoding = tiktoken.encoding_for_model(MODEL_NAME)
-    except KeyError:
-        encoding = tiktoken.get_encoding("cl100k_base")
-    return len(encoding.encode(text))
 
 class ConversationManager:
     """Manages conversations by storing and retrieving messages from the database."""
