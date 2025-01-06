@@ -7,9 +7,6 @@ __pycache__/
 venv/
 env/
 node_modules/
-# Environment variables file
-.env
-
 # Logs
 *.log
 app.log
