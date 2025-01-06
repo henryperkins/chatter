@@ -27,7 +27,9 @@
 
 /* Bottom Navigation Bar */
 .bottom-nav {
-  @apply fixed bottom-0 left-0 right-0 bg-white shadow-lg flex justify-around py-2;
+  @apply fixed left-0 right-0 bg-white shadow-lg flex justify-around py-2;
+  bottom: env(safe-area-inset-bottom, 0);
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0));
 }
 
 .bottom-nav-item {
