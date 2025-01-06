@@ -23,20 +23,22 @@ class ConversationManager:
         except KeyError:
             self.encoding = tiktoken.get_encoding("cl100k_base")
 
-    def calculate_total_tokens(self, messages: List[Dict[str, str]]) -> int:
+    def num_tokens_from_messages(self, messages: List[Dict[str, str]]) -> int:
         """
-        Calculate the total number of tokens in the conversation,
-        accounting for the overhead tokens per message and start/end tokens.
+        Returns the number of tokens used by a list of messages as per OpenAI's guidelines.
         """
-        total_tokens = 0
-        for msg in messages:
-            # ~4 tokens per message for role + formatting overhead
-            total_tokens += 4
-            total_tokens += count_tokens(msg["content"])
+        tokens_per_message = 3  # Includes role and message separators
+        tokens_per_assistant_reply = 3  # Accounts for assistant's reply tokens
+        num_tokens = 0
 
-        # ~2 tokens for start and end of conversation overhead
-        total_tokens += 2
-        return total_tokens
+        for message in messages:
+            num_tokens += tokens_per_message
+            num_tokens += len(self.encoding.encode(message["content"]))
+            if message.get("name"):  # If there's a name field, add an extra token
+                num_tokens += 1
+
+        num_tokens += tokens_per_assistant_reply
+        return num_tokens
 
     def get_context(self, chat_id: str, include_system: bool = False) -> List[Dict[str, str]]:
         """
@@ -106,35 +108,16 @@ class ConversationManager:
                     for msg in messages
                 ]
 
-                # 1. Trim based on number of messages
-                if len(message_dicts) > MAX_MESSAGES:
-                    excess = len(message_dicts) - MAX_MESSAGES
-                    db.execute(
-                        """
-                        DELETE FROM messages
-                        WHERE id IN (
-                            SELECT id FROM messages
-                            WHERE chat_id = ?
-                            ORDER BY timestamp ASC
-                            LIMIT ?
-                        )
-                        """,
-                        (chat_id, excess),
-                    )
-                    # Remove excess messages from our local list
-                    message_dicts = message_dicts[excess:]
-
-                # 2. Trim based on total token count
-                total_tokens = self.calculate_total_tokens(message_dicts)
-                while total_tokens > MAX_TOKENS and message_dicts:
-                    # Remove oldest message
+                # Trim based on total token count
+                total_tokens = self.num_tokens_from_messages(message_dicts)
+                while total_tokens > MAX_TOKENS and len(message_dicts) > 1:
+                    # Remove oldest message to stay within token limit
                     msg_to_remove = message_dicts.pop(0)
                     db.execute(
                         "DELETE FROM messages WHERE id = ?",
                         (msg_to_remove["id"],)
                     )
-                    # Recalculate tokens
-                    total_tokens = self.calculate_total_tokens(message_dicts)
+                    total_tokens = self.num_tokens_from_messages(message_dicts)
 
                 logger.debug(f"Added message to chat {chat_id}: {role}: {content[:50]}...")
         except Exception as e:
@@ -163,7 +146,7 @@ class ConversationManager:
     def get_usage_stats(self, chat_id: str) -> Dict[str, int]:
         """Get usage statistics for a chat session."""
         messages = self.get_context(chat_id, include_system=True)
-        total_tokens = self.calculate_total_tokens(messages)
+        total_tokens = self.num_tokens_from_messages(messages)
         return {
             "total_messages": len(messages),
             "total_tokens": total_tokens,
