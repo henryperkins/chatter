@@ -1,11 +1,26 @@
-// static/js/chat.js
+/* static/js/chat.js */
 
 (function () {
+    // Debug statement to confirm the file is loaded
+    console.log("chat.js loaded");
+
     // Constants for file handling
     let uploadedFiles = [];
+    const MAX_FILES = 5;
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+    const ALLOWED_FILE_TYPES = [
+        "text/plain",
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/x-python",
+        "application/javascript",
+        "text/markdown",
+        "image/jpeg",
+        "image/png",
+    ];
     const maxFiles = 5;
-    const maxFileSize = 10 * 1024 * 1024; // 10 MB
-    const allowedFileTypes = [
+    const maxFileSizeMaster = 10 * 1024 * 1024; // 10 MB
+    const allowedFileTypesMaster = [
         "text/plain",
         "application/pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -30,6 +45,10 @@
     const uploadButton = document.getElementById("upload-button");
     const modelSelect = document.getElementById("model-select");
     const editModelButton = document.getElementById("edit-model-btn");
+    const sidebarToggle = document.getElementById("sidebar-toggle");
+    const offCanvasMenu = document.getElementById("off-canvas-menu");
+    const offCanvasClose = document.getElementById("off-canvas-close");
+    const overlay = document.getElementById("overlay");
 
     // Helper Functions
     function adjustTextareaHeight(textarea) {
@@ -128,9 +147,9 @@
         const filesArray = Array.from(files);
 
         // Check total count
-        if (uploadedFiles.length + filesArray.length > maxFiles) {
+        if (uploadedFiles.length + filesArray.length > MAX_FILES) {
             showFeedback(
-                `You can upload up to ${maxFiles} files at a time.`,
+                `You can upload up to ${MAX_FILES} files at a time.`,
                 "error"
             );
             return;
@@ -138,11 +157,11 @@
 
         // Validate file type & size
         const validFiles = filesArray.filter((file) => {
-            if (!allowedFileTypes.includes(file.type)) {
+            if (!ALLOWED_FILE_TYPES.includes(file.type)) {
                 showFeedback(`File type not allowed: ${file.name}`, "error");
                 return false;
             }
-            if (file.size > maxFileSize) {
+            if (file.size > MAX_FILE_SIZE) {
                 showFeedback(
                     `File ${file.name} exceeds the 10MB size limit.`,
                     "error"
@@ -171,7 +190,7 @@
             fileDiv.innerHTML = `
                 <div class="flex items-center">
                     <svg class="w-4 h-4 mr-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"/>
+                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
                     </svg>
                     ${file.name}
                 </div>
@@ -456,7 +475,49 @@
         });
     }
 
-    // Handle mobile-specific interactions and optimizations
+    // Hamburger Menu Toggle
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener("click", function () {
+            offCanvasMenu.classList.toggle("hidden");
+            overlay.classList.toggle("hidden");
+        });
+    }
+
+    if (offCanvasClose) {
+        offCanvasClose.addEventListener("click", function () {
+            offCanvasMenu.classList.add("hidden");
+            overlay.classList.add("hidden");
+        });
+    }
+
+    if (overlay) {
+        overlay.addEventListener("click", function () {
+            offCanvasMenu.classList.add("hidden");
+            overlay.classList.add("hidden");
+        });
+    }
+
+    // Swipe Gestures for Off-Canvas Menu
+    let touchstartX = 0;
+    let touchendX = 0;
+
+    function handleGesture() {
+        if (touchendX < touchstartX) {
+            offCanvasMenu.classList.add("hidden");
+            overlay.classList.add("hidden");
+        }
+    }
+
+    document.addEventListener("touchstart", function (event) {
+        touchstartX = event.changedTouches[0].screenX;
+    }, false);
+
+    document.addEventListener("touchend", function (event) {
+        touchendX = event.changedTouches[0].screenX;
+        handleGesture();
+    }, false);
+
+    // Mobile-Specific Interactions and Optimizations
     function handleMobileInteractions() {
         // Add touch event listeners for better mobile experience
         chatBox.addEventListener("touchstart", handleTouchStart, false);
