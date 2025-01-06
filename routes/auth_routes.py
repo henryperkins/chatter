@@ -1,6 +1,8 @@
 # auth_routes.py
 
 import logging
+import bcrypt
+import uuid
 from flask import (
     Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 )
@@ -8,15 +10,12 @@ from flask_login import login_user, logout_user, current_user, login_required
 from database import db_connection  # Use the centralized context manager
 from models import User
 from decorators import admin_required
-import bcrypt
-import uuid
+from forms import LoginForm, RegistrationForm
+from extensions import limiter
 
 # Define the blueprint
 bp = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
-
-# Import limiter from extensions
-from extensions import limiter
 
 # Login route with rate-limiting
 @bp.route("/login", methods=["GET", "POST"])
@@ -44,7 +43,7 @@ def login():
             else:
                 logger.warning(f"Failed login attempt for username: {username}")
                 flash("Invalid username or password", "error")
-        
+
     return render_template("login.html", form=form)
 
 # Registration route
@@ -79,7 +78,7 @@ def register():
             )
             flash("Registration successful! Please check your email to confirm your account.", "success")
             return redirect(url_for("auth.login"))
-        
+
     return render_template("register.html", form=form)
 
 # Logout route

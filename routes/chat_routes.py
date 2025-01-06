@@ -16,7 +16,7 @@ from flask import (
 )
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from chat_api import scrape_data, get_azure_response
 from chat_utils import generate_new_chat_id
@@ -124,13 +124,19 @@ def chat_interface() -> str:
     # If you want a conversation list in the sidebar, you can do:
     conversations = Chat.get_user_chats(current_user.id)
 
+    # Get today and yesterday dates in the same format as chat timestamps
+    today = datetime.now().strftime('%Y-%m-%d')
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+
     return render_template(
         "chat.html",
         chat_id=chat_id,
         messages=messages,
         models=models,
-        conversations=conversations,  # Include this if your template expects it
+        conversations=conversations,
         now=datetime.now,
+        today=today,
+        yesterday=yesterday,
     )
 
 

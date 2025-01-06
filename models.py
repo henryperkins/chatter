@@ -357,7 +357,13 @@ class Chat:
         with db_connection() as db:
             chats = db.execute(
                 """
-                SELECT * FROM chats
+                SELECT
+                    id,
+                    user_id,
+                    title,
+                    model_id,
+                    created_at as timestamp
+                FROM chats
                 WHERE user_id = ?
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?

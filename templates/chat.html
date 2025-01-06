@@ -3,9 +3,9 @@
 {% block title %}Chat - Azure OpenAI{% endblock %}
 
 {% block content %}
-<!-- Main container: use dark classes if you enable dark mode in tailwind.config.js -->
+<!-- Main container -->
 <div class="flex flex-col h-screen bg-white dark:bg-gray-900">
-    <!-- Mobile Toggle (optional): Add a button to show/hide sidebar on small screens -->
+    <!-- Mobile Toggle -->
     <button
       class="md:hidden bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-4 py-2"
       onclick="toggleSidebar()"
@@ -17,35 +17,21 @@
         <!-- SIDEBAR -->
         <nav
           id="sidebar"
-          class="hidden md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700"
+          class="hidden md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto"
         >
             <div class="p-4 space-y-4">
                 <!-- New Chat Button -->
-                <!--
-                  This button is wired up in chat.js. It sends a POST to /new_chat and,
-                  upon success, redirects to /chat_interface?chat_id=... so that the new chat is properly loaded.
-                -->
                 <button
                     id="new-chat-btn"
-                    class="
-                        w-full flex items-center justify-center
-                        bg-blue-600 hover:bg-blue-700 text-white
-                        px-4 py-2 rounded-lg
-                        focus:outline-none focus:ring-2 focus:ring-blue-500
-                    "
+                    class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M12 4v16m8-8H4"
-                        />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
                     New Chat
                 </button>
 
-                <!-- Model Selection (optional) -->
+                <!-- Model Selection -->
                 {% if models %}
                     <div>
                         <label for="model-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -53,17 +39,10 @@
                         </label>
                         <select
                             id="model-select"
-                            class="
-                                w-full border-gray-300 rounded-md shadow-sm
-                                focus:border-blue-500 focus:ring-blue-500
-                                dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200
-                            "
+                            class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200"
                         >
                             {% for model in models %}
-                                <option
-                                    value="{{ model.id }}"
-                                    {% if model.is_default %}selected{% endif %}
-                                >
+                                <option value="{{ model.id }}" {% if model.is_default %}selected{% endif %}>
                                     {{ model.name }}{% if model.is_default %} (Default){% endif %}
                                 </option>
                             {% endfor %}
@@ -74,49 +53,57 @@
                 <!-- Admin-Only Buttons -->
                 {% if current_user.role == 'admin' %}
                     <div class="space-y-2">
-                        <a
-                            href="{{ url_for('model.add_model_page') }}"
-                            class="
-                                block w-full bg-green-500 hover:bg-green-600 text-white
-                                px-4 py-2 rounded-lg text-center
-                                focus:outline-none focus:ring-2 focus:ring-green-500
-                            "
-                        >
+                        <a href="{{ url_for('model.add_model_page') }}"
+                           class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-green-500">
                             Add Model
                         </a>
-                        <button
-                            id="edit-model-btn"
-                            class="
-                                block w-full bg-yellow-500 hover:bg-yellow-600 text-white
-                                px-4 py-2 rounded-lg text-center
-                                disabled:opacity-50 disabled:pointer-events-none
-                                focus:outline-none focus:ring-2 focus:ring-yellow-500
-                            "
-                            disabled
-                        >
+                        <button id="edit-model-btn"
+                                class="block w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-center disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                                disabled>
                             Edit Model
                         </button>
                     </div>
                 {% endif %}
 
                 <!-- Chat List -->
-                <div id="chat-list" class="space-y-2">
-                    {% for conversation in conversations %}
-                        <!--
-                          Each conversation link passes chat_id to /chat_interface,
-                          enabling the server to load that specific conversation.
-                        -->
-                        <a
-                            href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
-                            class="
-                                block p-2 rounded
-                                hover:bg-gray-200 dark:hover:bg-gray-700
-                                {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}
-                                focus:outline-none focus:ring-2 focus:ring-blue-500
-                            "
-                        >
-                            {{ conversation.title }}
-                        </a>
+                <div class="space-y-4">
+                    {% set ns = namespace(current_date=none) %}
+                    {% for conversation in conversations|sort(attribute='timestamp', reverse=true) %}
+                        {% set chat_date = conversation.timestamp.strftime('%Y-%m-%d') %}
+
+                        {% if chat_date != ns.current_date %}
+                            {% set ns.current_date = chat_date %}
+                            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider pt-4 first:pt-0">
+                                {% if chat_date == today %}
+                                    Today
+                                {% elif chat_date == yesterday %}
+                                    Yesterday
+                                {% else %}
+                                    {{ conversation.timestamp.strftime('%B %d, %Y') }}
+                                {% endif %}
+                            </div>
+                        {% endif %}
+
+                        <div class="relative group">
+                            <a href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
+                               class="block p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %} focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                        {{ conversation.title }}
+                                    </span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ conversation.timestamp.strftime('%I:%M %p') }}
+                                    </span>
+                                </div>
+                            </a>
+                            <button onclick="deleteChat('{{ conversation.id }}')"
+                                    class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center h-8 w-8 rounded-full hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400"
+                                    title="Delete chat">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </div>
                     {% endfor %}
                 </div>
             </div>
@@ -125,24 +112,14 @@
         <!-- MAIN CHAT AREA -->
         <div class="flex-1 flex flex-col">
             <!-- Messages Container -->
-            <div
-                id="chat-box"
-                class="
-                    flex-1 overflow-y-auto px-4 py-6 space-y-4
-                    bg-white dark:bg-gray-900
-                "
-            >
+            <div id="chat-box"
+                 class="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-white dark:bg-gray-900">
                 {% for message in messages %}
                     {% if message.role == 'user' %}
-                        <!-- User message (right-aligned) -->
+                        <!-- User message -->
                         <div class="flex justify-end">
                             <div class="max-w-lg text-right">
-                                <div
-                                  class="
-                                    bg-blue-600 text-white px-4 py-2 rounded-lg
-                                    focus:outline-none focus:ring-2 focus:ring-blue-500
-                                  "
-                                >
+                                <div class="bg-blue-600 text-white px-4 py-2 rounded-lg">
                                     <p class="text-sm">{{ message.content | safe }}</p>
                                 </div>
                                 <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
@@ -155,7 +132,7 @@
                             </div>
                         </div>
                     {% else %}
-                        <!-- Assistant or system message (left-aligned) -->
+                        <!-- Assistant message -->
                         <div class="flex">
                             <div class="max-w-lg">
                                 <div class="bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-lg">
@@ -176,11 +153,9 @@
                 {% endfor %}
             </div>
 
-            <!-- FILE UPLOAD AREA (Hidden by default) -->
-            <div
-                id="uploaded-files"
-                class="hidden px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700"
-            >
+            <!-- FILE UPLOAD AREA -->
+            <div id="uploaded-files"
+                 class="hidden px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
                 <h3 class="text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
                     Uploaded Files
                 </h3>
@@ -188,60 +163,30 @@
             </div>
 
             <!-- INPUT AREA -->
-            <div
-                class="
-                    border-t border-gray-200 dark:border-gray-700
-                    px-4 py-3 bg-white dark:bg-gray-900
-                "
-            >
+            <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-900">
                 <div class="flex items-end space-x-3">
                     <!-- Upload Button -->
-                    <button
-                        id="upload-button"
-                        class="
-                            p-2 rounded-lg text-gray-500 dark:text-gray-300
-                            hover:bg-gray-100 dark:hover:bg-gray-800
-                            focus:outline-none focus:ring-2 focus:ring-blue-500
-                            flex items-center
-                        "
-                        aria-label="Upload files"
-                    >
+                    <button id="upload-button"
+                            class="p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center"
+                            aria-label="Upload files">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M12 4v16m8-8H4"
-                            />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
                         <span>Upload</span>
                     </button>
                     <input type="file" id="file-input" class="hidden" multiple>
 
-                    <!-- Textarea for user message -->
+                    <!-- Message Input -->
                     <div class="flex-1">
-                        <textarea
-                            id="message-input"
-                            class="
-                                w-full px-3 py-2 resize-none border border-gray-300
-                                rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500
-                                dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200
-                                focus:border-transparent
-                            "
-                            placeholder="Type your message..."
-                            rows="1"
-                        ></textarea>
+                        <textarea id="message-input"
+                                  class="w-full px-3 py-2 resize-none border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 focus:border-transparent"
+                                  placeholder="Type your message..."
+                                  rows="1"></textarea>
                     </div>
 
                     <!-- Send Button -->
-                    <button
-                        id="send-button"
-                        class="
-                            px-4 py-2 bg-blue-600 text-white rounded-lg
-                            hover:bg-blue-700 flex items-center
-                            focus:outline-none focus:ring-2 focus:ring-blue-500
-                        "
-                    >
+                    <button id="send-button"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <span>Send</span>
                     </button>
                 </div>
@@ -250,14 +195,9 @@
     </div>
 </div>
 
-<!-- DROP ZONE (File Drag/Drop) -->
-<div
-    id="drop-zone"
-    class="
-        hidden fixed inset-0 bg-black bg-opacity-50 z-50
-        flex items-center justify-center
-    "
->
+<!-- DROP ZONE -->
+<div id="drop-zone"
+     class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
     <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl text-center">
         <p class="text-xl font-semibold text-gray-800 dark:text-gray-100">
             Drop files here
@@ -269,43 +209,96 @@
 </div>
 
 <!-- UPLOAD PROGRESS -->
-<div
-    id="upload-progress"
-    class="
-        hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800
-        rounded-lg shadow-lg p-4 w-64
-    "
->
+<div id="upload-progress"
+     class="hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 w-64">
     <div class="text-sm mb-2 text-gray-800 dark:text-gray-100">
         Uploading files...
     </div>
     <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-        <div
-            id="upload-progress-bar"
-            class="bg-blue-600 h-2 rounded-full"
-            style="width: 0%"
-        ></div>
+        <div id="upload-progress-bar"
+             class="bg-blue-600 h-2 rounded-full"
+             style="width: 0%"></div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_head %}
 <style>
-/* If you want a dashed border highlight on dragover, for example */
 .drop-zone-active {
     border: 2px dashed #4A90E2;
     background-color: rgba(74, 144, 226, 0.1);
 }
+
+/* Smooth transitions */
+.chat-item-enter {
+    opacity: 0;
+    transform: translateX(-20px);
+}
+.chat-item-enter-active {
+    opacity: 1;
+    transform: translateX(0);
+    transition: opacity 300ms, transform 300ms;
+}
+.chat-item-exit {
+    opacity: 1;
+}
+.chat-item-exit-active {
+    opacity: 0;
+    transform: translateX(-20px);
+    transition: opacity 300ms, transform 300ms;
+}
 </style>
+
 <script>
-// Optional toggleSidebar logic for smaller screens
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
-    if (sidebar.classList.contains('hidden')) {
-        sidebar.classList.remove('hidden');
-    } else {
-        sidebar.classList.add('hidden');
+    sidebar.classList.toggle('hidden');
+}
+
+function deleteChat(chatId) {
+    if (confirm('Are you sure you want to delete this chat?')) {
+        fetch(`/delete_chat/${chatId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // If we're currently viewing the deleted chat, redirect to a new chat
+                if (window.location.href.includes(chatId)) {
+                    window.location.href = '/chat_interface';
+                } else {
+                    // Otherwise just remove the chat from the list with animation
+                    const chatElement = document.querySelector(`a[href*="${chatId}"]`).parentElement;
+                    chatElement.classList.add('chat-item-exit');
+                    setTimeout(() => {
+                        chatElement.remove();
+                        // Check if the date group is now empty
+                        const dateGroup = chatElement.previousElementSibling;
+                        if (dateGroup && dateGroup.classList.contains('text-xs') && !dateGroup.nextElementSibling) {
+                            dateGroup.remove();
+                        }
+                    }, 300);
+                }
+            } else {
+                alert('Failed to delete chat');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred while deleting the chat');
+        });
     }
 }
+
+// Auto-expand textarea
+const messageInput = document.getElementById('message-input');
+messageInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+});
 </script>
 {% endblock %}
