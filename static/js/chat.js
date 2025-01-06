@@ -457,3 +457,56 @@ if (dropZone && messageInputArea) {
         dropZone.classList.add("hidden");
     });
 }
+
+// Handle mobile-specific interactions and optimizations
+function handleMobileInteractions() {
+    // Add touch event listeners for better mobile experience
+    chatBox.addEventListener("touchstart", handleTouchStart, false);
+    chatBox.addEventListener("touchmove", handleTouchMove, false);
+
+    let xDown = null;
+    let yDown = null;
+
+    function handleTouchStart(evt) {
+        const firstTouch = evt.touches[0];
+        xDown = firstTouch.clientX;
+        yDown = firstTouch.clientY;
+    }
+
+    function handleTouchMove(evt) {
+        if (!xDown || !yDown) {
+            return;
+        }
+
+        const xUp = evt.touches[0].clientX;
+        const yUp = evt.touches[0].clientY;
+
+        const xDiff = xDown - xUp;
+        const yDiff = yDown - yUp;
+
+        if (Math.abs(xDiff) > Math.abs(yDiff)) {
+            if (xDiff > 0) {
+                // Left swipe
+                console.log("Left swipe detected");
+            } else {
+                // Right swipe
+                console.log("Right swipe detected");
+            }
+        } else {
+            if (yDiff > 0) {
+                // Up swipe
+                console.log("Up swipe detected");
+            } else {
+                // Down swipe
+                console.log("Down swipe detected");
+            }
+        }
+
+        // Reset values
+        xDown = null;
+        yDown = null;
+    }
+}
+
+// Call the function to handle mobile interactions
+handleMobileInteractions();
