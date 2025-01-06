@@ -32,6 +32,10 @@ const fileInput = document.getElementById("file-input");
 const uploadButton = document.getElementById("upload-button");
 const modelSelect = document.getElementById("model-select");
 const editModelButton = document.getElementById("edit-model-btn");
+const sidebarToggle = document.getElementById("sidebar-toggle");
+const offCanvasMenu = document.getElementById("off-canvas-menu");
+const offCanvasClose = document.getElementById("off-canvas-close");
+const overlay = document.getElementById("overlay");
 
 // Helper Functions
 function adjustTextareaHeight(textarea) {
@@ -457,3 +461,46 @@ if (dropZone && messageInputArea) {
         dropZone.classList.add("hidden");
     });
 }
+
+// Hamburger Menu Toggle
+if (sidebarToggle) {
+    sidebarToggle.addEventListener("click", function() {
+        offCanvasMenu.classList.toggle("hidden");
+        overlay.classList.toggle("hidden");
+    });
+}
+
+if (offCanvasClose) {
+    offCanvasClose.addEventListener("click", function() {
+        offCanvasMenu.classList.add("hidden");
+        overlay.classList.add("hidden");
+    });
+}
+
+if (overlay) {
+    overlay.addEventListener("click", function() {
+        offCanvasMenu.classList.add("hidden");
+        overlay.classList.add("hidden");
+    });
+}
+
+// Swipe Gestures for Off-Canvas Menu
+let touchstartX = 0;
+let touchendX = 0;
+
+function handleGesture() {
+    if (touchendX < touchstartX) {
+        offCanvasMenu.classList.add("hidden");
+        overlay.classList.add("hidden");
+    }
+}
+
+document.addEventListener("touchstart", function(event) {
+    touchstartX = event.changedTouches[0].screenX;
+}, false);
+
+document.addEventListener("touchend", function(event) {
+    touchendX = event.changedTouches[0].screenX;
+    handleGesture();
+}, false);
+

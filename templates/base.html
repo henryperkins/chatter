@@ -61,15 +61,15 @@ href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
 </head>
 <body class="flex flex-col min-h-screen bg-gray-50">
     <!-- Navbar -->
-    <nav class="bg-white shadow-lg">
+    <nav class="bg-white shadow-lg" role="navigation">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <!-- Left side (Brand + Mobile toggle) -->
                 <div class="flex">
                     <div class="flex-shrink-0 flex items-center">
                         <!-- Mobile sidebar toggle for small devices -->
-                        <button id="sidebar-toggle" class="md:hidden mr-2">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <button id="sidebar-toggle" class="md:hidden mr-2 hamburger-menu" aria-label="Toggle sidebar">
+                            <svg class="w-6 h-6 hamburger-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" 
                                       stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
@@ -106,6 +106,19 @@ href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
         </div>
     </nav>
 
+    <!-- Off-Canvas Menu -->
+    <div id="off-canvas-menu" class="off-canvas-menu hidden" role="dialog" aria-modal="true">
+        <div class="off-canvas-content">
+            <button id="off-canvas-close" class="off-canvas-close" aria-label="Close menu">
+                &times;
+            </button>
+            <!-- Add your off-canvas menu content here -->
+        </div>
+    </div>
+
+    <!-- Overlay -->
+    <div id="overlay" class="overlay hidden" role="presentation"></div>
+
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
@@ -131,7 +144,7 @@ href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
     </main>
 
     <!-- Footer -->
-    <footer class="bg-white shadow-lg mt-8">
+    <footer class="bg-white shadow-lg mt-8" role="contentinfo">
         <div class="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
             <p class="text-center text-gray-500 text-sm">
                 &copy; {% if now %}{{ now().year }}{% else %}2024{% endif %} Azure OpenAI Chat. 

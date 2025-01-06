@@ -1,3 +1,58 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Hamburger Menu */
+.hamburger-menu {
+  @apply md:hidden block;
+}
+
+.hamburger-icon {
+  @apply w-6 h-6 text-gray-700;
+}
+
+/* Off-Canvas Menu */
+.off-canvas-menu {
+  @apply fixed inset-0 z-50 flex items-center justify-center bg-gray-800 bg-opacity-75;
+}
+
+.off-canvas-content {
+  @apply bg-white p-4 rounded-lg shadow-lg;
+}
+
+.off-canvas-close {
+  @apply absolute top-4 right-4 text-gray-700 hover:text-gray-900;
+}
+
+/* Bottom Navigation Bar */
+.bottom-nav {
+  @apply fixed bottom-0 left-0 right-0 bg-white shadow-lg flex justify-around py-2;
+}
+
+.bottom-nav-item {
+  @apply flex flex-col items-center text-gray-700;
+}
+
+.bottom-nav-item.active {
+  @apply text-blue-600;
+}
+
+/* Sticky Navigation */
+.sticky-nav {
+  @apply sticky top-0 z-10 bg-white shadow-md;
+}
+
+/* Overlay Effect */
+.overlay {
+  @apply fixed inset-0 bg-black bg-opacity-50 z-40;
+}
+
+/* Swipe Gestures */
+.swipe-gesture {
+  @apply touch-pan-x touch-pan-y;
+}
+
+/* Smooth Transitions */
+.transition-smooth {
+  @apply transition duration-300 ease-in-out;
+}
