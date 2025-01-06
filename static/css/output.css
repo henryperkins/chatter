@@ -2066,7 +2066,7 @@ select {
 
 .border-green-400 {
   --tw-border-opacity: 1;
-  border-color: rgb(74 222 128 / var (--tw-border-opacity, 1));
+  border-color: rgb(74 222 128 / var(--tw-border-opacity, 1));
 }
 
 .border-red-400 {
