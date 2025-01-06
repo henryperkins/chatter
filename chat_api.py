@@ -1,4 +1,3 @@
-```python
 """
 chat_api.py
 
@@ -51,6 +50,9 @@ def get_azure_response(
         max_tokens = None
         requires_o1_handling = False
 
+        # Models that require special handling
+        special_models = ['o1-preview']
+
         # If a specific model is selected, fetch its info from the database
         if selected_model_id:
             model = Model.get_by_id(selected_model_id)
@@ -61,10 +63,15 @@ def get_azure_response(
                     temperature,
                     max_tokens,
                     max_completion_tokens,
+                    requires_o1_handling,
                 ) = initialize_client_from_model(model.__dict__)
-                requires_o1_handling = getattr(model, "requires_o1_handling", False)
             else:
                 raise ValueError("Selected model not found.")
+        else:
+            # Determine if the model requires special handling based on deployment name
+            requires_o1_handling = any(
+                model_name in deployment_name for model_name in special_models
+            )
 
         # Adjust messages and parameters based on whether special handling is required
         if requires_o1_handling:
@@ -95,7 +102,7 @@ def get_azure_response(
             if max_tokens is not None:
                 api_params["max_tokens"] = max_tokens
 
-        # Make the API call without 'temperature' when using o1-preview models
+        # Make the API call
         response = client.chat.completions.create(**api_params)
 
         # Extract model response
@@ -208,4 +215,3 @@ def scrape_search(search_term: str) -> str:
     search_results = [result.text for result in results[:3]]
 
     return "Search results:\n" + "\n".join(search_results)
-```

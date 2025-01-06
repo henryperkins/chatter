@@ -70,7 +70,7 @@ class Model:
     description: Optional[str]
     model_type: str
     api_endpoint: str
-    temperature: float = 1.0
+    temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     max_completion_tokens: int = 500
     is_default: bool = False
@@ -157,6 +157,10 @@ class Model:
             ValueError: If required fields are missing or invalid
         """
         with db_connection() as db:
+            # Handle temperature for o1-preview models
+            if data.get("requires_o1_handling", False):
+                data["temperature"] = None
+
             cursor = db.cursor()
             cursor.execute(
                 """
@@ -181,7 +185,7 @@ class Model:
                     data.get("description", ""),
                     data["api_endpoint"],
                     data["api_version"],
-                    data["temperature"],
+                    data.get("temperature"),
                     data.get("max_tokens"),
                     data["max_completion_tokens"],
                     data["model_type"],
@@ -232,14 +236,12 @@ class Model:
             placeholders.append(model_id)  # Add model_id for the WHERE clause
 
             # 5. Execute the update
-            db.execute(
-                f"""
+            query = f"""
                 UPDATE models
                 SET {set_clause}
                 WHERE id = ?
-                """,
-                tuple(placeholders),
-            )
+            """
+            db.execute(query, tuple(placeholders))
 
             # 6. Handle default model logic (if applicable)
             if data.get("is_default"):
@@ -279,10 +281,11 @@ class Model:
         ):
             raise ValueError("Invalid Azure OpenAI API endpoint.")
 
-        # Validate temperature
-        temperature = config.get("temperature", 1.0)
-        if not (0 <= float(temperature) <= 2):
-            raise ValueError("Temperature must be between 0 and 2.")
+        # Validate temperature (only if present and not for o1-preview models)
+        if not config.get("requires_o1_handling", False):
+            temperature = config.get("temperature")
+            if temperature is not None and not (0 <= float(temperature) <= 2):
+                raise ValueError("Temperature must be between 0 and 2 or NULL for o1-preview models")
 
         # Validate max_tokens
         max_tokens = config.get("max_tokens", None)

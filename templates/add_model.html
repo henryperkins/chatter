@@ -14,8 +14,8 @@
         <!-- Model Name -->
         <div class="mb-4">
             {{ form.name.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                focus:outline-none focus:ring-2 focus:ring-blue-500 
+            {{ form.name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
+                                focus:outline-none focus:ring-2 focus:ring-blue-500
                                 focus:border-transparent") }}
             {% if form.name.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.name.errors[0] }}</p>
@@ -25,8 +25,8 @@
         <!-- Deployment Name -->
         <div class="mb-4">
             {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.deployment_name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                            focus:outline-none focus:ring-2 focus:ring-blue-500 
+            {{ form.deployment_name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
+                                            focus:outline-none focus:ring-2 focus:ring-blue-500
                                             focus:border-transparent") }}
             {% if form.deployment_name.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.deployment_name.errors[0] }}</p>
@@ -36,8 +36,8 @@
         <!-- Description -->
         <div class="mb-4">
             {{ form.description.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.description(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                        focus:outline-none focus:ring-2 focus:ring-blue-500 
+            {{ form.description(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
+                                        focus:outline-none focus:ring-2 focus:ring-blue-500
                                         focus:border-transparent") }}
             {% if form.description.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.description.errors[0] }}</p>
@@ -47,8 +47,8 @@
         <!-- API Endpoint -->
         <div class="mb-4">
             {{ form.api_endpoint.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.api_endpoint(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                         focus:outline-none focus:ring-2 focus:ring-blue-500 
+            {{ form.api_endpoint(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
+                                         focus:outline-none focus:ring-2 focus:ring-blue-500
                                          focus:border-transparent") }}
             {% if form.api_endpoint.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
@@ -58,8 +58,8 @@
         <!-- Model Type -->
         <div class="mb-4">
             {{ form.model_type.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.model_type(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                        focus:outline-none focus:ring-2 focus:ring-blue-500 
+            {{ form.model_type(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
+                                        focus:outline-none focus:ring-2 focus:ring-blue-500
                                         focus:border-transparent") }}
             {% if form.model_type.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.model_type.errors[0] }}</p>
@@ -69,8 +69,8 @@
         <!-- Temperature -->
         <div class="mb-4">
             {{ form.temperature.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.temperature(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                        focus:outline-none focus:ring-2 focus:ring-blue-500 
+            {{ form.temperature(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
+                                        focus:outline-none focus:ring-2 focus:ring-blue-500
                                         focus:border-transparent") }}
             {% if form.temperature.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.temperature.errors[0] }}</p>
@@ -81,8 +81,8 @@
         <div class="grid grid-cols-2 gap-4">
             <div class="mb-4">
                 {{ form.max_tokens.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-                {{ form.max_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                            focus:outline-none focus:ring-2 focus:ring-blue-500 
+                {{ form.max_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
+                                            focus:outline-none focus:ring-2 focus:ring-blue-500
                                             focus:border-transparent") }}
                 {% if form.max_tokens.errors %}
                     <p class="text-sm text-red-500 mt-1">{{ form.max_tokens.errors[0] }}</p>
@@ -90,8 +90,8 @@
             </div>
             <div class="mb-4">
                 {{ form.max_completion_tokens.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-                {{ form.max_completion_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                                    focus:outline-none focus:ring-2 focus:ring-blue-500 
+                {{ form.max_completion_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
+                                                    focus:outline-none focus:ring-2 focus:ring-blue-500
                                                     focus:border-transparent") }}
                 {% if form.max_completion_tokens.errors %}
                     <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
@@ -102,8 +102,8 @@
         <!-- API Version -->
         <div class="mb-4">
             {{ form.api_version.label(class="text-sm font-semibold text-gray-700 block mb-2") }}
-            {{ form.api_version(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 
-                                         focus:outline-none focus:ring-2 focus:ring-blue-500 
+            {{ form.api_version(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
+                                         focus:outline-none focus:ring-2 focus:ring-blue-500
                                          focus:border-transparent") }}
             {% if form.api_version.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.api_version.errors[0] }}</p>
@@ -113,7 +113,7 @@
         <!-- Requires o1-preview Handling -->
         <div class="mb-4">
             <label class="inline-flex items-center">
-                {{ form.requires_o1_handling(class="h-5 w-5 text-blue-600 form-checkbox 
+                {{ form.requires_o1_handling(class="h-5 w-5 text-blue-600 form-checkbox
                                                focus:ring-blue-500 focus:ring-2") }}
                 <span class="ml-2 text-sm text-gray-700 font-medium">
                     {{ form.requires_o1_handling.label.text }}
@@ -124,7 +124,7 @@
         <!-- Default Model Option -->
         <div class="mb-6">
             <label class="inline-flex items-center">
-                {{ form.is_default(class="h-5 w-5 text-blue-600 form-checkbox 
+                {{ form.is_default(class="h-5 w-5 text-blue-600 form-checkbox
                                       focus:ring-blue-500 focus:ring-2") }}
                 <span class="ml-2 text-sm text-gray-700 font-medium">
                     {{ form.is_default.label.text }}
@@ -136,14 +136,14 @@
         <div class="flex space-x-4">
             <button
                 type="submit"
-                class="px-4 py-2 bg-green-500 text-white rounded-lg shadow-lg font-medium 
+                class="px-4 py-2 bg-green-500 text-white rounded-lg shadow-lg font-medium
                        hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500"
             >
                 Add Model
             </button>
             <a
                 href="{{ url_for('chat.chat_interface') }}"
-                class="px-4 py-2 bg-gray-500 text-white rounded-lg shadow-lg font-medium 
+                class="px-4 py-2 bg-gray-500 text-white rounded-lg shadow-lg font-medium
                        hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
             >
                 Cancel
@@ -162,6 +162,30 @@
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const form = document.getElementById("add-model-form");
+
+    // Get references to the relevant form fields
+    const requiresO1Handling = document.getElementById("{{ form.requires_o1_handling.id }}");
+    const temperatureField = document.getElementById("{{ form.temperature.id }}");
+    const maxTokensField = document.getElementById("{{ form.max_tokens.id }}");
+
+    // Function to toggle field states based on o1-preview handling
+    function toggleO1Fields() {
+        if (requiresO1Handling.checked) {
+            temperatureField.value = '';
+            temperatureField.disabled = true;
+            maxTokensField.value = '';
+            maxTokensField.disabled = true;
+        } else {
+            temperatureField.disabled = false;
+            maxTokensField.disabled = false;
+        }
+    }
+
+    // Add event listener to checkbox
+    requiresO1Handling.addEventListener('change', toggleO1Fields);
+
+    // Set initial state
+    toggleO1Fields();
 
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -193,7 +217,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 }, 1500);
             } else {
                 showFeedback(data.error || "Failed to create the model", "error");
-                submitButton.disabled = false; 
+                submitButton.disabled = false;
             }
         } catch (err) {
             console.error("Error:", err);

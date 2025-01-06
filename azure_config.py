@@ -1,11 +1,10 @@
-```python
 # azure_config.py
 
 import os
 from openai import AzureOpenAI
 import requests
 import logging
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any, Union, List
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -56,9 +55,15 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
             "Please set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_KEY, and AZURE_OPENAI_DEPLOYMENT_NAME."
         )
 
+    # Validate azure_endpoint is not None
+    if not azure_endpoint:
+        raise ValueError("Azure endpoint cannot be None")
+
     # Configure the OpenAI client for Azure
     client = AzureOpenAI(
-        api_key=api_key, azure_endpoint=azure_endpoint, api_version=api_version
+        api_key=api_key,
+        azure_endpoint=str(azure_endpoint),  # Ensure string type
+        api_version=api_version
     )
 
     # Cache the client and deployment name
@@ -70,30 +75,45 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
 
 def initialize_client_from_model(
     model_config: Dict[str, Any]
-) -> Tuple[AzureOpenAI, str, Optional[float], Optional[int], int]:
+) -> Tuple[AzureOpenAI, str, Optional[float], Optional[int], int, bool]:
     """Initialize Azure OpenAI client from model configuration.
 
     Args:
         model_config (Dict[str, Any]): A dictionary containing model attributes.
 
     Returns:
-        Tuple[AzureOpenAI, str, Optional[float], Optional[int], int]: The client, deployment name,
-            temperature (or None), max_tokens, and max_completion_tokens.
+        Tuple[AzureOpenAI, str, Optional[float], Optional[int], int, bool]: The client, deployment name,
+            temperature (or None), max_tokens, max_completion_tokens, and requires_o1_handling flag.
 
     Raises:
         ValueError: If required configuration parameters are missing.
     """
-    api_endpoint = model_config.get("api_endpoint")
-    api_key = model_config.get("api_key")
-    api_version = model_config.get("api_version")
-    deployment_name = model_config.get("deployment_name")
-    temperature = model_config.get("temperature", 0.7)
-    max_tokens = model_config.get("max_tokens")
-    max_completion_tokens = model_config.get("max_completion_tokens")
-    requires_o1_handling = model_config.get("requires_o1_handling", False)
+    api_endpoint: str = str(model_config.get("api_endpoint"))
+    api_key: str = str(model_config.get("api_key"))
+    api_version: str = str(model_config.get("api_version"))
+    deployment_name: str = str(model_config.get("deployment_name"))
+    temperature: Optional[float] = float(model_config.get("temperature", 0.7)) if model_config.get("temperature") is not None else None
+    max_tokens: Optional[int] = None
+    if model_config.get("max_tokens") is not None:
+        try:
+            max_tokens = int(str(model_config.get("max_tokens")))
+        except (ValueError, TypeError):
+            raise ValueError("max_tokens must be a valid integer or None")
+    max_completion_tokens: int = int(model_config.get("max_completion_tokens", 500))
+    requires_o1_handling: bool = bool(model_config.get("requires_o1_handling", False))
 
-    if not all([api_endpoint, api_key, api_version, deployment_name]):
-        raise ValueError("Missing required configuration parameters")
+    # Validate required fields with type annotations
+    required_fields: Dict[str, Union[str, int]] = {
+        "api_endpoint": api_endpoint,
+        "api_key": api_key,
+        "api_version": api_version,
+        "deployment_name": deployment_name,
+        "max_completion_tokens": max_completion_tokens
+    }
+
+    for field_name, value in required_fields.items():
+        if not value:
+            raise ValueError(f"Missing required configuration parameter: {field_name}")
 
     if requires_o1_handling:
         # Enforce o1-preview specific requirements
@@ -101,17 +121,19 @@ def initialize_client_from_model(
         temperature = None  # Do not set temperature
         max_tokens = None  # max_tokens is not used for o1-preview models
 
-        if not max_completion_tokens:
-            raise ValueError(
-                "max_completion_tokens is required for models requiring o1 handling"
-            )
-
     # Initialize the Azure OpenAI client
     client = AzureOpenAI(
         azure_endpoint=api_endpoint, api_key=api_key, api_version=api_version
     )
 
-    return client, deployment_name, temperature, max_tokens, max_completion_tokens
+    return (
+        client,
+        deployment_name,
+        temperature,
+        max_tokens,
+        max_completion_tokens,
+        requires_o1_handling
+    )
 
 
 def validate_api_endpoint(
@@ -133,8 +155,8 @@ def validate_api_endpoint(
         test_url = f"{api_endpoint.rstrip('/')}/openai/deployments/{deployment_name}/chat/completions?api-version={api_version}"
         logger.debug(f"Validating API endpoint: {test_url}")
 
-        # Prepare the test request payload
-        test_payload = {
+        # Prepare the test request payload with type annotations
+        test_payload: Dict[str, Union[List[Dict[str, str]], int]] = {
             "messages": [{"role": "user", "content": "Test message"}],
             "max_completion_tokens": 1,
         }
@@ -157,4 +179,3 @@ def validate_api_endpoint(
     except Exception as e:
         logger.error(f"API endpoint validation failed: {str(e)}")
         return False
-```
