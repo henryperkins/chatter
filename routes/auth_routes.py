@@ -48,6 +48,7 @@ def login():
 
 # Registration route
 @bp.route("/register", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def register():
     if current_user.is_authenticated:
         return redirect(url_for("chat.chat_interface"))  # Redirect if user is already logged in
@@ -91,6 +92,7 @@ def logout():
 
 # Forgot Password route
 @bp.route("/forgot_password", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def forgot_password():
     """
     Handle the forgot password functionality.
