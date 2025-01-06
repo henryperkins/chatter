@@ -86,11 +86,12 @@ def get_azure_response(
             if max_completion_tokens is None:
                 max_completion_tokens = 500  # Set a default value
 
-            # Prepare API parameters WITHOUT 'temperature' and 'max_tokens'
+            # Prepare API parameters WITH 'temperature' set to 1
             api_params = {
                 "model": deployment_name,
                 "messages": api_messages,
                 "max_completion_tokens": max_completion_tokens,
+                "temperature": 1,  # Set temperature to 1 as required
             }
         else:
             # For standard models, include system messages and parameters

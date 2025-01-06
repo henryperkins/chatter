@@ -123,7 +123,7 @@ def initialize_client_from_model(
         # Enforce o1-preview specific requirements
         if api_version != "2024-12-01-preview":
             api_version = "2024-12-01-preview"  # Override to correct version
-        temperature = None  # Do not set temperature
+        temperature = 1  # Set temperature to 1 as required
         max_tokens = None  # max_tokens is not used for o1-preview models
 
     # Initialize the Azure OpenAI client
