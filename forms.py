@@ -28,7 +28,6 @@ from requests.exceptions import RequestException, Timeout
 from database import get_db
 from sqlalchemy import text
 
-
 class LoginForm(FlaskForm):
     """
     Form for user login.
@@ -47,7 +46,6 @@ class LoginForm(FlaskForm):
         ],
     )
     submit = SubmitField("Login")
-
 
 class RegistrationForm(FlaskForm):
     """
@@ -101,11 +99,11 @@ class RegistrationForm(FlaskForm):
         if username != field.data.strip():
             raise ValidationError("Username cannot contain leading or trailing spaces.")
 
-        # Check for existing username
+        # Check for existing username using text()
         with get_db() as db:
             existing = db.execute(
-                text("SELECT username FROM users WHERE LOWER(username) = ?"),
-                username,
+                text("SELECT username FROM users WHERE LOWER(username) = :username"),
+                {"username": username}
             ).fetchone()
             if existing:
                 raise ValidationError("This username is already taken.")
@@ -118,11 +116,11 @@ class RegistrationForm(FlaskForm):
         if email != field.data:
             raise ValidationError("Email cannot contain leading or trailing spaces.")
 
-        # Check for existing email
+        # Check for existing email using text()
         with get_db() as db:
             existing = db.execute(
-                 text("SELECT email FROM users WHERE LOWER(email) = ?"),
-                email,
+                text("SELECT email FROM users WHERE LOWER(email) = :email"),
+                {"email": email}
             ).fetchone()
             if existing:
                 raise ValidationError("This email is already registered.")
@@ -132,7 +130,6 @@ class RegistrationForm(FlaskForm):
         Validate password strength and security requirements.
         """
         validate_password_strength(field.data)
-
 
 class ModelForm(FlaskForm):
     """
@@ -265,7 +262,6 @@ class ModelForm(FlaskForm):
             if self.max_tokens.data is not None:
                 raise ValidationError("Max tokens must be None when special handling is required.")
 
-
 class ResetPasswordForm(FlaskForm):
     """
     Form for resetting user password.
@@ -291,7 +287,6 @@ class ResetPasswordForm(FlaskForm):
         Validate password strength and security requirements.
         """
         validate_password_strength(field.data)
-
 
 def validate_password_strength(password: str) -> None:
     """
