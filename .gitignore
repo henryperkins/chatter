@@ -21,3 +21,4 @@ uploads/
 .aider.input.history
 routes/__pycache__
 azure guide for o1-preview.md
+chat_app.db
