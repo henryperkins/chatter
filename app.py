@@ -94,7 +94,6 @@ def load_user(user_id: str) -> Optional[User]:
     finally:
         db.close()
 
-
 # --- CLEANUP HANDLERS ---
 
 # Close the database connection when the app context ends
@@ -189,11 +188,8 @@ def index() -> Response:
         return redirect(url_for("auth.login"), code=307)
     return redirect(url_for("chat.chat_interface"), code=307)
 
-
 # --- APPLICATION ENTRY POINT ---
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5000))  # Get port from environment or use 5000 as default
     app.run(host='0.0.0.0', port=port, debug=False)  # Ensure `debug=False` in production
-
-
