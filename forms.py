@@ -25,6 +25,7 @@ from wtforms.validators import (
 from typing import Any
 from azure_config import validate_api_endpoint
 from requests.exceptions import RequestException, Timeout
+from database import get_db
 
 class LoginForm(FlaskForm):
     """
@@ -99,8 +100,7 @@ class RegistrationForm(FlaskForm):
             raise ValidationError("Username cannot contain leading or trailing spaces.")
 
         # Check for existing username
-        from database import db_connection
-        with db_connection() as db:
+        with get_db() as db:
             existing = db.execute(
                 "SELECT username FROM users WHERE LOWER(username) = ?",
                 (username,)
@@ -117,8 +117,7 @@ class RegistrationForm(FlaskForm):
             raise ValidationError("Email cannot contain leading or trailing spaces.")
 
         # Check for existing email
-        from database import db_connection
-        with db_connection() as db:
+        with get_db() as db:
             existing = db.execute(
                 "SELECT email FROM users WHERE LOWER(email) = ?",
                 (email,)
