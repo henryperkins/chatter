@@ -1,6 +1,5 @@
-/* static/js/chat.js */
-
 (function () {
+    // Debug statement to confirm the file is loaded
     console.log("chat.js loaded");
 
     // Constants for file handling
@@ -8,10 +7,14 @@
     const MAX_FILES = 5;
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
     const ALLOWED_FILE_TYPES = [
-        "text/plain", "application/pdf",
+        "text/plain",
+        "application/pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "text/x-python", "application/javascript", "text/markdown",
-        "image/jpeg", "image/png",
+        "text/x-python",
+        "application/javascript",
+        "text/markdown",
+        "image/jpeg",
+        "image/png",
     ];
 
     // Get DOM elements
@@ -40,110 +43,143 @@
     }
 
     // Initialize markdown-it with Prism.js highlighting
+    const defaultLanguage = "plaintext";
+
     const md = window.markdownit({
-        html: true,
+        html: false,
         linkify: true,
         typographer: true,
-        breaks: true,
         highlight: function (str, lang) {
             if (lang && Prism.languages[lang]) {
-                try {
-                    return `<pre class="language-${lang}"><code>${Prism.highlight(
-                        str,
-                        Prism.languages[lang],
-                        lang
-                    )}</code></pre>`;
-                } catch (e) {
-                    console.error(e);
-                }
+                return `<pre class="language-${lang}"><code>${Prism.highlight(
+                    str,
+                    Prism.languages[lang],
+                    lang
+                )}</code></pre>`;
+            } else {
+                return `<pre class="language-plaintext"><code>${Prism.highlight(
+                    str,
+                    Prism.languages.plaintext,
+                    "plaintext"
+                )}</code></pre>`;
             }
-            return `<pre class="language-plaintext"><code>${md.utils.escapeHtml(str)}</code></pre>`;
         },
     });
 
     // Render Markdown content safely
     function renderMarkdown(content) {
         const html = md.render(content);
+
+        // Check if DOMPurify is available
         if (typeof DOMPurify !== "undefined" && DOMPurify.sanitize) {
             return DOMPurify.sanitize(html, {
                 USE_PROFILES: { html: true },
                 ALLOWED_TAGS: [
-                    "p", "strong", "em", "br", "ul", "ol", "li",
-                    "a", "img", "pre", "code", "blockquote", "h1", "h2",
-                    "h3", "h4", "h5", "h6", "hr", "table", "thead", "tbody",
-                    "tr", "th", "td"
+                    "p",
+                    "strong",
+                    "em",
+                    "br",
+                    "ul",
+                    "ol",
+                    "li",
+                    "a",
+                    "img",
+                    "pre",
+                    "code",
                 ],
                 ALLOWED_ATTR: [
-                    "href", "target", "rel", "src", "alt",
-                    "class", "style", "id"
+                    "href",
+                    "target",
+                    "rel",
+                    "src",
+                    "alt",
+                    "class",
+                    "style",
                 ],
             });
         }
+
+        // Fallback basic sanitization
         return html
             .replace(/<script.*?>.*?<\/script>/gi, "")
             .replace(/on\w+="[^"]*"/gi, "");
     }
 
-    // Show feedback to the user
-    window.showFeedback = function(message, type = "success") {
-        const feedbackDiv = document.getElementById("feedback-message");
-        if (!feedbackDiv) return;
-
-        feedbackDiv.textContent = message;
-        feedbackDiv.className = `fixed bottom-4 right-4 p-4 rounded-lg ${
-            type === "success"
-                ? "bg-green-100 border border-green-400 text-green-700"
-                : "bg-red-100 border border-red-400 text-red-700"
+    // Show feedback to the user (re-usable)
+    function showFeedback(message, type = "success") {
+        const feedbackMessage = document.getElementById("feedback-message");
+        feedbackMessage.innerHTML = `
+            <div class="flex items-center justify-between">
+                <span>${message}</span>
+                ${type === "error" ? '<button id="feedback-close" class="ml-4 text-lg">&times;</button>' : ''}
+            </div>
+        `;
+        feedbackMessage.className = `fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center ${
+            type === "success" ? "bg-green-500 text-white" : "bg-red-500 text-white"
         }`;
-        feedbackDiv.classList.remove("hidden");
-        setTimeout(() => feedbackDiv.classList.add("hidden"), 3000);
-    };
+        feedbackMessage.classList.remove("hidden");
 
-    // Get CSRF token
-    window.getCSRFToken = function() {
-        const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
-        return csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") : "";
-    };
+        if (type === "success") {
+            setTimeout(() => feedbackMessage.classList.add("hidden"), 5000);
+        } else {
+            const closeButton = document.getElementById("feedback-close");
+            if (closeButton) {
+                closeButton.addEventListener("click", () => {
+                    feedbackMessage.classList.add("hidden");
+                });
+            }
+        }
+    }
+
+    // Retrieve the CSRF token from a meta tag if your Flask app uses CSRF protection
+    function getCSRFToken() {
+        const csrfTokenMetaTag = document.querySelector(
+            'meta[name="csrf-token"]'
+        );
+        return csrfTokenMetaTag
+            ? csrfTokenMetaTag.getAttribute("content")
+            : "";
+    }
 
     // File Handling Functions
     function handleFileUpload(files) {
         const filesArray = Array.from(files);
-        if (uploadedFiles.length + filesArray.length > MAX_FILES) {
-            showFeedback(`You can upload up to ${MAX_FILES} files at a time.`, "error");
-            return;
-        }
+        const invalidFiles = [];
+        const validFiles = [];
 
-        const validFiles = filesArray.filter((file) => {
+        filesArray.forEach(file => {
             if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-                showFeedback(`File type not allowed: ${file.name}`, "error");
-                return false;
+                invalidFiles.push(`${file.name} (unsupported type)`);
+            } else if (file.size > MAX_FILE_SIZE) {
+                invalidFiles.push(`${file.name} (exceeds size limit)`);
+            } else {
+                validFiles.push(file);
             }
-            if (file.size > MAX_FILE_SIZE) {
-                showFeedback(`File ${file.name} exceeds the 10MB size limit.`, "error");
-                return false;
-            }
-            return true;
         });
 
         uploadedFiles = uploadedFiles.concat(validFiles);
         renderFileList();
 
+        if (invalidFiles.length > 0) {
+            showFeedback(`Some files were not added: ${invalidFiles.join(', ')}`, 'error');
+        }
+
         if (validFiles.length > 0) {
-            showFeedback(`${validFiles.length} file(s) queued for upload.`, "success");
+            showFeedback(`${validFiles.length} file(s) ready to upload.`, 'success');
         }
     }
 
     function renderFileList() {
         if (!fileListDiv) return;
 
-        fileListDiv.innerHTML = "";
+        fileListDiv.innerHTML = '';
         uploadedFiles.forEach((file, index) => {
-            const fileDiv = document.createElement("div");
-            fileDiv.className = "flex items-center justify-between bg-white px-2 py-1 rounded border text-sm";
+            const fileDiv = document.createElement('div');
+            fileDiv.className = 'flex items-center justify-between bg-gray-100 px-2 py-1 rounded text-sm';
             fileDiv.innerHTML = `
                 <div class="flex items-center">
-                    <svg class="w-4 h-4 mr-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" />
+                    <svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M16.707 5.293a1 1 0 00-1.414-1.414L9 10.172 5.707 6.879A1 1 0 004.293 8.293l4 4c.39.39 1.024.39 1.414 0l7-7z" />
                     </svg>
                     ${file.name}
                 </div>
@@ -155,16 +191,41 @@
         });
 
         if (uploadedFilesDiv) {
-            uploadedFilesDiv.classList.toggle("hidden", uploadedFiles.length === 0);
+            uploadedFilesDiv.classList.toggle('hidden', uploadedFiles.length === 0);
         }
 
-        document.querySelectorAll(".remove-file-button").forEach((button) => {
-            button.addEventListener("click", function () {
+        document.querySelectorAll('.remove-file-button').forEach((button) => {
+            button.addEventListener('click', function () {
                 const index = parseInt(this.dataset.index);
                 uploadedFiles.splice(index, 1);
                 renderFileList();
             });
         });
+    }
+
+    // Typing Indicator Functions
+    function showTypingIndicator() {
+        const typingIndicator = document.createElement('div');
+        typingIndicator.id = 'typing-indicator';
+        typingIndicator.className = 'flex w-full mt-2 space-x-3 max-w-3xl';
+        typingIndicator.innerHTML = `
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
+            <div class="flex-grow">
+                <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
+                    <p class="text-sm text-gray-500">Assistant is typing...</p>
+                </div>
+                <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
+            </div>
+        `;
+        chatBox.appendChild(typingIndicator);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function removeTypingIndicator() {
+        const typingIndicator = document.getElementById('typing-indicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
+        }
     }
 
     // Message Handling Functions
@@ -187,18 +248,29 @@
 
         const formData = new FormData();
         formData.append("message", message);
-        formData.append("model_id", modelSelect.value);
         uploadedFiles.forEach((file) => {
             formData.append("files[]", file);
         });
 
+        // Disable input controls
         sendButton.disabled = true;
         messageInput.disabled = true;
 
-        if (uploadedFiles.length > 0) {
-            uploadProgress.classList.remove("hidden");
-            uploadProgressBar.style.width = "0%";
-        }
+        // Show loading spinner on send button
+        sendButton.innerHTML = `
+            <svg class="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+        `;
+
+        // Show typing indicator
+        showTypingIndicator();
+
+        // Set a timeout to notify the user if response is taking too long (e.g., 15 seconds)
+        const responseTimeout = setTimeout(() => {
+            showFeedback("The assistant is taking longer than usual to respond.", "info");
+        }, 15000);
 
         try {
             const response = await axios.post("/chat", formData, {
@@ -216,9 +288,15 @@
             });
 
             const data = response.data;
-            uploadProgress.classList.add("hidden");
+
+            // Clear the timeout if response is received
+            clearTimeout(responseTimeout);
+
+            // Remove typing indicator and re-enable inputs
+            removeTypingIndicator();
             sendButton.disabled = false;
             messageInput.disabled = false;
+            sendButton.innerHTML = '<span>Send</span>';
 
             if (data.response) {
                 appendAssistantMessage(data.response);
@@ -226,15 +304,22 @@
                 renderFileList();
             }
             if (data.excluded_files && data.excluded_files.length > 0) {
-                showFeedback(
-                    `Some files were excluded: ${data.excluded_files.join(", ")}`,
-                    "error"
-                );
+                const errorMessages = data.excluded_files.map(file => `${file.filename}: ${file.error}`).join('<br>');
+                showFeedback(`File upload errors:<br>${errorMessages}`, 'error');
+            }
+            if (data.included_files && data.included_files.length > 0) {
+                const fileNames = data.included_files.map(file => file.filename).join(', ');
+                showFeedback(`Files uploaded successfully: ${fileNames}`, 'success');
             }
         } catch (error) {
-            uploadProgress.classList.add("hidden");
+            // Clear the timeout in case of error
+            clearTimeout(responseTimeout);
+
+            // Remove typing indicator and re-enable inputs
+            removeTypingIndicator();
             sendButton.disabled = false;
             messageInput.disabled = false;
+            sendButton.innerHTML = '<span>Send</span>';
 
             console.error("Error sending message:", error);
             const errorMsg = error.response?.data?.error || "An error occurred.";
@@ -244,36 +329,40 @@
 
     function appendUserMessage(message) {
         const userMessageDiv = document.createElement("div");
-        userMessageDiv.className = "flex w-full mt-2 space-x-3 max-w-3xl ml-auto justify-end";
+        userMessageDiv.className = "flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end";
         userMessageDiv.innerHTML = `
-            <div class="flex-grow">
+            <div>
                 <div class="bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
-                    <div class="text-sm markdown-content prose prose-invert max-w-none"></div>
+                    <div class="text-sm markdown-content"></div>
                 </div>
                 <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
             </div>
             <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
         `;
+        // Use renderMarkdown to render the message content
         userMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
         chatBox.appendChild(userMessageDiv);
+        // Highlight code blocks after adding to DOM
         Prism.highlightAllUnder(userMessageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     function appendAssistantMessage(message) {
         const assistantMessageDiv = document.createElement("div");
-        assistantMessageDiv.className = "flex w-full mt-2 space-x-3 max-w-3xl";
+        assistantMessageDiv.className = "flex w-full mt-2 space-x-3 max-w-xs";
         assistantMessageDiv.innerHTML = `
             <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
-            <div class="flex-grow">
-                <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
-                    <div class="text-sm markdown-content prose dark:prose-invert max-w-none"></div>
+            <div>
+                <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
+                    <div class="text-sm markdown-content"></div>
                 </div>
                 <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
             </div>
         `;
+        // Use renderMarkdown for the message content
         assistantMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
         chatBox.appendChild(assistantMessageDiv);
+        // Highlight code blocks after adding to DOM
         Prism.highlightAllUnder(assistantMessageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
@@ -297,6 +386,8 @@
         });
     }
 
+    // Handle form submission if the send button is inside a form
+    const chatForm = document.getElementById("chat-form");
     if (chatForm) {
         chatForm.addEventListener("submit", (e) => {
             sendMessage(e);
@@ -316,6 +407,7 @@
 
     // Model Selection and Editing
     if (modelSelect && editModelButton) {
+        // Function to update the edit button state
         function updateEditButtonState() {
             const selectedModelId = modelSelect.value;
             if (selectedModelId) {
@@ -327,27 +419,18 @@
             }
         }
 
+        // Initial state on page load
         updateEditButtonState();
 
         modelSelect.addEventListener("change", function () {
             updateEditButtonState();
-            if (chatBox.children.length > 0) {
-                const formData = new FormData();
-                formData.append("model_id", this.value);
-                fetch("/chat", {
-                    method: "POST",
-                    headers: {
-                        "X-CSRFToken": getCSRFToken(),
-                    },
-                    body: formData,
-                });
-            }
         });
 
         editModelButton.addEventListener("click", function () {
             const modelId = this.dataset.modelId;
             if (modelId) {
-                window.location.href = `/models/edit-model/${modelId}`;
+                // Correctly construct the URL for redirection
+                window.location.href = `/model/edit-model/${modelId}`;
             }
         });
     }
@@ -356,18 +439,16 @@
     if (newChatBtn) {
         newChatBtn.addEventListener("click", async () => {
             try {
-                const modelId = modelSelect.value;
                 const response = await fetch("/new_chat", {
                     method: "POST",
                     headers: {
                         "X-CSRFToken": getCSRFToken(),
-                        "Content-Type": "application/json"
                     },
-                    body: JSON.stringify({ model_id: modelId })
                 });
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success) {
+                        // Pass the newly created chat_id to the URL
                         window.location.href = `/chat_interface?chat_id=${data.chat_id}`;
                     }
                 } else {
@@ -379,27 +460,35 @@
             }
         });
     }
+    // Function to toggle the sidebar visibility
+    function toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.toggle('hidden');
+    }
 
-    // Chat Deletion
-    window.deleteChat = function(chatId) {
+    // Function to delete a chat
+    function deleteChat(chatId) {
         if (confirm('Are you sure you want to delete this chat?')) {
             fetch(`/delete_chat/${chatId}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': getCSRFToken()
+                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
                 }
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
+                    // If we're currently viewing the deleted chat, redirect to a new chat
                     if (window.location.href.includes(chatId)) {
                         window.location.href = '/chat_interface';
                     } else {
+                        // Otherwise just remove the chat from the list with animation
                         const chatElement = document.querySelector(`a[href*="${chatId}"]`).parentElement;
                         chatElement.classList.add('chat-item-exit');
                         setTimeout(() => {
                             chatElement.remove();
+                            // Check if the date group is now empty
                             const dateGroup = chatElement.previousElementSibling;
                             if (dateGroup && dateGroup.classList.contains('text-xs') && !dateGroup.nextElementSibling) {
                                 dateGroup.remove();
@@ -407,17 +496,16 @@
                         }, 300);
                     }
                 } else {
-                    showFeedback('Failed to delete chat', 'error');
+                    alert('Failed to delete chat');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showFeedback('An error occurred while deleting the chat', 'error');
+                alert('An error occurred while deleting the chat');
             });
         }
-    };
-
-    // File Drop Zone
+    }
+    // Drag and Drop
     const dropZone = document.getElementById("drop-zone");
     const messageInputArea = document.querySelector(".message-input-area");
 
@@ -452,7 +540,7 @@
         });
     }
 
-    // Mobile Menu
+    // Hamburger Menu Toggle
     if (sidebarToggle) {
         sidebarToggle.addEventListener("click", function () {
             offCanvasMenu.classList.toggle("hidden");
@@ -474,7 +562,7 @@
         });
     }
 
-    // Mobile Gestures
+    // Swipe Gestures for Off-Canvas Menu
     let touchstartX = 0;
     let touchendX = 0;
 
@@ -494,8 +582,9 @@
         handleGesture();
     }, false);
 
-    // Mobile Interactions
+    // Mobile-Specific Interactions and Optimizations
     function handleMobileInteractions() {
+        // Add touch event listeners for better mobile experience
         chatBox.addEventListener("touchstart", handleTouchStart, false);
         chatBox.addEventListener("touchmove", handleTouchMove, false);
 
@@ -509,7 +598,9 @@
         }
 
         function handleTouchMove(evt) {
-            if (!xDown || !yDown) return;
+            if (!xDown || !yDown) {
+                return;
+            }
 
             const xUp = evt.touches[0].clientX;
             const yUp = evt.touches[0].clientY;
@@ -519,20 +610,30 @@
 
             if (Math.abs(xDiff) > Math.abs(yDiff)) {
                 if (xDiff > 0) {
+                    // Left swipe
                     console.log("Left swipe detected");
                 } else {
+                    // Right swipe
                     console.log("Right swipe detected");
                 }
             } else if (yDiff > 0) {
+                // Up swipe
                 console.log("Up swipe detected");
             } else {
+                // Down swipe
                 console.log("Down swipe detected");
             }
 
+            // Reset values
             xDown = null;
             yDown = null;
         }
     }
 
+    // Call the function to handle mobile interactions
     handleMobileInteractions();
+
+    // Expose showFeedback and getCSRFToken functions if needed
+    window.showFeedback = showFeedback;
+    window.getCSRFToken = getCSRFToken;
 })();

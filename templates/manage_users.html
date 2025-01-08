@@ -12,7 +12,6 @@
                     <th class="py-2 px-4 text-left">Role</th>
                     <th class="py-2 px-4 text-left">Actions</th>
                 </tr>
-
             </thead>
             <tbody>
                 {% for user in users %}
@@ -33,6 +32,13 @@
     </div>
 </div>
 
+<!-- Feedback Message -->
+<div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50" role="alert" aria-live="assertive"></div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
 <script>
 document.querySelectorAll('.role-select').forEach(select => {
     select.addEventListener('change', async function() {
@@ -44,21 +50,26 @@ document.querySelectorAll('.role-select').forEach(select => {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    'X-CSRFToken': getCSRFToken()
                 },
                 body: JSON.stringify({role: newRole})
             });
 
             if (response.ok) {
-                alert('Role updated successfully');
+                showFeedback('Role updated successfully', 'success');
             } else {
-                alert('Failed to update role');
+                showFeedback('Failed to update role', 'error');
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Error updating role');
+            showFeedback('Error updating role', 'error');
         }
     });
 });
+
+
+function getCSRFToken() {
+    return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+}
 </script>
 {% endblock %}

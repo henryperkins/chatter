@@ -43,8 +43,10 @@ ALLOWED_MIME_TYPES = {
 }
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB per file
 MAX_TOTAL_FILE_SIZE = 50 * 1024 * 1024  # 50 MB for total files
-MAX_FILE_CONTENT_LENGTH = 6000  # Characters
-MAX_INPUT_TOKENS = 4000  # Azure OpenAI token limit
+MAX_FILE_CONTENT_LENGTH = 8000  # Characters (increased to accommodate larger files)
+MAX_INPUT_TOKENS = 8192  # Azure OpenAI input token limit
+MAX_OUTPUT_TOKENS = 16384  # Azure OpenAI output token limit
+MAX_CONTEXT_TOKENS = 128000  # Azure OpenAI context window limit
 
 # Initialize tokenizer
 encoding = tiktoken.encoding_for_model("gpt-4")  # Or whichever model you're using
@@ -79,13 +81,8 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
     """Create a new chat and return success JSON."""
     chat_id = generate_new_chat_id()
     user_id = int(current_user.id)
-    
-    # Get model_id from request data
-    data = request.get_json() if request.is_json else {}
-    model_id = data.get('model_id')
-    
-    # Create chat with optional model_id
-    Chat.create(chat_id, user_id, "New Chat", model_id)
+
+    Chat.create(chat_id, user_id, "New Chat")
     session["chat_id"] = chat_id
     logger.info("New chat created with ID: %s", chat_id)
 
@@ -112,19 +109,8 @@ def chat_interface() -> str:
     if chat_id:
         # 2. Verify chat ownership
         if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
-            logger.warning(
-                "Unauthorized access attempt to chat %s by user %s",
-                chat_id,
-                current_user.id,
-            )
-            logger.debug("Session data: %s", session)
-            logger.debug("Request args: %s", request.args)
-
-            # Automatically create a new chat if the current one is invalid
-            chat_id = generate_new_chat_id()
-            Chat.create(chat_id, current_user.id, "New Chat")
-            session["chat_id"] = chat_id
-            logger.info("Automatically created a new chat with ID: %s for user %s", chat_id, current_user.id)
+            logger.warning("Unauthorized access attempt to chat %s", chat_id)
+            return "Chat not found or access denied", 403
 
         session["chat_id"] = chat_id  # Update session with the valid chat_id
     else:
@@ -144,9 +130,6 @@ def chat_interface() -> str:
     today = datetime.now().strftime('%Y-%m-%d')
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
 
-    # Get current chat's model_id
-    current_model_id = Chat.get_model(chat_id)
-    
     return render_template(
         "chat.html",
         chat_id=chat_id,
@@ -156,7 +139,6 @@ def chat_interface() -> str:
         now=datetime.now,
         today=today,
         yesterday=yesterday,
-        current_model_id=current_model_id,
     )
 
 
@@ -172,13 +154,7 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         ).fetchone()
 
         if not chat:
-            logger.warning(
-                "Unauthorized access attempt to chat %s by user %s",
-                chat_id,
-                current_user.id,
-            )
-            logger.debug("Session data: %s", session)
-            logger.debug("Request args: %s", request.args)
+            logger.warning("Unauthorized access attempt to chat %s", chat_id)
             return jsonify({"error": "Chat not found or access denied"}), 403
 
         messages = conversation_manager.get_context(chat_id)
@@ -248,59 +224,39 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         logger.error("Chat ID not found in session.")
         return jsonify({"error": "Chat ID not found."}), 400
 
-    # Get model_id from form data or use existing chat model
-    model_id = request.form.get("model_id")
-    if model_id:
-        try:
-            model_id = int(model_id)  # Convert to int to ensure valid ID
-            # Verify model exists before updating
-            model = Model.get_by_id(model_id)
-            if model:
-                # Update chat's model if a new one is selected
-                with db_connection() as db:
-                    db.execute("UPDATE chats SET model_id = ? WHERE id = ?", (model_id, chat_id))
-                logger.info(f"Updated chat {chat_id} to use model {model_id}")
-            else:
-                logger.warning(f"Attempted to switch to non-existent model ID: {model_id}")
-                model_id = Chat.get_model(chat_id)  # Fall back to current model
-        except (ValueError, TypeError):
-            logger.error(f"Invalid model_id received: {model_id}")
-            model_id = Chat.get_model(chat_id)  # Fall back to current model
-    else:
-        # Retrieve the existing model for this chat
-        model_id = Chat.get_model(chat_id)
-    model_obj = None
-    
-    # Try to get the selected model first, then fall back to default
-    if model_id:
-        model_obj = Model.get_by_id(model_id)
-    if not model_obj:
-        model_obj = Model.get_default()
-    if not model_obj:
-        logger.error("No model configured. Please set up a model in the settings.")
-        return jsonify({"error": "No model configured. Please set up a model in the settings."}), 400
-        
-    requires_o1_handling = model_obj.requires_o1_handling
+    # Retrieve the model for this chat, if any
+    model_id = Chat.get_model(chat_id)
+    model_obj = Model.get_by_id(model_id) if model_id else Model.get_default()
+    requires_o1_handling = model_obj.requires_o1_handling if model_obj else False
 
-    # Retrieve user message
-    user_message = request.form.get("message", "").strip()
-    if not user_message and 'files[]' not in request.files:
-        return jsonify({"error": "Message or files are required."}), 400
+    # Validate model configuration
+    if not model_obj or not model_obj.deployment_name:
+        logger.error("Invalid model configuration: deployment name is missing.")
+        return jsonify({"error": "Invalid model configuration. Please select a valid model."}), 400
 
-    # Handle uploaded files
+    if not model_obj.api_key or not model_obj.api_endpoint:
+        logger.error("Invalid model configuration: API key or endpoint is missing.")
+        return jsonify({"error": "Invalid model configuration. Please check the API settings."}), 400
+
+    # Initialize variables
+    user_message = bleach.clean(request.form.get("message", "").strip())
     uploaded_files = request.files.getlist("files[]")
     included_files = []
     excluded_files = []
+    file_contents = []
+    total_tokens = len(encoding.encode(user_message)) if user_message else 0
 
+    # Handle uploaded files
     for file in uploaded_files:
-        if file and allowed_file(file.filename):
+        if file:
             filename = secure_filename(file.filename)
             mime_type = file.mimetype
 
-            # Validate MIME type
-            if mime_type not in ALLOWED_MIME_TYPES:
-                logger.warning(f"File {filename} has disallowed MIME type {mime_type}.")
-                excluded_files.append(filename)
+            # Validate file extension and MIME type
+            if not allowed_file(filename) or mime_type not in ALLOWED_MIME_TYPES:
+                error_message = f"File type not allowed: {filename}"
+                logger.warning(error_message)
+                excluded_files.append({"filename": filename, "error": error_message})
                 continue
 
             # Check file size
@@ -308,62 +264,71 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             file_length = file.tell()
             file.seek(0)
             if file_length > MAX_FILE_SIZE:
-                logger.warning(f"File {filename} exceeds the maximum size limit.")
-                excluded_files.append(filename)
+                error_message = f"File too large: {filename} exceeds the 10MB limit."
+                logger.warning(error_message)
+                excluded_files.append({"filename": filename, "error": error_message})
                 continue
 
             # Save the file to the upload folder
             file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
             try:
                 file.save(file_path)
+                included_files.append({"filename": filename})
+                # Process file content if necessary
+                if mime_type.startswith('text/'):
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            file_content = f.read()
+                    except Exception as e:
+                        error_message = f"Error reading file {filename}: {e}"
+                        logger.error(error_message)
+                        excluded_files.append({"filename": filename, "error": error_message})
+                        continue
+
+                    # Truncate file content to avoid excessive tokens
+                    truncated_content = truncate_message(file_content, MAX_FILE_CONTENT_LENGTH)
+
+                    # Format file content with markdown
+                    formatted_content = f"\nFile '{filename}' content:\n```\n{truncated_content}\n```\n"
+                    
+                    # Check if adding this file would exceed token limit
+                    content_tokens = len(encoding.encode(formatted_content))
+                    if total_tokens + content_tokens > MAX_INPUT_TOKENS:
+                        error_message = f"File {filename} skipped: Adding it would exceed the {MAX_INPUT_TOKENS} token limit (current: {total_tokens}, file: {content_tokens})"
+                        logger.warning(error_message)
+                        excluded_files.append({"filename": filename, "error": error_message})
+                        continue
+                        
+                    total_tokens += content_tokens
+                    file_contents.append(formatted_content)
+                else:
+                    logger.info(f"Skipping reading content for non-text file: {filename}")
             except Exception as e:
-                logger.error(f"Error saving file {filename}: {e}")
-                excluded_files.append(filename)
+                error_message = f"Error saving file {filename}: {e}"
+                logger.error(error_message)
+                excluded_files.append({"filename": filename, "error": error_message})
                 continue
-
-            # If it's a text file, read content and add to conversation
-            if mime_type.startswith('text/'):
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        file_content = f.read()
-                except Exception as e:
-                    logger.error(f"Error reading file {filename}: {e}")
-                    excluded_files.append(filename)
-                    continue
-
-                # Truncate file content to avoid excessive tokens
-                truncated_content = truncate_message(file_content, MAX_FILE_CONTENT_LENGTH)
-
-                # Add file content to conversation as an assistant message
-                conversation_manager.add_message(
-                    chat_id,
-                    "assistant",
-                    f"Here is the content of the file '{filename}':\n{truncated_content}"
-                )
-            else:
-                logger.info(f"Skipping reading content for non-text file: {filename}")
-
-            included_files.append(filename)
-            UploadedFile.create(chat_id, filename, file_path)
         else:
-            if file:
-                excluded_files.append(file.filename)
+            error_message = "Empty file received."
+            logger.warning(error_message)
+            excluded_files.append({"filename": "Unknown", "error": error_message})
 
-    # Process user message
-    if user_message:
-        # Sanitize input
-        user_message = bleach.clean(user_message)
+    # Combine user message with file contents
+    if file_contents:
+        combined_message = user_message + "\n" + "".join(file_contents) if user_message else "".join(file_contents)
+    else:
+        combined_message = user_message
 
-        conversation_manager.add_message(chat_id, "user", user_message)
+    # Only proceed if there's a message or files were included
+    if combined_message:
+        conversation_manager.add_message(chat_id, "user", combined_message)
 
-        # Update chat title if it's still "New Chat"
-        if Chat.is_title_default(chat_id):
-            # Use the first line (up to 50 characters) of user_message
+        # Update chat title if it's still "New Chat" and there's a text message
+        if user_message and Chat.is_title_default(chat_id):
             new_title = user_message.split("\n")[0][:50]
             Chat.update_title(chat_id, new_title)
 
     # Retrieve conversation history
-    # If requires_o1_handling == True, exclude system messages
     history = conversation_manager.get_context(
         chat_id,
         include_system=not requires_o1_handling
@@ -376,33 +341,37 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             "messages": history,
             "deployment_name": model_obj.deployment_name if model_obj else None,
             "selected_model_id": model_id,
-            "max_completion_tokens": model_obj.max_completion_tokens if model_obj else None,
+            "max_completion_tokens": model_obj.max_completion_tokens if model_obj else MAX_OUTPUT_TOKENS,
             "api_endpoint": model_obj.api_endpoint if model_obj else None,
             "api_key": model_obj.api_key if model_obj else None,
             "api_version": model_obj.api_version if model_obj else None,
             "requires_o1_handling": model_obj.requires_o1_handling if model_obj else False,
         }
 
+        # Set a timeout for the Azure OpenAI response
+        timeout_seconds = 30  # Adjust as needed
+        start_time = datetime.now()
+
         # Get response from Azure OpenAI
         model_response = get_azure_response(**model_config)
+
+        # Check if the response took too long
+        elapsed_time = (datetime.now() - start_time).total_seconds()
+        if elapsed_time > timeout_seconds:
+            logger.warning(f"Response took too long: {elapsed_time} seconds")
+            return jsonify({"error": "The assistant is taking longer than usual to respond. Please try again."}), 504
 
         # Add assistant's response to conversation history
         conversation_manager.add_message(chat_id, "assistant", model_response)
 
         response_data = {"response": model_response}
+        if included_files:
+            response_data["included_files"] = included_files
         if excluded_files:
             response_data["excluded_files"] = excluded_files
 
         return jsonify(response_data)
 
-    except ValueError as ex:
-        if "Missing required Azure OpenAI environment variables" in str(ex):
-            logger.error("Azure OpenAI configuration error: %s", str(ex))
-            return jsonify({
-                "error": "Azure OpenAI is not configured. Please set up your Azure OpenAI credentials in the model settings."
-            }), 400
-        logger.error("Validation error: %s", str(ex))
-        return jsonify({"error": str(ex)}), 400
     except Exception as ex:
         logger.exception("Error during chat handling: %s", ex)
-        return jsonify({"error": "An unexpected error occurred. Please try again later."}), 500
+        return jsonify({"error": "An unexpected error occurred."}), 500

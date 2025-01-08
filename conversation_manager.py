@@ -15,8 +15,8 @@ TOKENS_PER_ASSISTANT_REPLY: int = 3  # Accounts for assistant's reply tokens
 
 # Configurable Environment Variables (with defaults)
 MAX_MESSAGES: int = int(os.getenv("MAX_MESSAGES", "20"))
-MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "3500"))
-MAX_MESSAGE_TOKENS: int = int(os.getenv("MAX_MESSAGE_TOKENS", "500"))
+MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "128000"))  # GPT-4 context window
+MAX_MESSAGE_TOKENS: int = int(os.getenv("MAX_MESSAGE_TOKENS", "8192"))  # GPT-4 input limit
 MODEL_NAME: str = os.getenv("MODEL_NAME", "gpt-4")  # Model for token counting
 
 
@@ -32,8 +32,8 @@ class ConversationManager:
         TOKENS_PER_NAME (int): Extra token for messages with names (1)
         TOKENS_PER_ASSISTANT_REPLY (int): Tokens for assistant's reply metadata (3)
         MAX_MESSAGES (int): Maximum number of messages to keep (default: 20)
-        MAX_TOKENS (int): Maximum total tokens allowed (default: 3500)
-        MAX_MESSAGE_TOKENS (int): Maximum tokens per message (default: 500)
+        MAX_TOKENS (int): Maximum total tokens allowed (default: 128000)
+        MAX_MESSAGE_TOKENS (int): Maximum tokens per message (default: 8192)
         MODEL_NAME (str): Model to use for token counting (default: gpt-4)
     """
 

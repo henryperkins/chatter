@@ -36,7 +36,7 @@
 </div>
 
 <!-- Feedback Message -->
-<div id="feedback-message" class="hidden fixed bottom-4 right-4 p-4 rounded-lg"></div>
+<div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50" role="alert" aria-live="assertive"></div>
 
 {% endblock %}
 
@@ -173,12 +173,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function showFeedback(message, type) {
-        feedbackMessage.textContent = message;
-        feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${type === 'success' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700'}`;
-        feedbackMessage.classList.remove('hidden');
-        setTimeout(() => feedbackMessage.classList.add('hidden'), 3000);
-    }
 
     function getCSRFToken() {
         return document.querySelector('meta[name="csrf-token"]').getAttribute('content');

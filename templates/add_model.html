@@ -23,15 +23,13 @@
 
     <!-- Form -->
     <form id="add-model-form" method="POST" action="{{ url_for('model.create_model') }}" class="bg-white shadow-md rounded-lg p-6">
-        {{ form.csrf_token }}
+        {{ form.hidden_tag() }}
 
         <!-- Model Name -->
         <div class="mb-6">
             {{ form.name.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
             <p class="text-xs text-gray-500 mb-2">Choose a unique, descriptive name for your model (e.g., "GPT-4 Creative", "GPT-3.5 Technical")</p>
-            {{ form.name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
-                                focus:outline-none focus:ring-2 focus:ring-blue-500
-                                focus:border-transparent") }}
+            {{ form.name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.name.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.name.errors[0] }}</p>
             {% endif %}
@@ -41,9 +39,7 @@
         <div class="mb-6">
             {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
             <p class="text-xs text-gray-500 mb-2">Enter the deployment name from your Azure OpenAI resource (e.g., "gpt-4", "gpt-35-turbo")</p>
-            {{ form.deployment_name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
-                                            focus:outline-none focus:ring-2 focus:ring-blue-500
-                                            focus:border-transparent") }}
+            {{ form.deployment_name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.deployment_name.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.deployment_name.errors[0] }}</p>
             {% endif %}
@@ -53,9 +49,7 @@
         <div class="mb-6">
             {{ form.description.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
             <p class="text-xs text-gray-500 mb-2">Optional: Add notes about the model's purpose, capabilities, or usage guidelines</p>
-            {{ form.description(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 h-24
-                                        focus:outline-none focus:ring-2 focus:ring-blue-500
-                                        focus:border-transparent") }}
+            {{ form.description(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 h-24 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.description.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.description.errors[0] }}</p>
             {% endif %}
@@ -65,26 +59,9 @@
         <div class="mb-6">
             {{ form.api_endpoint.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
             <p class="text-xs text-gray-500 mb-2">Your Azure OpenAI endpoint URL (e.g., "https://your-resource.openai.azure.com")</p>
-            {{ form.api_endpoint(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
-                                         focus:outline-none focus:ring-2 focus:ring-blue-500
-                                         focus:border-transparent",
-                                placeholder="https://your-resource.openai.azure.com") }}
+            {{ form.api_endpoint(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", placeholder="https://your-resource.openai.azure.com") }}
             {% if form.api_endpoint.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
-            {% endif %}
-        </div>
-
-        <!-- API Key -->
-        <div class="mb-6">
-            {{ form.api_key.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            <p class="text-xs text-gray-500 mb-2">Your Azure OpenAI API key</p>
-            {{ form.api_key(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
-                                  focus:outline-none focus:ring-2 focus:ring-blue-500
-                                  focus:border-transparent",
-                           type="password",
-                           autocomplete="off") }}
-            {% if form.api_key.errors %}
-                <p class="text-sm text-red-500 mt-1">{{ form.api_key.errors[0] }}</p>
             {% endif %}
         </div>
 
@@ -92,9 +69,7 @@
         <div class="mb-6">
             {{ form.model_type.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
             <p class="text-xs text-gray-500 mb-2">Select 'azure' for standard models or 'o1-preview' for preview models</p>
-            {{ form.model_type(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
-                                        focus:outline-none focus:ring-2 focus:ring-blue-500
-                                        focus:border-transparent") }}
+            {{ form.model_type(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.model_type.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.model_type.errors[0] }}</p>
             {% endif %}
@@ -104,13 +79,7 @@
         <div class="mb-6">
             {{ form.temperature.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
             <p class="text-xs text-gray-500 mb-2">Controls randomness (0.0 for focused, up to 2.0 for more creative responses)</p>
-            {{ form.temperature(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
-                                        focus:outline-none focus:ring-2 focus:ring-blue-500
-                                        focus:border-transparent",
-                                type="number",
-                                step="0.1",
-                                min="0",
-                                max="2") }}
+            {{ form.temperature(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", type="number", step="0.1", min="0", max="2") }}
             {% if form.temperature.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.temperature.errors[0] }}</p>
             {% endif %}
@@ -121,12 +90,7 @@
             <div>
                 {{ form.max_tokens.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
                 <p class="text-xs text-gray-500 mb-2">Maximum input tokens (1-4000)</p>
-                {{ form.max_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
-                                            focus:outline-none focus:ring-2 focus:ring-blue-500
-                                            focus:border-transparent",
-                                    type="number",
-                                    min="1",
-                                    max="4000") }}
+                {{ form.max_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", type="number", min="1", max="4000") }}
                 {% if form.max_tokens.errors %}
                     <p class="text-sm text-red-500 mt-1">{{ form.max_tokens.errors[0] }}</p>
                 {% endif %}
@@ -134,12 +98,7 @@
             <div>
                 {{ form.max_completion_tokens.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
                 <p class="text-xs text-gray-500 mb-2">Maximum response length (1-1000)</p>
-                {{ form.max_completion_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
-                                                    focus:outline-none focus:ring-2 focus:ring-blue-500
-                                                    focus:border-transparent",
-                                            type="number",
-                                    min="1",
-                                    max="32000") }}
+                {{ form.max_completion_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", type="number", min="1", max="1000") }}
                 {% if form.max_completion_tokens.errors %}
                     <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
                 {% endif %}
@@ -150,9 +109,7 @@
         <div class="mb-6">
             {{ form.api_version.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
             <p class="text-xs text-gray-500 mb-2">Azure OpenAI API version (default: 2024-12-01-preview)</p>
-            {{ form.api_version(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
-                                         focus:outline-none focus:ring-2 focus:ring-blue-500
-                                         focus:border-transparent") }}
+            {{ form.api_version(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent") }}
             {% if form.api_version.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.api_version.errors[0] }}</p>
             {% endif %}
@@ -165,8 +122,7 @@
             <!-- Requires o1-preview Handling -->
             <div class="mb-4">
                 <label class="inline-flex items-center">
-                    {{ form.requires_o1_handling(class="h-5 w-5 text-blue-600 form-checkbox
-                                                   focus:ring-blue-500 focus:ring-2") }}
+                    {{ form.requires_o1_handling(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2") }}
                     <span class="ml-2 text-sm text-gray-700 font-medium">
                         {{ form.requires_o1_handling.label.text }}
                     </span>
@@ -177,8 +133,7 @@
             <!-- Default Model Option -->
             <div>
                 <label class="inline-flex items-center">
-                    {{ form.is_default(class="h-5 w-5 text-blue-600 form-checkbox
-                                          focus:ring-blue-500 focus:ring-2") }}
+                    {{ form.is_default(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2") }}
                     <span class="ml-2 text-sm text-gray-700 font-medium">
                         {{ form.is_default.label.text }}
                     </span>
@@ -191,10 +146,7 @@
         <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
             <button
                 type="submit"
-                class="w-full sm:w-auto px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg font-medium
-                       hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500
-                       transition duration-150 ease-in-out
-                       disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-full sm:w-auto px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg font-medium hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
                 id="submit-button"
             >
                 <span class="inline-flex items-center">
@@ -209,9 +161,7 @@
             </button>
             <a
                 href="{{ url_for('chat.chat_interface') }}"
-                class="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white rounded-lg shadow-lg font-medium
-                       hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500
-                       text-center transition duration-150 ease-in-out"
+                class="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white rounded-lg shadow-lg font-medium hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 text-center transition duration-150 ease-in-out"
             >
                 Cancel
             </a>
@@ -220,151 +170,61 @@
 </div>
 
 <!-- Feedback Message -->
-<div
-    id="feedback-message"
-    class="hidden fixed bottom-4 right-4 p-4 rounded-lg"
-></div>
+<div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50" role="alert" aria-live="assertive"></div>
 
 {% endblock content %}
 
 {% block scripts %}
 {{ super() }}
-{% block extra_scripts %}
-    <script>
-    document.addEventListener("DOMContentLoaded", function() {
+<script>
+document.addEventListener("DOMContentLoaded", function() {
     const form = document.getElementById("add-model-form");
+    const submitButton = document.getElementById("submit-button");
+    const buttonText = document.getElementById("button-text");
+    const loadingSpinner = document.getElementById("loading-spinner");
 
-    // Get references to the relevant form fields
-    const requiresO1Handling = document.getElementById("{{ form.requires_o1_handling.id }}");
-    const temperatureField = document.getElementById("{{ form.temperature.id }}");
-    const maxTokensField = document.getElementById("{{ form.max_tokens.id }}");
-
-    // Function to toggle field states based on o1-preview handling
-    function toggleO1Fields() {
-        if (requiresO1Handling.checked) {
-            temperatureField.value = '';
-            temperatureField.disabled = true;
-            maxTokensField.value = '';
-            maxTokensField.disabled = true;
-        } else {
-            temperatureField.disabled = false;
-            maxTokensField.disabled = false;
-        }
-    }
-
-    // Add event listener to checkbox
-    requiresO1Handling.addEventListener('change', toggleO1Fields);
-
-    // Set initial state
-    toggleO1Fields();
-
-    // Form validation function
-    function validateForm() {
-        const requiredFields = ['name', 'deployment_name', 'api_endpoint', 'model_type', 'api_version'];
-        let isValid = true;
-
-        requiredFields.forEach(fieldName => {
-            const field = form.querySelector(`[name="${fieldName}"]`);
-            const errorDiv = document.getElementById(`${fieldName}-error`);
-
-            if (!field.value.trim()) {
-                isValid = false;
-                if (!errorDiv) {
-                    const error = document.createElement('p');
-                    error.id = `${fieldName}-error`;
-                    error.className = 'text-sm text-red-500 mt-1';
-                    error.textContent = 'This field is required';
-                    field.parentNode.appendChild(error);
-                }
-            } else if (errorDiv) {
-                errorDiv.remove();
-            }
-        });
-
-        return isValid;
-    }
-
-    // Form submission handler
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        if (!validateForm()) {
-            return;
-        }
-
-        const submitButton = document.getElementById('submit-button');
-        const buttonText = document.getElementById('button-text');
-        const loadingSpinner = document.getElementById('loading-spinner');
+        // Show loading state
+        submitButton.disabled = true;
+        buttonText.textContent = "Adding Model...";
+        loadingSpinner.classList.remove("hidden");
 
         try {
-            // Show loading state
-            submitButton.disabled = true;
-            buttonText.textContent = 'Adding Model...';
-            loadingSpinner.classList.remove('hidden');
-
             const formData = new FormData(form);
-
             const response = await fetch(form.action, {
-                method: 'POST',
+                method: "POST",
                 body: formData,
-                credentials: 'same-origin',
                 headers: {
-                    'X-CSRFToken': form.querySelector('input[name="csrf_token"]').value
+                    "X-CSRFToken": getCSRFToken()
                 }
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                window.showFeedback(data.message || "Model created successfully", "success");
+                showFeedback("Model created successfully", "success");
                 setTimeout(() => {
                     window.location.href = "{{ url_for('chat.chat_interface') }}";
                 }, 1500);
             } else {
-                // Re-enable the submit button and hide loading spinner
-                submitButton.disabled = false;
-                buttonText.textContent = 'Add Model';
-                loadingSpinner.classList.add('hidden');
-
-                if (data.error && typeof data.error === 'object') {
-                    // Handle validation errors from WTForms
-                    Object.entries(data.error).forEach(([field, errors]) => {
-                        const fieldElement = form.querySelector(`[name="${field}"]`);
-                        if (fieldElement) {
-                            const existingError = document.getElementById(`${field}-error`);
-                            if (!existingError) {
-                                const error = document.createElement('p');
-                                error.id = `${field}-error`;
-                                error.className = 'text-sm text-red-500 mt-1';
-                                error.textContent = Array.isArray(errors) ? errors[0] : errors;
-                                fieldElement.parentNode.appendChild(error);
-                            }
-                        }
-                    });
-                    window.showFeedback("Please correct the errors in the form", "error");
-                } else {
-                    window.showFeedback(typeof data.error === 'string' ? data.error : "Failed to create the model", "error");
-                }
+                showFeedback(data.error || "Failed to create the model", "error");
             }
-        } catch (err) {
-            console.error("Error:", err);
-            window.showFeedback("An unexpected error occurred. Please try again.", "error");
+        } catch (error) {
+            console.error("Error:", error);
+            showFeedback("An unexpected error occurred. Please try again.", "error");
+        } finally {
             submitButton.disabled = false;
-            buttonText.textContent = 'Add Model';
-            loadingSpinner.classList.add('hidden');
+            buttonText.textContent = "Add Model";
+            loadingSpinner.classList.add("hidden");
         }
     });
 
-    // Add input validation listeners
-    form.querySelectorAll('input, select, textarea').forEach(field => {
-        field.addEventListener('input', () => {
-            const errorDiv = document.getElementById(`${field.name}-error`);
-            if (errorDiv && field.value.trim()) {
-                errorDiv.remove();
-            }
-        });
-    });
+
+    function getCSRFToken() {
+        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    }
 });
-    </script>
-{% endblock extra_scripts %}
+</script>
 {% endblock scripts %}

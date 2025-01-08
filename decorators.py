@@ -1,13 +1,14 @@
+# decorators.py
+
 """Decorators for authentication and authorization."""
 
 import functools
 from typing import Callable, TypeVar, cast
 
-from flask import abort, session
+from flask import abort, request
 from flask_login import current_user
 
 RT = TypeVar("RT")  # Return type for the decorated function
-
 
 def admin_required(func: Callable[..., RT]) -> Callable[..., RT]:
     """Decorator to ensure that only admin users can access a route.
@@ -21,16 +22,13 @@ def admin_required(func: Callable[..., RT]) -> Callable[..., RT]:
     Raises:
         403: If the current user is not an admin
     """
-
     @functools.wraps(func)
     def decorated_function(*args: object, **kwargs: object) -> RT:
         if not current_user.is_authenticated:
+            logger.warning(f"Unauthorized access attempt by unauthenticated user: {request.path}")
             abort(403, description="You need to be logged in to access this resource.")
         if current_user.role != "admin":
-            abort(
-                403,
-                description="You don't have sufficient privileges to access this resource.",
-            )
+            logger.warning(f"Unauthorized access attempt by non-admin user: {current_user.username}")
+            abort(403, description="You don't have sufficient privileges to access this resource.")
         return cast(RT, func(*args, **kwargs))
-
     return decorated_function
