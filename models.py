@@ -233,54 +233,62 @@ class Model:
 
     @staticmethod
     def update(model_id: int, data: Dict[str, Any]) -> None:
-        """
-        Update an existing model's attributes in the database.
+        try:
+            db: Session = get_db()
+            # 1. Validate the data (optional, but recommended)
+            Model.validate_model_config(data)
 
-        Args:
-            model_id (int): The ID of the model to update.
-            data (Mapping[str, Any]): A dictionary containing the updated model attributes.
-        """
-        db: Session = get_db()
-        # 1. Validate the data (optional, but recommended)
-        Model.validate_model_config(data)
+            # 2. Fetch the existing model
+            model = Model.get_by_id(model_id)
+            if not model:
+                raise ValueError(f"Model with ID {model_id} not found.")
 
-        # 2. Fetch the existing model
-        model = Model.get_by_id(model_id)
-        if not model:
-            raise ValueError(f"Model with ID {model_id} not found.")
+            # 3. Update model attributes
+            for key, value in data.items():
+                setattr(model, key, value)
 
-        # 3. Update model attributes
-        for key, value in data.items():
-            setattr(model, key, value)
+            # 4. Build the SQL UPDATE statement dynamically
+            ALLOWED_FIELDS = {
+                'name', 'deployment_name', 'description', 'api_endpoint',
+                'api_key', 'api_version', 'temperature', 'max_tokens',
+                'max_completion_tokens', 'model_type', 'requires_o1_handling',
+                'is_default', 'version'
+            }
+            set_clause = ", ".join(f"{key} = :{key}" for key in data if key in ALLOWED_FIELDS)
+            params = {**data, "model_id": model_id}
 
-        # 4. Build the SQL UPDATE statement dynamically
-        set_clause = ", ".join(f"{key} = :{key}" for key in data)
-        params = {**data, "model_id": model_id}
+            # 5. Execute the update
+            query = f"""
+                UPDATE models
+                SET {set_clause}
+                WHERE id = :model_id
+            """
+            db.execute(query, params)
+            db.commit()
 
-        # 5. Execute the update
-        query = f"""
-            UPDATE models
-            SET {set_clause}
-            WHERE id = :model_id
-        """
-        db.execute(query, params)
+            # 6. Handle default model logic (if applicable)
+            if data.get("is_default"):
+                db.execute(
+                    "UPDATE models SET is_default = 0 WHERE id != :model_id",
+                    {"model_id": model_id}
+                )
 
-        # 6. Handle default model logic (if applicable)
-        if data.get("is_default"):
-            db.execute(
-                "UPDATE models SET is_default = 0 WHERE id != :model_id",
-                {"model_id": model_id}
-            )
-
-        logger.info("Model updated (ID %d)", model_id)
+            logger.info("Model updated (ID %d)", model_id)
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to update model {model_id}: {e}")
+            raise
 
     @staticmethod
     def validate_model_config(config: Mapping[str, Any]) -> None:
         """
-        Validate the required fields for a model configuration.
-
+        Validate model configuration parameters.
+        
+        Args:
+            config: Dictionary containing model configuration
+            
         Raises:
-            ValueError: If a required field is missing or invalid.
+            ValueError: If any parameters are invalid
         """
         required_fields = [
             "name",
@@ -304,8 +312,6 @@ class Model:
             or "openai.azure.com" not in api_endpoint
         ):
             raise ValueError("Invalid Azure OpenAI API endpoint.")
-
-        # Validate temperature (only if present and not for o1-preview models)
         if not config.get("requires_o1_handling", False):
             temperature = config.get("temperature")
             if temperature is not None and not (0 <= float(temperature) <= 2):
@@ -317,6 +323,41 @@ class Model:
         max_tokens = config.get("max_tokens", None)
         if max_tokens is not None and (int(max_tokens) <= 0):
             raise ValueError("Max tokens must be a positive integer.")
+
+        # Add validation for max_completion_tokens
+        if config.get('max_completion_tokens'):
+            if not (0 < config['max_completion_tokens'] <= 16384):
+                raise ValueError("max_completion_tokens must be between 1 and 16384")
+
+    @staticmethod
+    def cleanup_orphaned_files() -> None:
+        """Remove files without database references"""
+        db: Session = get_db()
+        # Implementation needed
+
+    @staticmethod
+    def get_user_chats(user_id: int, limit: int = 10, offset: int = 0):
+        """
+        Fetch user chats with model information to avoid N+1 query problem.
+        
+        Args:
+            user_id: ID of the user
+            limit: Number of records to fetch
+            offset: Number of records to skip
+        
+        Returns:
+            List of user chats with model information
+        """
+        query = """
+        SELECT c.*, m.name as model_name 
+        FROM chats c 
+        LEFT JOIN models m ON c.model_id = m.id 
+        WHERE c.user_id = :user_id 
+        ORDER BY c.created_at DESC 
+        LIMIT :limit OFFSET :offset
+        """
+        db: Session = get_db()
+        return db.execute(query, {"user_id": user_id, "limit": limit, "offset": offset}).fetchall()
 
 
 @dataclass
@@ -490,8 +531,8 @@ class UploadedFile:
         if not chat_ids:
             return
         db: Session = get_db()
-        placeholders = ",".join(":id" + str(i) for i in range(len(chat_ids)))
+        placeholders = ",".join(f":id{i}" for i in range(len(chat_ids)))
         params = {f"id{i}": chat_id for i, chat_id in enumerate(chat_ids)}
         query = f"DELETE FROM uploaded_files WHERE chat_id IN ({placeholders})"
         db.execute(query, params)
-        logger.info("Deleted uploaded files for chats: %s", ", ".join(chat_ids))
+        logger.info("Deleted uploaded files for chats: %s", ", ".join(map(str, chat_ids)))

@@ -107,3 +107,9 @@ CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id); -- Speeds
 CREATE INDEX IF NOT EXISTS idx_models_is_default ON models (is_default); -- Ensures fast lookup of default model
 CREATE INDEX IF NOT EXISTS idx_uploaded_files_chat_id ON uploaded_files (chat_id); -- Speeds up file lookups by chat
 CREATE INDEX IF NOT EXISTS idx_model_versions_model_id ON model_versions (model_id); -- Speeds up version history lookups
+CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages (timestamp); -- Speeds up fetching messages by timestamp
+CREATE INDEX IF NOT EXISTS idx_chats_created_at ON chats (created_at); -- Speeds up fetching chats by creation time
+
+-- Missing constraints
+ALTER TABLE models ADD CONSTRAINT check_temperature 
+    CHECK (temperature IS NULL OR (temperature >= 0 AND temperature <= 2));

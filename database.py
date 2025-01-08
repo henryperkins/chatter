@@ -12,8 +12,9 @@ from flask.cli import with_appcontext
 logger = logging.getLogger(__name__)
 
 # Connection pool settings
-POOL_SIZE = 5
-MAX_OVERFLOW = 10
+# Pool settings too aggressive for SQLite
+POOL_SIZE = 1  # SQLite supports only one writer
+MAX_OVERFLOW = 2  # Minimal overflow for read operations
 POOL_RECYCLE = 3600  # Recycle connections after 1 hour
 POOL_TIMEOUT = 30  # Wait up to 30 seconds for a connection
 
