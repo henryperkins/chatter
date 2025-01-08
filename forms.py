@@ -26,6 +26,8 @@ from typing import Any
 from azure_config import validate_api_endpoint
 from requests.exceptions import RequestException, Timeout
 from database import get_db
+from sqlalchemy import text
+
 
 class LoginForm(FlaskForm):
     """
@@ -102,7 +104,7 @@ class RegistrationForm(FlaskForm):
         # Check for existing username
         with get_db() as db:
             existing = db.execute(
-                "SELECT username FROM users WHERE LOWER(username) = ?",
+                text("SELECT username FROM users WHERE LOWER(username) = ?"),
                 (username,)
             ).fetchone()
             if existing:
@@ -119,7 +121,7 @@ class RegistrationForm(FlaskForm):
         # Check for existing email
         with get_db() as db:
             existing = db.execute(
-                "SELECT email FROM users WHERE LOWER(email) = ?",
+                 text("SELECT email FROM users WHERE LOWER(email) = ?"),
                 (email,)
             ).fetchone()
             if existing:
