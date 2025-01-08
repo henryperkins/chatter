@@ -10,22 +10,19 @@ from flask import (
     Response
 )
 from flask_login import login_user, logout_user, current_user, login_required
-from database import get_db  # Use the centralized context manager
+from database import get_db
 from sqlalchemy import text
 from models import User
 from decorators import admin_required
 from forms import LoginForm, RegistrationForm, ResetPasswordForm
 from extensions import limiter
 
-
 # Define the blueprint
 bp = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
 
-
 # Track failed registration attempts
 failed_registrations: Dict[str, List[datetime]] = {}
-
 
 # Login route with rate-limiting
 @bp.route("/login", methods=["GET", "POST"])
@@ -40,7 +37,6 @@ def login():
             username = form.username.data.strip()
             password = form.password.data.strip()
 
-            from sqlalchemy import text
             db = get_db()
             user = db.execute(
                 text("SELECT * FROM users WHERE username = :username"),
@@ -61,7 +57,6 @@ def login():
 
     return render_template("login.html", form=form)
 
-
 def check_registration_attempts(ip: str) -> bool:
     """Check if IP has exceeded failed registration attempts"""
     now = datetime.now()
@@ -75,7 +70,6 @@ def check_registration_attempts(ip: str) -> bool:
         if len(failed_registrations[ip]) >= 5:
             return False
     return True
-
 
 # Registration route
 @bp.route("/register", methods=["GET", "POST"])
@@ -136,7 +130,6 @@ def register() -> Response:
 
     return render_template("register.html", form=form)
 
-
 # Logout route
 @bp.route("/logout")
 @login_required
@@ -144,7 +137,6 @@ def logout() -> Response:
     logout_user()
     session.clear()
     return redirect(url_for("auth.login"))
-
 
 # Forgot Password route
 @bp.route("/forgot_password", methods=["GET", "POST"])
@@ -180,6 +172,7 @@ def forgot_password() -> Response:
                 }
             )
             db.commit()
+            # In a real application, you would send an email here with the reset link
             return jsonify({"success": True, "message": "A password reset link has been sent to your email."}), 200
         except Exception as e:
             db.rollback()
@@ -187,7 +180,6 @@ def forgot_password() -> Response:
             return jsonify({"success": False, "error": "Failed to process password reset"}), 500
 
     return render_template("forgot_password.html")
-
 
 # Reset Password route
 @bp.route("/reset_password/<token>", methods=["GET", "POST"])
@@ -217,12 +209,12 @@ def reset_password(token):
                 "user_id": user["id"]
             }
         )
+        db.commit() # Added to commit the changes to the database.
         return jsonify({"success": True, "message": "Your password has been reset successfully."}), 200
     elif request.method == "POST":
         return jsonify({"success": False, "errors": form.errors}), 400
 
     return render_template("reset_password.html", form=form, token=token)
-
 
 # Manage Users route (admin-only access)
 @bp.route("/manage-users")
@@ -232,7 +224,6 @@ def manage_users() -> Response:
     db = get_db()
     users = db.execute(text("SELECT id, username, email, role FROM users")).fetchall()
     return render_template("manage_users.html", users=users)
-
 
 # API endpoint to update a user's role (admin-only access)
 @bp.route("/api/users/<int:user_id>/role", methods=["PUT"])
