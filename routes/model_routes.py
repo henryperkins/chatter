@@ -17,7 +17,7 @@ from flask import (
     current_app,
 )
 from flask_login import login_required, current_user
-from database import db_connection  # Use the centralized context manager
+from database import get_db  # Use the centralized context manager
 from models import Model
 from decorators import admin_required
 from forms import ModelForm

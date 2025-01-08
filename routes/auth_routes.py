@@ -10,7 +10,7 @@ from flask import (
     Response
 )
 from flask_login import login_user, logout_user, current_user, login_required
-from database import db_connection  # Use the centralized context manager
+from database import get_db  # Use the centralized context manager
 from models import User
 from decorators import admin_required
 from forms import LoginForm, RegistrationForm, ResetPasswordForm
@@ -39,20 +39,20 @@ def login():
             username = form.username.data.strip()
             password = form.password.data.strip()
 
-            with db_connection() as db:
-                user = db.execute(
-                    "SELECT * FROM users WHERE username = ?", (username,)
-                ).fetchone()
+            db = get_db()
+            user = db.execute(
+                "SELECT * FROM users WHERE username = ?", (username,)
+            ).fetchone()
 
-                if user and bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]):
-                    user_obj = User(user["id"], user["username"], user["email"], user["role"])
-                    session.clear()
-                    login_user(user_obj)
-                    logger.info(f"User {user['id']} logged in successfully.")
-                    return jsonify({"success": True, "message": "Login successful"}), 200
-                else:
-                    logger.warning(f"Failed login attempt for username: {username}")
-                    return jsonify({"success": False, "error": "Invalid username or password"}), 401
+            if user and bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]):
+                user_obj = User(user["id"], user["username"], user["email"], user["role"])
+                session.clear()
+                login_user(user_obj)
+                logger.info(f"User {user['id']} logged in successfully.")
+                return jsonify({"success": True, "message": "Login successful"}), 200
+            else:
+                logger.warning(f"Failed login attempt for username: {username}")
+                return jsonify({"success": False, "error": "Invalid username or password"}), 401
         else:
             return jsonify({"success": False, "errors": form.errors}), 400
 
@@ -93,30 +93,30 @@ def register() -> Response:
             email = form.email.data.lower().strip()
             password = form.password.data
 
-            with db_connection() as db:
-                # Case-insensitive check for existing username/email
-                existing_user = db.execute(
-                    "SELECT id FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)",
-                    (username, email),
-                ).fetchone()
+            db = get_db()
+            # Case-insensitive check for existing username/email
+            existing_user = db.execute(
+                "SELECT id FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)",
+                (username, email),
+            ).fetchone()
 
-                if existing_user:
-                    # Track failed attempt
-                    if ip not in failed_registrations:
-                        failed_registrations[ip] = []
-                    failed_registrations[ip].append(datetime.now())
+            if existing_user:
+                # Track failed attempt
+                if ip not in failed_registrations:
+                    failed_registrations[ip] = []
+                failed_registrations[ip].append(datetime.now())
 
-                    return jsonify({"success": False, "error": "Username or email already exists"}), 400
+                return jsonify({"success": False, "error": "Username or email already exists"}), 400
 
-                hashed_password = bcrypt.hashpw(
-                    password.encode("utf-8"), bcrypt.gensalt(rounds=12)
-                )
+            hashed_password = bcrypt.hashpw(
+                password.encode("utf-8"), bcrypt.gensalt(rounds=12)
+            )
 
-                db.execute(
-                    "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
-                    (username, email, hashed_password, "user"),
-                )
-                return jsonify({"success": True, "message": "Registration successful! Please check your email to confirm your account."}), 200
+            db.execute(
+                "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
+                (username, email, hashed_password, "user"),
+            )
+            return jsonify({"success": True, "message": "Registration successful! Please check your email to confirm your account."}), 200
         else:
             return jsonify({"success": False, "errors": form.errors}), 400
 
@@ -146,19 +146,19 @@ def forgot_password() -> Response:
         if not email:
             return jsonify({"success": False, "error": "Email is required."}), 400
 
-        with db_connection() as db:
-            user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        db = get_db()
+        user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
 
-            if not user:
-                return jsonify({"success": False, "error": "No account found with that email address."}), 404
+        if not user:
+            return jsonify({"success": False, "error": "No account found with that email address."}), 404
 
-            # Generate a password reset token (for simplicity, using a UUID here)
-            reset_token = str(uuid.uuid4())
-            db.execute(
-                "UPDATE users SET reset_token = ?, reset_token_expiry = datetime('now', '+1 hour') WHERE email = ?",
-                (reset_token, email),
-            )
-            return jsonify({"success": True, "message": "A password reset link has been sent to your email."}), 200
+        # Generate a password reset token (for simplicity, using a UUID here)
+        reset_token = str(uuid.uuid4())
+        db.execute(
+            "UPDATE users SET reset_token = ?, reset_token_expiry = datetime('now', '+1 hour') WHERE email = ?",
+            (reset_token, email),
+        )
+        return jsonify({"success": True, "message": "A password reset link has been sent to your email."}), 200
 
     return render_template("forgot_password.html")
 
@@ -171,26 +171,26 @@ def reset_password(token):
     Handle the password reset using the provided token.
     """
     form = ResetPasswordForm()
-    with db_connection() as db:
-        user = db.execute(
-            "SELECT * FROM users WHERE reset_token = ? AND reset_token_expiry > datetime('now')",
-            (token,),
-        ).fetchone()
+    db = get_db()
+    user = db.execute(
+        "SELECT * FROM users WHERE reset_token = ? AND reset_token_expiry > datetime('now')",
+        (token,),
+    ).fetchone()
 
-        if not user:
-            return jsonify({"success": False, "error": "Invalid or expired reset token."}), 400
+    if not user:
+        return jsonify({"success": False, "error": "Invalid or expired reset token."}), 400
 
-        if request.method == "POST" and form.validate_on_submit():
-            password = form.password.data.strip()
-            hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12))
+    if request.method == "POST" and form.validate_on_submit():
+        password = form.password.data.strip()
+        hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12))
 
-            db.execute(
-                "UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?",
-                (hashed_password, user["id"]),
-            )
-            return jsonify({"success": True, "message": "Your password has been reset successfully."}), 200
-        elif request.method == "POST":
-            return jsonify({"success": False, "errors": form.errors}), 400
+        db.execute(
+            "UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?",
+            (hashed_password, user["id"]),
+        )
+        return jsonify({"success": True, "message": "Your password has been reset successfully."}), 200
+    elif request.method == "POST":
+        return jsonify({"success": False, "errors": form.errors}), 400
 
     return render_template("reset_password.html", form=form, token=token)
 
@@ -200,9 +200,9 @@ def reset_password(token):
 @login_required
 @admin_required
 def manage_users() -> Response:
-    with db_connection() as db:
-        users = db.execute("SELECT id, username, email, role FROM users").fetchall()
-        return render_template("manage_users.html", users=users)
+    db = get_db()
+    users = db.execute("SELECT id, username, email, role FROM users").fetchall()
+    return render_template("manage_users.html", users=users)
 
 
 # API endpoint to update a user's role (admin-only access)
@@ -214,6 +214,6 @@ def update_user_role(user_id: int) -> tuple[Response, int]:
     if new_role not in ["user", "admin"]:
         return jsonify({"success": False, "error": "Invalid role"}), 400
 
-    with db_connection() as db:
-        db.execute("UPDATE users SET role = ? WHERE id = ?", (new_role, user_id))
-        return jsonify({"success": True}), 200
+    db = get_db()
+    db.execute("UPDATE users SET role = ? WHERE id = ?", (new_role, user_id))
+    return jsonify({"success": True}), 200
