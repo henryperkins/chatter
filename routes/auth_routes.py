@@ -4,13 +4,14 @@ from datetime import datetime, timedelta
 import logging
 import bcrypt
 import uuid
-from typing import Dict, List, Optional
+from typing import Dict, List
 from flask import (
-    Blueprint, render_template, request, redirect, url_for, flash, session, jsonify,
+    Blueprint, render_template, request, redirect, url_for, session, jsonify,
     Response
 )
 from flask_login import login_user, logout_user, current_user, login_required
 from database import get_db  # Use the centralized context manager
+from sqlalchemy import text
 from models import User
 from decorators import admin_required
 from forms import LoginForm, RegistrationForm, ResetPasswordForm
@@ -39,9 +40,11 @@ def login():
             username = form.username.data.strip()
             password = form.password.data.strip()
 
+            from sqlalchemy import text
             db = get_db()
             user = db.execute(
-                "SELECT * FROM users WHERE username = ?", (username,)
+                text("SELECT * FROM users WHERE username = :username"),
+                {"username": username}
             ).fetchone()
 
             if user and bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]):
@@ -96,8 +99,8 @@ def register() -> Response:
             db = get_db()
             # Case-insensitive check for existing username/email
             existing_user = db.execute(
-                "SELECT id FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)",
-                (username, email),
+                text("SELECT id FROM users WHERE LOWER(username) = LOWER(:username) OR LOWER(email) = LOWER(:email)"),
+                {"username": username, "email": email}
             ).fetchone()
 
             if existing_user:
@@ -112,11 +115,22 @@ def register() -> Response:
                 password.encode("utf-8"), bcrypt.gensalt(rounds=12)
             )
 
-            db.execute(
-                "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
-                (username, email, hashed_password, "user"),
-            )
-            return jsonify({"success": True, "message": "Registration successful! Please check your email to confirm your account."}), 200
+            try:
+                db.execute(
+                    text("INSERT INTO users (username, email, password_hash, role) VALUES (:username, :email, :password_hash, :role)"),
+                    {
+                        "username": username,
+                        "email": email,
+                        "password_hash": hashed_password,
+                        "role": "user"
+                    }
+                )
+                db.commit()
+                return jsonify({"success": True, "message": "Registration successful! Please check your email to confirm your account."}), 200
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Database error during registration: {e}")
+                return jsonify({"success": False, "error": "Registration failed due to database error"}), 500
         else:
             return jsonify({"success": False, "errors": form.errors}), 400
 
@@ -147,18 +161,30 @@ def forgot_password() -> Response:
             return jsonify({"success": False, "error": "Email is required."}), 400
 
         db = get_db()
-        user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+        user = db.execute(
+            text("SELECT * FROM users WHERE email = :email"),
+            {"email": email}
+        ).fetchone()
 
         if not user:
             return jsonify({"success": False, "error": "No account found with that email address."}), 404
 
         # Generate a password reset token (for simplicity, using a UUID here)
-        reset_token = str(uuid.uuid4())
-        db.execute(
-            "UPDATE users SET reset_token = ?, reset_token_expiry = datetime('now', '+1 hour') WHERE email = ?",
-            (reset_token, email),
-        )
-        return jsonify({"success": True, "message": "A password reset link has been sent to your email."}), 200
+        try:
+            reset_token = str(uuid.uuid4())
+            db.execute(
+                text("UPDATE users SET reset_token = :token, reset_token_expiry = datetime('now', '+1 hour') WHERE email = :email"),
+                {
+                    "token": reset_token,
+                    "email": email
+                }
+            )
+            db.commit()
+            return jsonify({"success": True, "message": "A password reset link has been sent to your email."}), 200
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Database error during password reset: {e}")
+            return jsonify({"success": False, "error": "Failed to process password reset"}), 500
 
     return render_template("forgot_password.html")
 
@@ -173,8 +199,8 @@ def reset_password(token):
     form = ResetPasswordForm()
     db = get_db()
     user = db.execute(
-        "SELECT * FROM users WHERE reset_token = ? AND reset_token_expiry > datetime('now')",
-        (token,),
+        text("SELECT * FROM users WHERE reset_token = :token AND reset_token_expiry > datetime('now')"),
+        {"token": token}
     ).fetchone()
 
     if not user:
@@ -185,8 +211,11 @@ def reset_password(token):
         hashed_password = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=12))
 
         db.execute(
-            "UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?",
-            (hashed_password, user["id"]),
+            text("UPDATE users SET password_hash = :password_hash, reset_token = NULL, reset_token_expiry = NULL WHERE id = :user_id"),
+            {
+                "password_hash": hashed_password,
+                "user_id": user["id"]
+            }
         )
         return jsonify({"success": True, "message": "Your password has been reset successfully."}), 200
     elif request.method == "POST":
@@ -201,7 +230,7 @@ def reset_password(token):
 @admin_required
 def manage_users() -> Response:
     db = get_db()
-    users = db.execute("SELECT id, username, email, role FROM users").fetchall()
+    users = db.execute(text("SELECT id, username, email, role FROM users")).fetchall()
     return render_template("manage_users.html", users=users)
 
 
@@ -215,5 +244,14 @@ def update_user_role(user_id: int) -> tuple[Response, int]:
         return jsonify({"success": False, "error": "Invalid role"}), 400
 
     db = get_db()
-    db.execute("UPDATE users SET role = ? WHERE id = ?", (new_role, user_id))
-    return jsonify({"success": True}), 200
+    try:
+        db.execute(
+            text("UPDATE users SET role = :role WHERE id = :user_id"),
+            {"role": new_role, "user_id": user_id}
+        )
+        db.commit()
+        return jsonify({"success": True}), 200
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Database error during role update: {e}")
+        return jsonify({"success": False, "error": "Failed to update user role"}), 500

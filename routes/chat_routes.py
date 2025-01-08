@@ -1,8 +1,6 @@
 import logging
 import os
 from typing import Union, Tuple
-from sqlalchemy.orm import Session
-from sqlalchemy import text
 
 import bleach
 from flask import (
@@ -23,8 +21,9 @@ from datetime import datetime, timedelta
 from chat_api import scrape_data, get_azure_response
 from chat_utils import generate_new_chat_id
 from conversation_manager import ConversationManager
-from database import get_db  # Use SQLAlchemy session
-from models import Chat, Model, UploadedFile, Message
+from database import get_db
+from sqlalchemy import text
+from models import Chat, Model
 import tiktoken
 
 bp = Blueprint("chat", __name__)
@@ -89,46 +88,32 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
     logger.info("New chat created with ID: %s", chat_id)
 
     if request.method == "POST":
-        # Return JSON if invoked via AJAX (POST)
         return jsonify({"success": True, "chat_id": chat_id})
-    # Otherwise, you can render a template if it's a GET request
     return render_template("new_chat.html")
 
 
 @bp.route("/chat_interface")
 @login_required
 def chat_interface() -> str:
-    """
-    Render the main chat interface page.
-    1. Retrieve chat_id from URL parameters (chat_id=...) or the session.
-    2. Verify ownership if chat_id is found.
-    3. If no valid chat_id, create a new one and save to session.
-    4. Load messages, models, and optionally the user's conversation list.
-    """
-    # 1. Retrieve from URL or session
+    """Render the main chat interface page."""
     chat_id = request.args.get("chat_id") or session.get("chat_id")
 
     if chat_id:
-        # 2. Verify chat ownership
         if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
             logger.warning("Unauthorized access attempt to chat %s", chat_id)
             return "Chat not found or access denied", 403
 
-        session["chat_id"] = chat_id  # Update session with the valid chat_id
+        session["chat_id"] = chat_id
     else:
-        # 3. No chat_id at all -> create new
         chat_id = generate_new_chat_id()
         user_id = int(current_user.id)
         Chat.create(chat_id, user_id, "New Chat")
         session["chat_id"] = chat_id
 
-    # 4. Load messages for this chat
     messages = conversation_manager.get_context(chat_id)
     models = Model.get_all()
-    # If you want a conversation list in the sidebar, you can do:
     conversations = Chat.get_user_chats(current_user.id)
 
-    # Get today and yesterday dates in the same format as chat timestamps
     today = datetime.now().strftime('%Y-%m-%d')
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
 
@@ -150,7 +135,6 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Load and return the messages for a specific chat."""
     db = get_db()
     try:
-        # Verify chat ownership using ORM
         chat = db.query(Chat).filter(
             Chat.id == chat_id,
             Chat.user_id == current_user.id
@@ -161,7 +145,6 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
             return jsonify({"error": "Chat not found or access denied"}), 403
 
         messages = conversation_manager.get_context(chat_id)
-        # Exclude 'system' messages from being sent to the frontend
         messages_to_send = [msg for msg in messages if msg["role"] != "system"]
         return jsonify({"messages": messages_to_send})
     finally:
@@ -174,22 +157,27 @@ def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Delete a chat and its associated messages."""
     db = get_db()
     try:
-        chat_to_delete = db.query(Chat).filter(Chat.id == chat_id).first()
+        chat_to_delete = db.query(Chat).filter(
+            Chat.id == chat_id,
+            Chat.user_id == current_user.id
+        ).first()
 
-        if not chat_to_delete or chat_to_delete.user_id != current_user.id:
+        if not chat_to_delete:
             logger.warning(
                 "Attempt to delete non-existent or unauthorized chat: %s", chat_id
             )
             return jsonify({"error": "Chat not found or access denied"}), 403
 
-        # Delete associated messages
-        db.query(Message).filter(Message.chat_id == chat_id).delete()
-        
-        # Delete the chat
-        db.delete(chat_to_delete)
-        db.commit()
-        logger.info("Chat %s deleted successfully", chat_id)
-        return jsonify({"success": True})
+        try:
+            db.execute(text("PRAGMA foreign_keys = ON"))
+            db.delete(chat_to_delete)
+            db.commit()
+            logger.info("Chat %s deleted successfully", chat_id)
+            return jsonify({"success": True})
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error deleting chat {chat_id}: {e}")
+            return jsonify({"error": "Failed to delete chat"}), 500
     finally:
         db.close()
 
@@ -234,12 +222,10 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         logger.error("Chat ID not found in session.")
         return jsonify({"error": "Chat ID not found."}), 400
 
-    # Retrieve the model for this chat, if any
     model_id = Chat.get_model(chat_id)
     model_obj = Model.get_by_id(model_id) if model_id else Model.get_default()
     requires_o1_handling = model_obj.requires_o1_handling if model_obj else False
 
-    # Validate model configuration
     if not model_obj or not model_obj.deployment_name:
         logger.error("Invalid model configuration: deployment name is missing.")
         return jsonify({"error": "Invalid model configuration. Please select a valid model."}), 400
@@ -248,7 +234,6 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         logger.error("Invalid model configuration: API key or endpoint is missing.")
         return jsonify({"error": "Invalid model configuration. Please check the API settings."}), 400
 
-    # Initialize variables
     user_message = bleach.clean(request.form.get("message", "").strip())
     uploaded_files = request.files.getlist("files[]")
     included_files = []
@@ -256,20 +241,17 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
     file_contents = []
     total_tokens = len(encoding.encode(user_message)) if user_message else 0
 
-    # Handle uploaded files
     for file in uploaded_files:
         if file:
             filename = secure_filename(file.filename)
             mime_type = file.mimetype
 
-            # Validate file extension and MIME type
             if not allowed_file(filename) or mime_type not in ALLOWED_MIME_TYPES:
                 error_message = f"File type not allowed: {filename}"
                 logger.warning(error_message)
                 excluded_files.append({"filename": filename, "error": error_message})
                 continue
 
-            # Check file size
             file.seek(0, os.SEEK_END)
             file_length = file.tell()
             file.seek(0)
@@ -279,12 +261,10 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                 excluded_files.append({"filename": filename, "error": error_message})
                 continue
 
-            # Save the file to the upload folder
             file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
             try:
                 file.save(file_path)
                 included_files.append({"filename": filename})
-                # Process file content if necessary
                 if mime_type.startswith('text/'):
                     try:
                         with open(file_path, 'r', encoding='utf-8') as f:
@@ -295,16 +275,12 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                         excluded_files.append({"filename": filename, "error": error_message})
                         continue
 
-                    # Truncate file content to avoid excessive tokens
                     truncated_content = truncate_message(file_content, MAX_FILE_CONTENT_LENGTH)
-
-                    # Format file content with markdown
                     formatted_content = f"\nFile '{filename}' content:\n```\n{truncated_content}\n```\n"
                     
-                    # Check if adding this file would exceed token limit
                     content_tokens = len(encoding.encode(formatted_content))
                     if total_tokens + content_tokens > MAX_INPUT_TOKENS:
-                        error_message = f"File {filename} skipped: Adding it would exceed the {MAX_INPUT_TOKENS} token limit (current: {total_tokens}, file: {content_tokens})"
+                        error_message = f"File {filename} skipped: Adding it would exceed the {MAX_INPUT_TOKENS} token limit"
                         logger.warning(error_message)
                         excluded_files.append({"filename": filename, "error": error_message})
                         continue
@@ -323,30 +299,24 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             logger.warning(error_message)
             excluded_files.append({"filename": "Unknown", "error": error_message})
 
-    # Combine user message with file contents
     if file_contents:
         combined_message = user_message + "\n" + "".join(file_contents) if user_message else "".join(file_contents)
     else:
         combined_message = user_message
 
-    # Only proceed if there's a message or files were included
     if combined_message:
         conversation_manager.add_message(chat_id, "user", combined_message)
 
-        # Update chat title if it's still "New Chat" and there's a text message
         if user_message and Chat.is_title_default(chat_id):
             new_title = user_message.split("\n")[0][:50]
             Chat.update_title(chat_id, new_title)
 
-    # Retrieve conversation history
     history = conversation_manager.get_context(
         chat_id,
         include_system=not requires_o1_handling
     )
 
-    # Get the Azure OpenAI response
     try:
-        # Prepare model configuration
         model_config = {
             "messages": history,
             "deployment_name": model_obj.deployment_name if model_obj else None,
@@ -358,20 +328,16 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             "requires_o1_handling": model_obj.requires_o1_handling if model_obj else False,
         }
 
-        # Set a timeout for the Azure OpenAI response
-        timeout_seconds = 30  # Adjust as needed
+        timeout_seconds = 30
         start_time = datetime.now()
 
-        # Get response from Azure OpenAI
         model_response = get_azure_response(**model_config)
 
-        # Check if the response took too long
         elapsed_time = (datetime.now() - start_time).total_seconds()
         if elapsed_time > timeout_seconds:
             logger.warning(f"Response took too long: {elapsed_time} seconds")
             return jsonify({"error": "The assistant is taking longer than usual to respond. Please try again."}), 504
 
-        # Add assistant's response to conversation history
         conversation_manager.add_message(chat_id, "assistant", model_response)
 
         response_data = {"response": model_response}

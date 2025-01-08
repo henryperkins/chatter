@@ -3,7 +3,7 @@ import os
 from typing import Dict, List, Optional
 
 from sqlalchemy import text
-from database import SessionLocal
+from database import get_db
 from token_utils import count_tokens
 import tiktoken
 
@@ -71,9 +71,9 @@ class ConversationManager:
         Returns:
             A list of message dictionaries with 'role' and 'content'.
         """
-        with SessionLocal() as session:
-            # Explicitly order by timestamp ascending
-            messages = session.execute(
+        db = get_db()
+        try:
+            messages = db.execute(
                 text("""
                 SELECT id, role, content
                 FROM messages
@@ -94,6 +94,8 @@ class ConversationManager:
                     for msg in messages
                     if msg["role"] != "system"
                 ]
+        finally:
+            db.close()
 
     def add_message(self, chat_id: str, role: str, content: str) -> None:
         """
@@ -123,63 +125,73 @@ class ConversationManager:
             tokens=tokens
         )
 
+        db = get_db()
         try:
-            with SessionLocal() as session:
-                # Insert new message
-                session.execute(
-                    text("""
-                    INSERT INTO messages (chat_id, role, content)
-                    VALUES (:chat_id, :role, :content)
-                    """),
-                    {"chat_id": chat_id, "role": role, "content": content}
+            # Insert new message
+            db.execute(
+                text("""
+                INSERT INTO messages (chat_id, role, content)
+                VALUES (:chat_id, :role, :content)
+                """),
+                {"chat_id": chat_id, "role": role, "content": content}
+            )
+            db.commit()
+
+            # Get all messages including the new one
+            messages = db.execute(
+                text("""
+                SELECT id, role, content
+                FROM messages
+                WHERE chat_id = :chat_id
+                ORDER BY timestamp ASC
+                """),
+                {"chat_id": chat_id}
+            ).fetchall()
+
+            # Convert to message dicts
+            message_dicts = [
+                {"id": msg["id"], "role": msg["role"], "content": msg["content"]}
+                for msg in messages
+            ]
+
+            # Trim based on total token count
+            total_tokens = self.num_tokens_from_messages(message_dicts)
+            while total_tokens > MAX_TOKENS and len(message_dicts) > 1:
+                # Remove oldest message to stay within token limit
+                msg_to_remove = message_dicts.pop(0)
+                db.execute(
+                    text("DELETE FROM messages WHERE id = :id"),
+                    {"id": msg_to_remove["id"]}
                 )
-                session.commit()
-
-                # Get all messages including the new one
-                messages = session.execute(
-                    text("""
-                    SELECT id, role, content
-                    FROM messages
-                    WHERE chat_id = :chat_id
-                    ORDER BY timestamp ASC
-                    """),
-                    {"chat_id": chat_id}
-                ).fetchall()
-
-                # Convert to message dicts
-                message_dicts = [
-                    {"id": msg["id"], "role": msg["role"], "content": msg["content"]}
-                    for msg in messages
-                ]
-
-                # Trim based on total token count
+                db.commit()
                 total_tokens = self.num_tokens_from_messages(message_dicts)
-                while total_tokens > MAX_TOKENS and len(message_dicts) > 1:
-                    # Remove oldest message to stay within token limit
-                    msg_to_remove = message_dicts.pop(0)
-                    session.execute(
-                        text("DELETE FROM messages WHERE id = :id"),
-                        {"id": msg_to_remove["id"]}
-                    )
-                    session.commit()
-                    total_tokens = self.num_tokens_from_messages(message_dicts)
 
-                logger.debug(
-                    f"Added message to chat {chat_id}: {role}: {content[:50]}..."
-                )
+            logger.debug(
+                f"Added message to chat {chat_id}: {role}: {content[:50]}..."
+            )
         except Exception as e:
+            db.rollback()
             logger.error(f"Error adding message to chat {chat_id}: {e}")
             raise
+        finally:
+            db.close()
 
     def clear_context(self, chat_id: str) -> None:
         """Clear the conversation context for a specific chat ID."""
-        with SessionLocal() as session:
-            session.execute(
+        db = get_db()
+        try:
+            db.execute(
                 text("DELETE FROM messages WHERE chat_id = :chat_id"),
                 {"chat_id": chat_id}
             )
-            session.commit()
+            db.commit()
             logger.debug(f"Cleared context for chat {chat_id}")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error clearing context for chat {chat_id}: {e}")
+            raise
+        finally:
+            db.close()
 
     def truncate_message(self, message: str, max_tokens: int, tokens: Optional[List[int]] = None) -> str:
         """

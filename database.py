@@ -42,6 +42,7 @@ def get_db():
         g.db = g.db_session()
     return g.db
 
+
 def close_db(e: Optional[BaseException] = None) -> None:
     """Return database connection to pool."""
     db = g.pop("db", None)
@@ -57,20 +58,23 @@ def close_db(e: Optional[BaseException] = None) -> None:
     if db_engine is not None:
         db_engine.dispose()
 
+
 def init_db() -> None:
     """Initialize database tables."""
     try:
         db = get_db()
         with current_app.open_resource("schema.sql") as f:
             # Execute each statement separately to handle SQLAlchemy
+            from sqlalchemy import text
             for statement in f.read().decode("utf8").split(';'):
                 if statement.strip():
-                    db.execute(statement)
-        db.commit()
-        logger.info("Database initialized successfully")
+                    db.execute(text(statement))
+            db.commit()
+            logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise RuntimeError("Failed to initialize the database. Please check the schema file and try again.")
+
 
 @click.command("init-db")
 @with_appcontext
@@ -78,6 +82,7 @@ def init_db_command() -> None:
     """Flask CLI command to initialize database."""
     init_db()
     click.echo("Initialized the database.")
+
 
 def init_app(app: Flask) -> None:
     """Register database functions with Flask app."""

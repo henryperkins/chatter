@@ -9,7 +9,7 @@ from werkzeug.wrappers import Response
 from flask_login import current_user
 from flask_wtf.csrf import CSRFError
 from werkzeug.exceptions import HTTPException
-from database import close_db, init_db, init_app, db_connection
+from database import close_db, init_db, init_app, get_db
 from models import User
 from extensions import limiter, login_manager, csrf
 from routes.auth_routes import bp as auth_bp
@@ -83,13 +83,17 @@ with app.app_context():
 # User loader for Flask-Login
 @login_manager.user_loader
 def load_user(user_id: str) -> Optional[User]:
-    with db_connection() as db:
+    db = get_db()
+    try:
         user_row = db.execute(
             "SELECT id, username, email, role FROM users WHERE id = ?", (int(user_id),)
         ).fetchone()
         if user_row:
             return User(**dict(user_row))
         return None
+    finally:
+        db.close()
+
 
 # --- CLEANUP HANDLERS ---
 
@@ -185,8 +189,11 @@ def index() -> Response:
         return redirect(url_for("auth.login"), code=307)
     return redirect(url_for("chat.chat_interface"), code=307)
 
+
 # --- APPLICATION ENTRY POINT ---
 
 if __name__ == "__main__":
     port = int(os.environ.get('PORT', 5000))  # Get port from environment or use 5000 as default
     app.run(host='0.0.0.0', port=port, debug=False)  # Ensure `debug=False` in production
+
+
