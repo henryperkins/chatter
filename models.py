@@ -9,7 +9,8 @@ import logging
 from dataclasses import dataclass
 from typing import Optional, List, Union, Any, Mapping, Dict
 
-from database import db_connection  # Use the centralized context manager
+from database import get_db  # Use SQLAlchemy session manager
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +31,13 @@ class User:
         """
         Retrieve a user by ID from the database.
         """
-        with db_connection() as db:
-            user_row = db.execute(
-                "SELECT * FROM users WHERE id = ?", (user_id,)
-            ).fetchone()
-            if user_row:
-                return User(**dict(user_row))
-            return None
+        db: Session = get_db()
+        user_row = db.execute(
+            "SELECT * FROM users WHERE id = :user_id", {"user_id": user_id}
+        ).fetchone()
+        if user_row:
+            return User(**dict(user_row))
+        return None
 
     @property
     def is_authenticated(self) -> bool:
@@ -91,57 +92,62 @@ class Model:
         """
         Retrieve the default model (where `is_default=1`).
         """
-        with db_connection() as db:
-            row = db.execute("SELECT * FROM models WHERE is_default = 1").fetchone()
-            if row:
-                return Model(**dict(row))
-            return None
+        db: Session = get_db()
+        row = db.execute(
+            "SELECT * FROM models WHERE is_default = 1"
+        ).fetchone()
+        if row:
+            return Model(**dict(row))
+        return None
 
     @staticmethod
     def get_by_id(model_id: int) -> Optional["Model"]:
         """
         Retrieve a model by its ID.
         """
-        with db_connection() as db:
-            row = db.execute(
-                "SELECT * FROM models WHERE id = ?", (model_id,)
-            ).fetchone()
-            if row:
-                return Model(**dict(row))
-            return None
+        db: Session = get_db()
+        row = db.execute(
+            "SELECT * FROM models WHERE id = :model_id", {"model_id": model_id}
+        ).fetchone()
+        if row:
+            return Model(**dict(row))
+        return None
 
     @staticmethod
     def get_all(limit: int = 10, offset: int = 0) -> List["Model"]:
         """
         Retrieve all models from the database, optionally paginated.
         """
-        with db_connection() as db:
-            rows = db.execute(
-                "SELECT * FROM models ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                (limit, offset),
-            ).fetchall()
-            return [Model(**dict(row)) for row in rows]
+        db: Session = get_db()
+        rows = db.execute(
+            "SELECT * FROM models ORDER BY created_at DESC LIMIT :limit OFFSET :offset",
+            {"limit": limit, "offset": offset}
+        ).fetchall()
+        return [Model(**dict(row)) for row in rows]
 
     @staticmethod
     def set_default(model_id: int):
         """
         Set a model as the default, and remove the default status from any other model.
         """
-        with db_connection() as db:
-            # Reset the current default model
-            db.execute("UPDATE models SET is_default = 0 WHERE is_default = 1")
+        db: Session = get_db()
+        # Reset the current default model
+        db.execute("UPDATE models SET is_default = 0 WHERE is_default = 1")
 
-            # Set the new model as default
-            db.execute("UPDATE models SET is_default = 1 WHERE id = ?", (model_id,))
+        # Set the new model as default
+        db.execute(
+            "UPDATE models SET is_default = 1 WHERE id = :model_id",
+            {"model_id": model_id}
+        )
 
-            # Ensure only one default model exists
-            duplicate_check = db.execute(
-                "SELECT COUNT(*) as count FROM models WHERE is_default = 1"
-            ).fetchone()
-            if duplicate_check["count"] > 1:
-                raise ValueError("More than one default model exists.")
+        # Ensure only one default model exists
+        duplicate_check = db.execute(
+            "SELECT COUNT(*) as count FROM models WHERE is_default = 1"
+        ).fetchone()
+        if duplicate_check["count"] > 1:
+            raise ValueError("More than one default model exists.")
 
-            logger.info("Model set as default (ID %d)", model_id)
+        logger.info("Model set as default (ID %d)", model_id)
 
     @staticmethod
     def create(data: Dict[str, Any]) -> Optional[int]:
@@ -157,59 +163,73 @@ class Model:
         Raises:
             ValueError: If required fields are missing or invalid
         """
-        with db_connection() as db:
-            # Handle temperature for o1-preview models
-            if data.get("requires_o1_handling", False):
-                data["temperature"] = None
+        db: Session = get_db()
+        # Handle temperature for o1-preview models
+        if data.get("requires_o1_handling", False):
+            data["temperature"] = None
 
-            cursor = db.cursor()
-            cursor.execute(
-                """
-                INSERT INTO models (
-                    name,
-                    deployment_name,
-                    description,
-                    api_endpoint,
-                    api_key,
-                    api_version,
-                    temperature,
-                    max_tokens,
-                    max_completion_tokens,
-                    model_type,
-                    requires_o1_handling,
-                    is_default,
-                    version
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    data["name"],
-                    data["deployment_name"],
-                    data.get("description", ""),
-                    data["api_endpoint"],
-                    data["api_key"],
-                    data["api_version"],
-                    data.get("temperature"),
-                    data.get("max_tokens"),
-                    data["max_completion_tokens"],
-                    data["model_type"],
-                    data.get("requires_o1_handling", False),
-                    data.get("is_default", False),
-                    data.get("version", 1),
-                ),
+        result = db.execute(
+            """
+            INSERT INTO models (
+                name,
+                deployment_name,
+                description,
+                api_endpoint,
+                api_key,
+                api_version,
+                temperature,
+                max_tokens,
+                max_completion_tokens,
+                model_type,
+                requires_o1_handling,
+                is_default,
+                version
+            ) VALUES (
+                :name,
+                :deployment_name,
+                :description,
+                :api_endpoint,
+                :api_key,
+                :api_version,
+                :temperature,
+                :max_tokens,
+                :max_completion_tokens,
+                :model_type,
+                :requires_o1_handling,
+                :is_default,
+                :version
             )
-            model_id = cursor.lastrowid
-            if model_id is None:
-                logger.error("Failed to create model - no ID returned")
-                return None
+            """,
+            {
+                "name": data["name"],
+                "deployment_name": data["deployment_name"],
+                "description": data.get("description", ""),
+                "api_endpoint": data["api_endpoint"],
+                "api_key": data["api_key"],
+                "api_version": data["api_version"],
+                "temperature": data.get("temperature"),
+                "max_tokens": data.get("max_tokens"),
+                "max_completion_tokens": data["max_completion_tokens"],
+                "model_type": data["model_type"],
+                "requires_o1_handling": data.get("requires_o1_handling", False),
+                "is_default": data.get("is_default", False),
+                "version": data.get("version", 1),
+            }
+        )
+        model_id = result.lastrowid
+        if model_id is None:
+            logger.error("Failed to create model - no ID returned")
+            return None
 
-            # If the new model is set as default, unset default on other models
-            if data.get("is_default", False):
-                db.execute(
-                    "UPDATE models SET is_default = 0 WHERE id != ?", (model_id,)
-                )
+        # If the new model is set as default, unset default on other models
+        if data.get("is_default", False):
+            db.execute(
+                "UPDATE models SET is_default = 0 WHERE id != :model_id",
+                {"model_id": model_id}
+            )
 
-            logger.info("Model created with ID: %d", model_id)
-            return model_id
+        logger.info("Model created with ID: %d", model_id)
+        return model_id
 
     @staticmethod
     def update(model_id: int, data: Dict[str, Any]) -> None:
@@ -220,39 +240,39 @@ class Model:
             model_id (int): The ID of the model to update.
             data (Mapping[str, Any]): A dictionary containing the updated model attributes.
         """
-        with db_connection() as db:
-            # 1. Validate the data (optional, but recommended)
-            Model.validate_model_config(data)
+        db: Session = get_db()
+        # 1. Validate the data (optional, but recommended)
+        Model.validate_model_config(data)
 
-            # 2. Fetch the existing model
-            model = Model.get_by_id(model_id)
-            if not model:
-                raise ValueError(f"Model with ID {model_id} not found.")
+        # 2. Fetch the existing model
+        model = Model.get_by_id(model_id)
+        if not model:
+            raise ValueError(f"Model with ID {model_id} not found.")
 
-            # 3. Update model attributes
-            for key, value in data.items():
-                setattr(model, key, value)
+        # 3. Update model attributes
+        for key, value in data.items():
+            setattr(model, key, value)
 
-            # 4. Build the SQL UPDATE statement dynamically
-            set_clause = ", ".join(f"{key} = ?" for key in data)
-            placeholders = list(data.values())
-            placeholders.append(model_id)  # Add model_id for the WHERE clause
+        # 4. Build the SQL UPDATE statement dynamically
+        set_clause = ", ".join(f"{key} = :{key}" for key in data)
+        params = {**data, "model_id": model_id}
 
-            # 5. Execute the update
-            query = f"""
-                UPDATE models
-                SET {set_clause}
-                WHERE id = ?
-            """
-            db.execute(query, tuple(placeholders))
+        # 5. Execute the update
+        query = f"""
+            UPDATE models
+            SET {set_clause}
+            WHERE id = :model_id
+        """
+        db.execute(query, params)
 
-            # 6. Handle default model logic (if applicable)
-            if data.get("is_default"):
-                db.execute(
-                    "UPDATE models SET is_default = 0 WHERE id != ?", (model_id,)
-                )
+        # 6. Handle default model logic (if applicable)
+        if data.get("is_default"):
+            db.execute(
+                "UPDATE models SET is_default = 0 WHERE id != :model_id",
+                {"model_id": model_id}
+            )
 
-            logger.info("Model updated (ID %d)", model_id)
+        logger.info("Model updated (ID %d)", model_id)
 
     @staticmethod
     def validate_model_config(config: Mapping[str, Any]) -> None:
@@ -319,25 +339,25 @@ class Chat:
         """
         Verify that the chat belongs to the specified user.
         """
-        with db_connection() as db:
-            logger.debug("Checking ownership for chat_id: %s, user_id: %d", chat_id, user_id)
-            chat = db.execute(
-                "SELECT id FROM chats WHERE id = ? AND user_id = ?",
-                (chat_id, user_id),
-            ).fetchone()
-            logger.debug("Query result for chat_id %s: %s", chat_id, chat)
-            return chat is not None
+        db: Session = get_db()
+        logger.debug("Checking ownership for chat_id: %s, user_id: %d", chat_id, user_id)
+        chat = db.execute(
+            "SELECT id FROM chats WHERE id = :chat_id AND user_id = :user_id",
+            {"chat_id": chat_id, "user_id": user_id}
+        ).fetchone()
+        logger.debug("Query result for chat_id %s: %s", chat_id, chat)
+        return chat is not None
 
     @staticmethod
     def is_title_default(chat_id: str) -> bool:
         """
         Check whether a chat has the default title.
         """
-        with db_connection() as db:
-            row = db.execute(
-                "SELECT title FROM chats WHERE id = ?", (chat_id,)
-            ).fetchone()
-            return bool(row) and row["title"] == "New Chat"
+        db: Session = get_db()
+        row = db.execute(
+            "SELECT title FROM chats WHERE id = :chat_id", {"chat_id": chat_id}
+        ).fetchone()
+        return bool(row) and row["title"] == "New Chat"
 
     @staticmethod
     def update_title(chat_id: str, new_title: str) -> None:
@@ -347,11 +367,11 @@ class Chat:
         if not new_title.strip():
             raise ValueError("Chat title cannot be empty.")
         new_title = new_title.strip()[:50]  # Limit to 50 characters
-        with db_connection() as db:
-            db.execute(
-                "UPDATE chats SET title = ? WHERE id = ?",
-                (new_title, chat_id),
-            )
+        db: Session = get_db()
+        db.execute(
+            "UPDATE chats SET title = :title WHERE id = :chat_id",
+            {"title": new_title, "chat_id": chat_id}
+        )
 
     @staticmethod
     def get_user_chats(
@@ -360,23 +380,23 @@ class Chat:
         """
         Retrieve paginated chat history for a user.
         """
-        with db_connection() as db:
-            chats = db.execute(
-                """
-                SELECT
-                    id,
-                    user_id,
-                    title,
-                    model_id,
-                    created_at as timestamp
-                FROM chats
-                WHERE user_id = ?
-                ORDER BY created_at DESC
-                LIMIT ? OFFSET ?
-                """,
-                (user_id, limit, offset),
-            ).fetchall()
-            return [dict(chat) for chat in chats]
+        db: Session = get_db()
+        chats = db.execute(
+            """
+            SELECT
+                id,
+                user_id,
+                title,
+                model_id,
+                created_at as timestamp
+            FROM chats
+            WHERE user_id = :user_id
+            ORDER BY created_at DESC
+            LIMIT :limit OFFSET :offset
+            """,
+            {"user_id": user_id, "limit": limit, "offset": offset}
+        ).fetchall()
+        return [dict(chat) for chat in chats]
 
     @staticmethod
     def create(chat_id: str, user_id: int, title: str = "New Chat", model_id: Optional[int] = None) -> None:
@@ -391,22 +411,22 @@ class Chat:
         """
         if len(title) > 50:
             title = title[:50]
-        with db_connection() as db:
-            db.execute(
-                "INSERT INTO chats (id, user_id, title, model_id) VALUES (?, ?, ?, ?)",
-                (chat_id, user_id, title, model_id),
-            )
-            logger.info("Chat created: %s for user %d with model %s", chat_id, user_id, model_id or "default")
+        db: Session = get_db()
+        db.execute(
+            "INSERT INTO chats (id, user_id, title, model_id) VALUES (:chat_id, :user_id, :title, :model_id)",
+            {"chat_id": chat_id, "user_id": user_id, "title": title, "model_id": model_id}
+        )
+        logger.info("Chat created: %s for user %d with model %s", chat_id, user_id, model_id or "default")
 
     @staticmethod
     def delete(chat_id: str) -> None:
         """
         Delete a chat and its associated messages efficiently.
         """
-        with db_connection() as db:
-            db.execute("PRAGMA foreign_keys = ON;")  # Enable cascading deletion
-            db.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
-            logger.info("Chat deleted: %s", chat_id)
+        db: Session = get_db()
+        db.execute("PRAGMA foreign_keys = ON;")  # Enable cascading deletion
+        db.execute("DELETE FROM chats WHERE id = :chat_id", {"chat_id": chat_id})
+        logger.info("Chat deleted: %s", chat_id)
 
     @staticmethod
     def get_model(chat_id: str) -> Optional[int]:
@@ -416,12 +436,12 @@ class Chat:
         Returns:
             The model_id if set, otherwise None.
         """
-        with db_connection() as db:
-            row = db.execute(
-                "SELECT model_id FROM chats WHERE id = ?",
-                (chat_id,),
-            ).fetchone()
-            return row["model_id"] if row else None
+        db: Session = get_db()
+        row = db.execute(
+            "SELECT model_id FROM chats WHERE id = :chat_id",
+            {"chat_id": chat_id}
+        ).fetchone()
+        return row["model_id"] if row else None
 
 
 @dataclass
@@ -440,11 +460,11 @@ class UploadedFile:
         """
         Insert a new uploaded file record into the database.
         """
-        with db_connection() as db:
-            db.execute(
-                "INSERT INTO uploaded_files (chat_id, filename, filepath) VALUES (?, ?, ?)",
-                (chat_id, filename, filepath),
-            )
+        db: Session = get_db()
+        db.execute(
+            "INSERT INTO uploaded_files (chat_id, filename, filepath) VALUES (:chat_id, :filename, :filepath)",
+            {"chat_id": chat_id, "filename": filename, "filepath": filepath}
+        )
 
     @staticmethod
     def get_by_chat_and_filename(
@@ -453,14 +473,14 @@ class UploadedFile:
         """
         Retrieve an uploaded file by chat ID and filename.
         """
-        with db_connection() as db:
-            row = db.execute(
-                "SELECT * FROM uploaded_files WHERE chat_id = ? AND filename = ?",
-                (chat_id, filename),
-            ).fetchone()
-            if row:
-                return UploadedFile(**dict(row))
-            return None
+        db: Session = get_db()
+        row = db.execute(
+            "SELECT * FROM uploaded_files WHERE chat_id = :chat_id AND filename = :filename",
+            {"chat_id": chat_id, "filename": filename}
+        ).fetchone()
+        if row:
+            return UploadedFile(**dict(row))
+        return None
 
     @staticmethod
     def delete_by_chat_ids(chat_ids: List[str]) -> None:
@@ -469,8 +489,9 @@ class UploadedFile:
         """
         if not chat_ids:
             return
-        with db_connection() as db:
-            placeholders = ",".join("?" for _ in chat_ids)
-            query = f"DELETE FROM uploaded_files WHERE chat_id IN ({placeholders})"
-            db.execute(query, chat_ids)
-            logger.info("Deleted uploaded files for chats: %s", ", ".join(chat_ids))
+        db: Session = get_db()
+        placeholders = ",".join(":id" + str(i) for i in range(len(chat_ids)))
+        params = {f"id{i}": chat_id for i, chat_id in enumerate(chat_ids)}
+        query = f"DELETE FROM uploaded_files WHERE chat_id IN ({placeholders})"
+        db.execute(query, params)
+        logger.info("Deleted uploaded files for chats: %s", ", ".join(chat_ids))

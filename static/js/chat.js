@@ -1,11 +1,13 @@
+// static/js/chat.js
+
 (function () {
-    // Debug statement to confirm the file is loaded
     console.log("chat.js loaded");
 
     // Constants for file handling
     let uploadedFiles = [];
     const MAX_FILES = 5;
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+    const MAX_MESSAGE_LENGTH = 1000; // Maximum message length
     const ALLOWED_FILE_TYPES = [
         "text/plain",
         "application/pdf",
@@ -26,7 +28,6 @@
     const uploadedFilesDiv = document.getElementById("uploaded-files");
     const uploadProgress = document.getElementById("upload-progress");
     const uploadProgressBar = document.getElementById("upload-progress-bar");
-    const feedbackMessage = document.getElementById("feedback-message");
     const fileInput = document.getElementById("file-input");
     const uploadButton = document.getElementById("upload-button");
     const modelSelect = document.getElementById("model-select");
@@ -43,8 +44,6 @@
     }
 
     // Initialize markdown-it with Prism.js highlighting
-    const defaultLanguage = "plaintext";
-
     const md = window.markdownit({
         html: false,
         linkify: true,
@@ -66,6 +65,25 @@
         },
     });
 
+    // Configure DOMPurify if available
+    if (typeof DOMPurify !== "undefined") {
+        // Add URI Scheme Validation to prevent dangerous protocols in links
+        DOMPurify.addHook('afterSanitizeAttributes', function(node) {
+            // Set all elements owning target to target=_blank
+            if ('target' in node) {
+                node.setAttribute('target', '_blank');
+                node.setAttribute('rel', 'noopener noreferrer');
+            }
+
+            if (node.tagName === 'A') {
+                const href = node.getAttribute('href') || '';
+                if (!href.match(/^(https?|mailto|ftp):/i)) {
+                    node.removeAttribute('href');
+                }
+            }
+        });
+    }
+
     // Render Markdown content safely
     function renderMarkdown(content) {
         const html = md.render(content);
@@ -75,27 +93,15 @@
             return DOMPurify.sanitize(html, {
                 USE_PROFILES: { html: true },
                 ALLOWED_TAGS: [
-                    "p",
-                    "strong",
-                    "em",
-                    "br",
-                    "ul",
-                    "ol",
-                    "li",
-                    "a",
-                    "img",
-                    "pre",
-                    "code",
+                    "p", "strong", "em", "br", "ul", "ol", "li",
+                    "a", "pre", "code", "blockquote"
                 ],
                 ALLOWED_ATTR: [
-                    "href",
-                    "target",
-                    "rel",
-                    "src",
-                    "alt",
-                    "class",
-                    "style",
+                    "href", "title", "target", "rel", "class"
                 ],
+                ALLOWED_URI_REGEXP: /^(https?|mailto|ftp):/,
+                FORBID_TAGS: ["style", "img", "svg", "iframe", "object", "embed", "script"],
+                FORBID_ATTR: ["style", "onerror", "onclick", "onload", "onsubmit", "formaction"],
             });
         }
 
@@ -105,47 +111,17 @@
             .replace(/on\w+="[^"]*"/gi, "");
     }
 
-    // Show feedback to the user (re-usable)
-    function showFeedback(message, type = "success") {
-        const feedbackMessage = document.getElementById("feedback-message");
-        feedbackMessage.innerHTML = `
-            <div class="flex items-center justify-between">
-                <span>${message}</span>
-                ${type === "error" ? '<button id="feedback-close" class="ml-4 text-lg">&times;</button>' : ''}
-            </div>
-        `;
-        feedbackMessage.className = `fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center ${
-            type === "success" ? "bg-green-500 text-white" : "bg-red-500 text-white"
-        }`;
-        feedbackMessage.classList.remove("hidden");
-
-        if (type === "success") {
-            setTimeout(() => feedbackMessage.classList.add("hidden"), 5000);
-        } else {
-            const closeButton = document.getElementById("feedback-close");
-            if (closeButton) {
-                closeButton.addEventListener("click", () => {
-                    feedbackMessage.classList.add("hidden");
-                });
-            }
-        }
-    }
-
-    // Retrieve the CSRF token from a meta tag if your Flask app uses CSRF protection
-    function getCSRFToken() {
-        const csrfTokenMetaTag = document.querySelector(
-            'meta[name="csrf-token"]'
-        );
-        return csrfTokenMetaTag
-            ? csrfTokenMetaTag.getAttribute("content")
-            : "";
-    }
-
     // File Handling Functions
     function handleFileUpload(files) {
         const filesArray = Array.from(files);
         const invalidFiles = [];
         const validFiles = [];
+
+        const totalFiles = uploadedFiles.length + filesArray.length;
+        if (totalFiles > MAX_FILES) {
+            showFeedback(`You can upload a maximum of ${MAX_FILES} files.`, 'error');
+            return;
+        }
 
         filesArray.forEach(file => {
             if (!ALLOWED_FILE_TYPES.includes(file.type)) {
@@ -240,6 +216,11 @@
             return false;
         }
 
+        if (message.length > MAX_MESSAGE_LENGTH) {
+            showFeedback(`Message exceeds maximum length of ${MAX_MESSAGE_LENGTH} characters.`, "error");
+            return false;
+        }
+
         if (message) {
             appendUserMessage(message);
             messageInput.value = "";
@@ -269,7 +250,7 @@
 
         // Set a timeout to notify the user if response is taking too long (e.g., 15 seconds)
         const responseTimeout = setTimeout(() => {
-            showFeedback("The assistant is taking longer than usual to respond.", "info");
+            showFeedback("The assistant is taking longer than usual to respond. You may continue waiting or try resending your message.", "warning");
         }, 15000);
 
         try {
@@ -285,6 +266,7 @@
                         uploadProgressBar.style.width = `${percentComplete}%`;
                     }
                 },
+                timeout: 30000, // 30-second timeout
             });
 
             const data = response.data;
@@ -322,8 +304,28 @@
             sendButton.innerHTML = '<span>Send</span>';
 
             console.error("Error sending message:", error);
-            const errorMsg = error.response?.data?.error || "An error occurred.";
-            showFeedback(errorMsg, "error");
+
+            if (error.response) {
+                // Server responded with a status code outside the 2xx range
+                const status = error.response.status;
+                const statusText = error.response.statusText;
+                const errorData = error.response.data;
+
+                let errorMsg = `Server Error ${status} ${statusText}`;
+                if (errorData && errorData.error) {
+                    errorMsg += `: ${errorData.error}`;
+                }
+                showFeedback(errorMsg, "error");
+            } else if (error.request) {
+                // No response received from server
+                showFeedback("No response from server. Please check your network connection.", "error");
+            } else if (error.message.includes("timeout")) {
+                // Timeout error
+                showFeedback("Request timed out. Please try again.", "error");
+            } else {
+                // Other errors
+                showFeedback(`An unexpected error occurred: ${error.message}`, "error");
+            }
         }
     }
 
@@ -342,12 +344,16 @@
         // Use renderMarkdown to render the message content
         userMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
         chatBox.appendChild(userMessageDiv);
-        // Highlight code blocks after adding to DOM
         Prism.highlightAllUnder(userMessageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     function appendAssistantMessage(message) {
+        if (!message || typeof message !== 'string' || message.trim() === '') {
+            console.error('Invalid message content:', message);
+            showFeedback('Received an invalid response from the assistant.', 'error');
+            return;
+        }
         const assistantMessageDiv = document.createElement("div");
         assistantMessageDiv.className = "flex w-full mt-2 space-x-3 max-w-xs";
         assistantMessageDiv.innerHTML = `
@@ -359,10 +365,8 @@
                 <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
             </div>
         `;
-        // Use renderMarkdown for the message content
         assistantMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
         chatBox.appendChild(assistantMessageDiv);
-        // Highlight code blocks after adding to DOM
         Prism.highlightAllUnder(assistantMessageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
@@ -438,13 +442,17 @@
     // New Chat Button
     if (newChatBtn) {
         newChatBtn.addEventListener("click", async () => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
             try {
                 const response = await fetch("/new_chat", {
                     method: "POST",
                     headers: {
                         "X-CSRFToken": getCSRFToken(),
                     },
+                    signal: controller.signal,
                 });
+                clearTimeout(timeoutId);
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success) {
@@ -455,28 +463,34 @@
                     showFeedback("Failed to create a new chat.", "error");
                 }
             } catch (error) {
-                console.error("Error creating new chat:", error);
-                showFeedback("Error creating new chat.", "error");
+                clearTimeout(timeoutId);
+                if (error.name === 'AbortError') {
+                    showFeedback('Request timed out. Please try again.', 'error');
+                } else {
+                    console.error("Error creating new chat:", error);
+                    showFeedback(`Error creating new chat: ${error.message}`, "error");
+                }
             }
         });
-    }
-    // Function to toggle the sidebar visibility
-    function toggleSidebar() {
-        const sidebar = document.getElementById('sidebar');
-        sidebar.classList.toggle('hidden');
     }
 
     // Function to delete a chat
     function deleteChat(chatId) {
         if (confirm('Are you sure you want to delete this chat?')) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
             fetch(`/delete_chat/${chatId}`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
-                }
+                    'X-CSRFToken': getCSRFToken()
+                },
+                signal: controller.signal,
             })
-            .then(response => response.json())
+            .then(response => {
+                clearTimeout(timeoutId);
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     // If we're currently viewing the deleted chat, redirect to a new chat
@@ -500,11 +514,17 @@
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while deleting the chat');
+                clearTimeout(timeoutId);
+                if (error.name === 'AbortError') {
+                    showFeedback('Request timed out. Please try again.', 'error');
+                } else {
+                    console.error('Error:', error);
+                    alert('An error occurred while deleting the chat');
+                }
             });
         }
     }
+
     // Drag and Drop
     const dropZone = document.getElementById("drop-zone");
     const messageInputArea = document.querySelector(".message-input-area");
@@ -562,78 +582,7 @@
         });
     }
 
-    // Swipe Gestures for Off-Canvas Menu
-    let touchstartX = 0;
-    let touchendX = 0;
+    // Expose deleteChat function globally if needed
+    window.deleteChat = deleteChat;
 
-    function handleGesture() {
-        if (touchendX < touchstartX) {
-            offCanvasMenu.classList.add("hidden");
-            overlay.classList.add("hidden");
-        }
-    }
-
-    document.addEventListener("touchstart", function (event) {
-        touchstartX = event.changedTouches[0].screenX;
-    }, false);
-
-    document.addEventListener("touchend", function (event) {
-        touchendX = event.changedTouches[0].screenX;
-        handleGesture();
-    }, false);
-
-    // Mobile-Specific Interactions and Optimizations
-    function handleMobileInteractions() {
-        // Add touch event listeners for better mobile experience
-        chatBox.addEventListener("touchstart", handleTouchStart, false);
-        chatBox.addEventListener("touchmove", handleTouchMove, false);
-
-        let xDown = null;
-        let yDown = null;
-
-        function handleTouchStart(evt) {
-            const firstTouch = evt.touches[0];
-            xDown = firstTouch.clientX;
-            yDown = firstTouch.clientY;
-        }
-
-        function handleTouchMove(evt) {
-            if (!xDown || !yDown) {
-                return;
-            }
-
-            const xUp = evt.touches[0].clientX;
-            const yUp = evt.touches[0].clientY;
-
-            const xDiff = xDown - xUp;
-            const yDiff = yDown - yUp;
-
-            if (Math.abs(xDiff) > Math.abs(yDiff)) {
-                if (xDiff > 0) {
-                    // Left swipe
-                    console.log("Left swipe detected");
-                } else {
-                    // Right swipe
-                    console.log("Right swipe detected");
-                }
-            } else if (yDiff > 0) {
-                // Up swipe
-                console.log("Up swipe detected");
-            } else {
-                // Down swipe
-                console.log("Down swipe detected");
-            }
-
-            // Reset values
-            xDown = null;
-            yDown = null;
-        }
-    }
-
-    // Call the function to handle mobile interactions
-    handleMobileInteractions();
-
-    // Expose showFeedback and getCSRFToken functions if needed
-    window.showFeedback = showFeedback;
-    window.getCSRFToken = getCSRFToken;
 })();

@@ -1,3 +1,5 @@
+// static/js/form_handler.js
+
 document.addEventListener('DOMContentLoaded', () => {
     // Attach event listeners to all forms with the class 'ajax-form'
     document.querySelectorAll('.ajax-form').forEach((form) => {
@@ -16,16 +18,29 @@ document.addEventListener('DOMContentLoaded', () => {
         // Show loading spinner
         showLoadingSpinner(form);
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
+
         try {
             const response = await fetch(form.action, {
                 method: form.method,
                 body: formData,
                 headers: {
-                    'X-CSRFToken': getCSRFToken(), // Include CSRF token for security
+                    'X-CSRFToken': getCSRFToken(),
                 },
+                signal: controller.signal,
             });
+            clearTimeout(timeoutId);
 
-            const data = await response.json();
+            let data;
+            try {
+                data = await response.json();
+            } catch (jsonError) {
+                // Non-JSON response handling
+                const errorText = await response.text();
+                showFeedback(`Server Error ${response.status}: ${errorText}`, 'error');
+                return;
+            }
 
             if (response.ok && data.success) {
                 // Handle successful form submission
@@ -42,9 +57,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         } catch (error) {
-            // Handle network or unexpected errors
-            console.error('Error submitting form:', error);
-            showFeedback('An unexpected error occurred. Please try again.', 'error');
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                showFeedback('Request timed out. Please try again.', 'error');
+            } else {
+                // Handle network or unexpected errors
+                console.error('Error submitting form:', error);
+                showFeedback(`An error occurred: ${error.message}`, 'error');
+            }
         } finally {
             // Hide loading spinner
             hideLoadingSpinner(form);
@@ -80,10 +100,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function showLoadingSpinner(form) {
         const submitButton = form.querySelector('button[type="submit"]');
         if (submitButton) {
+            submitButton.dataset.originalText = submitButton.innerHTML;
             submitButton.innerHTML = `
-                <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg class="animate-spin h-5 w-5 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                 </svg>
             `;
             submitButton.disabled = true; // Disable the button during submission
@@ -99,36 +120,4 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Function to show feedback messages (success/error)
-    function showFeedback(message, type = 'success') {
-        const feedbackDiv = document.getElementById('feedback-message');
-        if (!feedbackDiv) return;
-
-        feedbackDiv.innerHTML = `
-            <div class="flex items-center justify-between">
-                <span>${message}</span>
-                ${type === 'error' ? '<button id="feedback-close" class="ml-4 text-lg">&times;</button>' : ''}
-            </div>
-        `;
-        feedbackDiv.className = `fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center ${
-            type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-        }`;
-        feedbackDiv.classList.remove('hidden');
-
-        if (type === 'success') {
-            setTimeout(() => feedbackDiv.classList.add('hidden'), 5000); // Hide success messages after 5 seconds
-        } else {
-            const closeButton = document.getElementById('feedback-close');
-            if (closeButton) {
-                closeButton.addEventListener('click', () => {
-                    feedbackDiv.classList.add('hidden');
-                });
-            }
-        }
-    }
-
-    // Function to get the CSRF token from the meta tag
-    function getCSRFToken() {
-        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    }
 });

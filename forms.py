@@ -24,7 +24,7 @@ from wtforms.validators import (
 )
 from typing import Any
 from azure_config import validate_api_endpoint
-
+from requests.exceptions import RequestException, Timeout
 
 class LoginForm(FlaskForm):
     """
@@ -218,20 +218,51 @@ class ModelForm(FlaskForm):
         """
         Custom validator for API endpoint.
         """
+        api_endpoint = field.data
         api_key = os.getenv("AZURE_OPENAI_KEY")
-        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
-        deployment_name = str(self.deployment_name.data)
+        api_version = self.api_version.data or os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
+        deployment_name = self.deployment_name.data
 
         if not api_key:
             raise ValidationError("Azure OpenAI API key is not found in environment variables.")
 
         try:
-            if not validate_api_endpoint(
-                str(field.data), api_key, deployment_name, api_version
-            ):
+            if not validate_api_endpoint(api_endpoint, api_key, deployment_name, api_version):
                 raise ValidationError("Invalid or unreachable Azure OpenAI endpoint.")
-        except ValueError as ex:
-            raise ValidationError(str(ex))
+        except Timeout:
+            raise ValidationError("Connection timed out. Please check the endpoint URL.")
+        except RequestException as ex:
+            raise ValidationError(f"Connection error: {str(ex)}")
+        except Exception as ex:
+            raise ValidationError(f"An unexpected error occurred: {str(ex)}")
+
+    def validate_temperature(self, field: Any) -> None:
+        """
+        Validate temperature based on whether special handling is required.
+        """
+        if self.requires_o1_handling.data and field.data is not None:
+            raise ValidationError("Temperature must be None for models requiring special handling.")
+        if field.data is not None and not (0 <= field.data <= 2):
+            raise ValidationError("Temperature must be between 0 and 2.")
+
+    def validate_max_tokens(self, field: Any) -> None:
+        """
+        Validate max_tokens based on whether special handling is required.
+        """
+        if self.requires_o1_handling.data and field.data is not None:
+            raise ValidationError("Max tokens must be None for models requiring special handling.")
+        if field.data is not None and field.data <= 0:
+            raise ValidationError("Max tokens must be a positive integer.")
+
+    def validate_requires_o1_handling(self, field: Any) -> None:
+        """
+        Additional validation when special handling is required.
+        """
+        if field.data:
+            if self.temperature.data is not None:
+                raise ValidationError("Temperature must be None when special handling is required.")
+            if self.max_tokens.data is not None:
+                raise ValidationError("Max tokens must be None when special handling is required.")
 
 
 class ResetPasswordForm(FlaskForm):
@@ -293,20 +324,21 @@ def validate_password_strength(password: str) -> None:
     # Check for sequential characters
     sequences = (
         'abcdefghijklmnopqrstuvwxyz',
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
         '01234567890',
         'qwertyuiop',
         'asdfghjkl',
         'zxcvbnm'
     )
 
-    for sequence in sequences:
-        for i in range(len(sequence) - 2):
-            forward = sequence[i:i + 3]
-            backward = sequence[i:i + 3][::-1]
-            if forward in password.lower() or backward in password.lower():
-                raise ValidationError("Password contains sequential characters. Please avoid using sequential letters or numbers.")
-
+    for seq in sequences:
+        seq_len = len(seq)
+        for i in range(seq_len - 2):
+            forward_seq = seq[i:i + 3]
+            backward_seq = forward_seq[::-1]
+            if forward_seq in password or backward_seq in password:
+                raise ValidationError("Password cannot contain sequential characters.")
     # Check for repeated characters
     for i in range(len(password) - 2):
         if password[i] == password[i + 1] == password[i + 2]:
-            raise ValidationError("Password cannot contain three or more repeated characters in a row.")
+            raise ValidationError("Password must not contain three or more repeated characters in a row.")

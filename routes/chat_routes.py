@@ -1,6 +1,8 @@
 import logging
 import os
 from typing import Union, Tuple
+from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 import bleach
 from flask import (
@@ -21,8 +23,8 @@ from datetime import datetime, timedelta
 from chat_api import scrape_data, get_azure_response
 from chat_utils import generate_new_chat_id
 from conversation_manager import ConversationManager
-from database import db_connection  # Use the centralized context manager
-from models import Chat, Model, UploadedFile
+from database import get_db  # Use SQLAlchemy session
+from models import Chat, Model, UploadedFile, Message
 import tiktoken
 
 bp = Blueprint("chat", __name__)
@@ -146,12 +148,13 @@ def chat_interface() -> str:
 @login_required
 def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Load and return the messages for a specific chat."""
-    with db_connection() as db:
-        # Verify chat ownership
-        chat = db.execute(
-            "SELECT id FROM chats WHERE id = ? AND user_id = ?",
-            (chat_id, current_user.id),
-        ).fetchone()
+    db = get_db()
+    try:
+        # Verify chat ownership using ORM
+        chat = db.query(Chat).filter(
+            Chat.id == chat_id,
+            Chat.user_id == current_user.id
+        ).first()
 
         if not chat:
             logger.warning("Unauthorized access attempt to chat %s", chat_id)
@@ -161,27 +164,34 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         # Exclude 'system' messages from being sent to the frontend
         messages_to_send = [msg for msg in messages if msg["role"] != "system"]
         return jsonify({"messages": messages_to_send})
+    finally:
+        db.close()
 
 
 @bp.route("/delete_chat/<chat_id>", methods=["DELETE"])
 @login_required
 def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Delete a chat and its associated messages."""
-    with db_connection() as db:
-        chat_to_delete = db.execute(
-            "SELECT user_id FROM chats WHERE id = ?", (chat_id,)
-        ).fetchone()
+    db = get_db()
+    try:
+        chat_to_delete = db.query(Chat).filter(Chat.id == chat_id).first()
 
-        if not chat_to_delete or int(chat_to_delete["user_id"]) != int(current_user.id):
+        if not chat_to_delete or chat_to_delete.user_id != current_user.id:
             logger.warning(
                 "Attempt to delete non-existent or unauthorized chat: %s", chat_id
             )
             return jsonify({"error": "Chat not found or access denied"}), 403
 
-        db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
-        db.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
+        # Delete associated messages
+        db.query(Message).filter(Message.chat_id == chat_id).delete()
+        
+        # Delete the chat
+        db.delete(chat_to_delete)
+        db.commit()
         logger.info("Chat %s deleted successfully", chat_id)
         return jsonify({"success": True})
+    finally:
+        db.close()
 
 
 @bp.route("/conversations", methods=["GET"])

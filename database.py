@@ -1,73 +1,75 @@
 # database.py
 
-import sqlite3
+from sqlalchemy import create_engine
+from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.pool import QueuePool
 import logging
-from typing import Optional, Iterator
+from typing import Optional
 from flask import g, current_app, Flask
-from contextlib import contextmanager
 import click
 from flask.cli import with_appcontext
 
 logger = logging.getLogger(__name__)
 
-def get_db() -> sqlite3.Connection:
-    """Get database connection from Flask app context."""
+# Connection pool settings
+POOL_SIZE = 5
+MAX_OVERFLOW = 10
+POOL_RECYCLE = 3600  # Recycle connections after 1 hour
+POOL_TIMEOUT = 30  # Wait up to 30 seconds for a connection
+
+def get_db():
+    """Get database connection from Flask app context using connection pool."""
     if "db" not in g:
         db_path = str(current_app.config.get("DATABASE", "chat_app.db"))
-        logger.debug(f"Opening database connection to {db_path}")
-        g.db = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA foreign_keys = ON")
+        logger.debug(f"Getting database connection from pool to {db_path}")
+        
+        # Create engine with connection pooling if it doesn't exist
+        if "db_engine" not in g:
+            g.db_engine = create_engine(
+                f"sqlite:///{db_path}",
+                poolclass=QueuePool,
+                pool_size=POOL_SIZE,
+                max_overflow=MAX_OVERFLOW,
+                pool_recycle=POOL_RECYCLE,
+                pool_timeout=POOL_TIMEOUT,
+                connect_args={"check_same_thread": False}
+            )
+            g.db_session = scoped_session(
+                sessionmaker(bind=g.db_engine, autocommit=False, autoflush=False)
+            )
+        
+        g.db = g.db_session()
     return g.db
 
 def close_db(e: Optional[BaseException] = None) -> None:
-    """Close database connection."""
+    """Return database connection to pool."""
     db = g.pop("db", None)
     if db is not None:
-        logger.debug("Closing database connection")
+        logger.debug("Returning database connection to pool")
         db.close()
-
-@contextmanager
-def db_connection() -> Iterator[sqlite3.Connection]:
-    """Context manager for database operations."""
-    connection = None
-    try:
-        db_path = str(current_app.config.get("DATABASE", "chat_app.db"))
-        logger.debug(f"Opening database connection to {db_path}")
-        connection = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute("BEGIN")
-        yield connection
-        connection.commit()
-    except sqlite3.OperationalError as e:
-        logger.error(f"Database operational error: {e}")
-        if connection:
-            connection.rollback()
-        raise RuntimeError("An error occurred while accessing the database. Please try again later.")
-    except Exception as e:
-        logger.error(f"Database error: {e}")
-        if connection:
-            connection.rollback()
-        raise RuntimeError("An unexpected error occurred. Please try again later.")
-    finally:
-        if connection:
-            logger.debug("Closing database connection")
-            connection.close()
+    
+    # Clean up engine and session at app teardown
+    db_engine = g.pop("db_engine", None)
+    db_session = g.pop("db_session", None)
+    if db_session is not None:
+        db_session.remove()
+    if db_engine is not None:
+        db_engine.dispose()
 
 def init_db() -> None:
     """Initialize database tables."""
     try:
-        with db_connection() as db:
-            with current_app.open_resource("schema.sql") as f:
-                db.executescript(f.read().decode("utf8"))
+        db = get_db()
+        with current_app.open_resource("schema.sql") as f:
+            # Execute each statement separately to handle SQLAlchemy
+            for statement in f.read().decode("utf8").split(';'):
+                if statement.strip():
+                    db.execute(statement)
+        db.commit()
         logger.info("Database initialized successfully")
-    except sqlite3.OperationalError as e:
-        logger.error(f"Database initialization failed: {e}")
-        raise RuntimeError("Failed to initialize the database. Please check the schema file and try again.")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
-        raise RuntimeError("An unexpected error occurred while initializing the database.")
+        raise RuntimeError("Failed to initialize the database. Please check the schema file and try again.")
 
 @click.command("init-db")
 @with_appcontext
