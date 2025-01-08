@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS models (
     model_type TEXT NOT NULL DEFAULT 'azure', -- 'azure', 'openai', or 'o1-preview'
     api_endpoint TEXT NOT NULL, -- URL for calling the model API
     api_key TEXT NOT NULL, -- API key for authentication
-    temperature REAL DEFAULT 1.0, -- Creativity parameter (0: deterministic, 2: high randomness)
+    temperature REAL DEFAULT 1.0 CHECK (temperature IS NULL OR (temperature >= 0 AND temperature <= 2)), -- Creativity parameter (0: deterministic, 2: high randomness)
     max_tokens INTEGER, -- Maximum input tokens for the model
     max_completion_tokens INTEGER NOT NULL DEFAULT 500, -- Max tokens the model can generate in completion
     is_default BOOLEAN DEFAULT 0, -- Whether this is the default model
@@ -110,6 +110,3 @@ CREATE INDEX IF NOT EXISTS idx_model_versions_model_id ON model_versions (model_
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages (timestamp); -- Speeds up fetching messages by timestamp
 CREATE INDEX IF NOT EXISTS idx_chats_created_at ON chats (created_at); -- Speeds up fetching chats by creation time
 
--- Missing constraints
-ALTER TABLE models ADD CONSTRAINT check_temperature 
-    CHECK (temperature IS NULL OR (temperature >= 0 AND temperature <= 2));
