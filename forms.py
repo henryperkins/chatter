@@ -105,7 +105,7 @@ class RegistrationForm(FlaskForm):
         with get_db() as db:
             existing = db.execute(
                 text("SELECT username FROM users WHERE LOWER(username) = ?"),
-                (username,)
+                username,
             ).fetchone()
             if existing:
                 raise ValidationError("This username is already taken.")
@@ -122,7 +122,7 @@ class RegistrationForm(FlaskForm):
         with get_db() as db:
             existing = db.execute(
                  text("SELECT email FROM users WHERE LOWER(email) = ?"),
-                (email,)
+                email,
             ).fetchone()
             if existing:
                 raise ValidationError("This email is already registered.")
