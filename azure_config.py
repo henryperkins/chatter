@@ -38,7 +38,6 @@ def validate_o1_preview_config(model_config: Dict[str, Any]) -> None:
     if model_config.get("temperature") not in (None, 1, 1.0):
         raise ValueError("o1-preview models require temperature=1")
 
-
 def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI, str]:
     """
     Retrieve the Azure OpenAI client and deployment name.
@@ -86,7 +85,6 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
     )
 
     return client, deployment_name
-
 
 def initialize_client_from_model(
     model_config: Dict[str, Any]
@@ -194,7 +192,6 @@ def initialize_client_from_model(
         max_completion_tokens,
         requires_o1_handling,
     )
-
 
 def validate_api_endpoint(
     api_endpoint: str, api_key: str, deployment_name: str, api_version: str
