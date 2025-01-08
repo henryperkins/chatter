@@ -109,12 +109,18 @@ def register() -> Response:
                 password.encode("utf-8"), bcrypt.gensalt(rounds=12)
             )
 
-            db.execute(
+            # Insert new user and get the ID
+            cursor = db.execute(
                 "INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)",
                 (username, email, hashed_password, "user"),
             )
-            flash("Registration successful! Please check your email to confirm your account.", "success")
-            return redirect(url_for("auth.login"))
+            user_id = cursor.lastrowid
+            
+            # Create User object and log in
+            user_obj = User(user_id, username, email, "user")
+            login_user(user_obj)
+            flash("Registration successful!", "success")
+            return redirect(url_for("chat.chat_interface"))
 
     return render_template("register.html", form=form)
 

@@ -22,6 +22,10 @@ def get_azure_response(
     deployment_name: Optional[str] = None,
     selected_model_id: Optional[int] = None,
     max_completion_tokens: Optional[int] = None,
+    api_endpoint: Optional[str] = None,
+    api_key: Optional[str] = None,
+    api_version: Optional[str] = None,
+    requires_o1_handling: bool = False,
 ) -> str:
     """
     Sends a chat message to the Azure OpenAI API and returns the response.
@@ -32,6 +36,10 @@ def get_azure_response(
             the default deployment will be used.
         selected_model_id: The ID of the selected model (optional).
         max_completion_tokens: The maximum number of completion tokens to generate.
+        api_endpoint: The Azure OpenAI endpoint URL (optional).
+        api_key: The Azure OpenAI API key (optional).
+        api_version: The Azure OpenAI API version (optional).
+        requires_o1_handling: Whether to use o1-preview specific handling (optional).
 
     Returns:
         The response string from the Azure OpenAI API.
@@ -42,42 +50,45 @@ def get_azure_response(
         Exception: If any other error occurs.
     """
     try:
-        # Retrieve the cached client and deployment name
-        client, deployment_name = get_azure_client(deployment_name)
-
         # Initialize defaults
         api_params = {
-            "model": deployment_name,
             "messages": [],  # Will be populated based on model type
-            "max_completion_tokens": max_completion_tokens or 500  # Default if not provided
+            "max_completion_tokens": max_completion_tokens or 1000  # Default if not provided
         }
 
-        # If a specific model is selected, fetch its info from the database
+        # Create model config from provided credentials or get from database
+        model_config = {}
         if selected_model_id:
             model = Model.get_by_id(selected_model_id)
             if not model:
                 raise ValueError("Selected model not found.")
+            model_config = model.__dict__
 
-            (
-                client,
-                deployment_name,
-                temperature,
-                max_tokens,
-                max_completion_tokens,
-                requires_o1_handling,
-            ) = initialize_client_from_model(model.__dict__)
+        # Override with any provided credentials
+        if api_endpoint:
+            model_config["api_endpoint"] = api_endpoint
+        if api_key:
+            model_config["api_key"] = api_key
+        if api_version:
+            model_config["api_version"] = api_version
+        if deployment_name:
+            model_config["deployment_name"] = deployment_name
+        model_config["requires_o1_handling"] = requires_o1_handling
 
-            # Update api_params with model-specific values
-            api_params["model"] = deployment_name
-            if max_completion_tokens:
-                api_params["max_completion_tokens"] = max_completion_tokens
-        else:
-            # Default behavior without specific model
-            requires_o1_handling = any(
-                model_name in deployment_name
-                for model_name in ['o1-preview']
-            )
-            temperature = 1 if requires_o1_handling else 0.7
+        # Initialize client from model config
+        (
+            client,
+            deployment_name,
+            temperature,
+            max_tokens,
+            max_completion_tokens,
+            requires_o1_handling,
+        ) = initialize_client_from_model(model_config)
+
+        # Update api_params with model/deployment info
+        api_params["model"] = deployment_name
+        if max_completion_tokens:
+            api_params["max_completion_tokens"] = max_completion_tokens
 
         # Filter messages based on model requirements
         api_messages = [

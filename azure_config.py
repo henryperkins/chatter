@@ -118,12 +118,23 @@ def initialize_client_from_model(
         ValueError: If required configuration parameters are missing or if o1-preview requirements
             are violated (see validate_o1_preview_config for specific validations).
     """
-    api_endpoint: str = str(model_config.get("api_endpoint"))
-    api_key: str = str(model_config.get("api_key"))
-    api_version: str = str(
-        model_config.get("api_version", "2024-02-15-preview")
-    )  # Using latest preview version
-    deployment_name: str = str(model_config.get("deployment_name"))
+    # Get required fields, ensuring they exist
+    api_endpoint = model_config.get("api_endpoint")
+    api_key = model_config.get("api_key")
+    deployment_name = model_config.get("deployment_name")
+    
+    # Validate required fields are present and not None
+    if not api_endpoint or not api_key or not deployment_name:
+        raise ValueError(
+            "Missing required Azure OpenAI configuration. "
+            "Please ensure api_endpoint, api_key, and deployment_name are set in the model configuration."
+        )
+    
+    # Convert to strings only after validation
+    api_endpoint = str(api_endpoint)
+    api_key = str(api_key)
+    deployment_name = str(deployment_name)
+    api_version = str(model_config.get("api_version", "2024-02-15-preview"))
     temperature: Optional[float] = (
         float(model_config.get("temperature", 0.7))
         if model_config.get("temperature") is not None

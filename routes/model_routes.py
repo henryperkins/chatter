@@ -65,7 +65,7 @@ def get_models():
         return jsonify({"error": "An error occurred while retrieving models"}), 500
 
 
-@bp.route("/models", methods=["POST"])
+@bp.route("/", methods=["POST"])
 @login_required
 @admin_required
 def create_model():
@@ -77,44 +77,58 @@ def create_model():
       max_tokens, max_completion_tokens, model_type, api_version,
       requires_o1_handling, is_default
     """
+    logger.debug("Received POST request to create model")
+    
     form = ModelForm()
-    if form.validate_on_submit():
-        try:
-            data = {
-                "name": form.name.data,
-                "deployment_name": form.deployment_name.data,
-                "description": form.description.data,
-                "api_endpoint": form.api_endpoint.data,
-                "temperature": form.temperature.data,
-                "max_tokens": form.max_tokens.data,
-                "max_completion_tokens": form.max_completion_tokens.data,
-                "model_type": form.model_type.data,
-                "api_version": form.api_version.data,
-                "requires_o1_handling": form.requires_o1_handling.data,
-                "is_default": form.is_default.data,
-            }
-            model_id = Model.create(data)
-            return jsonify(
-                {
-                    "id": model_id,
-                    "success": True,
-                    "message": "Model created successfully",
-                }
-            )
-        except ValueError as e:
-            logger.error("Validation error: %s", str(e))
-            return jsonify({"error": str(e), "success": False}), 400
-        except Exception as e:
-            logger.exception("Error creating model")
-            return (
-                jsonify({"error": "An unexpected error occurred", "success": False}),
-                500,
-            )
+    if not form.validate_on_submit():
+        logger.error("Form validation failed: %s", form.errors)
+        return jsonify({"error": form.errors, "success": False}), 400
 
-    return jsonify({"error": form.errors, "success": False}), 400
+    try:
+        data = {
+            "name": form.name.data,
+            "deployment_name": form.deployment_name.data,
+            "description": form.description.data,
+            "api_endpoint": form.api_endpoint.data,
+            "api_key": form.api_key.data,
+            "temperature": form.temperature.data,
+            "max_tokens": form.max_tokens.data,
+            "max_completion_tokens": form.max_completion_tokens.data,
+            "model_type": form.model_type.data,
+            "api_version": form.api_version.data,
+            "requires_o1_handling": form.requires_o1_handling.data,
+            "is_default": form.is_default.data
+        }
+
+        # Log model creation attempt without sensitive data
+        logger.debug("Creating model with data: %s", {
+            k: v for k, v in data.items() if k != 'api_key'
+        })
+
+        model_id = Model.create(data)
+        return jsonify({
+            "id": model_id,
+            "success": True,
+            "message": "Model created successfully"
+        })
+
+    except ValueError as e:
+        logger.error("Validation error: %s", str(e))
+        return jsonify({"error": str(e), "success": False}), 400
+    except Exception as e:
+        logger.exception("Error creating model")
+        if "UNIQUE constraint failed: models.deployment_name" in str(e):
+            return jsonify({
+                "error": "A model with this deployment name already exists",
+                "success": False
+            }), 400
+        return jsonify({
+            "error": "An unexpected error occurred",
+            "success": False
+        }), 500
 
 
-@bp.route("/models/<int:model_id>", methods=["PUT"])
+@bp.route("/<int:model_id>", methods=["PUT"])
 @login_required
 @admin_required
 def update_model(model_id: int):
@@ -148,10 +162,11 @@ def update_model(model_id: int):
         return jsonify({"error": str(e), "success": False}), 400
     except Exception as e:
         logger.exception("Unexpected error during model update")
-        return jsonify({"error": "An unexpected error occurred", "success": False}), 500
+        logger.error("Unexpected error: %s", str(e))
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}", "success": False}), 500
 
 
-@bp.route("/models/<int:model_id>", methods=["DELETE"])
+@bp.route("/<int:model_id>", methods=["DELETE"])
 @login_required
 @admin_required
 def delete_model(model_id: int):
@@ -219,7 +234,7 @@ def edit_model_page(model_id):
     return render_template("edit_model.html", form=form, model=model)
 
 
-@bp.route("/models/default/<int:model_id>", methods=["POST"])
+@bp.route("/default/<int:model_id>", methods=["POST"])
 @login_required
 @admin_required
 def set_default_model(model_id: int):
@@ -237,7 +252,7 @@ def set_default_model(model_id: int):
         return jsonify({"error": "An unexpected error occurred", "success": False}), 500
 
 
-@bp.route("/models/<int:model_id>/immutable-fields", methods=["GET"])
+@bp.route("/<int:model_id>/immutable-fields", methods=["GET"])
 @login_required
 def get_immutable_fields(model_id: int):
     """
@@ -256,7 +271,7 @@ def get_immutable_fields(model_id: int):
         )
 
 
-@bp.route("/models/<int:model_id>/versions", methods=["GET"])
+@bp.route("/<int:model_id>/versions", methods=["GET"])
 @login_required
 def get_version_history(model_id: int):
     """
@@ -274,7 +289,7 @@ def get_version_history(model_id: int):
         )
 
 
-@bp.route("/models/<int:model_id>/revert/<int:version>", methods=["POST"])
+@bp.route("/<int:model_id>/revert/<int:version>", methods=["POST"])
 @login_required
 @admin_required
 def revert_to_version(model_id: int, version: int):

@@ -23,7 +23,7 @@
 
     <!-- Form -->
     <form id="add-model-form" method="POST" action="{{ url_for('model.create_model') }}" class="bg-white shadow-md rounded-lg p-6">
-        {{ form.hidden_tag() }}
+        {{ form.csrf_token }}
 
         <!-- Model Name -->
         <div class="mb-6">
@@ -71,6 +71,20 @@
                                 placeholder="https://your-resource.openai.azure.com") }}
             {% if form.api_endpoint.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- API Key -->
+        <div class="mb-6">
+            {{ form.api_key.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
+            <p class="text-xs text-gray-500 mb-2">Your Azure OpenAI API key</p>
+            {{ form.api_key(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
+                                  focus:outline-none focus:ring-2 focus:ring-blue-500
+                                  focus:border-transparent",
+                           type="password",
+                           autocomplete="off") }}
+            {% if form.api_key.errors %}
+                <p class="text-sm text-red-500 mt-1">{{ form.api_key.errors[0] }}</p>
             {% endif %}
         </div>
 
@@ -124,8 +138,8 @@
                                                     focus:outline-none focus:ring-2 focus:ring-blue-500
                                                     focus:border-transparent",
                                             type="number",
-                                            min="1",
-                                            max="1000") }}
+                                    min="1",
+                                    max="32000") }}
                 {% if form.max_completion_tokens.errors %}
                     <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
                 {% endif %}
@@ -172,7 +186,6 @@
                 <p class="text-xs text-gray-500 mt-1 ml-7">Make this the default model for new conversations</p>
             </div>
         </div>
-
 
         <!-- Submit & Cancel -->
         <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
@@ -292,12 +305,12 @@
             const formData = new FormData(form);
 
             const response = await fetch(form.action, {
-                method: "POST",
+                method: 'POST',
                 body: formData,
+                credentials: 'same-origin',
                 headers: {
-                    "X-CSRFToken": window.getCSRFToken()
-                },
-                credentials: 'same-origin'
+                    'X-CSRFToken': form.querySelector('input[name="csrf_token"]').value
+                }
             });
 
             const data = await response.json();
@@ -307,29 +320,32 @@
                 setTimeout(() => {
                     window.location.href = "{{ url_for('chat.chat_interface') }}";
                 }, 1500);
-            } else if (response.status === 422) {
-                // Handle validation errors
-                const errors = data.errors || {};
-                Object.keys(errors).forEach(field => {
-                    const errorDiv = document.getElementById(`${field}-error`);
-                    if (!errorDiv) {
-                        const error = document.createElement('p');
-                        error.id = `${field}-error`;
-                        error.className = 'text-sm text-red-500 mt-1';
-                        error.textContent = errors[field][0];
+            } else {
+                // Re-enable the submit button and hide loading spinner
+                submitButton.disabled = false;
+                buttonText.textContent = 'Add Model';
+                loadingSpinner.classList.add('hidden');
+
+                if (data.error && typeof data.error === 'object') {
+                    // Handle validation errors from WTForms
+                    Object.entries(data.error).forEach(([field, errors]) => {
                         const fieldElement = form.querySelector(`[name="${field}"]`);
                         if (fieldElement) {
-                            fieldElement.parentNode.appendChild(error);
+                            const existingError = document.getElementById(`${field}-error`);
+                            if (!existingError) {
+                                const error = document.createElement('p');
+                                error.id = `${field}-error`;
+                                error.className = 'text-sm text-red-500 mt-1';
+                                error.textContent = Array.isArray(errors) ? errors[0] : errors;
+                                fieldElement.parentNode.appendChild(error);
+                            }
                         }
-                    }
-                });
-                window.showFeedback("Please correct the errors in the form", "error");
-            } else {
-                window.showFeedback(data.error || "Failed to create the model", "error");
+                    });
+                    window.showFeedback("Please correct the errors in the form", "error");
+                } else {
+                    window.showFeedback(typeof data.error === 'string' ? data.error : "Failed to create the model", "error");
+                }
             }
-            submitButton.disabled = false;
-            buttonText.textContent = 'Add Model';
-            loadingSpinner.classList.add('hidden');
         } catch (err) {
             console.error("Error:", err);
             window.showFeedback("An unexpected error occurred. Please try again.", "error");

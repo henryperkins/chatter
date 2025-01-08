@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS models (
     description TEXT, -- Optional description of the model
     model_type TEXT NOT NULL DEFAULT 'azure', -- 'azure', 'openai', or 'o1-preview'
     api_endpoint TEXT NOT NULL, -- URL for calling the model API
+    api_key TEXT NOT NULL, -- API key for authentication
     temperature REAL DEFAULT 1.0, -- Creativity parameter (0: deterministic, 2: high randomness)
     max_tokens INTEGER, -- Maximum input tokens for the model
     max_completion_tokens INTEGER NOT NULL DEFAULT 500, -- Max tokens the model can generate in completion

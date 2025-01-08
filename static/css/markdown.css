@@ -1,0 +1,106 @@
+/* Markdown and Code Block Styles */
+
+/* Code blocks */
+pre[class*="language-"] {
+    margin: 1em 0;
+    padding: 1em;
+    border-radius: 0.5rem;
+    background: #2d2d2d !important;
+    max-height: 400px;
+    overflow: auto;
+}
+
+.line-numbers .line-numbers-rows {
+    border-right: 1px solid #999;
+    padding-right: 0.5em;
+}
+
+/* Inline code */
+:not(pre) > code {
+    background: rgba(0, 0, 0, 0.1);
+    padding: 0.2em 0.4em;
+    border-radius: 0.3em;
+    font-size: 0.9em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Dark mode adjustments */
+.dark pre[class*="language-"] {
+    background: #1a1a1a !important;
+}
+
+.dark :not(pre) > code {
+    background: rgba(255, 255, 255, 0.1);
+    color: #e5e7eb;
+}
+
+/* Prose overrides */
+.prose pre {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+}
+
+.prose code {
+    font-weight: 400;
+}
+
+.prose img {
+    margin: 1em 0;
+}
+
+.prose a {
+    color: #2563eb;
+    text-decoration: underline;
+}
+
+.prose blockquote {
+    border-left: 4px solid #e5e7eb;
+    padding-left: 1em;
+    font-style: italic;
+}
+
+.dark .prose blockquote {
+    border-left-color: #4b5563;
+}
+
+/* Message container adjustments */
+.markdown-content {
+    overflow-x: auto;
+}
+
+.markdown-content > *:first-child {
+    margin-top: 0;
+}
+
+.markdown-content > *:last-child {
+    margin-bottom: 0;
+}
+
+/* Table styles */
+.prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1em 0;
+}
+
+.prose th,
+.prose td {
+    border: 1px solid #e5e7eb;
+    padding: 0.5em;
+    text-align: left;
+}
+
+.dark .prose th,
+.dark .prose td {
+    border-color: #4b5563;
+}
+
+.prose th {
+    background: #f3f4f6;
+    font-weight: 600;
+}
+
+.dark .prose th {
+    background: #374151;
+}

@@ -1,7 +1,6 @@
 /* static/js/chat.js */
 
 (function () {
-    // Debug statement to confirm the file is loaded
     console.log("chat.js loaded");
 
     // Constants for file handling
@@ -9,26 +8,10 @@
     const MAX_FILES = 5;
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
     const ALLOWED_FILE_TYPES = [
-        "text/plain",
-        "application/pdf",
+        "text/plain", "application/pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "text/x-python",
-        "application/javascript",
-        "text/markdown",
-        "image/jpeg",
-        "image/png",
-    ];
-    const maxFiles = 5;
-    const maxFileSizeMaster = 10 * 1024 * 1024; // 10 MB
-    const allowedFileTypesMaster = [
-        "text/plain",
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "text/x-python",
-        "application/javascript",
-        "text/markdown",
-        "image/jpeg",
-        "image/png",
+        "text/x-python", "application/javascript", "text/markdown",
+        "image/jpeg", "image/png",
     ];
 
     // Get DOM elements
@@ -57,115 +40,86 @@
     }
 
     // Initialize markdown-it with Prism.js highlighting
-    const defaultLanguage = "plaintext";
-
     const md = window.markdownit({
-        html: false,
+        html: true,
         linkify: true,
         typographer: true,
+        breaks: true,
         highlight: function (str, lang) {
             if (lang && Prism.languages[lang]) {
-                return `<pre class="language-${lang}"><code>${Prism.highlight(
-                    str,
-                    Prism.languages[lang],
-                    lang
-                )}</code></pre>`;
-            } else {
-                return `<pre class="language-plaintext"><code>${Prism.highlight(
-                    str,
-                    Prism.languages.plaintext,
-                    "plaintext"
-                )}</code></pre>`;
+                try {
+                    return `<pre class="language-${lang}"><code>${Prism.highlight(
+                        str,
+                        Prism.languages[lang],
+                        lang
+                    )}</code></pre>`;
+                } catch (e) {
+                    console.error(e);
+                }
             }
+            return `<pre class="language-plaintext"><code>${md.utils.escapeHtml(str)}</code></pre>`;
         },
     });
 
     // Render Markdown content safely
     function renderMarkdown(content) {
         const html = md.render(content);
-
-        // Check if DOMPurify is available
         if (typeof DOMPurify !== "undefined" && DOMPurify.sanitize) {
             return DOMPurify.sanitize(html, {
                 USE_PROFILES: { html: true },
                 ALLOWED_TAGS: [
-                    "p",
-                    "strong",
-                    "em",
-                    "br",
-                    "ul",
-                    "ol",
-                    "li",
-                    "a",
-                    "img",
-                    "pre",
-                    "code",
+                    "p", "strong", "em", "br", "ul", "ol", "li",
+                    "a", "img", "pre", "code", "blockquote", "h1", "h2",
+                    "h3", "h4", "h5", "h6", "hr", "table", "thead", "tbody",
+                    "tr", "th", "td"
                 ],
                 ALLOWED_ATTR: [
-                    "href",
-                    "target",
-                    "rel",
-                    "src",
-                    "alt",
-                    "class",
-                    "style",
+                    "href", "target", "rel", "src", "alt",
+                    "class", "style", "id"
                 ],
             });
         }
-
-        // Fallback basic sanitization
         return html
             .replace(/<script.*?>.*?<\/script>/gi, "")
             .replace(/on\w+="[^"]*"/gi, "");
     }
 
-    // Show feedback to the user (re-usable)
-    function showFeedback(message, type = "success") {
-        const feedbackMessage = document.getElementById("feedback-message");
-        feedbackMessage.textContent = message;
-        feedbackMessage.className = `fixed bottom-4 right-4 p-4 rounded-lg ${
+    // Show feedback to the user
+    window.showFeedback = function(message, type = "success") {
+        const feedbackDiv = document.getElementById("feedback-message");
+        if (!feedbackDiv) return;
+
+        feedbackDiv.textContent = message;
+        feedbackDiv.className = `fixed bottom-4 right-4 p-4 rounded-lg ${
             type === "success"
                 ? "bg-green-100 border border-green-400 text-green-700"
                 : "bg-red-100 border border-red-400 text-red-700"
         }`;
-        feedbackMessage.classList.remove("hidden");
-        setTimeout(() => feedbackMessage.classList.add("hidden"), 3000);
-    }
+        feedbackDiv.classList.remove("hidden");
+        setTimeout(() => feedbackDiv.classList.add("hidden"), 3000);
+    };
 
-    // Retrieve the CSRF token from a meta tag if your Flask app uses CSRF protection
-    function getCSRFToken() {
-        const csrfTokenMetaTag = document.querySelector(
-            'meta[name="csrf-token"]'
-        );
-        return csrfTokenMetaTag
-            ? csrfTokenMetaTag.getAttribute("content")
-            : "";
-    }
+    // Get CSRF token
+    window.getCSRFToken = function() {
+        const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
+        return csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") : "";
+    };
 
     // File Handling Functions
     function handleFileUpload(files) {
         const filesArray = Array.from(files);
-
-        // Check total count
         if (uploadedFiles.length + filesArray.length > MAX_FILES) {
-            showFeedback(
-                `You can upload up to ${MAX_FILES} files at a time.`,
-                "error"
-            );
+            showFeedback(`You can upload up to ${MAX_FILES} files at a time.`, "error");
             return;
         }
 
-        // Validate file type & size
         const validFiles = filesArray.filter((file) => {
             if (!ALLOWED_FILE_TYPES.includes(file.type)) {
                 showFeedback(`File type not allowed: ${file.name}`, "error");
                 return false;
             }
             if (file.size > MAX_FILE_SIZE) {
-                showFeedback(
-                    `File ${file.name} exceeds the 10MB size limit.`,
-                    "error"
-                );
+                showFeedback(`File ${file.name} exceeds the 10MB size limit.`, "error");
                 return false;
             }
             return true;
@@ -185,8 +139,7 @@
         fileListDiv.innerHTML = "";
         uploadedFiles.forEach((file, index) => {
             const fileDiv = document.createElement("div");
-            fileDiv.className =
-                "flex items-center justify-between bg-white px-2 py-1 rounded border text-sm";
+            fileDiv.className = "flex items-center justify-between bg-white px-2 py-1 rounded border text-sm";
             fileDiv.innerHTML = `
                 <div class="flex items-center">
                     <svg class="w-4 h-4 mr-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
@@ -201,16 +154,10 @@
             fileListDiv.appendChild(fileDiv);
         });
 
-        // Show/hide uploaded files container
         if (uploadedFilesDiv) {
-            if (uploadedFiles.length > 0) {
-                uploadedFilesDiv.classList.remove("hidden");
-            } else {
-                uploadedFilesDiv.classList.add("hidden");
-            }
+            uploadedFilesDiv.classList.toggle("hidden", uploadedFiles.length === 0);
         }
 
-        // Attach event listeners for removing files
         document.querySelectorAll(".remove-file-button").forEach((button) => {
             button.addEventListener("click", function () {
                 const index = parseInt(this.dataset.index);
@@ -222,29 +169,25 @@
 
     // Message Handling Functions
     async function sendMessage(e) {
-        // Prevent default form submission if this is triggered by a form
         if (e && e.preventDefault) {
             e.preventDefault();
         }
 
         const message = messageInput.value.trim();
-
-        // Check if either a message or files are present
         if (!message && uploadedFiles.length === 0) {
             showFeedback("Please enter a message or upload files.", "error");
             return false;
         }
 
-        // Append the user's message to the chat window if not empty
         if (message) {
             appendUserMessage(message);
             messageInput.value = "";
             adjustTextareaHeight(messageInput);
         }
 
-        // Prepare form data
         const formData = new FormData();
         formData.append("message", message);
+        formData.append("model_id", modelSelect.value);
         uploadedFiles.forEach((file) => {
             formData.append("files[]", file);
         });
@@ -252,16 +195,13 @@
         sendButton.disabled = true;
         messageInput.disabled = true;
 
-        // Show the upload progress bar if there are files
         if (uploadedFiles.length > 0) {
             uploadProgress.classList.remove("hidden");
             uploadProgressBar.style.width = "0%";
         }
 
-        const sendMessageUrl = "/chat";
-
         try {
-            const response = await axios.post(sendMessageUrl, formData, {
+            const response = await axios.post("/chat", formData, {
                 headers: {
                     "X-CSRFToken": getCSRFToken(),
                 },
@@ -276,15 +216,12 @@
             });
 
             const data = response.data;
-
-            // Re-enable the send button and message input
             uploadProgress.classList.add("hidden");
             sendButton.disabled = false;
             messageInput.disabled = false;
 
             if (data.response) {
                 appendAssistantMessage(data.response);
-                // Clear the file list on success
                 uploadedFiles = [];
                 renderFileList();
             }
@@ -295,7 +232,6 @@
                 );
             }
         } catch (error) {
-            // Re-enable the send button and message input
             uploadProgress.classList.add("hidden");
             sendButton.disabled = false;
             messageInput.disabled = false;
@@ -308,40 +244,36 @@
 
     function appendUserMessage(message) {
         const userMessageDiv = document.createElement("div");
-        userMessageDiv.className = "flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end";
+        userMessageDiv.className = "flex w-full mt-2 space-x-3 max-w-3xl ml-auto justify-end";
         userMessageDiv.innerHTML = `
-            <div>
+            <div class="flex-grow">
                 <div class="bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
-                    <div class="text-sm markdown-content"></div>
+                    <div class="text-sm markdown-content prose prose-invert max-w-none"></div>
                 </div>
                 <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
             </div>
             <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
         `;
-        // Use renderMarkdown to render the message content
         userMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
         chatBox.appendChild(userMessageDiv);
-        // Highlight code blocks after adding to DOM
         Prism.highlightAllUnder(userMessageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     function appendAssistantMessage(message) {
         const assistantMessageDiv = document.createElement("div");
-        assistantMessageDiv.className = "flex w-full mt-2 space-x-3 max-w-xs";
+        assistantMessageDiv.className = "flex w-full mt-2 space-x-3 max-w-3xl";
         assistantMessageDiv.innerHTML = `
             <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
-            <div>
-                <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
-                    <div class="text-sm markdown-content"></div>
+            <div class="flex-grow">
+                <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
+                    <div class="text-sm markdown-content prose dark:prose-invert max-w-none"></div>
                 </div>
                 <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
             </div>
         `;
-        // Use renderMarkdown for the message content
         assistantMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
         chatBox.appendChild(assistantMessageDiv);
-        // Highlight code blocks after adding to DOM
         Prism.highlightAllUnder(assistantMessageDiv);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
@@ -365,8 +297,6 @@
         });
     }
 
-    // Handle form submission if the send button is inside a form
-    const chatForm = document.getElementById("chat-form");
     if (chatForm) {
         chatForm.addEventListener("submit", (e) => {
             sendMessage(e);
@@ -386,7 +316,6 @@
 
     // Model Selection and Editing
     if (modelSelect && editModelButton) {
-        // Function to update the edit button state
         function updateEditButtonState() {
             const selectedModelId = modelSelect.value;
             if (selectedModelId) {
@@ -398,18 +327,27 @@
             }
         }
 
-        // Initial state on page load
         updateEditButtonState();
 
         modelSelect.addEventListener("change", function () {
             updateEditButtonState();
+            if (chatBox.children.length > 0) {
+                const formData = new FormData();
+                formData.append("model_id", this.value);
+                fetch("/chat", {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": getCSRFToken(),
+                    },
+                    body: formData,
+                });
+            }
         });
 
         editModelButton.addEventListener("click", function () {
             const modelId = this.dataset.modelId;
             if (modelId) {
-                // Correctly construct the URL for redirection
-                window.location.href = `/edit-model/${modelId}`;
+                window.location.href = `/models/edit-model/${modelId}`;
             }
         });
     }
@@ -418,16 +356,18 @@
     if (newChatBtn) {
         newChatBtn.addEventListener("click", async () => {
             try {
+                const modelId = modelSelect.value;
                 const response = await fetch("/new_chat", {
                     method: "POST",
                     headers: {
                         "X-CSRFToken": getCSRFToken(),
+                        "Content-Type": "application/json"
                     },
+                    body: JSON.stringify({ model_id: modelId })
                 });
                 if (response.ok) {
                     const data = await response.json();
                     if (data.success) {
-                        // Pass the newly created chat_id to the URL
                         window.location.href = `/chat_interface?chat_id=${data.chat_id}`;
                     }
                 } else {
@@ -440,7 +380,44 @@
         });
     }
 
-    // Drag and Drop
+    // Chat Deletion
+    window.deleteChat = function(chatId) {
+        if (confirm('Are you sure you want to delete this chat?')) {
+            fetch(`/delete_chat/${chatId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (window.location.href.includes(chatId)) {
+                        window.location.href = '/chat_interface';
+                    } else {
+                        const chatElement = document.querySelector(`a[href*="${chatId}"]`).parentElement;
+                        chatElement.classList.add('chat-item-exit');
+                        setTimeout(() => {
+                            chatElement.remove();
+                            const dateGroup = chatElement.previousElementSibling;
+                            if (dateGroup && dateGroup.classList.contains('text-xs') && !dateGroup.nextElementSibling) {
+                                dateGroup.remove();
+                            }
+                        }, 300);
+                    }
+                } else {
+                    showFeedback('Failed to delete chat', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showFeedback('An error occurred while deleting the chat', 'error');
+            });
+        }
+    };
+
+    // File Drop Zone
     const dropZone = document.getElementById("drop-zone");
     const messageInputArea = document.querySelector(".message-input-area");
 
@@ -475,7 +452,7 @@
         });
     }
 
-    // Hamburger Menu Toggle
+    // Mobile Menu
     if (sidebarToggle) {
         sidebarToggle.addEventListener("click", function () {
             offCanvasMenu.classList.toggle("hidden");
@@ -497,7 +474,7 @@
         });
     }
 
-    // Swipe Gestures for Off-Canvas Menu
+    // Mobile Gestures
     let touchstartX = 0;
     let touchendX = 0;
 
@@ -517,9 +494,8 @@
         handleGesture();
     }, false);
 
-    // Mobile-Specific Interactions and Optimizations
+    // Mobile Interactions
     function handleMobileInteractions() {
-        // Add touch event listeners for better mobile experience
         chatBox.addEventListener("touchstart", handleTouchStart, false);
         chatBox.addEventListener("touchmove", handleTouchMove, false);
 
@@ -533,9 +509,7 @@
         }
 
         function handleTouchMove(evt) {
-            if (!xDown || !yDown) {
-                return;
-            }
+            if (!xDown || !yDown) return;
 
             const xUp = evt.touches[0].clientX;
             const yUp = evt.touches[0].clientY;
@@ -545,30 +519,20 @@
 
             if (Math.abs(xDiff) > Math.abs(yDiff)) {
                 if (xDiff > 0) {
-                    // Left swipe
                     console.log("Left swipe detected");
                 } else {
-                    // Right swipe
                     console.log("Right swipe detected");
                 }
             } else if (yDiff > 0) {
-                // Up swipe
                 console.log("Up swipe detected");
             } else {
-                // Down swipe
                 console.log("Down swipe detected");
             }
 
-            // Reset values
             xDown = null;
             yDown = null;
         }
     }
 
-    // Call the function to handle mobile interactions
     handleMobileInteractions();
-
-    // Expose showFeedback and getCSRFToken functions if needed
-    window.showFeedback = showFeedback;
-    window.getCSRFToken = getCSRFToken;
 })();

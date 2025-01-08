@@ -70,6 +70,7 @@ class Model:
     description: Optional[str]
     model_type: str
     api_endpoint: str
+    api_key: str
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     max_completion_tokens: int = 500
@@ -169,6 +170,7 @@ class Model:
                     deployment_name,
                     description,
                     api_endpoint,
+                    api_key,
                     api_version,
                     temperature,
                     max_tokens,
@@ -177,13 +179,14 @@ class Model:
                     requires_o1_handling,
                     is_default,
                     version
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     data["name"],
                     data["deployment_name"],
                     data.get("description", ""),
                     data["api_endpoint"],
+                    data["api_key"],
                     data["api_version"],
                     data.get("temperature"),
                     data.get("max_tokens"),
@@ -263,6 +266,7 @@ class Model:
             "name",
             "deployment_name",
             "api_endpoint",
+            "api_key",
             "api_version",
             "model_type",
             "max_completion_tokens",
@@ -316,10 +320,12 @@ class Chat:
         Verify that the chat belongs to the specified user.
         """
         with db_connection() as db:
+            logger.debug("Checking ownership for chat_id: %s, user_id: %d", chat_id, user_id)
             chat = db.execute(
                 "SELECT id FROM chats WHERE id = ? AND user_id = ?",
                 (chat_id, user_id),
             ).fetchone()
+            logger.debug("Query result for chat_id %s: %s", chat_id, chat)
             return chat is not None
 
     @staticmethod
@@ -373,18 +379,24 @@ class Chat:
             return [dict(chat) for chat in chats]
 
     @staticmethod
-    def create(chat_id: str, user_id: int, title: str = "New Chat") -> None:
+    def create(chat_id: str, user_id: int, title: str = "New Chat", model_id: Optional[int] = None) -> None:
         """
         Create a new chat record.
+
+        Args:
+            chat_id: The unique identifier for the chat
+            user_id: The ID of the user creating the chat
+            title: The chat title (defaults to "New Chat")
+            model_id: Optional ID of the model to use for this chat
         """
         if len(title) > 50:
             title = title[:50]
         with db_connection() as db:
             db.execute(
-                "INSERT INTO chats (id, user_id, title) VALUES (?, ?, ?)",
-                (chat_id, user_id, title),
+                "INSERT INTO chats (id, user_id, title, model_id) VALUES (?, ?, ?, ?)",
+                (chat_id, user_id, title, model_id),
             )
-            logger.info("Chat created: %s for user %d", chat_id, user_id)
+            logger.info("Chat created: %s for user %d with model %s", chat_id, user_id, model_id or "default")
 
     @staticmethod
     def delete(chat_id: str) -> None:

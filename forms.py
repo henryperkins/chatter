@@ -119,6 +119,17 @@ class ModelForm(FlaskForm):
             ),
         ],
     )
+    api_key = StringField(
+        "API Key",
+        validators=[
+            DataRequired(),
+            Length(min=32, message="API key must be at least 32 characters long"),
+            Regexp(
+                r"^[a-zA-Z0-9]+$",
+                message="API key can only contain letters and numbers",
+            ),
+        ],
+    )
     temperature = FloatField(
         "Temperature (Creativity Level)",
         validators=[
@@ -135,7 +146,7 @@ class ModelForm(FlaskForm):
     )
     max_completion_tokens = IntegerField(
         "Max Completion Tokens (Output)",
-        validators=[DataRequired(), NumberRange(min=1, max=1000)],
+        validators=[DataRequired(), NumberRange(min=1, max=32000)],
         default=500,
     )
     model_type = SelectField(
@@ -188,24 +199,6 @@ class ModelForm(FlaskForm):
     def validate_password(self, field: Any) -> None:
         """Validate password strength and security requirements."""
         validate_password_strength(field.data)
-
-    def validate_api_endpoint(self, field: Any) -> None:
-        api_key = os.getenv("AZURE_OPENAI_KEY")
-        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
-        deployment_name = str(self.deployment_name.data)  # Ensure string type
-
-        if not api_key:
-            raise ValidationError(
-                "Azure OpenAI API key is not found in environment variables."
-            )
-
-        try:
-            if not validate_api_endpoint(
-                str(field.data), api_key, deployment_name, api_version
-            ):
-                raise ValidationError("Invalid or unreachable Azure OpenAI endpoint.")
-        except ValueError as ex:
-            raise ValidationError(str(ex))
 
     def validate_temperature(self, field: Any) -> None:
         if self.requires_o1_handling.data:

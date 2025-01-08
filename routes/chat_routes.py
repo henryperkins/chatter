@@ -79,8 +79,13 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
     """Create a new chat and return success JSON."""
     chat_id = generate_new_chat_id()
     user_id = int(current_user.id)
-
-    Chat.create(chat_id, user_id, "New Chat")
+    
+    # Get model_id from request data
+    data = request.get_json() if request.is_json else {}
+    model_id = data.get('model_id')
+    
+    # Create chat with optional model_id
+    Chat.create(chat_id, user_id, "New Chat", model_id)
     session["chat_id"] = chat_id
     logger.info("New chat created with ID: %s", chat_id)
 
@@ -107,8 +112,19 @@ def chat_interface() -> str:
     if chat_id:
         # 2. Verify chat ownership
         if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
-            logger.warning("Unauthorized access attempt to chat %s", chat_id)
-            return "Chat not found or access denied", 403
+            logger.warning(
+                "Unauthorized access attempt to chat %s by user %s",
+                chat_id,
+                current_user.id,
+            )
+            logger.debug("Session data: %s", session)
+            logger.debug("Request args: %s", request.args)
+
+            # Automatically create a new chat if the current one is invalid
+            chat_id = generate_new_chat_id()
+            Chat.create(chat_id, current_user.id, "New Chat")
+            session["chat_id"] = chat_id
+            logger.info("Automatically created a new chat with ID: %s for user %s", chat_id, current_user.id)
 
         session["chat_id"] = chat_id  # Update session with the valid chat_id
     else:
@@ -128,6 +144,9 @@ def chat_interface() -> str:
     today = datetime.now().strftime('%Y-%m-%d')
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
 
+    # Get current chat's model_id
+    current_model_id = Chat.get_model(chat_id)
+    
     return render_template(
         "chat.html",
         chat_id=chat_id,
@@ -137,6 +156,7 @@ def chat_interface() -> str:
         now=datetime.now,
         today=today,
         yesterday=yesterday,
+        current_model_id=current_model_id,
     )
 
 
@@ -152,7 +172,13 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         ).fetchone()
 
         if not chat:
-            logger.warning("Unauthorized access attempt to chat %s", chat_id)
+            logger.warning(
+                "Unauthorized access attempt to chat %s by user %s",
+                chat_id,
+                current_user.id,
+            )
+            logger.debug("Session data: %s", session)
+            logger.debug("Request args: %s", request.args)
             return jsonify({"error": "Chat not found or access denied"}), 403
 
         messages = conversation_manager.get_context(chat_id)
@@ -222,10 +248,39 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         logger.error("Chat ID not found in session.")
         return jsonify({"error": "Chat ID not found."}), 400
 
-    # Retrieve the model for this chat, if any
-    model_id = Chat.get_model(chat_id)
-    model_obj = Model.get_by_id(model_id) if model_id else Model.get_default()
-    requires_o1_handling = model_obj.requires_o1_handling if model_obj else False
+    # Get model_id from form data or use existing chat model
+    model_id = request.form.get("model_id")
+    if model_id:
+        try:
+            model_id = int(model_id)  # Convert to int to ensure valid ID
+            # Verify model exists before updating
+            model = Model.get_by_id(model_id)
+            if model:
+                # Update chat's model if a new one is selected
+                with db_connection() as db:
+                    db.execute("UPDATE chats SET model_id = ? WHERE id = ?", (model_id, chat_id))
+                logger.info(f"Updated chat {chat_id} to use model {model_id}")
+            else:
+                logger.warning(f"Attempted to switch to non-existent model ID: {model_id}")
+                model_id = Chat.get_model(chat_id)  # Fall back to current model
+        except (ValueError, TypeError):
+            logger.error(f"Invalid model_id received: {model_id}")
+            model_id = Chat.get_model(chat_id)  # Fall back to current model
+    else:
+        # Retrieve the existing model for this chat
+        model_id = Chat.get_model(chat_id)
+    model_obj = None
+    
+    # Try to get the selected model first, then fall back to default
+    if model_id:
+        model_obj = Model.get_by_id(model_id)
+    if not model_obj:
+        model_obj = Model.get_default()
+    if not model_obj:
+        logger.error("No model configured. Please set up a model in the settings.")
+        return jsonify({"error": "No model configured. Please set up a model in the settings."}), 400
+        
+    requires_o1_handling = model_obj.requires_o1_handling
 
     # Retrieve user message
     user_message = request.form.get("message", "").strip()
@@ -322,6 +377,10 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             "deployment_name": model_obj.deployment_name if model_obj else None,
             "selected_model_id": model_id,
             "max_completion_tokens": model_obj.max_completion_tokens if model_obj else None,
+            "api_endpoint": model_obj.api_endpoint if model_obj else None,
+            "api_key": model_obj.api_key if model_obj else None,
+            "api_version": model_obj.api_version if model_obj else None,
+            "requires_o1_handling": model_obj.requires_o1_handling if model_obj else False,
         }
 
         # Get response from Azure OpenAI
@@ -336,6 +395,14 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
 
         return jsonify(response_data)
 
+    except ValueError as ex:
+        if "Missing required Azure OpenAI environment variables" in str(ex):
+            logger.error("Azure OpenAI configuration error: %s", str(ex))
+            return jsonify({
+                "error": "Azure OpenAI is not configured. Please set up your Azure OpenAI credentials in the model settings."
+            }), 400
+        logger.error("Validation error: %s", str(ex))
+        return jsonify({"error": str(ex)}), 400
     except Exception as ex:
         logger.exception("Error during chat handling: %s", ex)
-        return jsonify({"error": "An unexpected error occurred."}), 500
+        return jsonify({"error": "An unexpected error occurred. Please try again later."}), 500
