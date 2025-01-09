@@ -1,48 +1,55 @@
-import logging
-import os
-from typing import Union, Tuple, Dict, List
-import tiktoken
-import bleach
-from flask import (
-    Blueprint,
-    jsonify,
-    redirect,
-    render_template,
-    request,
-    session,
-    url_for,
-    Response,
-    current_app,
-)
+from flask import Blueprint, request, jsonify, redirect, url_for, render_template, current_app, session
 from flask_login import login_required, current_user
-from werkzeug.utils import secure_filename
-from datetime import datetime, timedelta
-
-from chat_api import scrape_data, get_azure_response
-from chat_utils import generate_new_chat_id
-from conversation_manager import ConversationManager
+from typing import Union, Tuple, List, Dict
+import os
+import logging
+import bleach
+from models.model import Model
+from conversation_manager import conversation_manager
+from utils import count_tokens, secure_filename, get_azure_response
 from database import get_db
 from models.chat import Chat
-from models.model import Model
-from token_utils import count_tokens
-from extensions import csrf
+from extensions import csrf_protect
+import tiktoken
 
-bp = Blueprint("chat", __name__)
-conversation_manager = ConversationManager()
-logger = logging.getLogger(__name__)
+chat_routes = Blueprint('chat_routes', __name__)
 
-# Constants
-ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx", ".py", ".js", ".md", ".jpg", ".png"}
-ALLOWED_MIME_TYPES = {
-    "text/plain",
-    "application/pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "text/x-python",
-    "application/javascript",
-    "text/markdown",
-    "image/jpeg",
-    "image/png",
-}
+@chat_routes.route('/chat', methods=['POST'])
+def chat():
+    """
+    Handle message submissions from the chat interface.
+    """
+    user_id = request.headers.get('X-User-ID')  # Replace with actual user session handling
+    if not user_id:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    message = request.form.get('message')
+    files = request.files.getlist('files[]')
+
+    if not message and not files:
+        return jsonify({'error': 'Message or files required'}), 400
+
+    # Save message to the database
+    db = get_db()
+    chat = Chat(user_id=user_id, message=message)
+    db.session.add(chat)
+    db.session.commit()
+
+    # Handle file uploads (if any)
+    included_files = []
+    excluded_files = []
+    for file in files:
+        try:
+            # Save file logic here
+            included_files.append({'filename': file.filename})
+        except Exception as e:
+            excluded_files.append({'filename': file.filename, 'error': str(e)})
+
+    return jsonify({
+        'response': f'Message received: {message}',
+        'included_files': included_files,
+        'excluded_files': excluded_files
+    })
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB per file
 MAX_TOTAL_FILE_SIZE = 50 * 1024 * 1024  # 50 MB for total files
 MAX_FILE_CONTENT_LENGTH = 8000  # Characters (increased to accommodate larger files)

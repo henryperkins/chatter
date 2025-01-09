@@ -264,3 +264,7 @@ class ConversationManager:
             "total_messages": len(messages),
             "total_tokens": total_tokens,
         }
+
+
+# Export an instance of ConversationManager
+conversation_manager = ConversationManager()
