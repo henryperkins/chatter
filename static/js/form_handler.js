@@ -17,6 +17,11 @@ document.addEventListener('DOMContentLoaded', () => {
         form.addEventListener('submit', handleFormSubmit);
     });
 
+    // Get CSRF token from meta tag
+    function getCSRFToken() {
+        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    }
+
     // Function to handle form submissions
     async function handleFormSubmit(event) {
         event.preventDefault(); // Prevent the default form submission
