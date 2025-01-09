@@ -142,7 +142,7 @@ def initialize_client_from_model(
         if model_config.get("max_tokens") is not None
         else None
     )
-    max_completion_tokens: int = int(model_config.get("max_completion_tokens", 500))
+    max_completion_tokens: int = int(model_config.get("max_completion_tokens", 8500))
     requires_o1_handling: bool = bool(model_config.get("requires_o1_handling", False))
 
     # Validate required fields
