@@ -5,84 +5,96 @@
 {% block content %}
 <div class="flex flex-col h-screen bg-white dark:bg-gray-900">
     <!-- Mobile Toggle -->
-    <button id="sidebar-toggle" class="md:hidden bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-4 py-2">
+    <button id="sidebar-toggle"
+        class="md:hidden bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-4 py-2">
         Toggle Sidebar
     </button>
 
     <div class="flex flex-1 overflow-hidden">
         <!-- SIDEBAR -->
-        <nav id="sidebar" class="hidden md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
+        <nav id="sidebar"
+            class="hidden md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
             <div class="p-4 space-y-4">
                 <!-- New Chat Button -->
-                <button id="new-chat-btn" class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                <button id="new-chat-btn"
+                    class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
                     New Chat
                 </button>
 
                 <!-- Model Selection -->
                 {% if models %}
-                    <div>
-                        <label for="model-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model:</label>
-                        <select id="model-select" class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
-                            {% for model in models %}
-                                <option value="{{ model.id }}" {% if model.is_default %}selected{% endif %}>
-                                    {{ model.name }}{% if model.is_default %} (Default){% endif %}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                <div>
+                    <label for="model-select"
+                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model:</label>
+                    <select id="model-select"
+                        class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                        {% for model in models %}
+                        <option value="{{ model.id }}" {% if model.is_default %}selected{% endif %}>
+                            {{ model.name }}{% if model.is_default %} (Default){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
                 {% endif %}
 
                 <!-- Admin-Only Buttons -->
                 {% if current_user.role == 'admin' %}
-                    <div class="space-y-2">
-                        <a href="{{ url_for('model.add_model_page') }}" class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center">
-                            Add Model
-                        </a>
-                        <button id="edit-model-btn" class="block w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-center disabled:opacity-50 disabled:pointer-events-none" disabled>
-                            Edit Model
-                        </button>
-                    </div>
+                <div class="space-y-2">
+                    <a href="{{ url_for('model.add_model_page') }}"
+                        class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center">
+                        Add Model
+                    </a>
+                    <button id="edit-model-btn"
+                        class="block w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-center">
+                        Edit Model
+                    </button>
+                </div>
                 {% endif %}
 
                 <!-- Chat List -->
                 <div class="space-y-4">
                     {% set ns = namespace(current_date=None) %}
                     {% for conversation in conversations|sort(attribute='timestamp', reverse=True) %}
-                        {% set chat_date = conversation.timestamp.strftime('%Y-%m-%d') %}
+                    {% set chat_date = conversation.timestamp.strftime('%Y-%m-%d') %}
 
-                        {% if chat_date != ns.current_date %}
-                            {% set ns.current_date = chat_date %}
-                            <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider pt-4 first:pt-0">
-                                {% if chat_date == today %}
-                                    Today
-                                {% elif chat_date == yesterday %}
-                                    Yesterday
-                                {% else %}
-                                    {{ conversation.timestamp.strftime('%B %d, %Y') }}
-                                {% endif %}
-                            </div>
+                    {% if chat_date != ns.current_date %}
+                    {% set ns.current_date = chat_date %}
+                    <div
+                        class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider pt-4 first:pt-0">
+                        {% if chat_date == today %}
+                        Today
+                        {% elif chat_date == yesterday %}
+                        Yesterday
+                        {% else %}
+                        {{ conversation.timestamp.strftime('%B %d, %Y') }}
                         {% endif %}
+                    </div>
+                    {% endif %}
 
-                        <div class="relative group">
-                            <a href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}" class="block p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                    <div class="relative group">
+                        <a href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
+                            class="block p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                                     {{ conversation.title }} - {{ conversation.model_name }}
-                                    </span>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">
-                                        {{ conversation.timestamp.strftime('%I:%M %p') }}
-                                    </span>
-                                </div>
-                            </a>
-                            <button class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center h-8 w-8 rounded-full hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 delete-chat-btn" data-chat-id="{{ conversation.id }}" title="Delete chat">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                </svg>
-                            </button>
-                        </div>
+                                </span>
+                                <span class="text-xs text-gray-500 dark:text-gray-400">
+                                    {{ conversation.timestamp.strftime('%I:%M %p') }}
+                                </span>
+                            </div>
+                        </a>
+                        <button
+                            class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center h-8 w-8 rounded-full hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 delete-chat-btn"
+                            data-chat-id="{{ conversation.id }}" title="Delete chat">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
                     {% endfor %}
                 </div>
             </div>
@@ -90,54 +102,58 @@
 
         <!-- MAIN CHAT AREA -->
         <div class="flex-1 flex flex-col">
-            <div class="chat-header px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                <h2 id="chat-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    {{ chat_title }} - {{ model_name }}
-                </h2>
-                <button id="edit-title-btn" class="ml-4 text-sm text-blue-600 hover:underline">Edit Title</button>
+            <div
+                class="chat-header px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div class="flex items-center">
+                    <h2 id="chat-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        {{ chat_title }} - {{ model_name }}
+                    </h2>
+                    <button id="edit-title-btn" class="ml-4 text-sm text-blue-600 hover:underline">Edit Title</button>
+                </div>
             </div>
             <div id="chat-box" class="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-white dark:bg-gray-900">
                 {% for message in messages %}
-                    {% if message.role == 'user' %}
-                        <!-- User message -->
-                        <div class="flex justify-end">
-                            <div class="max-w-lg text-right">
-                                <div class="bg-blue-600 text-white px-4 py-2 rounded-lg">
-                                    <p class="text-sm">{{ message.content }}</p>
-                                </div>
-                                <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
-                                    {% if message.timestamp %}
-                                        {{ message.timestamp.strftime('%I:%M %p') }}
-                                    {% else %}
-                                        {{ now().strftime('%I:%M %p') }}
-                                    {% endif %}
-                                </span>
+                {% if message.role == 'user' %}
+                <!-- User message -->
+                <div class="flex justify-end">
+                    <div class="max-w-lg text-right">
+                        <div class="bg-blue-600 text-white px-4 py-2 rounded-lg">
+                            <p class="text-sm">{{ message.content }}</p>
+                        </div>
+                        <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                            {% if message.timestamp %}
+                            {{ message.timestamp.strftime('%I:%M %p') }}
+                            {% else %}
+                            {{ now().strftime('%I:%M %p') }}
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                {% else %}
+                <!-- Assistant message -->
+                <div class="flex">
+                    <div class="max-w-lg">
+                        <div class="bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-lg">
+                            <div class="prose dark:prose-invert prose-sm max-w-none">
+                                {{ message.content|safe }}
                             </div>
                         </div>
-                    {% else %}
-                        <!-- Assistant message -->
-                        <div class="flex">
-                            <div class="max-w-lg">
-                                <div class="bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-lg">
-                                    <div class="prose dark:prose-invert prose-sm max-w-none">
-                                        {{ message.content }}
-                                    </div>
-                                </div>
-                                <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
-                                    {% if message.timestamp %}
-                                        {{ message.timestamp.strftime('%I:%M %p') }}
-                                    {% else %}
-                                        {{ now().strftime('%I:%M %p') }}
-                                    {% endif %}
-                                </span>
-                            </div>
-                        </div>
-                    {% endif %}
+                        <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                            {% if message.timestamp %}
+                            {{ message.timestamp.strftime('%I:%M %p') }}
+                            {% else %}
+                            {{ now().strftime('%I:%M %p') }}
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                {% endif %}
                 {% endfor %}
             </div>
 
             <!-- FILE UPLOAD AREA -->
-            <div id="uploaded-files" class="hidden px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+            <div id="uploaded-files"
+                class="hidden px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
                 <h3 class="text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
                     Uploaded Files
                 </h3>
@@ -148,9 +164,11 @@
             <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-900">
                 <div class="flex items-end space-x-3 message-input-area">
                     <!-- Upload Button -->
-                    <button id="upload-button" class="p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center" aria-label="Upload files">
+                    <button id="upload-button"
+                        class="p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center"
+                        aria-label="Upload files">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                         </svg>
                         <span>Upload</span>
                     </button>
@@ -158,11 +176,14 @@
 
                     <!-- Message Input -->
                     <div class="flex-1">
-                        <textarea id="message-input" class="w-full px-3 py-2 resize-none border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200" placeholder="Type your message..." rows="1"></textarea>
+                        <textarea id="message-input"
+                            class="w-full px-3 py-2 resize-none border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+                            placeholder="Type your message..." rows="1"></textarea>
                     </div>
 
                     <!-- Send Button -->
-                    <button id="send-button" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+                    <button id="send-button"
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
                         <span>Send</span>
                     </button>
                 </div>
@@ -184,7 +205,8 @@
 </div>
 
 <!-- UPLOAD PROGRESS -->
-<div id="upload-progress" class="hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 w-64">
+<div id="upload-progress"
+    class="hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 w-64">
     <div class="text-sm mb-2 text-gray-800 dark:text-gray-100">
         Uploading files...
     </div>
@@ -196,7 +218,8 @@
 <div class="bottom-nav">
     <div class="bottom-nav-item">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M13 5v6h6"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M13 5v6h6">
+            </path>
         </svg>
         <span class="text-xs">Home</span>
     </div>
@@ -226,4 +249,34 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const editTitleBtn = document.getElementById('edit-title-btn');
+        if (editTitleBtn) {
+            editTitleBtn.addEventListener('click', function () {
+                editChatTitle('{{ chat_id }}');
+            });
+        }
+        document.querySelectorAll('.delete-chat-btn').forEach(button => {
+            button.addEventListener('click', function (event) {
+                event.preventDefault();
+                const chatId = this.getAttribute('data-chat-id');
+                deleteChat(chatId);
+            });
+        });
+        const modelSelect = document.getElementById('model-select');
+        const editModelButton = document.getElementById('edit-model-btn');
+
+        if (modelSelect && editModelButton) {
+            editModelButton.addEventListener('click', function () {
+                const selectedModelId = modelSelect.value;
+                window.location.href = `/edit/${selectedModelId}`;
+            });
+        }
+    });
+</script>
 {% endblock %}

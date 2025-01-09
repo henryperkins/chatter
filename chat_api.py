@@ -184,9 +184,7 @@ def scrape_weather(location: str) -> str:
         return "Could not retrieve weather information due to a network error."
 
     soup = BeautifulSoup(response.text, "html.parser")
-    weather_element = soup.find("div", class_="BNeawe")
-
-    if weather_element:
+    if weather_element := soup.find("div", class_="BNeawe"):
         weather = weather_element.text
         return f"The weather in {location} is: {weather}"
     else:

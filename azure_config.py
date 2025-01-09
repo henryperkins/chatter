@@ -9,6 +9,7 @@ from typing import Dict, Optional, Tuple, Any
 # Initialize logger
 logger = logging.getLogger(__name__)
 
+
 def validate_o1_preview_config(model_config: Dict[str, Any]) -> None:
     """
     Validate configuration for o1-preview models.
@@ -34,9 +35,12 @@ def validate_o1_preview_config(model_config: Dict[str, Any]) -> None:
     if model_config.get("stream"):
         raise ValueError("o1-preview models do not support streaming")
     if model_config.get("max_tokens"):
-        raise ValueError("o1-preview models use max_completion_tokens instead of max_tokens")
+        raise ValueError(
+            "o1-preview models use max_completion_tokens instead of max_tokens"
+        )
     if model_config.get("temperature") not in (None, 1, 1.0):
         raise ValueError("o1-preview models require temperature=1")
+
 
 def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI, str]:
     """
@@ -57,14 +61,14 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
     if not deployment_name:
         deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
     if not deployment_name:
-        raise ValueError(
-            "Default deployment name not found in environment variables."
-        )
+        raise ValueError("Default deployment name not found in environment variables.")
 
     # Retrieve Azure OpenAI configuration from environment variables
     azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
     api_key = os.getenv("AZURE_OPENAI_KEY")
-    api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")  # Updated to latest o1-preview version
+    api_version = os.getenv(
+        "AZURE_OPENAI_API_VERSION", "2024-12-01-preview"
+    )  # Updated to latest o1-preview version
 
     # Validate required configuration variables
     if not all([azure_endpoint, api_key, deployment_name]):
@@ -85,6 +89,7 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
     )
 
     return client, deployment_name
+
 
 def initialize_client_from_model(
     model_config: Dict[str, Any]
@@ -127,24 +132,17 @@ def initialize_client_from_model(
     api_key = str(api_key)
     deployment_name = str(deployment_name)
     api_version = str(model_config.get("api_version", "2024-12-01-preview"))
-    if requires_o1_handling:
-        # For o1-preview models
-        max_completion_tokens: int = int(model_config.get("max_completion_tokens", 32000))
-        temperature = 1
-        max_tokens = None
-    else:
-        # For other models like gpt-4o
-        temperature: Optional[float] = (
-            float(model_config.get("temperature"))
-            if model_config.get("temperature") is not None
-            else None
-        )
-        max_tokens: Optional[int] = (
-            int(model_config.get("max_tokens"))
-            if model_config.get("max_tokens") is not None
-            else None
-        )
-        max_completion_tokens: int = int(model_config.get("max_completion_tokens", 500))
+    temperature: Optional[float] = (
+        float(model_config.get("temperature"))
+        if model_config.get("temperature") is not None
+        else None
+    )
+    max_tokens: Optional[int] = (
+        int(model_config.get("max_tokens"))
+        if model_config.get("max_tokens") is not None
+        else None
+    )
+    max_completion_tokens: int = int(model_config.get("max_completion_tokens", 500))
     requires_o1_handling: bool = bool(model_config.get("requires_o1_handling", False))
 
     # Validate required fields
@@ -158,7 +156,9 @@ def initialize_client_from_model(
 
     # Ensure API version is correct for o1-preview
     if requires_o1_handling and not api_version.endswith("-preview"):
-        logger.warning("Updating API version to 2024-12-01-preview for o1-preview model")
+        logger.warning(
+            "Updating API version to 2024-12-01-preview for o1-preview model"
+        )
         api_version = "2024-12-01-preview"
 
     for field_name, value in required_fields.items():
@@ -168,7 +168,7 @@ def initialize_client_from_model(
     if requires_o1_handling:
         # Enforce o1-preview specific requirements
         api_version = "2024-12-01-preview"  # Must use this specific version
-        temperature = None  # Temperature must be None for o1-preview
+        temperature = 1  # Temperature must be 1 for o1-preview
         max_tokens = None  # Use max_completion_tokens instead of max_tokens
 
         # Validate and update o1-preview configuration
@@ -182,6 +182,10 @@ def initialize_client_from_model(
         if model_config.get("stream", False):
             # Disable streaming for o1-preview
             model_config["stream"] = False
+    else:
+        # For other models like gpt-4o
+        max_completion_tokens = int(model_config.get("max_completion_tokens") or 500)
+        max_tokens = int(model_config.get("max_tokens") or 16384)
 
     # Initialize the Azure OpenAI client
     client = AzureOpenAI(
@@ -198,6 +202,7 @@ def initialize_client_from_model(
         max_completion_tokens,
         requires_o1_handling,
     )
+
 
 def validate_api_endpoint(
     api_endpoint: str, api_key: str, deployment_name: str, api_version: str
@@ -219,15 +224,18 @@ def validate_api_endpoint(
         Exception: If there's an unexpected error during validation.
     """
     try:
-        def construct_test_url(api_endpoint: str, deployment_name: str, api_version: str) -> str:
+
+        def construct_test_url(
+            api_endpoint: str, deployment_name: str, api_version: str
+        ) -> str:
             """
             Construct the full URL for validation.
-        
+
             Args:
                 api_endpoint (str): The base API endpoint URL.
                 deployment_name (str): The deployment name for the model.
                 api_version (str): The API version.
-        
+
             Returns:
                 str: The constructed URL.
             """
@@ -254,10 +262,7 @@ def validate_api_endpoint(
 
         # Make the test request
         response = requests.post(
-            test_url,
-            headers={"api-key": api_key},
-            json=test_payload,
-            timeout=10
+            test_url, headers={"api-key": api_key}, json=test_payload, timeout=10
         )
         return response.status_code == 200
     except requests.exceptions.Timeout:
@@ -267,15 +272,7 @@ def validate_api_endpoint(
         logger.error(f"Validation failed with a request exception: {str(e)}")
         raise
     except Exception as e:
-        logger.error(f"An unexpected error occurred during API endpoint validation: {str(e)}")
+        logger.error(
+            f"An unexpected error occurred during API endpoint validation: {str(e)}"
+        )
         raise
-    except requests.exceptions.Timeout:
-        logger.error("Validation failed due to a timeout.")
-        raise
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Validation failed with a request exception: {str(e)}")
-        raise
-    except Exception as e:
-        logger.error(f"An unexpected error occurred during API endpoint validation: {str(e)}")
-        raise
-    

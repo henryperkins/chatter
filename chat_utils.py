@@ -21,10 +21,11 @@ def extract_context_from_conversation(messages: List[Dict[str, str]], latest_res
     context_parts: List[str] = []
 
     # Consider last 10 messages for context
-    for msg in messages[-10:]:
-        if msg["role"] in ["assistant", "user"]:
-            context_parts.append(f"{msg['role']}: {msg['content']}")
-
+    context_parts.extend(
+        f"{msg['role']}: {msg['content']}"
+        for msg in messages[-10:]
+        if msg["role"] in ["assistant", "user"]
+    )
     # Add the latest response
     context_parts.append(f"assistant: {latest_response}")
 

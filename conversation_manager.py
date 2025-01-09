@@ -16,8 +16,7 @@ TOKENS_PER_ASSISTANT_REPLY: int = 3  # Accounts for assistant's reply tokens
 
 # Configurable Environment Variables (with defaults)
 MAX_MESSAGES: int = int(os.getenv("MAX_MESSAGES", "20"))
-# MAX_TOKENS will be set based on the model's `max_tokens` parameter
-# Remove the fixed MAX_TOKENS value
+MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "16384"))  # Adjusted for GPT-4 16K model
 MAX_MESSAGE_TOKENS: int = int(
     os.getenv("MAX_MESSAGE_TOKENS", "8192")
 )  # GPT-4 input limit

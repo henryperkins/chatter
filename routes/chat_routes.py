@@ -22,7 +22,8 @@ from chat_api import scrape_data, get_azure_response
 from chat_utils import generate_new_chat_id
 from conversation_manager import ConversationManager
 from database import get_db
-from models import Chat, Model
+from models.chat import Chat
+from models.model import Model
 from token_utils import count_tokens
 
 bp = Blueprint("chat", __name__)
@@ -368,34 +369,10 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                         f"Skipping reading content for non-text file: {filename}"
                     )
 
-                # Read text-based file content directly from the file object
-                if mime_type.startswith("text/"):
-                    file_content = file.read().decode("utf-8")
-                    # Truncate file content if it exceeds the token limit
-                    truncated_content = truncate_message(
-                        file_content, MAX_FILE_CONTENT_LENGTH
-                    )
-                    formatted_content = (
-                        f"\nFile '{filename}' content:\n```\n{truncated_content}\n```\n"
-                    )
-
-                    # Check if adding the file content would exceed the total token limit
-                    content_tokens = count_tokens(formatted_content, MODEL_NAME)
-                    if total_tokens + content_tokens > MAX_INPUT_TOKENS:
-                        error_message = f"File {filename} skipped: Adding it would exceed the {MAX_INPUT_TOKENS} token limit"
-                        logger.warning(error_message)
-                        excluded_files.append(
-                            {"filename": filename, "error": error_message}
-                        )
-                        continue
-
-                    total_tokens += content_tokens
-                    file_contents.append(formatted_content)
-                    file.seek(0)  # Reset file pointer after reading
-                else:
-                    logger.info(
-                        f"Skipping reading content for non-text file: {filename}"
-                    )
+                # Save the file
+                file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+                file.save(file_path)
+                included_files.append({"filename": filename})
 
             except Exception as e:
                 error_message = f"Error processing file {filename}: {e}"
@@ -479,7 +456,9 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             )
 
         # Add the assistant's response to the conversation history
-        conversation_manager.add_message(chat_id, "assistant", model_response)
+        conversation_manager.add_message(
+            chat_id, "assistant", model_response, model_max_tokens=model_max_tokens
+        )
 
         # Prepare the response data
         response_data = {"response": model_response}

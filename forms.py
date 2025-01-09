@@ -25,6 +25,7 @@ from typing import Any
 from database import get_db
 from sqlalchemy import text
 
+
 class LoginForm(FlaskForm):
     """
     Form for user login.
@@ -44,6 +45,7 @@ class LoginForm(FlaskForm):
     )
     submit = SubmitField("Login")
 
+
 class RegistrationForm(FlaskForm):
     """
     Form for user registration.
@@ -53,7 +55,9 @@ class RegistrationForm(FlaskForm):
         "Username",
         validators=[
             DataRequired(message="Username is required."),
-            Length(min=4, max=20, message="Username must be between 4 and 20 characters."),
+            Length(
+                min=4, max=20, message="Username must be between 4 and 20 characters."
+            ),
             Regexp(
                 r"^[a-zA-Z0-9_]+$",
                 message="Username can only contain letters, numbers, and underscores.",
@@ -100,7 +104,7 @@ class RegistrationForm(FlaskForm):
         with get_db() as db:
             if db.execute(
                 text("SELECT username FROM users WHERE LOWER(username) = :username"),
-                {"username": username}
+                {"username": username},
             ).fetchone():
                 raise ValidationError("This username is already taken.")
 
@@ -125,6 +129,7 @@ class RegistrationForm(FlaskForm):
         Validate password strength and security requirements.
         """
         validate_password_strength(field.data)
+
 
 class ModelForm(FlaskForm):
     """
@@ -155,7 +160,10 @@ class ModelForm(FlaskForm):
     )
     description = TextAreaField(
         "Description (Optional)",
-        validators=[Optional(), Length(max=500, message="Description cannot exceed 500 characters.")],
+        validators=[
+            Optional(),
+            Length(max=500, message="Description cannot exceed 500 characters."),
+        ],
     )
     api_endpoint = URLField(
         "API Endpoint",
@@ -174,7 +182,8 @@ class ModelForm(FlaskForm):
         Custom validator for API endpoint.
         """
         # Remove any trailing slashes
-        field.data = field.data.rstrip('/')
+        field.data = field.data.rstrip("/")
+
     temperature = FloatField(
         "Temperature (Creativity Level)",
         validators=[
@@ -186,14 +195,20 @@ class ModelForm(FlaskForm):
         "Max Tokens (Input)",
         validators=[
             Optional(),
-            NumberRange(min=1, max=4000, message="Max tokens must be between 1 and 4000."),
+            NumberRange(
+                min=1, max=4000, message="Max tokens must be between 1 and 4000."
+            ),
         ],
     )
     max_completion_tokens = IntegerField(
         "Max Completion Tokens (Output)",
         validators=[
             DataRequired(message="Max completion tokens is required."),
-            NumberRange(min=1, max=32000, message="Max completion tokens must be between 1 and 32000."),
+            NumberRange(
+                min=1,
+                max=32000,
+                message="Max completion tokens must be between 1 and 32000.",
+            ),
         ],
         default=500,
     )
@@ -204,11 +219,16 @@ class ModelForm(FlaskForm):
         """
         try:
             value = int(field.data)
-            if not (1 <= value <= 16384):
-                raise ValidationError("Max completion tokens must be between 1 and 16384.")
+            if not (1 <= value <= 32000):
+                raise ValidationError(
+                    "Max completion tokens must be between 1 and 32000."
+                )
             field.data = value  # Ensure the value is an integer
         except (TypeError, ValueError) as e:
-            raise ValidationError("Max completion tokens must be a valid integer.") from e
+            raise ValidationError(
+                "Max completion tokens must be a valid integer."
+            ) from e
+
     model_type = SelectField(
         "Model Type",
         choices=[("azure", "Azure"), ("o1-preview", "o1-preview")],
@@ -255,6 +275,7 @@ class ModelForm(FlaskForm):
             self.temperature.data = None
             self.max_tokens.data = None
 
+
 class ResetPasswordForm(FlaskForm):
     """
     Form for resetting user password.
@@ -281,6 +302,7 @@ class ResetPasswordForm(FlaskForm):
         """
         validate_password_strength(field.data)
 
+
 def validate_password_strength(password: str) -> None:
     """
     Validate password meets security requirements.
@@ -299,36 +321,51 @@ def validate_password_strength(password: str) -> None:
         raise ValidationError("Password must contain at least one lowercase letter.")
     if not any(c.isdigit() for c in password):
         raise ValidationError("Password must contain at least one number.")
-    if all(c not in "!@#$%^&*(),.?\":{}|<>" for c in password):
-        raise ValidationError("Password must contain at least one special character (!@#$%^&*(),.?\":{}|<>).")
+    if all(c not in '!@#$%^&*(),.?":{}|<>' for c in password):
+        raise ValidationError(
+            'Password must contain at least one special character (!@#$%^&*(),.?":{}|<>).'
+        )
 
     # Check for common passwords
     common_passwords = {
-        'password', 'password123', '123456', 'qwerty', 'letmein', 'admin123',
-        'welcome', 'monkey', 'dragon', 'baseball', 'football', 'master'
+        "password",
+        "password123",
+        "123456",
+        "qwerty",
+        "letmein",
+        "admin123",
+        "welcome",
+        "monkey",
+        "dragon",
+        "baseball",
+        "football",
+        "master",
     }
     if password.lower() in common_passwords:
-        raise ValidationError("This password is too common. Please choose a stronger password.")
+        raise ValidationError(
+            "This password is too common. Please choose a stronger password."
+        )
 
     # Check for sequential characters
     sequences = (
-        'abcdefghijklmnopqrstuvwxyz',
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-        '01234567890',
-        'qwertyuiop',
-        'asdfghjkl',
-        'zxcvbnm'
+        "abcdefghijklmnopqrstuvwxyz",
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+        "01234567890",
+        "qwertyuiop",
+        "asdfghjkl",
+        "zxcvbnm",
     )
 
     for seq in sequences:
         seq_len = len(seq)
         for i in range(seq_len - 2):
-            forward_seq = seq[i:i + 3]
+            forward_seq = seq[i : i + 3]
             backward_seq = forward_seq[::-1]
             if forward_seq in password or backward_seq in password:
                 raise ValidationError("Password cannot contain sequential characters.")
     # Check for repeated characters
     for i in range(len(password) - 2):
         if password[i] == password[i + 1] == password[i + 2]:
-            raise ValidationError("Password must not contain three or more repeated characters in a row.")
-        
+            raise ValidationError(
+                "Password must not contain three or more repeated characters in a row."
+            )
