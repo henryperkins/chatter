@@ -193,7 +193,7 @@ class ModelForm(FlaskForm):
         "Max Completion Tokens (Output)",
         validators=[
             DataRequired(message="Max completion tokens is required."),
-            NumberRange(min=1, max=16384, message="Max completion tokens must be between 1 and 16384."),
+            NumberRange(min=1, max=32000, message="Max completion tokens must be between 1 and 32000."),
         ],
         default=500,
     )

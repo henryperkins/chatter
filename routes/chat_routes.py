@@ -368,10 +368,34 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                         f"Skipping reading content for non-text file: {filename}"
                     )
 
-                # Save the file
-                file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
-                file.save(file_path)
-                included_files.append({"filename": filename})
+                # Read text-based file content directly from the file object
+                if mime_type.startswith("text/"):
+                    file_content = file.read().decode("utf-8")
+                    # Truncate file content if it exceeds the token limit
+                    truncated_content = truncate_message(
+                        file_content, MAX_FILE_CONTENT_LENGTH
+                    )
+                    formatted_content = (
+                        f"\nFile '{filename}' content:\n```\n{truncated_content}\n```\n"
+                    )
+
+                    # Check if adding the file content would exceed the total token limit
+                    content_tokens = count_tokens(formatted_content, MODEL_NAME)
+                    if total_tokens + content_tokens > MAX_INPUT_TOKENS:
+                        error_message = f"File {filename} skipped: Adding it would exceed the {MAX_INPUT_TOKENS} token limit"
+                        logger.warning(error_message)
+                        excluded_files.append(
+                            {"filename": filename, "error": error_message}
+                        )
+                        continue
+
+                    total_tokens += content_tokens
+                    file_contents.append(formatted_content)
+                    file.seek(0)  # Reset file pointer after reading
+                else:
+                    logger.info(
+                        f"Skipping reading content for non-text file: {filename}"
+                    )
 
             except Exception as e:
                 error_message = f"Error processing file {filename}: {e}"

@@ -208,10 +208,15 @@ def register() -> Response:
                 user_obj = User(user_id, username, email, "user")
                 login_user(user_obj)
 
+                # Create a new chat for the user
+                chat_id = generate_new_chat_id()
+                Chat.create(chat_id, user_id, "New Chat")
+                session["chat_id"] = chat_id
+
                 return jsonify({
                     "success": True,
                     "message": "Registration successful!",
-                    "redirect": url_for("chat.chat_interface")
+                    "redirect": url_for("chat.chat_interface", chat_id=chat_id)
                 }), 200
 
             except Exception as e:
