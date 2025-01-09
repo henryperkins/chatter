@@ -112,7 +112,7 @@ class Chat:
                     FROM chats c
                     LEFT JOIN models m ON c.model_id = m.id
                     WHERE c.user_id = :user_id
-                    ORDER by created_at DESC
+                    ORDER by c.created_at DESC
                     LIMIT :limit OFFSET :offset
                 """
                 )
@@ -161,7 +161,7 @@ class Chat:
         """
         with db_session() as db:
             try:
-                query = text("SELECT * FROM chats WHERE id = :chat_id")
+                query = text("SELECT id, user_id, title, model_id FROM chats WHERE id = :chat_id")
                 row = db.execute(query, {"chat_id": chat_id}).mappings().first()
                 if row:
                     chat_dict = dict(row)

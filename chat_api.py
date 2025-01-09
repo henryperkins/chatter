@@ -11,7 +11,7 @@ import requests
 from bs4 import BeautifulSoup
 from openai import OpenAIError
 
-from azure_config import get_azure_client, initialize_client_from_model
+from azure_config import initialize_client_from_model
 from models import Model
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,6 @@ def get_azure_response(
         # Initialize defaults
         api_params = {
             "messages": [],  # Will be populated based on model type
-            "max_completion_tokens": max_completion_tokens or 1000  # Default if not provided
         }
 
         # Create model config from provided credentials or get from database
@@ -98,40 +97,67 @@ def get_azure_response(
         ]
         api_params["messages"] = api_messages
 
-        # Set temperature and tokens based on model type
+        # Set parameters based on model type
         if requires_o1_handling:
-            api_params["temperature"] = 1  # Required for o1-preview
-            # Remove max_tokens if present, use max_completion_tokens
+            # Required parameters for o1-preview
+            api_params.update({
+                "temperature": 1,  # Must be 1 for o1-preview
+                "max_completion_tokens": max_completion_tokens or 8500,  # Use model config or default to 8500
+                "stream": False  # Streaming not supported
+            })
+            # Ensure max_tokens is not present
             api_params.pop("max_tokens", None)
         else:
+            # Parameters for other models
             if temperature is not None:
                 api_params["temperature"] = temperature
             if max_tokens is not None:
                 api_params["max_tokens"] = max_tokens
 
-        # Make the API call (no streaming for o1-preview)
-        response = client.chat.completions.create(
-            **api_params,
-            stream=False if requires_o1_handling else None
+        # Log the final API parameters for debugging
+        logger.debug("Final API parameters: %s", api_params)
+
+        # Make the API call
+        response = client.chat.completions.create(**api_params)
+
+        # Log full response for debugging
+        logger.debug("Raw API response: %s", response.model_dump_json())
+
+        # Extract model response with enhanced error checking
+        if not response.choices:
+            logger.error("No choices in model response")
+            raise ValueError("Model response contained no choices")
+            
+        if not response.choices[0].message:
+            logger.error("No message in first choice")
+            raise ValueError("Model response choice contained no message")
+            
+        model_response = response.choices[0].message.content
+        if not model_response:
+            logger.error("Empty content in model response")
+            raise ValueError("Model returned empty response content")
+
+        # Log successful response
+        logger.info(
+            "Response received from the model (length: %d): %s",
+            len(model_response),
+            model_response[:100] + "..." if len(model_response) > 100 else model_response
         )
-
-        # Extract model response
-        if response.choices and response.choices[0].message:
-            model_response = response.choices[0].message.content
-        else:
-            model_response = (
-                "The assistant was unable to generate a response. "
-                "Please try again or rephrase your input."
-            )
-
-        logger.info("Response received from the model: %s", model_response)
         return model_response
 
     except OpenAIError as e:
-        logger.error("OpenAI API error: %s", str(e))
+        logger.error(
+            "OpenAI API error with %s model: %s",
+            "o1-preview" if requires_o1_handling else "standard",
+            str(e)
+        )
         raise
     except Exception as e:
-        logger.error("Error in get_azure_response: %s", str(e))
+        logger.error(
+            "Error in get_azure_response (%s model): %s",
+            "o1-preview" if requires_o1_handling else "standard",
+            str(e)
+        )
         raise
 
 

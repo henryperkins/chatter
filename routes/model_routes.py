@@ -240,7 +240,7 @@ def edit_model(model_id):
             logger.debug("Updating model %d with data: %s", model_id, {k: v for k, v in data.items() if k != 'api_key'})
             Model.update(model_id, data)
             
-            if request.is_xhr:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({"success": True, "message": "Model updated successfully"})
             else:
                 flash("Model updated successfully", "success")
@@ -248,7 +248,7 @@ def edit_model(model_id):
                 
         except Exception as e:
             logger.exception("Error updating model %d: %s", model_id, str(e))
-            if request.is_xhr:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({"error": str(e), "success": False}), 400
             else:
                 flash(f"Error updating model: {str(e)}", "error")

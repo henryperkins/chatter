@@ -56,6 +56,7 @@
         <!-- Temperature -->
         <div class="mb-6">
             {{ form.temperature.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
+            <p class="text-xs text-gray-500 mb-2">Controls randomness (0.0 for focused, up to 2.0 for more creative responses). Note: For o1-preview models, temperature is automatically set to 1.0.</p>
             {{ form.temperature(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.temperature) }}
             {% if form.temperature.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.temperature.errors[0] }}</p>
@@ -116,7 +117,7 @@
                         {{ form.requires_o1_handling.label.text }}
                     </span>
                 </label>
-                <p class="text-xs text-gray-500 mt-1 ml-7">Enable this for models that require special handling (disables temperature and max tokens settings)</p>
+                <p class="text-xs text-gray-500 mt-1 ml-7">Enable this for o1-preview models (sets temperature to 1.0 and disables max tokens settings)</p>
             </div>
 
             <!-- Default Model Option -->

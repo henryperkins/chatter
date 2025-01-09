@@ -20,7 +20,7 @@ from database import get_db
 from sqlalchemy import text
 from models.user import User
 from decorators import admin_required
-from forms.forms import LoginForm, RegistrationForm, ResetPasswordForm
+from forms import LoginForm, RegistrationForm, ResetPasswordForm
 from extensions import limiter
 from threading import Timer
 from models.chat import Chat

@@ -118,7 +118,7 @@ class RegistrationForm(FlaskForm):
 
         # Check for existing email using text()
         with get_db() as db:
-            if existing := db.execute(
+            if db.execute(
                 text("SELECT email FROM users WHERE LOWER(email) = :email"),
                 {"email": email},
             ).fetchone():
@@ -206,11 +206,10 @@ class ModelForm(FlaskForm):
             DataRequired(message="Max completion tokens is required."),
             NumberRange(
                 min=1,
-                max=32000,
-                message="Max completion tokens must be between 1 and 32000.",
+                max=16384,
+                message="Max completion tokens must be between 1 and 16384.",
             ),
         ],
-        default=500,
     )
 
     def validate_max_completion_tokens(self, field: Any) -> None:
@@ -251,8 +250,8 @@ class ModelForm(FlaskForm):
         Validate temperature based on whether special handling is required.
         """
         if self.requires_o1_handling.data:
-            # When requires_o1_handling is True, automatically set temperature to None
-            field.data = None
+            # When requires_o1_handling is True, set temperature to 1 as required by o1-preview models
+            field.data = 1.0
         elif field.data is not None and not (0 <= field.data <= 2):
             raise ValidationError("Temperature must be between 0 and 2.")
 
@@ -359,7 +358,7 @@ def validate_password_strength(password: str) -> None:
     for seq in sequences:
         seq_len = len(seq)
         for i in range(seq_len - 2):
-            forward_seq = seq[i : i + 3]
+            forward_seq = seq[i:i + 3]
             backward_seq = forward_seq[::-1]
             if forward_seq in password or backward_seq in password:
                 raise ValidationError("Password cannot contain sequential characters.")

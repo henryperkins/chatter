@@ -24,7 +24,7 @@ class Model:
     api_key: str
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
-    max_completion_tokens: int = 500
+    max_completion_tokens: int = 8300  # o1-preview model can handle up to 8300 tokens
     is_default: bool = False
     requires_o1_handling: bool = False
     api_version: str = "2024-10-01-preview"
@@ -80,17 +80,25 @@ class Model:
         """
         with db_session() as db:
             try:
-                query = text("""
+                query = text(
+                    """
                     SELECT * FROM models 
                     ORDER BY created_at DESC 
                     LIMIT :limit OFFSET :offset
-                """)
-                rows = db.execute(query, {"limit": limit, "offset": offset}).mappings().all()
+                """
+                )
+                rows = (
+                    db.execute(query, {"limit": limit, "offset": offset})
+                    .mappings()
+                    .all()
+                )
                 models = []
                 for row in rows:
                     model_dict = dict(row)
                     models.append(Model(**model_dict))
-                logger.debug(f"Retrieved {len(models)} models with limit={limit} and offset={offset}")
+                logger.debug(
+                    f"Retrieved {len(models)} models with limit={limit} and offset={offset}"
+                )
                 return models
             except Exception as e:
                 logger.error(f"Error retrieving all models: {e}")
@@ -103,12 +111,29 @@ class Model:
         """
         with db_session() as db:
             try:
-                db.execute(text("UPDATE models SET is_default = 0 WHERE is_default = :current_default"), {"current_default": True})
-                db.execute(text("UPDATE models SET is_default = 1 WHERE id = :model_id"), {"model_id": model_id})
+                db.execute(
+                    text(
+                        "UPDATE models SET is_default = 0 WHERE is_default = :current_default"
+                    ),
+                    {"current_default": True},
+                )
+                db.execute(
+                    text("UPDATE models SET is_default = 1 WHERE id = :model_id"),
+                    {"model_id": model_id},
+                )
 
-                duplicate_check = db.execute(text("""
+                duplicate_check = (
+                    db.execute(
+                        text(
+                            """
                     SELECT COUNT(*) as count FROM models WHERE is_default = :is_default
-                """), {"is_default": True}).mappings().first()
+                """
+                        ),
+                        {"is_default": True},
+                    )
+                    .mappings()
+                    .first()
+                )
                 if duplicate_check and duplicate_check["count"] > 1:
                     raise ValueError("More than one default model exists.")
 
@@ -129,7 +154,8 @@ class Model:
                 if data.get("requires_o1_handling", False):
                     data["temperature"] = None
 
-                query = text("""
+                query = text(
+                    """
                     INSERT INTO models (
                         name, deployment_name, description, api_endpoint, api_key,
                         api_version, temperature, max_tokens, max_completion_tokens,
@@ -140,7 +166,8 @@ class Model:
                         :model_type, :requires_o1_handling, :is_default, :version
                     )
                     RETURNING id
-                """)
+                """
+                )
                 result = db.execute(query, data)
                 model_id = result.scalar()
 
@@ -149,12 +176,16 @@ class Model:
                     return None
 
                 if data.get("is_default", False):
-                    unset_default_query = text("""
+                    unset_default_query = text(
+                        """
                         UPDATE models 
                         SET is_default = 0 
                         WHERE id != :model_id AND is_default = :is_default
-                    """)
-                    db.execute(unset_default_query, {"model_id": model_id, "is_default": True})
+                    """
+                    )
+                    db.execute(
+                        unset_default_query, {"model_id": model_id, "is_default": True}
+                    )
                     db.commit()
 
                 logger.info(f"Model created with ID: {model_id}")
@@ -178,12 +209,23 @@ class Model:
                     raise ValueError(f"Model with ID {model_id} not found.")
 
                 allowed_fields = {
-                    'name', 'deployment_name', 'description', 'api_endpoint',
-                    'api_key', 'api_version', 'temperature', 'max_tokens',
-                    'max_completion_tokens', 'model_type', 'requires_o1_handling',
-                    'is_default', 'version'
+                    "name",
+                    "deployment_name",
+                    "description",
+                    "api_endpoint",
+                    "api_key",
+                    "api_version",
+                    "temperature",
+                    "max_tokens",
+                    "max_completion_tokens",
+                    "model_type",
+                    "requires_o1_handling",
+                    "is_default",
+                    "version",
                 }
-                update_data = {key: value for key, value in data.items() if key in allowed_fields}
+                update_data = {
+                    key: value for key, value in data.items() if key in allowed_fields
+                }
 
                 if not update_data:
                     logger.info(f"No valid fields to update for model ID {model_id}")
@@ -192,21 +234,27 @@ class Model:
                 set_clause = ", ".join(f"{key} = :{key}" for key in update_data)
                 params = {**update_data, "model_id": model_id}
 
-                query = text(f"""
+                query = text(
+                    f"""
                     UPDATE models
                     SET {set_clause}
                     WHERE id = :model_id
-                """)
+                """
+                )
 
                 db.execute(query, params)
 
                 if update_data.get("is_default", False):
-                    unset_default_query = text("""
+                    unset_default_query = text(
+                        """
                         UPDATE models 
                         SET is_default = 0 
                         WHERE id != :model_id AND is_default = :is_default
-                    """)
-                    db.execute(unset_default_query, {"model_id": model_id, "is_default": True})
+                    """
+                    )
+                    db.execute(
+                        unset_default_query, {"model_id": model_id, "is_default": True}
+                    )
 
                 db.commit()
                 logger.info(f"Model updated (ID {model_id})")
@@ -221,8 +269,13 @@ class Model:
         Validate model configuration parameters.
         """
         required_fields = [
-            "name", "deployment_name", "api_endpoint", "api_key", "api_version",
-            "model_type", "max_completion_tokens",
+            "name",
+            "deployment_name",
+            "api_endpoint",
+            "api_key",
+            "api_version",
+            "model_type",
+            "max_completion_tokens",
         ]
 
         for field_name in required_fields:
@@ -231,25 +284,32 @@ class Model:
                 raise ValueError(f"Missing required field: {field_name}")
 
         api_endpoint = config["api_endpoint"]
-        if not api_endpoint.startswith("https://") or "openai.azure.com" not in api_endpoint:
+        if (
+            not api_endpoint.startswith("https://")
+            or "openai.azure.com" not in api_endpoint
+        ):
             raise ValueError("Invalid Azure OpenAI API endpoint.")
 
         if not config.get("requires_o1_handling", False):
             temperature = config.get("temperature")
             if temperature is not None and not (0 <= float(temperature) <= 2):
-                raise ValueError("Temperature must be between 0 and 2 or NULL for o1-preview models")
+                raise ValueError(
+                    "Temperature must be between 0 and 2 or NULL for o1-preview models"
+                )
 
         max_tokens = config.get("max_tokens", None)
         if max_tokens is not None and int(max_tokens) <= 0:
             raise ValueError("Max tokens must be a positive integer.")
 
-        max_completion_tokens = config.get('max_completion_tokens')
+        max_completion_tokens = config.get("max_completion_tokens")
         if max_completion_tokens is not None:
             try:
                 max_completion_tokens = int(max_completion_tokens)
                 if not (1 <= max_completion_tokens <= 16384):
-                    raise ValueError("max_completion_tokens must be between 1 and 16384")
-                config['max_completion_tokens'] = max_completion_tokens
+                    raise ValueError(
+                        "max_completion_tokens must be between 1 and 16384"
+                    )
+                config["max_completion_tokens"] = max_completion_tokens
             except (TypeError, ValueError):
                 raise ValueError("max_completion_tokens must be a valid integer")
 
@@ -260,21 +320,27 @@ class Model:
         pass
 
     @staticmethod
-    def get_user_chats(user_id: int, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+    def get_user_chats(
+        user_id: int, limit: int = 10, offset: int = 0
+    ) -> List[Dict[str, Any]]:
         """
         Fetch user chats with model information to avoid N+1 query problem.
         """
         with db_session() as db:
             try:
-                query = text("""
+                query = text(
+                    """
                     SELECT c.*, m.name as model_name 
                     FROM chats c 
                     LEFT JOIN models m ON c.model_id = m.id 
                     WHERE c.user_id = :user_id 
                     ORDER BY c.created_at DESC 
                     LIMIT :limit OFFSET :offset
-                """)
-                result = db.execute(query, {"user_id": user_id, "limit": limit, "offset": offset}).fetchall()
+                """
+                )
+                result = db.execute(
+                    query, {"user_id": user_id, "limit": limit, "offset": offset}
+                ).fetchall()
                 logger.debug(f"Retrieved {len(result)} chats for user ID {user_id}")
                 return [dict(row) for row in result]
             except Exception as e:

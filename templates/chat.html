@@ -172,7 +172,7 @@
                         </svg>
                         <span>Upload</span>
                     </button>
-                    <input type="file" id="file-input" class="hidden" multiple>
+                    <input type="file" id="file-input" class="hidden" multiple aria-label="Upload files">
 
                     <!-- Message Input -->
                     <div class="flex-1">
@@ -274,7 +274,7 @@
         if (modelSelect && editModelButton) {
             editModelButton.addEventListener('click', function () {
                 const selectedModelId = modelSelect.value;
-                window.location.href = `/edit/${selectedModelId}`;
+                window.location.href = `{{ url_for('model.edit_model', model_id=0) }}`.replace('0', selectedModelId);
             });
         }
     });
