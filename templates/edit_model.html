@@ -5,61 +5,70 @@
 {% block content %}
 <div class="container mx-auto px-4 py-8">
     <h1 class="text-2xl font-bold mb-4">Edit Model: {{ model.name }}</h1>
-    <form id="edit-model-form" method="POST" action="{{ url_for('model.edit_model', model_id=model.id) }}" class="bg-white shadow-md rounded-lg p-6 ajax-form">
+    <form id="edit-model-form" method="POST" action="{{ url_for('model.edit_model', model_id=model.id) }}"
+        class="bg-white shadow-md rounded-lg p-6 ajax-form">
         {{ form.hidden_tag() }}
 
         <!-- Model Name -->
         <div class="mb-6">
             {{ form.name.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            {{ form.name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.name) }}
+            {{ form.name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none
+            focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.name) }}
             {% if form.name.errors %}
-                <p class="text-sm text-red-500 mt-1">{{ form.name.errors[0] }}</p>
+            <p class="text-sm text-red-500 mt-1">{{ form.name.errors[0] }}</p>
             {% endif %}
         </div>
 
         <!-- Deployment Name -->
         <div class="mb-6">
             {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            {{ form.deployment_name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.deployment_name) }}
+            {{ form.deployment_name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
+            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.deployment_name)
+            }}
             {% if form.deployment_name.errors %}
-                <p class="text-sm text-red-500 mt-1">{{ form.deployment_name.errors[0] }}</p>
+            <p class="text-sm text-red-500 mt-1">{{ form.deployment_name.errors[0] }}</p>
             {% endif %}
         </div>
 
         <!-- Description -->
         <div class="mb-6">
             {{ form.description.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            {{ form.description(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 h-24 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.description) }}
+            {{ form.description(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 h-24
+            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.description) }}
             {% if form.description.errors %}
-                <p class="text-sm text-red-500 mt-1">{{ form.description.errors[0] }}</p>
+            <p class="text-sm text-red-500 mt-1">{{ form.description.errors[0] }}</p>
             {% endif %}
         </div>
 
         <!-- API Endpoint -->
         <div class="mb-6">
             {{ form.api_endpoint.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            {{ form.api_endpoint(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.api_endpoint) }}
+            {{ form.api_endpoint(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none
+            focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.api_endpoint) }}
             {% if form.api_endpoint.errors %}
-                <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
+            <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
             {% endif %}
         </div>
 
         <!-- Model Type -->
         <div class="mb-6">
             {{ form.model_type.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            {{ form.model_type(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.model_type) }}
+            {{ form.model_type(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none
+            focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.model_type) }}
             {% if form.model_type.errors %}
-                <p class="text-sm text-red-500 mt-1">{{ form.model_type.errors[0] }}</p>
+            <p class="text-sm text-red-500 mt-1">{{ form.model_type.errors[0] }}</p>
             {% endif %}
         </div>
 
         <!-- Temperature -->
         <div class="mb-6">
             {{ form.temperature.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            <p class="text-xs text-gray-500 mb-2">Controls randomness (0.0 for focused, up to 2.0 for more creative responses). Note: For o1-preview models, temperature is automatically set to 1.0.</p>
-            {{ form.temperature(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.temperature) }}
+            <p class="text-xs text-gray-500 mb-2">Controls randomness (0.0 for focused, up to 2.0 for more creative
+                responses). Note: For o1-preview models, temperature is automatically set to 1.0.</p>
+            {{ form.temperature(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none
+            focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.temperature) }}
             {% if form.temperature.errors %}
-                <p class="text-sm text-red-500 mt-1">{{ form.temperature.errors[0] }}</p>
+            <p class="text-sm text-red-500 mt-1">{{ form.temperature.errors[0] }}</p>
             {% endif %}
         </div>
 
@@ -67,9 +76,11 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
                 {{ form.max_tokens.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-                {{ form.max_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.max_tokens) }}
+                {{ form.max_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
+                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.max_tokens)
+                }}
                 {% if form.max_tokens.errors %}
-                    <p class="text-sm text-red-500 mt-1">{{ form.max_tokens.errors[0] }}</p>
+                <p class="text-sm text-red-500 mt-1">{{ form.max_tokens.errors[0] }}</p>
                 {% endif %}
             </div>
             <div>
@@ -77,21 +88,23 @@
                 <div class="flex flex-col space-y-2">
                     <div class="flex justify-between">
                         <span class="text-sm text-gray-600">500</span>
-                        <span id="max-completion-tokens-value" class="text-sm font-semibold text-blue-600">{{ model.max_completion_tokens }}</span>
+                        <span id="max-completion-tokens-value" class="text-sm font-semibold text-blue-600">{{
+                            model.max_completion_tokens }}</span>
                         <span class="text-sm text-gray-600">16384</span>
                     </div>
                     {{ form.max_completion_tokens(
-                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600",
-                        type="range",
-                        min="500",
-                        max="16384",
-                        step="100",
-                        value=model.max_completion_tokens,
-                        oninput="document.getElementById('max-completion-tokens-value').textContent = this.value"
+                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700
+                    accent-blue-600",
+                    type="range",
+                    min="500",
+                    max="16384",
+                    step="100",
+                    value=model.max_completion_tokens,
+                    oninput="document.getElementById('max-completion-tokens-value').textContent = this.value"
                     ) }}
                 </div>
                 {% if form.max_completion_tokens.errors %}
-                    <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
+                <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
                 {% endif %}
             </div>
         </div>
@@ -99,9 +112,10 @@
         <!-- API Version -->
         <div class="mb-6">
             {{ form.api_version.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            {{ form.api_version(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.api_version) }}
+            {{ form.api_version(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none
+            focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.api_version) }}
             {% if form.api_version.errors %}
-                <p class="text-sm text-red-500 mt-1">{{ form.api_version.errors[0] }}</p>
+            <p class="text-sm text-red-500 mt-1">{{ form.api_version.errors[0] }}</p>
             {% endif %}
         </div>
 
@@ -112,18 +126,21 @@
             <!-- Requires o1-preview Handling -->
             <div class="mb-4">
                 <label class="inline-flex items-center">
-                    {{ form.requires_o1_handling(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2", checked=model.requires_o1_handling) }}
+                    {{ form.requires_o1_handling(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500
+                    focus:ring-2", checked=model.requires_o1_handling) }}
                     <span class="ml-2 text-sm text-gray-700 font-medium">
                         {{ form.requires_o1_handling.label.text }}
                     </span>
                 </label>
-                <p class="text-xs text-gray-500 mt-1 ml-7">Enable this for o1-preview models (sets temperature to 1.0 and disables max tokens settings)</p>
+                <p class="text-xs text-gray-500 mt-1 ml-7">Enable this for o1-preview models (sets temperature to 1.0
+                    and disables max tokens settings)</p>
             </div>
 
             <!-- Default Model Option -->
             <div>
                 <label class="inline-flex items-center">
-                    {{ form.is_default(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2", checked=model.is_default) }}
+                    {{ form.is_default(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2",
+                    checked=model.is_default) }}
                     <span class="ml-2 text-sm text-gray-700 font-medium">
                         {{ form.is_default.label.text }}
                     </span>
@@ -134,25 +151,25 @@
 
         <!-- Submit & Cancel -->
         <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
-            <button
-                type="submit"
+            <button type="submit"
                 class="w-full sm:w-auto px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg font-medium hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-                id="submit-button"
-            >
+                id="submit-button">
                 <span class="inline-flex items-center">
                     <span id="button-text">Update Model</span>
                     <span id="loading-spinner" class="hidden ml-2">
-                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
                         </svg>
                     </span>
                 </span>
             </button>
-            <a
-                href="{{ url_for('chat.chat_interface') }}"
-                class="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white rounded-lg shadow-lg font-medium hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 text-center transition duration-150 ease-in-out"
-            >
+            <a href="{{ url_for('chat.chat_interface') }}"
+                class="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white rounded-lg shadow-lg font-medium hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 text-center transition duration-150 ease-in-out">
                 Cancel
             </a>
         </div>
@@ -160,107 +177,106 @@
 </div>
 
 <!-- Feedback Message -->
-<div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50" role="alert" aria-live="assertive"></div>
+<div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50"
+    role="alert" aria-live="assertive"></div>
 
 {% endblock content %}
 
 {% block scripts %}
 {{ super() }}
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-    const form = document.getElementById("edit-model-form");
-    const submitButton = document.getElementById("submit-button");
-    const buttonText = document.getElementById("button-text");
-    const loadingSpinner = document.getElementById("loading-spinner");
+    document.addEventListener("DOMContentLoaded", function () {
+        const form = document.getElementById("edit-model-form");
+        const submitButton = document.getElementById("submit-button");
+        const buttonText = document.getElementById("button-text");
+        const loadingSpinner = document.getElementById("loading-spinner");
 
-    form.addEventListener("submit", async (e) => {
-        e.preventDefault();
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
 
-        // Show loading state
-        submitButton.disabled = true;
-        buttonText.textContent = "Updating Model...";
-        loadingSpinner.classList.remove("hidden");
+            // Show loading state
+            submitButton.disabled = true;
+            buttonText.textContent = "Updating Model...";
+            loadingSpinner.classList.remove("hidden");
 
-        try {
-            const formData = new FormData(form);
-            
-            // Convert and validate max_completion_tokens
-            const maxCompletionTokens = parseInt(formData.get('max_completion_tokens'), 10);
-            if (isNaN(maxCompletionTokens) || maxCompletionTokens < 1 || maxCompletionTokens > 16384) {
-                showFeedback("Max completion tokens must be between 1 and 16384", "error");
-                return;
-            }
-            formData.set('max_completion_tokens', maxCompletionTokens);
+            try {
+                const formData = new FormData(form);
 
-            // Convert temperature to number if present
-            const temperature = formData.get('temperature');
-            if (temperature) {
-                formData.set('temperature', parseFloat(temperature));
-            }
-
-            // Convert max_tokens to number if present
-            const maxTokens = formData.get('max_tokens');
-            if (maxTokens) {
-                formData.set('max_tokens', parseInt(maxTokens, 10));
-            }
-
-            // Convert boolean fields
-            formData.set('requires_o1_handling', formData.get('requires_o1_handling') === 'y');
-            formData.set('is_default', formData.get('is_default') === 'y');
-
-            const response = await fetch(form.action, {
-                method: "POST",
-                body: formData,
-                headers: {
-                    "X-CSRFToken": getCSRFToken(),
-                    "X-Requested-With": "XMLHttpRequest"
+                // Convert and validate max_completion_tokens
+                const maxCompletionTokens = parseInt(formData.get('max_completion_tokens'), 10);
+                if (isNaN(maxCompletionTokens) || maxCompletionTokens < 1 || maxCompletionTokens > 16384) {
+                    showFeedback("Max completion tokens must be between 1 and 16384", "error");
+                    return;
                 }
-            });
+                formData.set('max_completion_tokens', maxCompletionTokens);
 
-            const data = await response.json();
-
-            if (response.ok && data.success) {
-                showFeedback(data.message || "Model updated successfully", "success");
-                // Update the displayed value
-                document.getElementById('max-completion-tokens-value').textContent = formData.get('max_completion_tokens');
-                setTimeout(() => {
-                    window.location.href = "{{ url_for('chat.chat_interface') }}";
-                }, 1500);
-            } else {
-                let errorMessage = "Failed to update the model";
-                if (data.error) {
-                    errorMessage = typeof data.error === 'object'
-                        ? Object.values(data.error).join(', ')
-                        : data.error;
+                // Convert temperature to number if present
+                const temperature = formData.get('temperature');
+                if (temperature) {
+                    formData.set('temperature', parseFloat(temperature));
                 }
-                showFeedback(errorMessage, "error");
+
+                // Convert max_tokens to number if present
+                const maxTokens = formData.get('max_tokens');
+                if (maxTokens) {
+                    formData.set('max_tokens', parseInt(maxTokens, 10));
+                }
+
+                // Convert boolean fields
+                formData.set('requires_o1_handling', formData.get('requires_o1_handling') === 'y');
+                formData.set('is_default', formData.get('is_default') === 'y');
+
+                const response = await fetch(form.action, {
+                    method: "POST",
+                    body: formData,
+                    headers: {
+                        "X-CSRFToken": getCSRFToken(),
+                        "X-Requested-With": "XMLHttpRequest"
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showFeedback(data.message || "Model updated successfully", "success");
+                    // Update the displayed value
+                    document.getElementById('max-completion-tokens-value').textContent = formData.get('max_completion_tokens');
+                    setTimeout(() => {
+                        window.location.href = "{{ url_for('chat.chat_interface') }}";
+                    }, 1500);
+                } else {
+                    let errorMessage = "Failed to update the model";
+                    if (data.error) {
+                        errorMessage = typeof data.error === 'object'
+                            ? Object.values(data.error).join(', ')
+                            : data.error;
+                    }
+                    showFeedback(errorMessage, "error");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                showFeedback("An unexpected error occurred. Please try again.", "error");
+            } finally {
+                submitButton.disabled = false;
+                buttonText.textContent = "Update Model";
+                loadingSpinner.classList.add("hidden");
             }
-        } catch (error) {
-            console.error("Error:", error);
-            showFeedback("An unexpected error occurred. Please try again.", "error");
-        } finally {
-            submitButton.disabled = false;
-            buttonText.textContent = "Update Model";
-            loadingSpinner.classList.add("hidden");
+        });
+
+        function showFeedback(message, type) {
+            const feedbackDiv = document.getElementById('feedback-message');
+            feedbackDiv.textContent = message;
+            feedbackDiv.className = `fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 ${type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                }`;
+            feedbackDiv.classList.remove('hidden');
+            setTimeout(() => {
+                feedbackDiv.classList.add('hidden');
+            }, 3000);
+        }
+
+        function getCSRFToken() {
+            return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
         }
     });
-
-    function showFeedback(message, type) {
-        const feedbackDiv = document.getElementById('feedback-message');
-        feedbackDiv.textContent = message;
-        feedbackDiv.className = `fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 ${
-            type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-        }`;
-        feedbackDiv.classList.remove('hidden');
-        setTimeout(() => {
-            feedbackDiv.classList.add('hidden');
-        }, 3000);
-    }
-
-
-    function getCSRFToken() {
-        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    }
-});
 </script>
 {% endblock scripts %}
