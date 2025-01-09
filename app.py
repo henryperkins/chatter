@@ -11,7 +11,7 @@ from flask_wtf.csrf import CSRFError
 from werkzeug.exceptions import HTTPException
 from database import close_db, init_db, init_app, get_db
 from sqlalchemy import text
-from models import User
+from models import User, Chat, Model, UploadedFile
 from extensions import limiter, login_manager, csrf
 from routes.auth_routes import bp as auth_bp
 from routes.chat_routes import bp as chat_bp

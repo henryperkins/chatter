@@ -1,5 +1,7 @@
 import tiktoken
+import logging
 
+logger = logging.getLogger(__name__)
 
 def count_tokens(text: str, model_name: str = "gpt-3.5-turbo") -> int:
     """
@@ -13,11 +15,11 @@ def count_tokens(text: str, model_name: str = "gpt-3.5-turbo") -> int:
         The number of tokens in the text.
 
     Raises:
-        KeyError: If the model is not found, falls back to cl100k_base encoding.
+        ValueError: If the model encoding is not found.
     """
     try:
         encoding = tiktoken.encoding_for_model(model_name)
     except KeyError:
-        # Fallback to a default encoding if model not found
-        encoding = tiktoken.get_encoding("cl100k_base")
+        logger.error(f"Encoding not found for model '{model_name}'")
+        raise ValueError(f"Token encoding not found for model '{model_name}'")
     return len(encoding.encode(text))

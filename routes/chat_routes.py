@@ -73,22 +73,30 @@ def generate_chat_title(conversation_text: str) -> str:
     """Generate a chat title based on the first 5 messages."""
     # Extract key topics from the conversation
     lines = conversation_text.split("\n")
-    user_messages = [line.split(": ", 1)[1] for line in lines if line.startswith("user:")]
-    
+    user_messages = []
+    for line in lines:
+        if line.startswith("user:") and ": " in line:
+            parts = line.split(": ", 1)
+            if len(parts) == 2:
+                user_messages.append(parts[1])
+
+    if not user_messages:
+        return "New Chat"
+
     # Combine first 3 user messages to find common themes
     combined = " ".join(user_messages[:3])
     words = [word.lower() for word in combined.split() if len(word) > 3]
-    
+
     # Count word frequencies and get top 2 most common
     word_counts = {}
     for word in words:
         word_counts[word] = word_counts.get(word, 0) + 1
     top_words = sorted(word_counts, key=word_counts.get, reverse=True)[:2]
-    
-    # Create title from top words or fallback to first message
+
+    # Create title from top words or fallback to default
     if top_words:
         return " ".join([word.capitalize() for word in top_words])
-    return lines[0].split(": ", 1)[1][:50]
+    return "New Chat"
 
 @bp.route("/")
 @login_required
@@ -172,6 +180,7 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 @login_required
 def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Delete a chat and its associated messages."""
+    logger.debug(f"Received request to delete chat_id: {chat_id}")
     if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
         logger.warning("Unauthorized delete attempt for chat %s by user %s", chat_id, current_user.id)
         return jsonify({"error": "Chat not found or access denied"}), 403
@@ -215,6 +224,7 @@ def scrape() -> Union[Response, Tuple[Response, int]]:
 @login_required
 def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Update the title of a chat."""
+    logger.debug(f"Received request to update title for chat_id: {chat_id}")
     if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
         return jsonify({"error": "Chat not found or access denied"}), 403
 

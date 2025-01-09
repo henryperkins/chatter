@@ -16,6 +16,7 @@ from models import User
 from decorators import admin_required
 from forms import LoginForm, RegistrationForm, ResetPasswordForm
 from extensions import limiter
+from threading import Timer
 
 # Define the blueprint
 bp = Blueprint("auth", __name__)
@@ -23,6 +24,25 @@ logger = logging.getLogger(__name__)
 
 # Track failed registration attempts
 failed_registrations: Dict[str, List[datetime]] = {}
+
+def clean_failed_registrations():
+    now = datetime.now()
+    to_delete = []
+    for ip, timestamps in failed_registrations.items():
+        # Remove timestamps older than 15 minutes
+        failed_registrations[ip] = [
+            ts for ts in timestamps if now - ts < timedelta(minutes=15)
+        ]
+        if not failed_registrations[ip]:
+            to_delete.append(ip)
+    # Delete IPs with no recent attempts
+    for ip in to_delete:
+        del failed_registrations[ip]
+    # Schedule next clean-up
+    Timer(900, clean_failed_registrations).start()  # Run every 15 minutes
+
+# Start the first clean-up
+Timer(900, clean_failed_registrations).start()
 
 
 def log_and_rollback(db, exception, user_message="An unexpected error occurred"):
