@@ -26,6 +26,7 @@ def get_azure_response(
     api_key: Optional[str] = None,
     api_version: Optional[str] = None,
     requires_o1_handling: bool = False,
+    timeout_seconds: int = 30,
 ) -> str:
     """
     Sends a chat message to the Azure OpenAI API and returns the response.
@@ -118,7 +119,7 @@ def get_azure_response(
         logger.debug("Final API parameters: %s", api_params)
 
         # Make the API call
-        response = client.chat.completions.create(**api_params)
+        response = client.chat.completions.create(**api_params, request_timeout=timeout_seconds)
 
         # Log full response for debugging
         logger.debug("Raw API response: %s", response.model_dump_json())
