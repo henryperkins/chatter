@@ -1,4 +1,3 @@
-import os
 from flask_wtf import FlaskForm
 from wtforms import (
     StringField,
@@ -23,8 +22,6 @@ from wtforms.validators import (
     Regexp,
 )
 from typing import Any
-from azure_config import validate_api_endpoint
-from requests.exceptions import RequestException, Timeout
 from database import get_db
 from sqlalchemy import text
 
@@ -168,11 +165,18 @@ class ModelForm(FlaskForm):
             DataRequired(message="API endpoint is required."),
             URL(message="Must be a valid URL."),
             Regexp(
-                r"^https://.*\.openai\.azure\.com/.*$",
+                r"^https://[^/]+\.openai\.azure\.com/?$",
                 message="Must be a valid Azure OpenAI endpoint URL.",
             ),
         ],
     )
+
+    def validate_api_endpoint(self, field: Any) -> None:
+        """
+        Custom validator for API endpoint.
+        """
+        # Remove any trailing slashes
+        field.data = field.data.rstrip('/')
     temperature = FloatField(
         "Temperature (Creativity Level)",
         validators=[
@@ -191,10 +195,22 @@ class ModelForm(FlaskForm):
         "Max Completion Tokens (Output)",
         validators=[
             DataRequired(message="Max completion tokens is required."),
-            NumberRange(min=1, max=1000, message="Max completion tokens must be between 1 and 1000."),
+            NumberRange(min=1, max=16384, message="Max completion tokens must be between 1 and 16384."),
         ],
         default=500,
     )
+
+    def validate_max_completion_tokens(self, field: Any) -> None:
+        """
+        Custom validator for max_completion_tokens.
+        """
+        try:
+            value = int(field.data)
+            if not (1 <= value <= 16384):
+                raise ValidationError("Max completion tokens must be between 1 and 16384.")
+            field.data = value  # Ensure the value is an integer
+        except (TypeError, ValueError):
+            raise ValidationError("Max completion tokens must be a valid integer.")
     model_type = SelectField(
         "Model Type",
         choices=[("azure", "Azure"), ("o1-preview", "o1-preview")],
@@ -215,41 +231,36 @@ class ModelForm(FlaskForm):
     def validate_api_endpoint(self, field: Any) -> None:
         """
         Custom validator for API endpoint.
+        Validates that the endpoint is a valid Azure OpenAI URL:
+        - Must start with https://
+        - Must contain openai.azure.com
+        - Must not have trailing slashes
         """
-        api_endpoint = field.data
-        api_key = os.getenv("AZURE_OPENAI_KEY")
-        api_version = self.api_version.data or os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
-        deployment_name = self.deployment_name.data
-
-        if not api_key:
-            raise ValidationError("Azure OpenAI API key is not found in environment variables.")
-
-        try:
-            if not validate_api_endpoint(api_endpoint, api_key, deployment_name, api_version):
-                raise ValidationError("Invalid or unreachable Azure OpenAI endpoint.")
-        except Timeout:
-            raise ValidationError("Connection timed out. Please check the endpoint URL.")
-        except RequestException as ex:
-            raise ValidationError(f"Connection error: {str(ex)}")
-        except Exception as ex:
-            raise ValidationError(f"An unexpected error occurred: {str(ex)}")
+        api_endpoint = field.data.strip().rstrip('/')
+        if not api_endpoint.startswith("https://"):
+            raise ValidationError("API endpoint must start with https://")
+        if ".openai.azure.com" not in api_endpoint:
+            raise ValidationError("API endpoint must be an Azure OpenAI URL (*.openai.azure.com)")
+        field.data = api_endpoint  # Update the field with cleaned value
 
     def validate_temperature(self, field: Any) -> None:
         """
         Validate temperature based on whether special handling is required.
         """
-        if self.requires_o1_handling.data and field.data is not None:
-            raise ValidationError("Temperature must be None for models requiring special handling.")
-        if field.data is not None and not (0 <= field.data <= 2):
+        if self.requires_o1_handling.data:
+            # When requires_o1_handling is True, automatically set temperature to None
+            field.data = None
+        elif field.data is not None and not (0 <= field.data <= 2):
             raise ValidationError("Temperature must be between 0 and 2.")
 
     def validate_max_tokens(self, field: Any) -> None:
         """
         Validate max_tokens based on whether special handling is required.
         """
-        if self.requires_o1_handling.data and field.data is not None:
-            raise ValidationError("Max tokens must be None for models requiring special handling.")
-        if field.data is not None and field.data <= 0:
+        if self.requires_o1_handling.data:
+            # When requires_o1_handling is True, automatically set max_tokens to None
+            field.data = None
+        elif field.data is not None and field.data <= 0:
             raise ValidationError("Max tokens must be a positive integer.")
 
     def validate_requires_o1_handling(self, field: Any) -> None:
@@ -257,10 +268,9 @@ class ModelForm(FlaskForm):
         Additional validation when special handling is required.
         """
         if field.data:
-            if self.temperature.data is not None:
-                raise ValidationError("Temperature must be None when special handling is required.")
-            if self.max_tokens.data is not None:
-                raise ValidationError("Max tokens must be None when special handling is required.")
+            # When requires_o1_handling is True, automatically set temperature and max_tokens to None
+            self.temperature.data = None
+            self.max_tokens.data = None
 
 class ResetPasswordForm(FlaskForm):
     """

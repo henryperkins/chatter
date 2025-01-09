@@ -434,7 +434,7 @@
             const modelId = this.dataset.modelId;
             if (modelId) {
                 // Correctly construct the URL for redirection
-                window.location.href = `/model/edit-model/${modelId}`;
+                window.location.href = `/models/edit/${modelId}`;
             }
         });
     }

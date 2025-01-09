@@ -8,19 +8,15 @@
         <h1 class="text-2xl font-bold text-center mb-4">Login</h1>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                <div class="space-y-2 mb-4">
-                    {% for category, message in messages %}
-                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                            <strong class="font-bold">{{ category | capitalize }}: </strong>
-                            <span class="block sm:inline">{{ message }}</span>
-                        </div>
-                    {% endfor %}
+            <div id="error-message" class="space-y-2 mb-4" style="display: none;">
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                    <span class="block sm:inline" id="error-text"></span>
                 </div>
-            {% endif %}
+            </div>
+            <div id="attempts-remaining" class="text-sm text-gray-600 mt-2" style="display: none;"></div>
         {% endwith %}
 
-        <form id="login-form" method="POST" action="{{ url_for('auth.login') }}" class="space-y-4">
+        <form id="login-form" method="POST" action="{{ url_for('auth.login') }}" class="space-y-4 ajax-form">
             {{ form.hidden_tag() }}
 
             <!-- Username Field -->
@@ -64,4 +60,40 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(loginForm);
+            
+            try {
+                const response = await fetch(loginForm.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    window.location.href = "{{ url_for('chat.chat_interface') }}";
+                } else {
+                    showFeedback(data.error || 'Login failed', 'error');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showFeedback('An error occurred during login', 'error');
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

@@ -1,27 +1,13 @@
-"""
-models.py
-
-This module contains classes and methods for managing users, models,
-chats, and files in the database.
-"""
+# models.py
 
 import logging
 from dataclasses import dataclass
-from typing import Optional, List, Union, Any, Mapping, Dict
+from typing import Optional, List, Union, Any, Dict
+from datetime import datetime
 
 from database import get_db  # Use SQLAlchemy session manager
 from sqlalchemy.orm import Session
-
-logger = logging.getLogger(__name__)
-
-
-from dataclasses import dataclass
-from typing import Optional
 from sqlalchemy import text
-from sqlalchemy.orm import Session
-import logging
-
-from database import get_db  # Ensure this is correctly implemented in your project
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +33,13 @@ class User:
             query = text("SELECT * FROM users WHERE id = :user_id")
             user_row = db.execute(query, {"user_id": user_id}).fetchone()
             if user_row:
-                user_dict = dict(user_row)
+                # Convert SQLAlchemy row to dictionary using index access
+                user_dict = {
+                    'id': user_row[0],
+                    'username': user_row[1],
+                    'email': user_row[2],
+                    'role': user_row[3]
+                }
                 logger.debug(f"User retrieved: {user_dict}")
                 return User(**user_dict)
             logger.info(f"No user found with ID: {user_id}")
@@ -116,7 +108,24 @@ class Model:
             query = text("SELECT * FROM models WHERE is_default = :is_default")
             row = db.execute(query, {"is_default": True}).fetchone()
             if row:
-                model_dict = dict(row)
+                # Convert SQLAlchemy row to dictionary using index access
+                model_dict = {
+                    'id': row[0],
+                    'name': row[1],
+                    'deployment_name': row[2],
+                    'description': row[3],
+                    'model_type': row[4],
+                    'api_endpoint': row[5],
+                    'api_key': row[6],
+                    'temperature': row[7],
+                    'max_tokens': row[8],
+                    'max_completion_tokens': row[9],
+                    'is_default': row[10],
+                    'requires_o1_handling': row[11],
+                    'api_version': row[12],
+                    'version': row[13],
+                    'created_at': row[14]
+                }
                 logger.debug(f"Default model retrieved: {model_dict}")
                 return Model(**model_dict)
             logger.info("No default model found.")
@@ -137,7 +146,24 @@ class Model:
             query = text("SELECT * FROM models WHERE id = :model_id")
             row = db.execute(query, {"model_id": model_id}).fetchone()
             if row:
-                model_dict = dict(row)
+                # Convert SQLAlchemy row to dictionary using index access
+                model_dict = {
+                    'id': row[0],
+                    'name': row[1],
+                    'deployment_name': row[2],
+                    'description': row[3],
+                    'model_type': row[4],
+                    'api_endpoint': row[5],
+                    'api_key': row[6],
+                    'temperature': row[7],
+                    'max_tokens': row[8],
+                    'max_completion_tokens': row[9],
+                    'is_default': row[10],
+                    'requires_o1_handling': row[11],
+                    'api_version': row[12],
+                    'version': row[13],
+                    'created_at': row[14]
+                }
                 logger.debug(f"Model retrieved by ID {model_id}: {model_dict}")
                 return Model(**model_dict)
             logger.info(f"No model found with ID: {model_id}")
@@ -161,7 +187,27 @@ class Model:
                 LIMIT :limit OFFSET :offset
             """)
             rows = db.execute(query, {"limit": limit, "offset": offset}).fetchall()
-            models = [Model(**dict(row)) for row in rows]
+            models = []
+            for row in rows:
+                # Convert SQLAlchemy row to dictionary using index access
+                model_dict = {
+                    'id': row[0],
+                    'name': row[1],
+                    'deployment_name': row[2],
+                    'description': row[3],
+                    'model_type': row[4],
+                    'api_endpoint': row[5],
+                    'api_key': row[6],
+                    'temperature': row[7],
+                    'max_tokens': row[8],
+                    'max_completion_tokens': row[9],
+                    'is_default': row[10],
+                    'requires_o1_handling': row[11],
+                    'api_version': row[12],
+                    'version': row[13],
+                    'created_at': row[14]
+                }
+                models.append(Model(**model_dict))
             logger.debug(f"Retrieved {len(models)} models with limit={limit} and offset={offset}")
             return models
         except Exception as e:
@@ -185,7 +231,7 @@ class Model:
             duplicate_check = db.execute(text("""
                 SELECT COUNT(*) as count FROM models WHERE is_default = :is_default
             """), {"is_default": True}).fetchone()
-            if duplicate_check and duplicate_check["count"] > 1:
+            if duplicate_check and duplicate_check[0] > 1:
                 raise ValueError("More than one default model exists.")
 
             db.commit()
@@ -437,6 +483,7 @@ class Model:
         finally:
             db.close()
 
+
 @dataclass
 class Chat:
     """
@@ -482,7 +529,7 @@ class Chat:
         try:
             query = text("SELECT title FROM chats WHERE id = :chat_id")
             row = db.execute(query, {"chat_id": chat_id}).fetchone()
-            is_default = bool(row) and row["title"] == "New Chat"
+            is_default = bool(row) and row[0] == "New Chat"
             logger.debug(f"Title default check for chat_id {chat_id}: {is_default}")
             return is_default
         except Exception as e:
@@ -537,7 +584,16 @@ class Chat:
                 LIMIT :limit OFFSET :offset
             """)
             chats = db.execute(query, {"user_id": user_id, "limit": limit, "offset": offset}).fetchall()
-            chat_list = [dict(chat) for chat in chats]
+            chat_list = []
+            for chat in chats:
+                chat_dict = {
+                    'id': chat[0],
+                    'user_id': chat[1],
+                    'title': chat[2],
+                    'model_id': chat[3],
+                    'timestamp': datetime.strptime(chat[4], '%Y-%m-%d %H:%M:%S') if chat[4] else None
+                }
+                chat_list.append(chat_dict)
             logger.debug(f"Retrieved {len(chat_list)} chats for user_id {user_id}")
             return chat_list
         except Exception as e:
@@ -616,7 +672,7 @@ class Chat:
         try:
             query = text("SELECT model_id FROM chats WHERE id = :chat_id")
             row = db.execute(query, {"chat_id": chat_id}).fetchone()
-            model_id = row["model_id"] if row else None
+            model_id = row[0] if row else None
             logger.debug(f"Model ID for chat_id {chat_id}: {model_id}")
             return model_id
         except Exception as e:
@@ -624,6 +680,7 @@ class Chat:
             raise
         finally:
             db.close()
+
 
 @dataclass
 class UploadedFile:
@@ -642,26 +699,54 @@ class UploadedFile:
         Insert a new uploaded file record into the database.
         """
         db: Session = get_db()
-        db.execute(
-            "INSERT INTO uploaded_files (chat_id, filename, filepath) VALUES (:chat_id, :filename, :filepath)",
-            {"chat_id": chat_id, "filename": filename, "filepath": filepath}
-        )
+        try:
+            query = text("""
+                INSERT INTO uploaded_files (chat_id, filename, filepath) 
+                VALUES (:chat_id, :filename, :filepath)
+            """)
+            db.execute(query, {
+                "chat_id": chat_id,
+                "filename": filename,
+                "filepath": filepath
+            })
+            db.commit()
+            logger.info(f"File uploaded: {filename} for chat {chat_id}")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to create uploaded file record: {e}")
+            raise
+        finally:
+            db.close()
 
     @staticmethod
-    def get_by_chat_and_filename(
-        chat_id: str, filename: str
-    ) -> Optional["UploadedFile"]:
+    def get_by_chat_and_filename(chat_id: str, filename: str) -> Optional["UploadedFile"]:
         """
         Retrieve an uploaded file by chat ID and filename.
         """
         db: Session = get_db()
-        row = db.execute(
-            "SELECT * FROM uploaded_files WHERE chat_id = :chat_id AND filename = :filename",
-            {"chat_id": chat_id, "filename": filename}
-        ).fetchone()
-        if row:
-            return UploadedFile(**dict(row))
-        return None
+        try:
+            query = text("""
+                SELECT * FROM uploaded_files 
+                WHERE chat_id = :chat_id AND filename = :filename
+            """)
+            row = db.execute(query, {
+                "chat_id": chat_id,
+                "filename": filename
+            }).fetchone()
+            if row:
+                file_dict = {
+                    'id': row[0],
+                    'chat_id': row[1],
+                    'filename': row[2],
+                    'filepath': row[3]
+                }
+                return UploadedFile(**file_dict)
+            return None
+        except Exception as e:
+            logger.error(f"Error retrieving uploaded file: {e}")
+            raise
+        finally:
+            db.close()
 
     @staticmethod
     def delete_by_chat_ids(chat_ids: List[str]) -> None:
@@ -674,7 +759,7 @@ class UploadedFile:
         try:
             placeholders = ",".join(f":id{i}" for i in range(len(chat_ids)))
             params = {f"id{i}": chat_id for i, chat_id in enumerate(chat_ids)}
-            query = f"DELETE FROM uploaded_files WHERE chat_id IN ({placeholders})"
+            query = text(f"DELETE FROM uploaded_files WHERE chat_id IN ({placeholders})")
             db.execute(query, params)
             db.commit()
             logger.info("Deleted uploaded files for chats: %s", ", ".join(map(str, chat_ids)))
@@ -682,3 +767,5 @@ class UploadedFile:
             db.rollback()
             logger.error(f"Error deleting uploaded files: {e}")
             raise
+        finally:
+            db.close()

@@ -1,6 +1,17 @@
 // static/js/form_handler.js
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Get CSRF token from meta tag
+    function getCSRFToken() {
+        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    }
+
+    // Add ajax-form class to login form
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.classList.add('ajax-form');
+    }
+
     // Attach event listeners to all forms with the class 'ajax-form'
     document.querySelectorAll('.ajax-form').forEach((form) => {
         form.addEventListener('submit', handleFormSubmit);
@@ -11,6 +22,30 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault(); // Prevent the default form submission
         const form = event.target;
         const formData = new FormData(form);
+        
+        // Convert numeric fields
+        for (const [key, value] of formData.entries()) {
+            if (key === 'max_completion_tokens' || key === 'max_tokens') {
+                const numValue = parseInt(value, 10);
+                if (!isNaN(numValue)) {
+                    formData.set(key, numValue);
+                }
+            } else if (key === 'temperature') {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                    formData.set(key, numValue);
+                }
+            }
+        }
+
+        // Convert boolean fields
+        const booleanFields = ['requires_o1_handling', 'is_default'];
+        for (const field of booleanFields) {
+            const checkbox = form.querySelector(`[name="${field}"]`);
+            if (checkbox) {
+                formData.set(field, checkbox.checked);
+            }
+        }
 
         // Clear previous errors
         clearErrors(form);
@@ -27,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: formData,
                 headers: {
                     'X-CSRFToken': getCSRFToken(),
+                    'Accept': 'application/json'
                 },
                 signal: controller.signal,
             });
@@ -68,6 +104,21 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             // Hide loading spinner
             hideLoadingSpinner(form);
+        }
+    }
+
+    // Function to show feedback message
+    function showFeedback(message, type) {
+        const feedbackDiv = document.createElement('div');
+        feedbackDiv.className = `feedback-message ${type === 'error' ? 'text-red-500' : 'text-green-500'} text-sm mt-2`;
+        feedbackDiv.textContent = message;
+
+        // Find the form and insert the feedback after it
+        const form = document.querySelector('.ajax-form');
+        if (form) {
+            form.parentNode.insertBefore(feedbackDiv, form.nextSibling);
+            // Remove the feedback after 5 seconds
+            setTimeout(() => feedbackDiv.remove(), 5000);
         }
     }
 
@@ -119,5 +170,4 @@ document.addEventListener('DOMContentLoaded', () => {
             submitButton.disabled = false; // Re-enable the button
         }
     }
-
 });

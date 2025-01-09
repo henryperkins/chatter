@@ -1,7 +1,7 @@
 import logging
 import os
 from typing import Union, Tuple, Dict, List
-
+import tiktoken
 import bleach
 from flask import (
     Blueprint,
@@ -22,7 +22,6 @@ from chat_api import scrape_data, get_azure_response
 from chat_utils import generate_new_chat_id
 from conversation_manager import ConversationManager
 from database import get_db
-from sqlalchemy import text
 from models import Chat, Model
 from token_utils import count_tokens
 
@@ -202,17 +201,11 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         logger.error("Chat ID not found in session.")
         return jsonify({"error": "Chat ID not found."}), 400
 
-    # Fetch the model ID associated with the chat
-    model_id = Chat.get_model_id(chat_id)
-    if model_id is None:
+    # Fetch the model associated with the chat
+    model_obj = Chat.get_model(chat_id)
+    if model_obj is None:
         logger.error(f"No model associated with chat ID {chat_id}.")
         return jsonify({"error": "No model associated with this chat."}), 400
-
-    # Get the model object from the database
-    model_obj = Model.get_by_id(model_id)
-    if model_obj is None:
-        logger.error(f"Model with ID {model_id} not found.")
-        return jsonify({"error": f"Model with ID {model_id} not found."}), 400
 
     if not model_obj.deployment_name:
         logger.error("Invalid model configuration: deployment name is missing.")

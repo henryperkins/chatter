@@ -14,10 +14,8 @@ from flask import (
     redirect,
     url_for,
     flash,
-    current_app,
 )
-from flask_login import login_required, current_user
-from database import get_db  # Use the centralized context manager
+from flask_login import login_required
 from models import Model
 from decorators import admin_required
 from forms import ModelForm
@@ -35,6 +33,8 @@ def get_models():
     This route handles a GET request that returns a paginated list of
     models. You can supply `limit` and `offset` as query parameters to
     paginate the results. Example: /models?limit=10&offset=20
+
+    Returns:
 
     Returns:
         JSON response containing an array of model data.
@@ -162,8 +162,8 @@ def update_model(model_id: int):
         logger.error("Validation error during model update: %s", str(e))
         return jsonify({"error": str(e), "success": False}), 400
     except Exception as e:
-        logger.exception("Unexpected error during model update")
-        return jsonify({"error": "An unexpected error occurred", "success": False}), 500
+        logger.exception("Unexpected error during model update: %s", str(e))
+        return jsonify({"error": str(e), "success": False}), 500
 
 
 @bp.route("/models/<int:model_id>", methods=["DELETE"])
@@ -179,11 +179,13 @@ def delete_model(model_id: int):
         Model.delete(model_id)
         return jsonify({"success": True})
     except ValueError as e:
-        logger.error("Attempted to delete a model in use: %s", str(e))
-        return jsonify({"error": str(e), "success": False}), 400
+        error_msg = str(e)
+        logger.error("Attempted to delete a model in use: %s", error_msg)
+        return jsonify({"error": error_msg, "success": False}), 400
     except Exception as e:
-        logger.exception("Unexpected error during model deletion")
-        return jsonify({"error": "An unexpected error occurred", "success": False}), 500
+        error_msg = str(e)
+        logger.exception("Unexpected error during model deletion: %s", error_msg)
+        return jsonify({"error": error_msg, "success": False}), 500
 
 
 @bp.route("/add-model", methods=["GET"])
@@ -198,10 +200,10 @@ def add_model_page():
     return render_template("add_model.html", form=form)
 
 
-@bp.route("/edit-model/<int:model_id>", methods=["GET", "POST"])
+@bp.route("/edit/<int:model_id>", methods=["GET", "POST"])
 @login_required
 @admin_required
-def edit_model_page(model_id):
+def edit_model(model_id):
     """
     Render the edit model page (GET) and handle form submission (POST).
     If model is not found, redirect to a relevant page.
@@ -213,23 +215,44 @@ def edit_model_page(model_id):
 
     form = ModelForm(obj=model)
 
-    if form.validate_on_submit():
-        data = {
-            "name": form.name.data,
-            "deployment_name": form.deployment_name.data,
-            "description": form.description.data,
-            "api_endpoint": form.api_endpoint.data,
-            "temperature": form.temperature.data,
-            "max_tokens": form.max_tokens.data,
-            "max_completion_tokens": form.max_completion_tokens.data,
-            "model_type": form.model_type.data,
-            "api_version": form.api_version.data,
-            "requires_o1_handling": form.requires_o1_handling.data,
-            "is_default": form.is_default.data,
-        }
-        Model.update(model_id, data)
-        flash("Model updated successfully", "success")
-        return redirect(url_for("chat.chat_interface"))
+    if request.method == "POST":
+        if not form.validate_on_submit():
+            logger.error("Form validation failed: %s", form.errors)
+            return jsonify({"error": form.errors, "success": False}), 400
+
+        try:
+            # Get existing model data to preserve api_key
+            existing_model = Model.get_by_id(model_id)
+            data = {
+                "name": form.name.data,
+                "deployment_name": form.deployment_name.data,
+                "description": form.description.data,
+                "api_endpoint": form.api_endpoint.data,
+                "temperature": form.temperature.data,
+                "max_tokens": form.max_tokens.data,
+                "max_completion_tokens": form.max_completion_tokens.data,
+                "model_type": form.model_type.data,
+                "api_version": form.api_version.data,
+                "requires_o1_handling": form.requires_o1_handling.data,
+                "is_default": form.is_default.data,
+                "api_key": existing_model.api_key,  # Preserve existing API key
+            }
+            logger.debug("Updating model %d with data: %s", model_id, {k: v for k, v in data.items() if k != 'api_key'})
+            Model.update(model_id, data)
+            
+            if request.is_xhr:
+                return jsonify({"success": True, "message": "Model updated successfully"})
+            else:
+                flash("Model updated successfully", "success")
+                return redirect(url_for("chat.chat_interface"))
+                
+        except Exception as e:
+            logger.exception("Error updating model %d: %s", model_id, str(e))
+            if request.is_xhr:
+                return jsonify({"error": str(e), "success": False}), 400
+            else:
+                flash(f"Error updating model: {str(e)}", "error")
+                return render_template("edit_model.html", form=form, model=model)
 
     return render_template("edit_model.html", form=form, model=model)
 
@@ -247,7 +270,7 @@ def set_default_model(model_id: int):
     try:
         Model.set_default(model_id)
         return jsonify({"success": True})
-    except Exception as e:
+    except Exception:
         logger.exception("Unexpected error setting default model")
         return jsonify({"error": "An unexpected error occurred", "success": False}), 500
 
@@ -265,10 +288,7 @@ def get_immutable_fields(model_id: int):
         return jsonify(immutable_fields)
     except Exception as e:
         logger.error("Error retrieving immutable fields: %s", str(e))
-        return (
-            jsonify({"error": "An error occurred while retrieving immutable fields"}),
-            500,
-        )
+        return jsonify({"error": f"Error retrieving immutable fields: {str(e)}"}), 500
 
 
 @bp.route("/models/<int:model_id>/versions", methods=["GET"])
@@ -282,9 +302,10 @@ def get_version_history(model_id: int):
         versions = Model.get_version_history(model_id)
         return jsonify(versions)
     except Exception as e:
-        logger.error("Error retrieving version history: %s", str(e))
+        error_msg = str(e)
+        logger.error("Error retrieving version history: %s", error_msg)
         return (
-            jsonify({"error": "An error occurred while retrieving version history"}),
+            jsonify({"error": error_msg}),
             500,
         )
 
@@ -305,5 +326,6 @@ def revert_to_version(model_id: int, version: int):
         logger.error("Error reverting model: %s", str(e))
         return jsonify({"error": str(e), "success": False}), 400
     except Exception as e:
-        logger.exception("Unexpected error during model revert")
-        return jsonify({"error": "An unexpected error occurred", "success": False}), 500
+        error_msg = str(e)
+        logger.exception("Unexpected error during model revert: %s", error_msg)
+        return jsonify({"error": error_msg, "success": False}), 500

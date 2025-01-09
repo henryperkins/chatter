@@ -5,7 +5,7 @@
 {% block content %}
 <div class="container mx-auto px-4 py-8">
     <h1 class="text-2xl font-bold mb-4">Edit Model: {{ model.name }}</h1>
-    <form id="edit-model-form" method="POST" action="{{ url_for('model.edit_model_page', model_id=model.id) }}" class="bg-white shadow-md rounded-lg p-6">
+    <form id="edit-model-form" method="POST" action="{{ url_for('model.edit_model', model_id=model.id) }}" class="bg-white shadow-md rounded-lg p-6 ajax-form">
         {{ form.hidden_tag() }}
 
         <!-- Model Name -->
@@ -73,7 +73,22 @@
             </div>
             <div>
                 {{ form.max_completion_tokens.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-                {{ form.max_completion_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.max_completion_tokens) }}
+                <div class="flex flex-col space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">500</span>
+                        <span id="max-completion-tokens-value" class="text-sm font-semibold text-blue-600">{{ model.max_completion_tokens }}</span>
+                        <span class="text-sm text-gray-600">16384</span>
+                    </div>
+                    {{ form.max_completion_tokens(
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600",
+                        type="range",
+                        min="500",
+                        max="16384",
+                        step="100",
+                        value=model.max_completion_tokens,
+                        oninput="document.getElementById('max-completion-tokens-value').textContent = this.value"
+                    ) }}
+                </div>
                 {% if form.max_completion_tokens.errors %}
                     <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
                 {% endif %}
@@ -167,23 +182,57 @@ document.addEventListener("DOMContentLoaded", function() {
 
         try {
             const formData = new FormData(form);
+            
+            // Convert and validate max_completion_tokens
+            const maxCompletionTokens = parseInt(formData.get('max_completion_tokens'), 10);
+            if (isNaN(maxCompletionTokens) || maxCompletionTokens < 1 || maxCompletionTokens > 16384) {
+                showFeedback("Max completion tokens must be between 1 and 16384", "error");
+                return;
+            }
+            formData.set('max_completion_tokens', maxCompletionTokens);
+
+            // Convert temperature to number if present
+            const temperature = formData.get('temperature');
+            if (temperature) {
+                formData.set('temperature', parseFloat(temperature));
+            }
+
+            // Convert max_tokens to number if present
+            const maxTokens = formData.get('max_tokens');
+            if (maxTokens) {
+                formData.set('max_tokens', parseInt(maxTokens, 10));
+            }
+
+            // Convert boolean fields
+            formData.set('requires_o1_handling', formData.get('requires_o1_handling') === 'y');
+            formData.set('is_default', formData.get('is_default') === 'y');
+
             const response = await fetch(form.action, {
                 method: "POST",
                 body: formData,
                 headers: {
-                    "X-CSRFToken": getCSRFToken()
+                    "X-CSRFToken": getCSRFToken(),
+                    "X-Requested-With": "XMLHttpRequest"
                 }
             });
 
             const data = await response.json();
 
-            if (response.ok) {
-                showFeedback("Model updated successfully", "success");
+            if (response.ok && data.success) {
+                showFeedback(data.message || "Model updated successfully", "success");
+                // Update the displayed value
+                document.getElementById('max-completion-tokens-value').textContent = formData.get('max_completion_tokens');
                 setTimeout(() => {
                     window.location.href = "{{ url_for('chat.chat_interface') }}";
                 }, 1500);
             } else {
-                showFeedback(data.error || "Failed to update the model", "error");
+                let errorMessage = "Failed to update the model";
+                if (data.error) {
+                    errorMessage = typeof data.error === 'object'
+                        ? Object.values(data.error).join(', ')
+                        : data.error;
+                }
+                showFeedback(errorMessage, "error");
             }
         } catch (error) {
             console.error("Error:", error);
@@ -194,6 +243,18 @@ document.addEventListener("DOMContentLoaded", function() {
             loadingSpinner.classList.add("hidden");
         }
     });
+
+    function showFeedback(message, type) {
+        const feedbackDiv = document.getElementById('feedback-message');
+        feedbackDiv.textContent = message;
+        feedbackDiv.className = `fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 ${
+            type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+        }`;
+        feedbackDiv.classList.remove('hidden');
+        setTimeout(() => {
+            feedbackDiv.classList.add('hidden');
+        }, 3000);
+    }
 
 
     function getCSRFToken() {

@@ -4,12 +4,13 @@ import os
 import logging
 from datetime import timedelta
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, url_for, request
+from flask import Flask, jsonify, redirect, url_for, request, session
 from werkzeug.wrappers import Response
-from flask_login import current_user
+from flask_login import current_user, logout_user
 from flask_wtf.csrf import CSRFError
 from werkzeug.exceptions import HTTPException
 from database import close_db, init_db, init_app, get_db
+from sqlalchemy import text
 from models import User
 from extensions import limiter, login_manager, csrf
 from routes.auth_routes import bp as auth_bp
@@ -80,24 +81,39 @@ app.register_blueprint(model_bp, url_prefix="/models")
 with app.app_context():
     init_db()
 
+
 # User loader for Flask-Login
 @login_manager.user_loader
 def load_user(user_id: str) -> Optional[User]:
     db = get_db()
     try:
-        user_row = db.execute(
-            "SELECT id, username, email, role FROM users WHERE id = ?", (int(user_id),)
+        result = db.execute(
+            text("SELECT id, username, email, role FROM users WHERE id = :id"),
+            {"id": int(user_id)}
         ).fetchone()
-        if user_row:
-            return User(**dict(user_row))
+        if result:
+            # Convert tuple to dictionary with known column order
+            user_dict = {
+                'id': result[0],
+                'username': result[1],
+                'email': result[2],
+                'role': result[3]
+            }
+            logger.debug(f"Loading user: {user_dict}")
+            return User(**user_dict)
+        return None
+    except Exception as e:
+        logger.error(f"Error loading user: {e}")
         return None
     finally:
         db.close()
+
 
 # --- CLEANUP HANDLERS ---
 
 # Close the database connection when the app context ends
 app.teardown_appcontext(close_db)
+
 
 # --- ERROR HANDLERS ---
 
@@ -109,6 +125,7 @@ def bad_request(error: HTTPException) -> tuple[Dict[str, str], int]:
         message=error.description or "The request was invalid. Please check your input and try again."
     ), 400
 
+
 @app.errorhandler(403)
 def forbidden(error: HTTPException) -> tuple[Dict[str, str], int]:
     """Handle HTTP 403 Forbidden errors."""
@@ -118,6 +135,7 @@ def forbidden(error: HTTPException) -> tuple[Dict[str, str], int]:
         message="You don't have permission to access this resource."
     ), 403
 
+
 @app.errorhandler(404)
 def not_found(error: HTTPException) -> tuple[Dict[str, str], int]:
     """Handle HTTP 404 Not Found errors."""
@@ -125,6 +143,7 @@ def not_found(error: HTTPException) -> tuple[Dict[str, str], int]:
         error="Not found",
         message="The requested resource was not found."
     ), 404
+
 
 @app.errorhandler(429)
 def rate_limit_exceeded(error: HTTPException) -> tuple[Dict[str, str], int]:
@@ -135,6 +154,7 @@ def rate_limit_exceeded(error: HTTPException) -> tuple[Dict[str, str], int]:
         message="You have exceeded the allowed number of requests. Please try again later."
     ), 429
 
+
 @app.errorhandler(500)
 def internal_server_error(error: HTTPException) -> tuple[Dict[str, str], int]:
     """Handle HTTP 500 Internal Server Error."""
@@ -144,6 +164,7 @@ def internal_server_error(error: HTTPException) -> tuple[Dict[str, str], int]:
         message="An unexpected error occurred. Please try again later."
     ), 500
 
+
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e: CSRFError) -> tuple[Dict[str, str], int]:
     """Handle CSRF token errors raised by Flask-WTF."""
@@ -152,6 +173,7 @@ def handle_csrf_error(e: CSRFError) -> tuple[Dict[str, str], int]:
         error="CSRF Error",
         message="This request is invalid. Refresh the page and try again."
     ), 400
+
 
 @app.errorhandler(Exception)
 def handle_exception(e: Exception) -> tuple[Dict[str, str], int]:
@@ -174,11 +196,13 @@ def handle_exception(e: Exception) -> tuple[Dict[str, str], int]:
         message="An unexpected error occurred. Please try again later."
     ), 500
 
+
 # Handle favicon.ico requests
 @app.route('/favicon.ico')
 def favicon() -> Response:
     """Redirect favicon.ico requests to the static file."""
     return redirect(url_for('static', filename='favicon.ico'))
+
 
 # Redirect root URL to chat interface
 @app.route("/")
@@ -187,6 +211,16 @@ def index() -> Response:
     if not current_user.is_authenticated:
         return redirect(url_for("auth.login"), code=307)
     return redirect(url_for("chat.chat_interface"), code=307)
+
+
+# Clear session route
+@app.route("/clear-session")
+def clear_session() -> Response:
+    """Clear the session and log out the user."""
+    logout_user()
+    session.clear()
+    return redirect(url_for("auth.login"))
+
 
 # --- APPLICATION ENTRY POINT ---
 

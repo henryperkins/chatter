@@ -81,7 +81,7 @@ class ConversationManager:
                 ORDER BY timestamp ASC
                 """),
                 {"chat_id": chat_id}
-            ).fetchall()
+            ).mappings().all()
 
             if include_system:
                 return [
@@ -146,7 +146,7 @@ class ConversationManager:
                 ORDER BY timestamp ASC
                 """),
                 {"chat_id": chat_id}
-            ).fetchall()
+            ).mappings().all()
 
             # Convert to message dicts
             message_dicts = [

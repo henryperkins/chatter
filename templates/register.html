@@ -20,7 +20,7 @@
             {% endif %}
         {% endwith %}
 
-        <form id="registration-form" method="POST" action="{{ url_for('auth.register') }}" class="space-y-4">
+        <form id="registration-form" method="POST" action="{{ url_for('auth.register') }}" class="space-y-4 ajax-form">
             {{ form.hidden_tag() }}
 
             <!-- Username -->
@@ -86,4 +86,41 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const registrationForm = document.getElementById('registration-form');
+    if (registrationForm) {
+        registrationForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(registrationForm);
+            
+            try {
+                const response = await fetch(registrationForm.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    // Redirect to chat interface after successful registration
+                    window.location.href = "{{ url_for('chat.chat_interface') }}";
+                } else {
+                    showFeedback(data.error || 'Registration failed', 'error');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                showFeedback('An error occurred during registration', 'error');
+            }
+        });
+    }
+});
+</script>
 {% endblock %}
