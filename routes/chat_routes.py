@@ -44,9 +44,9 @@ ALLOWED_MIME_TYPES = {
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB per file
 MAX_TOTAL_FILE_SIZE = 50 * 1024 * 1024  # 50 MB for total files
 MAX_FILE_CONTENT_LENGTH = 8000  # Characters (increased to accommodate larger files)
-MAX_INPUT_TOKENS = 8192 # Max tokens allowed for input (user message + file content)
-MAX_CONTEXT_TOKENS = 128000 # Max tokens allowed for the entire context window (messages in database)
-MODEL_NAME = "gpt-4" # Model name for tiktoken encoding
+MAX_INPUT_TOKENS = 8192  # Max tokens allowed for input (user message + file content)
+MAX_CONTEXT_TOKENS = 128000  # Max tokens allowed for the entire context window (messages in database)
+MODEL_NAME = "gpt-4"  # Model name for tiktoken encoding
 
 # Initialize tokenizer outside the route handlers
 try:
@@ -68,6 +68,27 @@ def truncate_message(message: str, max_tokens: int) -> str:
         truncated_message += "\n\n[Note: The input was too long and has been truncated.]"
         return truncated_message
     return message
+
+def generate_chat_title(conversation_text: str) -> str:
+    """Generate a chat title based on the first 5 messages."""
+    # Extract key topics from the conversation
+    lines = conversation_text.split("\n")
+    user_messages = [line.split(": ", 1)[1] for line in lines if line.startswith("user:")]
+    
+    # Combine first 3 user messages to find common themes
+    combined = " ".join(user_messages[:3])
+    words = [word.lower() for word in combined.split() if len(word) > 3]
+    
+    # Count word frequencies and get top 2 most common
+    word_counts = {}
+    for word in words:
+        word_counts[word] = word_counts.get(word, 0) + 1
+    top_words = sorted(word_counts, key=word_counts.get, reverse=True)[:2]
+    
+    # Create title from top words or fallback to first message
+    if top_words:
+        return " ".join([word.capitalize() for word in top_words])
+    return lines[0].split(": ", 1)[1][:50]
 
 @bp.route("/")
 @login_required
@@ -190,6 +211,25 @@ def scrape() -> Union[Response, Tuple[Response, int]]:
         logger.error("Error during scraping: %s", str(ex))
         return jsonify({"error": "An error occurred during scraping"}), 500
 
+@bp.route("/update_chat_title/<chat_id>", methods=["POST"])
+@login_required
+def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
+    """Update the title of a chat."""
+    if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
+        return jsonify({"error": "Chat not found or access denied"}), 403
+
+    data = request.get_json()
+    new_title = data.get("title")
+    if not new_title:
+        return jsonify({"error": "Title is required"}), 400
+
+    try:
+        Chat.update_title(chat_id, new_title)
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error(f"Error updating chat title: {e}")
+        return jsonify({"error": "Failed to update chat title"}), 500
+
 @bp.route("/chat", methods=["POST"])
 @login_required
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
@@ -302,14 +342,21 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
     else:
         combined_message = user_message
 
-    # Update chat title if it's still the default
+    # Update chat title after 5 messages if it's still the default
     if combined_message and Chat.is_title_default(chat_id):
-        new_title = combined_message.split("\n")[0][:50]
-        Chat.update_title(chat_id, new_title)
+        messages = conversation_manager.get_context(chat_id)
+        if len(messages) >= 5:
+            # Generate title from first 5 messages
+            conversation_text = "\n".join(
+                f"{msg['role']}: {msg['content']}" 
+                for msg in messages[:5]
+            )
+            new_title = generate_chat_title(conversation_text)
+            Chat.update_title(chat_id, new_title)
 
     # Add the combined message to the conversation history
     if combined_message:
-      conversation_manager.add_message(chat_id, "user", combined_message)
+        conversation_manager.add_message(chat_id, "user", combined_message)
 
     # Prepare the messages for the API call, excluding system messages if required
     history = conversation_manager.get_context(

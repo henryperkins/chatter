@@ -70,7 +70,7 @@
                             <a href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}" class="block p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}">
                                 <div class="flex justify-between items-center">
                                     <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                        {{ conversation.title }}
+                                    {{ conversation.title }} - {{ conversation.model_name }}
                                     </span>
                                     <span class="text-xs text-gray-500 dark:text-gray-400">
                                         {{ conversation.timestamp.strftime('%I:%M %p') }}
@@ -90,6 +90,12 @@
 
         <!-- MAIN CHAT AREA -->
         <div class="flex-1 flex flex-col">
+            <div class="chat-header px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                <h2 id="chat-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    {{ chat_title }} - {{ model_name }}
+                </h2>
+                <button id="edit-title-btn" class="ml-4 text-sm text-blue-600 hover:underline">Edit Title</button>
+            </div>
             <div id="chat-box" class="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-white dark:bg-gray-900">
                 {% for message in messages %}
                     {% if message.role == 'user' %}

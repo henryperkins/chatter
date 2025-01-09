@@ -582,7 +582,51 @@
         });
     }
 
-    // Expose deleteChat function globally if needed
+    // Function to edit a chat title
+    function editChatTitle(chatId) {
+        const newTitle = prompt("Enter the new title for this chat:");
+        if (newTitle && newTitle.trim() !== "") {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
+            fetch(`/update_chat_title/${chatId}`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCSRFToken(),
+                },
+                body: JSON.stringify({ title: newTitle }),
+                signal: controller.signal,
+            })
+            .then(response => {
+                clearTimeout(timeoutId);
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Update the title in the UI
+                    const chatTitleElement = document.getElementById("chat-title");
+                    if (chatTitleElement) {
+                        chatTitleElement.textContent = `${newTitle} - ${chatTitleElement.textContent.split(" - ")[1]}`;
+                    }
+                    alert("Chat title updated successfully!");
+                } else {
+                    alert("Failed to update chat title");
+                }
+            })
+            .catch(error => {
+                clearTimeout(timeoutId);
+                if (error.name === "AbortError") {
+                    alert("Request timed out. Please try again.");
+                } else {
+                    console.error("Error:", error);
+                    alert("An error occurred while updating the chat title");
+                }
+            });
+        }
+    }
+
+    // Expose deleteChat and editChatTitle functions globally if needed
     window.deleteChat = deleteChat;
+    window.editChatTitle = editChatTitle;
 
 })();
