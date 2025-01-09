@@ -1,3 +1,7 @@
+// static/js/chat.js
+
+import { getCSRFToken, showFeedback } from "./utils.js";
+
 (function () {
   // Debug statement to confirm the file is loaded
   console.log("chat.js loaded");
@@ -96,42 +100,6 @@
     return html
       .replace(/<script.*?>.*?<\/script>/gi, "")
       .replace(/on\w+="[^"]*"/gi, "");
-  }
-
-  // Show feedback to the user (re-usable)
-  function showFeedback(message, type = "success") {
-    const feedbackMessage = document.getElementById("feedback-message");
-    feedbackMessage.innerHTML = `
-            <div class="flex items-center justify-between">
-                <span>${message}</span>
-                ${
-                  type === "error"
-                    ? '<button id="feedback-close" class="ml-4 text-lg">&times;</button>'
-                    : ""
-                }
-            </div>
-        `;
-    feedbackMessage.className = `fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center ${
-      type === "success" ? "bg-green-500 text-white" : "bg-red-500 text-white"
-    }`;
-    feedbackMessage.classList.remove("hidden");
-
-    if (type === "success") {
-      setTimeout(() => feedbackMessage.classList.add("hidden"), 5000);
-    } else {
-      const closeButton = document.getElementById("feedback-close");
-      if (closeButton) {
-        closeButton.addEventListener("click", () => {
-          feedbackMessage.classList.add("hidden");
-        });
-      }
-    }
-  }
-
-  // Retrieve the CSRF token from a meta tag if your Flask app uses CSRF protection
-  function getCSRFToken() {
-    const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
-    return csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") : "";
   }
 
   // File Handling Functions
@@ -467,13 +435,8 @@
       }
     });
   }
-  // Function to toggle the sidebar visibility
-  function toggleSidebar() {
-    const sidebar = document.getElementById("sidebar");
-    sidebar.classList.toggle("hidden");
-  }
 
-  // Function to delete a chat (Issue 3)
+  // Function to delete a chat
   function deleteChat(chatId) {
     console.log("deleteChat triggered for chatId:", chatId);
     if (confirm("Are you sure you want to delete this chat?")) {
@@ -522,7 +485,7 @@
     }
   }
 
-  // Function to edit a chat title (Issue 1)
+  // Function to edit a chat title
   function editChatTitle(chatId) {
     console.log("editChatTitle triggered for chatId:", chatId);
     const newTitle = prompt("Enter the new title for this chat:");
@@ -568,161 +531,4 @@
         });
     }
   }
-
-  // Event listener for "Edit Model" button (Issue 5)
-  document.addEventListener("DOMContentLoaded", function () {
-    const modelSelect = document.getElementById("model-select");
-    const editModelButton = document.getElementById("edit-model-btn");
-
-    if (modelSelect && editModelButton) {
-      editModelButton.addEventListener("click", function () {
-        const selectedModelId = modelSelect.value;
-        window.location.href = `/edit/${selectedModelId}`;
-      });
-    }
-  });
-
-  // Expose deleteChat and editChatTitle functions globally if needed
-  window.deleteChat = deleteChat;
-  window.editChatTitle = editChatTitle;
-
-  // Drag and Drop
-  const dropZone = document.getElementById("drop-zone");
-  const messageInputArea = document.querySelector(".message-input-area");
-
-  if (dropZone && messageInputArea) {
-    ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
-      messageInputArea.addEventListener(eventName, preventDefaults, false);
-      dropZone.addEventListener(eventName, preventDefaults, false);
-    });
-
-    function preventDefaults(e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-
-    messageInputArea.addEventListener("dragover", () => {
-      dropZone.classList.remove("hidden");
-      dropZone.classList.add("drop-zone-active");
-    });
-
-    ["dragleave", "drop"].forEach((eventName) => {
-      messageInputArea.addEventListener(eventName, () => {
-        dropZone.classList.add("hidden");
-        dropZone.classList.remove("drop-zone-active");
-      });
-    });
-
-    dropZone.addEventListener("drop", (e) => {
-      const dt = e.dataTransfer;
-      const files = dt.files;
-      handleFileUpload(files);
-      dropZone.classList.add("hidden");
-    });
-  }
-
-  // Hamburger Menu Toggle
-  if (sidebarToggle) {
-    sidebarToggle.addEventListener("click", function () {
-      offCanvasMenu.classList.toggle("hidden");
-      overlay.classList.toggle("hidden");
-    });
-  }
-
-  if (offCanvasClose) {
-    offCanvasClose.addEventListener("click", function () {
-      offCanvasMenu.classList.add("hidden");
-      overlay.classList.add("hidden");
-    });
-  }
-
-  if (overlay) {
-    overlay.addEventListener("click", function () {
-      offCanvasMenu.classList.add("hidden");
-      overlay.classList.add("hidden");
-    });
-  }
-
-  // Swipe Gestures for Off-Canvas Menu
-  let touchstartX = 0;
-  let touchendX = 0;
-
-  function handleGesture() {
-    if (touchendX < touchstartX) {
-      offCanvasMenu.classList.add("hidden");
-      overlay.classList.add("hidden");
-    }
-  }
-
-  document.addEventListener(
-    "touchstart",
-    function (event) {
-      touchstartX = event.changedTouches[0].screenX;
-    },
-    false
-  );
-
-  document.addEventListener(
-    "touchend",
-    function (event) {
-      touchendX = event.changedTouches[0].screenX;
-      handleGesture();
-    },
-    false
-  );
-
-  // Mobile-Specific Interactions and Optimizations
-  function handleMobileInteractions() {
-    // Add touch event listeners for better mobile experience
-    chatBox.addEventListener("touchstart", handleTouchStart, false);
-    chatBox.addEventListener("touchmove", handleTouchMove, false);
-
-    let xDown = null;
-    let yDown = null;
-
-    function handleTouchStart(evt) {
-      const firstTouch = evt.touches[0];
-      xDown = firstTouch.clientX;
-      yDown = firstTouch.clientY;
-    }
-
-    function handleTouchMove(evt) {
-      if (!xDown || !yDown) {
-        return;
-      }
-
-      const xUp = evt.touches[0].clientX;
-      const yUp = evt.touches[0].clientY;
-
-      const xDiff = xDown - xUp;
-      const yDiff = yDown - yUp;
-
-      if (Math.abs(xDiff) > Math.abs(yDiff)) {
-        if (xDiff > 0) {
-          // Left swipe
-          console.log("Left swipe detected");
-        } else {
-          // Right swipe
-          console.log("Right swipe detected");
-        }
-      } else if (yDiff > 0) {
-        // Up swipe
-        console.log("Up swipe detected");
-      } else {
-        // Down swipe
-        console.log("Down swipe detected");
-      }
-
-      // Reset values
-      xDown = null;
-      yDown = null;
-    }
-  }
-
-  // Call the function to handle mobile interactions
-  handleMobileInteractions();
-
-  // Expose showFeedback and getCSRFToken functions if needed
-  window.showFeedback = showFeedback;
-  window.getCSRFToken = getCSRFToken;
 })();

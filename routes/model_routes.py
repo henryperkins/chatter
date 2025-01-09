@@ -19,6 +19,7 @@ from flask_login import login_required
 from models import Model
 from decorators import admin_required
 from forms import ModelForm
+from extensions import csrf
 
 bp = Blueprint("model", __name__)
 logger = logging.getLogger(__name__)
@@ -29,36 +30,25 @@ logger = logging.getLogger(__name__)
 def get_models():
     """
     Retrieve all models with optional pagination.
-
-    This route handles a GET request that returns a paginated list of
-    models. You can supply `limit` and `offset` as query parameters to
-    paginate the results. Example: /models?limit=10&offset=20
-
-    Returns:
-
-    Returns:
-        JSON response containing an array of model data.
     """
     try:
         limit = request.args.get("limit", 10, type=int)
         offset = request.args.get("offset", 0, type=int)
         models = Model.get_all(limit, offset)
 
-        # Convert model objects to dictionaries for JSON serialization
-        model_list = []
-        for m in models:
-            model_list.append(
-                {
-                    "id": m.id,
-                    "name": m.name,
-                    "deployment_name": m.deployment_name,
-                    "description": m.description,
-                    "is_default": m.is_default,
-                    "requires_o1_handling": m.requires_o1_handling,
-                    "api_version": m.api_version,
-                    "version": m.version,
-                }
-            )
+        model_list = [
+            {
+                "id": m.id,
+                "name": m.name,
+                "deployment_name": m.deployment_name,
+                "description": m.description,
+                "is_default": m.is_default,
+                "requires_o1_handling": m.requires_o1_handling,
+                "api_version": m.api_version,
+                "version": m.version,
+            }
+            for m in models
+        ]
         return jsonify(model_list)
 
     except Exception as e:
@@ -72,11 +62,6 @@ def get_models():
 def create_model():
     """
     Create a new model (admin-only).
-
-    Expects form data corresponding to ModelForm fields:
-    - name, deployment_name, description, api_endpoint, temperature,
-      max_tokens, max_completion_tokens, model_type, api_version,
-      requires_o1_handling, is_default
     """
     form = ModelForm()
     if not form.validate_on_submit():
@@ -98,20 +83,21 @@ def create_model():
             "is_default": form.is_default.data,
         }
 
-        # Log model creation attempt without sensitive data
-        logger.debug("Creating model with data: %s", {
-            k: v for k, v in data.items() if k != 'api_key'
-        })
+        logger.debug(
+            "Creating model with data: %s",
+            {k: v for k, v in data.items() if k != "api_key"},
+        )
 
-        # Validate the data before creating the model
         Model.validate_model_config(data)
 
         model_id = Model.create(data)
-        return jsonify({
-            "id": model_id,
-            "success": True,
-            "message": "Model created successfully"
-        })
+        return jsonify(
+            {
+                "id": model_id,
+                "success": True,
+                "message": "Model created successfully",
+            }
+        )
 
     except ValueError as e:
         logger.error("Validation error: %s", str(e))
@@ -119,14 +105,19 @@ def create_model():
     except Exception as e:
         logger.exception("Error creating model")
         if "UNIQUE constraint failed: models.deployment_name" in str(e):
-            return jsonify({
-                "error": "A model with this deployment name already exists",
-                "success": False
-            }), 400
-        return jsonify({
-            "error": "An unexpected error occurred",
-            "success": False
-        }), 500
+            return (
+                jsonify(
+                    {
+                        "error": "A model with this deployment name already exists",
+                        "success": False,
+                    }
+                ),
+                400,
+            )
+        return (
+            jsonify({"error": "An unexpected error occurred", "success": False}),
+            500,
+        )
 
 
 @bp.route("/models/<int:model_id>", methods=["PUT"])
@@ -135,22 +126,16 @@ def create_model():
 def update_model(model_id: int):
     """
     Update an existing model (admin-only).
-
-    JSON body structure might look like:
-    {
-        "name": "...",
-        "deployment_name": "...",
-        "description": "...",
-        "api_endpoint": "...",
-        "temperature": 0.7,
-        "max_tokens": 2048,
-        "max_completion_tokens": 500,
-        "model_type": "GPT-3.5",
-        "api_version": "2023-XX-XX",
-        "requires_o1_handling": false,
-        "is_default": false
-    }
     """
+    # Verify CSRF token for AJAX requests
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        csrf_token = request.headers.get("X-CSRFToken")
+        if not csrf_token or not csrf.validate_csrf(csrf_token):
+            return (
+                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
+                400,
+            )
+
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided", "success": False}), 400
@@ -172,9 +157,16 @@ def update_model(model_id: int):
 def delete_model(model_id: int):
     """
     Delete a model (admin-only).
-
-    This operation should be approached carefully if the model is in use.
     """
+    # Verify CSRF token for AJAX requests
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        csrf_token = request.headers.get("X-CSRFToken")
+        if not csrf_token or not csrf.validate_csrf(csrf_token):
+            return (
+                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
+                400,
+            )
+
     try:
         Model.delete(model_id)
         return jsonify({"success": True})
@@ -193,8 +185,7 @@ def delete_model(model_id: int):
 @admin_required
 def add_model_page():
     """
-    Render a page (if you have a template) for adding a model.
-    The form includes fields like name, deployment_name, etc.
+    Render a page for adding a model.
     """
     form = ModelForm()
     return render_template("add_model.html", form=form)
@@ -206,7 +197,6 @@ def add_model_page():
 def edit_model(model_id):
     """
     Render the edit model page (GET) and handle form submission (POST).
-    If model is not found, redirect to a relevant page.
     """
     model = Model.get_by_id(model_id)
     if not model:
@@ -216,43 +206,48 @@ def edit_model(model_id):
     form = ModelForm(obj=model)
 
     if request.method == "POST":
-        if not form.validate_on_submit():
+        if form.validate_on_submit():
+            try:
+                existing_model = Model.get_by_id(model_id)
+                data = {
+                    "name": form.name.data,
+                    "deployment_name": form.deployment_name.data,
+                    "description": form.description.data,
+                    "api_endpoint": form.api_endpoint.data,
+                    "temperature": form.temperature.data,
+                    "max_tokens": form.max_tokens.data,
+                    "max_completion_tokens": form.max_completion_tokens.data,
+                    "model_type": form.model_type.data,
+                    "api_version": form.api_version.data,
+                    "requires_o1_handling": form.requires_o1_handling.data,
+                    "is_default": form.is_default.data,
+                    "api_key": existing_model.api_key,  # Preserve existing API key
+                }
+                logger.debug(
+                    "Updating model %d with data: %s",
+                    model_id,
+                    {k: v for k, v in data.items() if k != "api_key"},
+                )
+                Model.update(model_id, data)
+
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify(
+                        {"success": True, "message": "Model updated successfully"}
+                    )
+                else:
+                    flash("Model updated successfully", "success")
+                    return redirect(url_for("chat.chat_interface"))
+
+            except Exception as e:
+                logger.exception("Error updating model %d: %s", model_id, str(e))
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify({"error": str(e), "success": False}), 400
+                else:
+                    flash(f"Error updating model: {str(e)}", "error")
+                    return render_template("edit_model.html", form=form, model=model)
+        else:
             logger.error("Form validation failed: %s", form.errors)
             return jsonify({"error": form.errors, "success": False}), 400
-
-        try:
-            # Get existing model data to preserve api_key
-            existing_model = Model.get_by_id(model_id)
-            data = {
-                "name": form.name.data,
-                "deployment_name": form.deployment_name.data,
-                "description": form.description.data,
-                "api_endpoint": form.api_endpoint.data,
-                "temperature": form.temperature.data,
-                "max_tokens": form.max_tokens.data,
-                "max_completion_tokens": form.max_completion_tokens.data,
-                "model_type": form.model_type.data,
-                "api_version": form.api_version.data,
-                "requires_o1_handling": form.requires_o1_handling.data,
-                "is_default": form.is_default.data,
-                "api_key": existing_model.api_key,  # Preserve existing API key
-            }
-            logger.debug("Updating model %d with data: %s", model_id, {k: v for k, v in data.items() if k != 'api_key'})
-            Model.update(model_id, data)
-            
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({"success": True, "message": "Model updated successfully"})
-            else:
-                flash("Model updated successfully", "success")
-                return redirect(url_for("chat.chat_interface"))
-                
-        except Exception as e:
-            logger.exception("Error updating model %d: %s", model_id, str(e))
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({"error": str(e), "success": False}), 400
-            else:
-                flash(f"Error updating model: {str(e)}", "error")
-                return render_template("edit_model.html", form=form, model=model)
 
     return render_template("edit_model.html", form=form, model=model)
 
@@ -263,10 +258,16 @@ def edit_model(model_id):
 def set_default_model(model_id: int):
     """
     Set a model as the default (admin-only).
-
-    Only one model should be default at a time, so this route likely
-    unsets the default flag on other models and sets it on this one.
     """
+    # Verify CSRF token for AJAX requests
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        csrf_token = request.headers.get("X-CSRFToken")
+        if not csrf_token or not csrf.validate_csrf(csrf_token):
+            return (
+                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
+                400,
+            )
+
     try:
         Model.set_default(model_id)
         return jsonify({"success": True})
@@ -279,24 +280,24 @@ def set_default_model(model_id: int):
 @login_required
 def get_immutable_fields(model_id: int):
     """
-    Retrieve any immutable fields for the specified model. Typically
-    used to prevent certain fields from being changed via the UI
-    or certain routes.
+    Retrieve any immutable fields for the specified model.
     """
     try:
         immutable_fields = Model.get_immutable_fields(model_id)
         return jsonify(immutable_fields)
     except Exception as e:
         logger.error("Error retrieving immutable fields: %s", str(e))
-        return jsonify({"error": f"Error retrieving immutable fields: {str(e)}"}), 500
+        return (
+            jsonify({"error": f"Error retrieving immutable fields: {str(e)}"}),
+            500,
+        )
 
 
 @bp.route("/models/<int:model_id>/versions", methods=["GET"])
 @login_required
 def get_version_history(model_id: int):
     """
-    Retrieve version history for a model (if you store historical
-    snapshots or maintain a versioning system).
+    Retrieve version history for a model.
     """
     try:
         versions = Model.get_version_history(model_id)
@@ -316,9 +317,15 @@ def get_version_history(model_id: int):
 def revert_to_version(model_id: int, version: int):
     """
     Revert a model to a previous version (admin-only).
-    Expects that `Model.revert_to_version` handles any validation
-    or database logic to restore that version.
     """
+    # Verify CSRF token for AJAX requests
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        csrf_token = request.headers.get("X-CSRFToken")
+        if not csrf_token or not csrf.validate_csrf(csrf_token):
+            return (
+                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
+                400,
+            )
     try:
         Model.revert_to_version(model_id, version)
         return jsonify({"success": True})

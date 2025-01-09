@@ -34,8 +34,13 @@ logger = logging.getLogger(__name__)
 
 # Load configuration from environment variables
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
-if app.config["SECRET_KEY"] == "dev-secret-key" and os.environ.get('FLASK_ENV') == 'production':
-    logger.error("Using default SECRET_KEY in production is insecure. Please set a secure SECRET_KEY in your environment variables.")
+if (
+    app.config["SECRET_KEY"] == "dev-secret-key"
+    and os.environ.get("FLASK_ENV") == "production"
+):
+    logger.error(
+        "Using default SECRET_KEY in production is insecure. Please set a secure SECRET_KEY in your environment variables."
+    )
 else:
     logger.debug(f"Loaded SECRET_KEY: {app.config['SECRET_KEY']}")
 
@@ -44,10 +49,12 @@ app.config["DATABASE"] = os.environ.get("DATABASE", "chat_app.db")
 # Session cookies and security
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SECURE=os.environ.get('FLASK_ENV') == 'production',  # Only force HTTPS in production
+    SESSION_COOKIE_SECURE=os.environ.get("FLASK_ENV")
+    == "production",  # Only force HTTPS in production
     SESSION_COOKIE_SAMESITE="Lax",
     REMEMBER_COOKIE_HTTPONLY=True,
-    REMEMBER_COOKIE_SECURE=os.environ.get('FLASK_ENV') == 'production',  # Only force HTTPS in production
+    REMEMBER_COOKIE_SECURE=os.environ.get("FLASK_ENV")
+    == "production",  # Only force HTTPS in production
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=60),  # Customize as needed
 )
 
@@ -89,15 +96,15 @@ def load_user(user_id: str) -> Optional[User]:
     try:
         result = db.execute(
             text("SELECT id, username, email, role FROM users WHERE id = :id"),
-            {"id": int(user_id)}
+            {"id": int(user_id)},
         ).fetchone()
         if result:
             # Convert tuple to dictionary with known column order
             user_dict = {
-                'id': result[0],
-                'username': result[1],
-                'email': result[2],
-                'role': result[3]
+                "id": result[0],
+                "username": result[1],
+                "email": result[2],
+                "role": result[3],
             }
             logger.debug(f"Loading user: {user_dict}")
             return User(**user_dict)
@@ -114,65 +121,83 @@ def load_user(user_id: str) -> Optional[User]:
 # Close the database connection when the app context ends
 app.teardown_appcontext(close_db)
 
-
 # --- ERROR HANDLERS ---
+
 
 @app.errorhandler(400)
 def bad_request(error: HTTPException) -> tuple[Dict[str, str], int]:
     """Handle HTTP 400 Bad Request errors."""
-    return jsonify(
-        error="Bad request",
-        message=error.description or "The request was invalid. Please check your input and try again."
-    ), 400
+    return (
+        jsonify(
+            error="Bad request",
+            message=error.description
+            or "The request was invalid. Please check your input and try again.",
+        ),
+        400,
+    )
 
 
 @app.errorhandler(403)
 def forbidden(error: HTTPException) -> tuple[Dict[str, str], int]:
     """Handle HTTP 403 Forbidden errors."""
-    logger.warning(f"Forbidden access attempt by user {current_user.username if current_user.is_authenticated else 'anonymous'} to {request.path}")
-    return jsonify(
-        error="Forbidden",
-        message="You don't have permission to access this resource."
-    ), 403
+    logger.warning(
+        f"Forbidden access attempt by user {current_user.username if current_user.is_authenticated else 'anonymous'} to {request.path}"
+    )
+    return (
+        jsonify(
+            error="Forbidden",
+            message="You don't have permission to access this resource.",
+        ),
+        403,
+    )
 
 
 @app.errorhandler(404)
 def not_found(error: HTTPException) -> tuple[Dict[str, str], int]:
     """Handle HTTP 404 Not Found errors."""
-    return jsonify(
-        error="Not found",
-        message="The requested resource was not found."
-    ), 404
+    return (
+        jsonify(error="Not found", message="The requested resource was not found."),
+        404,
+    )
 
 
 @app.errorhandler(429)
 def rate_limit_exceeded(error: HTTPException) -> tuple[Dict[str, str], int]:
     """Handle HTTP 429 Too Many Requests errors."""
     logger.warning("Rate limit exceeded: %s", error)
-    return jsonify(
-        error="Rate limit exceeded",
-        message="You have exceeded the allowed number of requests. Please try again later."
-    ), 429
+    return (
+        jsonify(
+            error="Rate limit exceeded",
+            message="You have exceeded the allowed number of requests. Please try again later.",
+        ),
+        429,
+    )
 
 
 @app.errorhandler(500)
 def internal_server_error(error: HTTPException) -> tuple[Dict[str, str], int]:
     """Handle HTTP 500 Internal Server Error."""
     logger.error("Internal server error: %s", error)
-    return jsonify(
-        error="Internal server error",
-        message="An unexpected error occurred. Please try again later."
-    ), 500
+    return (
+        jsonify(
+            error="Internal server error",
+            message="An unexpected error occurred. Please try again later.",
+        ),
+        500,
+    )
 
 
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e: CSRFError) -> tuple[Dict[str, str], int]:
     """Handle CSRF token errors raised by Flask-WTF."""
     logger.warning("CSRF error: %s", e.description)
-    return jsonify(
-        error="CSRF Error",
-        message="This request is invalid. Refresh the page and try again."
-    ), 400
+    return (
+        jsonify(
+            error="CSRF Error",
+            message="This request is invalid. Refresh the page and try again.",
+        ),
+        400,
+    )
 
 
 @app.errorhandler(Exception)
@@ -182,26 +207,35 @@ def handle_exception(e: Exception) -> tuple[Dict[str, str], int]:
         return e
     logger.exception("Unhandled exception: %s", e)
     if "database" in str(e).lower():
-        return jsonify(
-            error="Database error",
-            message="An error occurred while accessing the database. Please try again later."
-        ), 500
+        return (
+            jsonify(
+                error="Database error",
+                message="An error occurred while accessing the database. Please try again later.",
+            ),
+            500,
+        )
     elif "file upload" in str(e).lower():
-        return jsonify(
-            error="File upload error",
-            message="An error occurred while uploading your file. Please check the file and try again."
-        ), 500
-    return jsonify(
-        error="Unexpected error",
-        message="An unexpected error occurred. Please try again later."
-    ), 500
+        return (
+            jsonify(
+                error="File upload error",
+                message="An error occurred while uploading your file. Please check the file and try again.",
+            ),
+            500,
+        )
+    return (
+        jsonify(
+            error="Unexpected error",
+            message="An unexpected error occurred. Please try again later.",
+        ),
+        500,
+    )
 
 
 # Handle favicon.ico requests
-@app.route('/favicon.ico')
+@app.route("/favicon.ico")
 def favicon() -> Response:
     """Redirect favicon.ico requests to the static file."""
-    return redirect(url_for('static', filename='favicon.ico'))
+    return redirect(url_for("static", filename="favicon.ico"))
 
 
 # Redirect root URL to chat interface
@@ -225,5 +259,9 @@ def clear_session() -> Response:
 # --- APPLICATION ENTRY POINT ---
 
 if __name__ == "__main__":
-    port = int(os.environ.get('PORT', 5000))  # Get port from environment or use 5000 as default
-    app.run(host='0.0.0.0', port=port, debug=False)  # Ensure `debug=False` in production
+    port = int(
+        os.environ.get("PORT", 5000)
+    )  # Get port from environment or use 5000 as default
+    app.run(
+        host="0.0.0.0", port=port, debug=False
+    )  # Ensure `debug=False` in production

@@ -21,7 +21,7 @@ from sqlalchemy import text
 from models.user import User
 from decorators import admin_required
 from forms import LoginForm, RegistrationForm, ResetPasswordForm
-from extensions import limiter
+from extensions import limiter, csrf
 from threading import Timer
 from models.chat import Chat
 from chat_utils import generate_new_chat_id
@@ -279,7 +279,7 @@ def register() -> Response:
                 user_obj = User(user_id, username, email, "user")
                 login_user(user_obj)
 
-                # Create a new chat for the user (Issue 9)
+                # Create a new chat for the user
                 chat_id = generate_new_chat_id()
                 Chat.create(chat_id, user_id, "New Chat")
                 session["chat_id"] = chat_id
@@ -378,6 +378,11 @@ def forgot_password() -> Response:
             )
             db.commit()
             logger.info(f"Password reset token generated for email: {email}")
+
+            # Placeholder for sending email logic
+            # In a real application, you would send an email here with the reset link
+            # Example: send_reset_email(user.email, reset_token)
+
             return (
                 jsonify(
                     {
@@ -530,6 +535,15 @@ def update_user_role(user_id: int) -> tuple[Response, int]:
     Returns:
         tuple[Response, int]: JSON response with success or error message, and HTTP status code.
     """
+
+    # CSRF protection for API endpoints
+    csrf_token = request.headers.get("X-CSRFToken")
+    if not csrf_token or not csrf.validate_csrf(csrf_token):
+        return (
+            jsonify({"success": False, "error": "CSRF token invalid or missing"}),
+            400,
+        )
+
     new_role = request.json.get("role")
     if new_role not in ["user", "admin"]:
         logger.warning(f"Invalid role '{new_role}' provided for user ID {user_id}.")

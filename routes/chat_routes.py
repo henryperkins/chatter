@@ -25,6 +25,7 @@ from database import get_db
 from models.chat import Chat
 from models.model import Model
 from token_utils import count_tokens
+from extensions import csrf
 
 bp = Blueprint("chat", __name__)
 conversation_manager = ConversationManager()
@@ -212,6 +213,15 @@ def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         )
         return jsonify({"error": "Chat not found or access denied"}), 403
 
+    # CSRF protection for AJAX requests
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        csrf_token = request.headers.get("X-CSRFToken")
+        if not csrf_token or not csrf.validate_csrf(csrf_token):
+            return (
+                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
+                400,
+            )
+
     try:
         Chat.delete(chat_id)
         logger.info("Chat %s deleted successfully", chat_id)
@@ -234,6 +244,15 @@ def get_conversations() -> Response:
 @login_required
 def scrape() -> Union[Response, Tuple[Response, int]]:
     """Handle web scraping requests."""
+    # CSRF protection for AJAX requests
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        csrf_token = request.headers.get("X-CSRFToken")
+        if not csrf_token or not csrf.validate_csrf(csrf_token):
+            return (
+                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
+                400,
+            )
+
     data = request.get_json()
     query = data.get("query")
     if not query:
@@ -258,6 +277,15 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
         return jsonify({"error": "Chat not found or access denied"}), 403
 
+    # CSRF protection for AJAX requests
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        csrf_token = request.headers.get("X-CSRFToken")
+        if not csrf_token or not csrf.validate_csrf(csrf_token):
+            return (
+                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
+                400,
+            )
+
     data = request.get_json()
     new_title = data.get("title")
     if not new_title:
@@ -276,6 +304,15 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
     """Handle incoming chat messages and return AI responses."""
     logger.debug("Received chat message")
+
+    # CSRF protection for AJAX requests
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        csrf_token = request.headers.get("X-CSRFToken")
+        if not csrf_token or not csrf.validate_csrf(csrf_token):
+            return (
+                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
+                400,
+            )
 
     chat_id = session.get("chat_id")
     if not chat_id:
@@ -438,7 +475,9 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         }
 
         timeout_seconds = 30
-        model_response = get_azure_response(**model_config, timeout_seconds=timeout_seconds)
+        model_response = get_azure_response(
+            **model_config, timeout_seconds=timeout_seconds
+        )
 
         # Add the assistant's response to the conversation history
         conversation_manager.add_message(
