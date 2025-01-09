@@ -56,10 +56,10 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
     # If no deployment name is provided, use the default from environment variables
     if not deployment_name:
         deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
-        if not deployment_name:
-            raise ValueError(
-                "Default deployment name not found in environment variables."
-            )
+    if not deployment_name:
+        raise ValueError(
+            "Default deployment name not found in environment variables."
+        )
 
     # Retrieve Azure OpenAI configuration from environment variables
     azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
@@ -168,8 +168,7 @@ def initialize_client_from_model(
         validate_o1_preview_config(model_config)
 
         # Filter out system messages if present
-        messages = model_config.get("messages", [])
-        if messages:
+        if messages := model_config.get("messages", []):
             model_config["messages"] = [
                 msg for msg in messages if msg.get("role") != "system"
             ]
@@ -213,11 +212,25 @@ def validate_api_endpoint(
         Exception: If there's an unexpected error during validation.
     """
     try:
+        def construct_test_url(api_endpoint: str, deployment_name: str, api_version: str) -> str:
+            """
+            Construct the full URL for validation.
+        
+            Args:
+                api_endpoint (str): The base API endpoint URL.
+                deployment_name (str): The deployment name for the model.
+                api_version (str): The API version.
+        
+            Returns:
+                str: The constructed URL.
+            """
+            return (
+                f"{api_endpoint.rstrip('/')}/openai/deployments/"
+                f"{deployment_name}/chat/completions?api-version={api_version}"
+            )
+
         # Construct the full URL for validation
-        test_url = (
-            f"{api_endpoint.rstrip('/')}/openai/deployments/"
-            f"{deployment_name}/chat/completions?api-version={api_version}"
-        )
+        test_url = construct_test_url(api_endpoint, deployment_name, api_version)
         logger.debug("Validating API endpoint and deployment.")
 
         # Prepare the test request payload
@@ -231,27 +244,15 @@ def validate_api_endpoint(
             test_payload["temperature"] = 1.0  # Required for o1-preview
             test_payload["max_completion_tokens"] = 1
             test_payload.pop("max_tokens", None)
-            # Filter out system messages
-            messages = test_payload.get("messages", [])
-            if messages:
-                test_payload["messages"] = [msg for msg in messages if msg.get("role") != "system"]
 
-        # Make a test request to the API
+        # Make the test request
         response = requests.post(
             test_url,
-            headers={"api-key": api_key, "Content-Type": "application/json"},
+            headers={"api-key": api_key},
             json=test_payload,
-            timeout=5,
+            timeout=10
         )
-
-        logger.debug(f"Validation response status code: {response.status_code}")
-
-        # Return True if the response status code indicates success
-        if response.status_code == 200:
-            return True
-        else:
-            logger.error(f"Validation failed with status code {response.status_code}: {response.text}")
-            return False
+        return response.status_code == 200
     except requests.exceptions.Timeout:
         logger.error("Validation failed due to a timeout.")
         raise
@@ -261,3 +262,13 @@ def validate_api_endpoint(
     except Exception as e:
         logger.error(f"An unexpected error occurred during API endpoint validation: {str(e)}")
         raise
+    except requests.exceptions.Timeout:
+        logger.error("Validation failed due to a timeout.")
+        raise
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Validation failed with a request exception: {str(e)}")
+        raise
+    except Exception as e:
+        logger.error(f"An unexpected error occurred during API endpoint validation: {str(e)}")
+        raise
+    

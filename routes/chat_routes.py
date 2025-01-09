@@ -30,7 +30,7 @@ conversation_manager = ConversationManager()
 logger = logging.getLogger(__name__)
 
 # Constants
-ALLOWED_EXTENSIONS = {'.txt', '.pdf', '.docx', '.py', '.js', '.md', '.jpg', '.png'}
+ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx", ".py", ".js", ".md", ".jpg", ".png"}
 ALLOWED_MIME_TYPES = {
     "text/plain",
     "application/pdf",
@@ -45,19 +45,25 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB per file
 MAX_TOTAL_FILE_SIZE = 50 * 1024 * 1024  # 50 MB for total files
 MAX_FILE_CONTENT_LENGTH = 8000  # Characters (increased to accommodate larger files)
 MAX_INPUT_TOKENS = 8192  # Max tokens allowed for input (user message + file content)
-MAX_CONTEXT_TOKENS = 128000  # Max tokens allowed for the entire context window (messages in database)
+MAX_CONTEXT_TOKENS = (
+    128000  # Max tokens allowed for the entire context window (messages in database)
+)
 MODEL_NAME = "gpt-4"  # Model name for tiktoken encoding
 
 # Initialize tokenizer outside the route handlers
 try:
     encoding = tiktoken.encoding_for_model(MODEL_NAME)
 except KeyError:
-    logger.warning(f"Model '{MODEL_NAME}' not found. Falling back to 'cl100k_base' encoding.")
+    logger.warning(
+        f"Model '{MODEL_NAME}' not found. Falling back to 'cl100k_base' encoding."
+    )
     encoding = tiktoken.get_encoding("cl100k_base")
+
 
 def allowed_file(filename: str) -> bool:
     """Check if the file has an allowed extension."""
     return os.path.splitext(filename)[1].lower() in ALLOWED_EXTENSIONS
+
 
 def truncate_message(message: str, max_tokens: int) -> str:
     """Truncates a message to a specified number of tokens using tiktoken."""
@@ -65,9 +71,12 @@ def truncate_message(message: str, max_tokens: int) -> str:
     if len(tokens) > max_tokens:
         truncated_tokens = tokens[:max_tokens]
         truncated_message = encoding.decode(truncated_tokens)
-        truncated_message += "\n\n[Note: The input was too long and has been truncated.]"
+        truncated_message += (
+            "\n\n[Note: The input was too long and has been truncated.]"
+        )
         return truncated_message
     return message
+
 
 def generate_chat_title(conversation_text: str) -> str:
     """Generate a chat title based on the first 5 messages."""
@@ -98,11 +107,13 @@ def generate_chat_title(conversation_text: str) -> str:
         return " ".join([word.capitalize() for word in top_words])
     return "New Chat"
 
+
 @bp.route("/")
 @login_required
 def index() -> Response:
     """Redirect to the chat interface."""
     return redirect(url_for("chat.chat_interface"))
+
 
 @bp.route("/new_chat", methods=["GET", "POST"])
 @login_required
@@ -118,6 +129,7 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
     if request.method == "POST":
         return jsonify({"success": True, "chat_id": chat_id})
     return render_template("new_chat.html")
+
 
 @bp.route("/chat_interface")
 @login_required
@@ -137,16 +149,23 @@ def chat_interface() -> str:
         Chat.create(chat_id, user_id, "New Chat")
         session["chat_id"] = chat_id
 
+    chat = Chat.get_by_id(chat_id)
+    model = Model.get_by_id(chat.model_id) if chat.model_id else None
+    chat_title = chat.title
+    model_name = model.name if model else "Unknown Model"
+
     messages = conversation_manager.get_context(chat_id)
     models = Model.get_all()
     conversations = Chat.get_user_chats(current_user.id)
 
-    today = datetime.now().strftime('%Y-%m-%d')
-    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    today = datetime.now().strftime("%Y-%m-%d")
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
     return render_template(
         "chat.html",
         chat_id=chat_id,
+        chat_title=chat_title,
+        model_name=model_name,
         messages=messages,
         models=models,
         conversations=conversations,
@@ -155,16 +174,18 @@ def chat_interface() -> str:
         yesterday=yesterday,
     )
 
+
 @bp.route("/load_chat/<chat_id>")
 @login_required
 def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Load and return the messages for a specific chat."""
     db = get_db()
     try:
-        chat = db.query(Chat).filter(
-            Chat.id == chat_id,
-            Chat.user_id == current_user.id
-        ).first()
+        chat = (
+            db.query(Chat)
+            .filter(Chat.id == chat_id, Chat.user_id == current_user.id)
+            .first()
+        )
 
         if not chat:
             logger.warning("Unauthorized access attempt to chat %s", chat_id)
@@ -176,13 +197,18 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     finally:
         db.close()
 
+
 @bp.route("/delete_chat/<chat_id>", methods=["DELETE"])
 @login_required
 def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Delete a chat and its associated messages."""
     logger.debug(f"Received request to delete chat_id: {chat_id}")
     if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
-        logger.warning("Unauthorized delete attempt for chat %s by user %s", chat_id, current_user.id)
+        logger.warning(
+            "Unauthorized delete attempt for chat %s by user %s",
+            chat_id,
+            current_user.id,
+        )
         return jsonify({"error": "Chat not found or access denied"}), 403
 
     try:
@@ -193,6 +219,7 @@ def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         logger.error(f"Error deleting chat {chat_id}: {e}")
         return jsonify({"error": "Failed to delete chat"}), 500
 
+
 @bp.route("/conversations", methods=["GET"])
 @login_required
 def get_conversations() -> Response:
@@ -200,6 +227,7 @@ def get_conversations() -> Response:
     user_id = int(current_user.id)
     conversations = Chat.get_user_chats(user_id)
     return jsonify(conversations)
+
 
 @bp.route("/scrape", methods=["POST"])
 @login_required
@@ -219,6 +247,7 @@ def scrape() -> Union[Response, Tuple[Response, int]]:
     except Exception as ex:
         logger.error("Error during scraping: %s", str(ex))
         return jsonify({"error": "An error occurred during scraping"}), 500
+
 
 @bp.route("/update_chat_title/<chat_id>", methods=["POST"])
 @login_required
@@ -240,6 +269,7 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         logger.error(f"Error updating chat title: {e}")
         return jsonify({"error": "Failed to update chat title"}), 500
 
+
 @bp.route("/chat", methods=["POST"])
 @login_required
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
@@ -259,11 +289,21 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
 
     if not model_obj.deployment_name:
         logger.error("Invalid model configuration: deployment name is missing.")
-        return jsonify({"error": "Invalid model configuration. Please select a valid model."}), 400
+        return (
+            jsonify(
+                {"error": "Invalid model configuration. Please select a valid model."}
+            ),
+            400,
+        )
 
     if not model_obj.api_key or not model_obj.api_endpoint:
         logger.error("Invalid model configuration: API key or endpoint is missing.")
-        return jsonify({"error": "Invalid model configuration. Please check the API settings."}), 400
+        return (
+            jsonify(
+                {"error": "Invalid model configuration. Please check the API settings."}
+            ),
+            400,
+        )
 
     # Sanitize user input before processing
     user_message = bleach.clean(request.form.get("message", "").strip())
@@ -298,57 +338,66 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                 excluded_files.append({"filename": filename, "error": error_message})
                 continue
 
-            # Save the file
-            file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
             try:
-                file.save(file_path)
-                included_files.append({"filename": filename})
-
-                # Read text-based file content
-                if mime_type.startswith('text/'):
-                    try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            file_content = f.read()
-                    except Exception as e:
-                        error_message = f"Error reading file {filename}: {e}"
-                        logger.error(error_message)
-                        excluded_files.append({"filename": filename, "error": error_message})
-                        continue
-
+                # Read text-based file content directly from the file object
+                if mime_type.startswith("text/"):
+                    file_content = file.read().decode("utf-8")
                     # Truncate file content if it exceeds the token limit
-                    truncated_content = truncate_message(file_content, MAX_FILE_CONTENT_LENGTH)
-                    formatted_content = f"\nFile '{filename}' content:\n```\n{truncated_content}\n```\n"
+                    truncated_content = truncate_message(
+                        file_content, MAX_FILE_CONTENT_LENGTH
+                    )
+                    formatted_content = (
+                        f"\nFile '{filename}' content:\n```\n{truncated_content}\n```\n"
+                    )
 
                     # Check if adding the file content would exceed the total token limit
                     content_tokens = count_tokens(formatted_content, MODEL_NAME)
                     if total_tokens + content_tokens > MAX_INPUT_TOKENS:
                         error_message = f"File {filename} skipped: Adding it would exceed the {MAX_INPUT_TOKENS} token limit"
                         logger.warning(error_message)
-                        excluded_files.append({"filename": filename, "error": error_message})
+                        excluded_files.append(
+                            {"filename": filename, "error": error_message}
+                        )
                         continue
 
                     total_tokens += content_tokens
                     file_contents.append(formatted_content)
-
+                    file.seek(0)  # Reset file pointer after reading
                 else:
-                    logger.info(f"Skipping reading content for non-text file: {filename}")
+                    logger.info(
+                        f"Skipping reading content for non-text file: {filename}"
+                    )
+
+                # Save the file
+                file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+                file.save(file_path)
+                included_files.append({"filename": filename})
+
             except Exception as e:
-                error_message = f"Error saving file {filename}: {e}"
+                error_message = f"Error processing file {filename}: {e}"
                 logger.error(error_message)
                 excluded_files.append({"filename": filename, "error": error_message})
                 continue
         else:
             if file.filename:
-                error_message = f"File type not allowed or file is empty: {file.filename}"
+                error_message = (
+                    f"File type not allowed or file is empty: {file.filename}"
+                )
             else:
                 error_message = "Empty file received."
 
             logger.warning(error_message)
-            excluded_files.append({"filename": file.filename or "Unknown", "error": error_message})
+            excluded_files.append(
+                {"filename": file.filename or "Unknown", "error": error_message}
+            )
 
     # Combine user message and file contents
     if file_contents:
-        combined_message = user_message + "\n" + "".join(file_contents) if user_message else "".join(file_contents)
+        combined_message = (
+            (user_message + "\n" + "".join(file_contents))
+            if user_message
+            else "".join(file_contents)
+        )
     else:
         combined_message = user_message
 
@@ -358,20 +407,21 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         if len(messages) >= 5:
             # Generate title from first 5 messages
             conversation_text = "\n".join(
-                f"{msg['role']}: {msg['content']}" 
-                for msg in messages[:5]
+                f"{msg['role']}: {msg['content']}" for msg in messages[:5]
             )
             new_title = generate_chat_title(conversation_text)
             Chat.update_title(chat_id, new_title)
 
     # Add the combined message to the conversation history
+    model_max_tokens = model_obj.max_tokens or 16384
     if combined_message:
-        conversation_manager.add_message(chat_id, "user", combined_message)
+        conversation_manager.add_message(
+            chat_id, "user", combined_message, model_max_tokens=model_max_tokens
+        )
 
     # Prepare the messages for the API call, excluding system messages if required
     history = conversation_manager.get_context(
-        chat_id,
-        include_system=not model_obj.requires_o1_handling
+        chat_id, include_system=not model_obj.requires_o1_handling
     )
 
     # Get the response from Azure OpenAI
@@ -395,8 +445,15 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         elapsed_time = (datetime.now() - start_time).total_seconds()
         if elapsed_time > timeout_seconds:
             logger.warning(f"Response took too long: {elapsed_time} seconds")
-            return jsonify({"error": "The assistant is taking longer than usual to respond. Please try again."}), 504
-        
+            return (
+                jsonify(
+                    {
+                        "error": "The assistant is taking longer than usual to respond. Please try again."
+                    }
+                ),
+                504,
+            )
+
         # Add the assistant's response to the conversation history
         conversation_manager.add_message(chat_id, "assistant", model_response)
 

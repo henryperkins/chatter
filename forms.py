@@ -98,11 +98,10 @@ class RegistrationForm(FlaskForm):
 
         # Check for existing username using text()
         with get_db() as db:
-            existing = db.execute(
+            if db.execute(
                 text("SELECT username FROM users WHERE LOWER(username) = :username"),
                 {"username": username}
-            ).fetchone()
-            if existing:
+            ).fetchone():
                 raise ValidationError("This username is already taken.")
 
     def validate_email(self, field: Any) -> None:
@@ -115,11 +114,10 @@ class RegistrationForm(FlaskForm):
 
         # Check for existing email using text()
         with get_db() as db:
-            existing = db.execute(
+            if existing := db.execute(
                 text("SELECT email FROM users WHERE LOWER(email) = :email"),
-                {"email": email}
-            ).fetchone()
-            if existing:
+                {"email": email},
+            ).fetchone():
                 raise ValidationError("This email is already registered.")
 
     def validate_password(self, field: Any) -> None:
@@ -209,8 +207,8 @@ class ModelForm(FlaskForm):
             if not (1 <= value <= 16384):
                 raise ValidationError("Max completion tokens must be between 1 and 16384.")
             field.data = value  # Ensure the value is an integer
-        except (TypeError, ValueError):
-            raise ValidationError("Max completion tokens must be a valid integer.")
+        except (TypeError, ValueError) as e:
+            raise ValidationError("Max completion tokens must be a valid integer.") from e
     model_type = SelectField(
         "Model Type",
         choices=[("azure", "Azure"), ("o1-preview", "o1-preview")],
@@ -227,21 +225,6 @@ class ModelForm(FlaskForm):
     )
     requires_o1_handling = BooleanField("Special Handling for o1-preview Models")
     is_default = BooleanField("Set as Default Model")
-
-    def validate_api_endpoint(self, field: Any) -> None:
-        """
-        Custom validator for API endpoint.
-        Validates that the endpoint is a valid Azure OpenAI URL:
-        - Must start with https://
-        - Must contain openai.azure.com
-        - Must not have trailing slashes
-        """
-        api_endpoint = field.data.strip().rstrip('/')
-        if not api_endpoint.startswith("https://"):
-            raise ValidationError("API endpoint must start with https://")
-        if ".openai.azure.com" not in api_endpoint:
-            raise ValidationError("API endpoint must be an Azure OpenAI URL (*.openai.azure.com)")
-        field.data = api_endpoint  # Update the field with cleaned value
 
     def validate_temperature(self, field: Any) -> None:
         """
@@ -316,7 +299,7 @@ def validate_password_strength(password: str) -> None:
         raise ValidationError("Password must contain at least one lowercase letter.")
     if not any(c.isdigit() for c in password):
         raise ValidationError("Password must contain at least one number.")
-    if not any(c in "!@#$%^&*(),.?\":{}|<>" for c in password):
+    if all(c not in "!@#$%^&*(),.?\":{}|<>" for c in password):
         raise ValidationError("Password must contain at least one special character (!@#$%^&*(),.?\":{}|<>).")
 
     # Check for common passwords
@@ -348,3 +331,4 @@ def validate_password_strength(password: str) -> None:
     for i in range(len(password) - 2):
         if password[i] == password[i + 1] == password[i + 2]:
             raise ValidationError("Password must not contain three or more repeated characters in a row.")
+        
