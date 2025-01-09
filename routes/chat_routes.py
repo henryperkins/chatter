@@ -438,22 +438,7 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         }
 
         timeout_seconds = 30
-        start_time = datetime.now()
-
-        model_response = get_azure_response(**model_config)
-
-        # Check for timeout
-        elapsed_time = (datetime.now() - start_time).total_seconds()
-        if elapsed_time > timeout_seconds:
-            logger.warning(f"Response took too long: {elapsed_time} seconds")
-            return (
-                jsonify(
-                    {
-                        "error": "The assistant is taking longer than usual to respond. Please try again."
-                    }
-                ),
-                504,
-            )
+        model_response = get_azure_response(**model_config, timeout_seconds=timeout_seconds)
 
         # Add the assistant's response to the conversation history
         conversation_manager.add_message(
