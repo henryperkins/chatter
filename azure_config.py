@@ -127,17 +127,24 @@ def initialize_client_from_model(
     api_key = str(api_key)
     deployment_name = str(deployment_name)
     api_version = str(model_config.get("api_version", "2024-12-01-preview"))
-    temperature: Optional[float] = (
-        float(model_config.get("temperature"))
-        if model_config.get("temperature") is not None
-        else None
-    )
-    max_tokens: Optional[int] = (
-        int(model_config.get("max_tokens"))
-        if model_config.get("max_tokens") is not None
-        else None
-    )
-    max_completion_tokens: int = int(model_config.get("max_completion_tokens", 500))
+    if requires_o1_handling:
+        # For o1-preview models
+        max_completion_tokens: int = int(model_config.get("max_completion_tokens", 32000))
+        temperature = 1
+        max_tokens = None
+    else:
+        # For other models like gpt-4o
+        temperature: Optional[float] = (
+            float(model_config.get("temperature"))
+            if model_config.get("temperature") is not None
+            else None
+        )
+        max_tokens: Optional[int] = (
+            int(model_config.get("max_tokens"))
+            if model_config.get("max_tokens") is not None
+            else None
+        )
+        max_completion_tokens: int = int(model_config.get("max_completion_tokens", 500))
     requires_o1_handling: bool = bool(model_config.get("requires_o1_handling", False))
 
     # Validate required fields
