@@ -133,7 +133,7 @@ class ConversationManager:
             content = self.truncate_message(
                 content, max_tokens=MAX_MESSAGE_TOKENS, tokens=tokens
             )
-        # Assistant messages are stored without truncation
+        # Assistant messages are not truncated
 
         db = get_db()
         try:
