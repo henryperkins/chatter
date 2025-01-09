@@ -154,17 +154,21 @@ class ConversationManager:
                 for msg in messages
             ]
 
-            # Trim based on total token count
-            total_tokens = self.num_tokens_from_messages(message_dicts)
+            # Maintain a running total of tokens
+            total_tokens = sum(
+                self.num_tokens_from_messages([msg]) for msg in message_dicts
+            )
+
             while total_tokens > MAX_TOKENS and len(message_dicts) > 1:
                 # Remove oldest message to stay within token limit
                 msg_to_remove = message_dicts.pop(0)
+                msg_tokens = self.num_tokens_from_messages([msg_to_remove])
                 db.execute(
                     text("DELETE FROM messages WHERE id = :id"),
                     {"id": msg_to_remove["id"]}
                 )
                 db.commit()
-                total_tokens = self.num_tokens_from_messages(message_dicts)
+                total_tokens -= msg_tokens
 
             logger.debug(
                 f"Added message to chat {chat_id}: {role}: {content[:50]}..."
