@@ -3,17 +3,16 @@
 {% block title %}Edit Model - Azure OpenAI{% endblock %}
 
 {% block content %}
-<div class="container mx-auto px-4 py-8">
-    <h1 class="text-2xl font-bold mb-4">Edit Model: {{ model.name }}</h1>
+<div class="container mx-auto px-4 py-8 bg-white dark:bg-gray-900">
+    <h1 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-100">Edit Model: {{ model.name }}</h1>
     <form id="edit-model-form" method="POST" action="{{ url_for('model.edit_model', model_id=model.id) }}"
-        class="bg-white shadow-md rounded-lg p-6 ajax-form">
+        class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 ajax-form">
         {{ form.hidden_tag() }}
 
         <!-- Model Name -->
         <div class="mb-6">
-            {{ form.name.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            {{ form.name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none
-            focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.name) }}
+            {{ form.name.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.name(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.name) }}
             {% if form.name.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.name.errors[0] }}</p>
             {% endif %}
@@ -21,9 +20,8 @@
 
         <!-- Deployment Name -->
         <div class="mb-6">
-            {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            {{ form.deployment_name(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.deployment_name)
+            {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.deployment_name(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.deployment_name)
             }}
             {% if form.deployment_name.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.deployment_name.errors[0] }}</p>
@@ -32,9 +30,8 @@
 
         <!-- Description -->
         <div class="mb-6">
-            {{ form.description.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            {{ form.description(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 h-24
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.description) }}
+            {{ form.description.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.description(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 h-24 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.description) }}
             {% if form.description.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.description.errors[0] }}</p>
             {% endif %}
@@ -42,9 +39,8 @@
 
         <!-- API Endpoint -->
         <div class="mb-6">
-            {{ form.api_endpoint.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            {{ form.api_endpoint(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none
-            focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.api_endpoint) }}
+            {{ form.api_endpoint.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.api_endpoint(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.api_endpoint) }}
             {% if form.api_endpoint.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
             {% endif %}
@@ -52,9 +48,8 @@
 
         <!-- API Key -->
         <div class="mb-6">
-            {{ form.api_key.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            {{ form.api_key(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none
-            focus:ring-2 focus:ring-blue-500 focus:border-transparent", type="password",
+            {{ form.api_key.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.api_key(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", type="password",
             placeholder="Enter new API key (leave blank to keep current)") }}
             {% if form.api_key.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.api_key.errors[0] }}</p>
@@ -63,9 +58,8 @@
 
         <!-- Model Type -->
         <div class="mb-6">
-            {{ form.model_type.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            {{ form.model_type(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none
-            focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.model_type) }}
+            {{ form.model_type.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.model_type(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.model_type) }}
             {% if form.model_type.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.model_type.errors[0] }}</p>
             {% endif %}
@@ -73,11 +67,10 @@
 
         <!-- Temperature -->
         <div class="mb-6">
-            {{ form.temperature.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            <p class="text-xs text-gray-500 mb-2">Controls randomness (0.0 for focused, up to 2.0 for more creative
+            {{ form.temperature.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Controls randomness (0.0 for focused, up to 2.0 for more creative
                 responses). Note: For o1-preview models, temperature is automatically set to 1.0.</p>
-            {{ form.temperature(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none
-            focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.temperature) }}
+            {{ form.temperature(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.temperature) }}
             {% if form.temperature.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.temperature.errors[0] }}</p>
             {% endif %}
@@ -86,22 +79,21 @@
         <!-- Max Tokens and Max Completion Tokens -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-                {{ form.max_tokens.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-                {{ form.max_tokens(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2
-                focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.max_tokens)
+                {{ form.max_tokens.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+                {{ form.max_tokens(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.max_tokens)
                 }}
                 {% if form.max_tokens.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.max_tokens.errors[0] }}</p>
                 {% endif %}
             </div>
             <div>
-                {{ form.max_completion_tokens.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
+                {{ form.max_completion_tokens.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
                 <div class="flex flex-col space-y-2">
                     <div class="flex justify-between">
-                        <span class="text-sm text-gray-600">500</span>
-                        <span id="max-completion-tokens-value" class="text-sm font-semibold text-blue-600">{{
+                        <span class="text-sm text-gray-600 dark:text-gray-400">500</span>
+                        <span id="max-completion-tokens-value" class="text-sm font-semibold text-blue-600 dark:text-blue-400">{{
                             model.max_completion_tokens }}</span>
-                        <span class="text-sm text-gray-600">16384</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">16384</span>
                     </div>
                     {{ form.max_completion_tokens(
                     class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700
@@ -122,28 +114,27 @@
 
         <!-- API Version -->
         <div class="mb-6">
-            {{ form.api_version.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
-            {{ form.api_version(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none
-            focus:ring-2 focus:ring-blue-500 focus:border-transparent", value=model.api_version) }}
+            {{ form.api_version.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.api_version(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.api_version) }}
             {% if form.api_version.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.api_version.errors[0] }}</p>
             {% endif %}
         </div>
 
         <!-- Advanced Settings Section -->
-        <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h3 class="text-lg font-semibold text-gray-800 mb-4">Advanced Settings</h3>
+        <div class="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Advanced Settings</h3>
 
             <!-- Requires o1-preview Handling -->
             <div class="mb-4">
                 <label class="inline-flex items-center">
                     {{ form.requires_o1_handling(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500
                     focus:ring-2", checked=model.requires_o1_handling) }}
-                    <span class="ml-2 text-sm text-gray-700 font-medium">
+                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
                         {{ form.requires_o1_handling.label.text }}
                     </span>
                 </label>
-                <p class="text-xs text-gray-500 mt-1 ml-7">Enable this for o1-preview models (sets temperature to 1.0
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">Enable this for o1-preview models (sets temperature to 1.0
                     and disables max tokens settings)</p>
             </div>
 
@@ -152,11 +143,11 @@
                 <label class="inline-flex items-center">
                     {{ form.is_default(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2",
                     checked=model.is_default) }}
-                    <span class="ml-2 text-sm text-gray-700 font-medium">
+                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
                         {{ form.is_default.label.text }}
                     </span>
                 </label>
-                <p class="text-xs text-gray-500 mt-1 ml-7">Make this the default model for new conversations</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">Make this the default model for new conversations</p>
             </div>
         </div>
 

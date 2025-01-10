@@ -37,10 +37,10 @@ function showFeedback(message, type = "info") {
   const feedbackDiv = document.createElement("div");
   feedbackDiv.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg ${
     type === "error"
-      ? "bg-red-500 text-white"
+      ? "bg-red-500 dark:bg-red-600 text-white"
       : type === "success"
-      ? "bg-green-500 text-white"
-      : "bg-blue-500 text-white"
+      ? "bg-green-500 dark:bg-green-600 text-white"
+      : "bg-blue-500 dark:bg-blue-600 text-white"
   }`;
   feedbackDiv.innerHTML = message;
   document.body.appendChild(feedbackDiv);
@@ -396,14 +396,14 @@ window.copyToClipboard = async function(text) {
 
   // Typing Indicator Functions
   function showTypingIndicator() {
-    const typingIndicator = document.createElement("div");
-    typingIndicator.id = "typing-indicator";
-    typingIndicator.className = "flex w-full mt-2 space-x-3 max-w-3xl";
-    typingIndicator.innerHTML = `
-      <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
-      <div class="flex-grow">
-        <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
-          <p class="text-sm text-gray-500">Assistant is typing...</p>
+  const typingIndicator = document.createElement("div");
+  typingIndicator.id = "typing-indicator";
+  typingIndicator.className = "flex w-full mt-2 space-x-3 max-w-3xl";
+  typingIndicator.innerHTML = `
+    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
+    <div class="flex-grow">
+      <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
+        <p class="text-sm text-gray-500 dark:text-gray-400">Assistant is typing...</p>
         </div>
         <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
       </div>
@@ -646,30 +646,32 @@ window.copyToClipboard = async function(text) {
   }
 
   // New Chat Button
-  if (newChatBtn) {
+if (newChatBtn) {
     newChatBtn.addEventListener("click", async () => {
-      try {
-        const response = await fetch("/new_chat", {
-          method: "POST",
-          headers: {
-            "X-CSRFToken": getCSRFToken(),
-            "X-Requested-With": "XMLHttpRequest"
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            window.location.href = `/chat_interface?chat_id=${data.chat_id}`;
-          }
-        } else {
-          showFeedback("Failed to create a new chat.", "error");
+        try {
+            const response = await fetch("/chat/new_chat", {  // Add correct route prefix
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": getCSRFToken(),
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "XMLHttpRequest"
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    window.location.href = `/chat/chat_interface?chat_id=${data.chat_id}`;
+                }
+            } else {
+                showFeedback("Failed to create new chat", "error");
+            }
+        } catch (error) {
+            console.error("Error creating new chat:", error);
+            showFeedback("Error creating new chat", "error");
         }
-      } catch (error) {
-        console.error("Error creating new chat:", error);
-        showFeedback("Error creating new chat.", "error");
-      }
     });
-  }
+}
 
   // Function to apply markdown and syntax highlighting to messages
   function formatMessages() {

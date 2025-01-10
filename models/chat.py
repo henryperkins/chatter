@@ -51,6 +51,30 @@ class Chat:
                 raise
 
     @staticmethod
+    def can_access_chat(chat_id: str, user_id: int, user_role: str) -> bool:
+        """
+        Check if a user can access a chat based on ownership and role.
+        Admin users can access all chats.
+        Regular users can only access their own chats.
+        """
+        if user_role == 'admin':
+            # Admins can access all chats, but still verify chat exists
+            try:
+                with db_session() as db:
+                    query = text("SELECT COUNT(1) FROM chats WHERE id = :chat_id")
+                    result = db.execute(query, {"chat_id": chat_id}).scalar()
+                    logger.debug(f"Query result for chat_id {chat_id}: {result}")
+                    exists = result > 0
+                    logger.debug(f"Admin access check for chat_id {chat_id}: {exists}")
+                    return exists
+            except Exception as e:
+                logger.error(f"Error checking chat existence for chat_id {chat_id}: {e}")
+                raise
+        else:
+            # Regular users can only access their own chats
+            return Chat.is_chat_owned_by_user(chat_id, user_id)
+
+    @staticmethod
     def is_title_default(chat_id: str) -> bool:
         """
         Check whether a chat has the default title.
@@ -208,6 +232,7 @@ class Chat:
                     VALUES (:chat_id, :user_id, :title, :model_id)
                 """
                 )
+                logger.debug(f"Attempting to insert chat with ID: {chat_id}, user_id: {user_id}, title: {title}, model_id: {model_id}")
                 db.execute(
                     query,
                     {

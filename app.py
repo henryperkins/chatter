@@ -1,5 +1,3 @@
-# app.py
-
 import os
 import logging
 from datetime import timedelta
@@ -81,8 +79,7 @@ init_app(app)
 
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix="/auth")
-chat_routes.name = 'chat'  # Set the blueprint name to 'chat'
-app.register_blueprint(chat_routes)
+app.register_blueprint(chat_routes, url_prefix="/chat")
 app.register_blueprint(model_bp, url_prefix="/models")
 
 # Initialize database tables

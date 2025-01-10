@@ -9,7 +9,6 @@ from models.model import Model
 from conversation_manager import conversation_manager
 from chat_utils import count_tokens, secure_filename, generate_new_chat_id
 from chat_api import get_azure_response, scrape_data
-from database import get_db
 from models.chat import Chat
 import tiktoken
 
@@ -104,40 +103,48 @@ def index() -> Response:
 @login_required
 def new_chat_route() -> Union[Response, Tuple[Response, int]]:
     """Create a new chat and return success JSON."""
-    chat_id = generate_new_chat_id()
-    user_id = int(current_user.id)
+    logger.debug(f"New chat request from user {current_user.id}")
+    try:
+        chat_id = generate_new_chat_id()
+        user_id = int(current_user.id)
 
-    Chat.create(chat_id, user_id, "New Chat")
-    session["chat_id"] = chat_id
-    logger.info("New chat created with ID: %s", chat_id)
+        Chat.create(chat_id, user_id, "New Chat")
+        session["chat_id"] = chat_id
+        logger.info("New chat created with ID: %s", chat_id)
 
-    if request.method == "POST":
-        return jsonify({"success": True, "chat_id": chat_id})
-    return render_template("new_chat.html")
+        if request.method == "POST":
+            return jsonify({"success": True, "chat_id": chat_id})
+        return render_template("new_chat.html")
+    except Exception as e:
+        logger.error(f"Error creating new chat: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @chat_routes.route("/chat_interface")
 @login_required
 def chat_interface() -> str:
     """Render the main chat interface page."""
+    logger.debug(f"Current user: id={current_user.id}, role={current_user.role}")
+    
+    # Get chat_id from query params or session
     chat_id = request.args.get("chat_id") or session.get("chat_id")
 
-    if chat_id:
-        if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
-            logger.warning("Unauthorized access attempt to chat %s", chat_id)
-            return "Chat not found or access denied", 403
-
-        session["chat_id"] = chat_id
-    else:
+    # If chat doesn't exist or can't be accessed, create new chat
+    if not chat_id or not Chat.get_by_id(chat_id):
         chat_id = generate_new_chat_id()
         user_id = int(current_user.id)
         Chat.create(chat_id, user_id, "New Chat")
         session["chat_id"] = chat_id
+        logger.info(f"Created new chat {chat_id} for user {user_id}")
+        # Redirect to remove stale chat_id from URL
+        if request.args.get("chat_id"):
+            return redirect(url_for("chat.chat_interface"))
 
+    # Fetch chat data
     chat = Chat.get_by_id(chat_id)
     model = Model.get_by_id(chat.model_id) if chat.model_id else None
     chat_title = chat.title
-    model_name = model.name if model else "Unknown Model"
+    model_name = model.name if model else "Default Model"
 
     messages = conversation_manager.get_context(chat_id)
     models = Model.get_all()
@@ -164,7 +171,7 @@ def chat_interface() -> str:
 @login_required
 def get_chat_context(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Get the conversation context for a chat."""
-    if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
+    if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
         sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
         logger.warning("Unauthorized access attempt to chat %s", sanitized_chat_id)
         return jsonify({"error": "Chat not found or access denied"}), 403
@@ -176,24 +183,14 @@ def get_chat_context(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 @login_required
 def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Load and return the messages for a specific chat."""
-    db = get_db()
-    try:
-        chat = (
-            db.query(Chat)
-            .filter(Chat.id == chat_id, Chat.user_id == current_user.id)
-            .first()
-        )
+    if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
+        sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
+        logger.warning("Unauthorized access attempt to chat %s", sanitized_chat_id)
+        return jsonify({"error": "Chat not found or access denied"}), 403
 
-        if not chat:
-            sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
-            logger.warning("Unauthorized access attempt to chat %s", sanitized_chat_id)
-            return jsonify({"error": "Chat not found or access denied"}), 403
-
-        messages = conversation_manager.get_context(chat_id)
-        messages_to_send = [msg for msg in messages if msg["role"] != "system"]
-        return jsonify({"messages": messages_to_send})
-    finally:
-        db.close()
+    messages = conversation_manager.get_context(chat_id)
+    messages_to_send = [msg for msg in messages if msg["role"] != "system"]
+    return jsonify({"messages": messages_to_send})
 
 
 @chat_routes.route("/delete_chat/<chat_id>", methods=["DELETE"])
@@ -202,7 +199,7 @@ def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Delete a chat and its associated messages."""
     sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
     logger.debug(f"Received request to delete chat_id: {sanitized_chat_id}")
-    if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
+    if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
         logger.warning(
             "Unauthorized delete attempt for chat %s by user %s",
             chat_id,
@@ -255,7 +252,7 @@ def scrape() -> Union[Response, Tuple[Response, int]]:
 def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Update the title of a chat."""
     logger.debug(f"Received request to update title for chat_id: {chat_id}")
-    if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
+    if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
         return jsonify({"error": "Chat not found or access denied"}), 403
 
     data = request.get_json()
