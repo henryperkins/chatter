@@ -30,16 +30,16 @@
     {% endblock %}
 </head>
 
-<body class="flex flex-col min-h-screen bg-gray-50">
+<body class="flex flex-col min-h-screen bg-white dark:bg-gray-900">
     <!-- Navbar -->
-    <nav class="bg-white shadow-lg fixed w-full top-0 z-50" role="navigation">
+    <nav class="bg-white dark:bg-gray-800 shadow-lg fixed w-full top-0 z-50" role="navigation">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <!-- Left side (Brand + Mobile toggle) -->
                 <div class="flex items-center">
                     <!-- Mobile sidebar toggle for small devices -->
                     <button id="sidebar-toggle"
-                        class="md:hidden mr-2 hamburger-menu inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                        class="md:hidden mr-2 hamburger-menu inline-flex items-center justify-center p-2 rounded-md text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
                         aria-label="Toggle sidebar">
                         <svg class="w-6 h-6 hamburger-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -47,7 +47,7 @@
                         </svg>
                     </button>
                     <!-- Brand name / Logo -->
-                    <a href="{{ url_for('chat.chat_interface') }}" class="text-xl font-bold text-blue-600">
+                    <a href="{{ url_for('chat.chat_interface') }}" class="text-xl font-bold text-blue-600 dark:text-blue-400">
                         Azure OpenAI Chat
                     </a>
                 </div>
