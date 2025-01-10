@@ -13,9 +13,9 @@ function showTypingIndicator() {
     <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
     <div class="flex-grow">
       <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
-        <p class="text-sm text-gray-500">Assistant is typing...</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Assistant is typing...</p>
       </div>
-      <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
+      <span class="text-xs text-gray-500 dark:text-gray-400 leading-none">${new Date().toLocaleTimeString()}</span>
     </div>
   `;
   chatBox.appendChild(typingIndicator);
