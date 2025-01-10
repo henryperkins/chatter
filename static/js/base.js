@@ -1,7 +1,12 @@
 // static/js/base.js
 
 // Store CSRF token in a variable
-const csrfToken = getCSRFToken();
+let csrfToken;
+try {
+  csrfToken = getCSRFToken();
+} catch (error) {
+  console.warn("CSRF token retrieval failed:", error);
+}
 axios.defaults.headers.common["X-CSRFToken"] = csrfToken;
 
 /**
@@ -42,8 +47,8 @@ document.addEventListener("DOMContentLoaded", () => {
    * @function toggleMenu
    */
   function toggleMenu() {
-    offCanvasMenu.classList.toggle("hidden");
-    overlay.classList.toggle("hidden");
+    offCanvasMenu?.classList.toggle("hidden");
+    overlay?.classList.toggle("hidden");
     document.body.classList.toggle("overflow-hidden");
   }
 
@@ -60,15 +65,34 @@ document.addEventListener("DOMContentLoaded", () => {
   const rootElement = document.documentElement;
 
   // Check system preferences on page load
-  const savedTheme = localStorage.getItem("theme");
+  let savedTheme;
+  try {
+    savedTheme = localStorage.getItem("theme");
+  } catch (error) {
+    console.warn("localStorage is not available. Falling back to system preferences.");
+    savedTheme = null;
+  }
+
   const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
   if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
-    rootElement.classList.add("dark");
-    localStorage.setItem("theme", "dark");
+    if (!rootElement.classList.contains("dark")) {
+      rootElement.classList.add("dark");
+    }
+    try {
+      localStorage.setItem("theme", "dark");
+    } catch (error) {
+      console.warn("Failed to save theme to localStorage.");
+    }
   } else {
-    rootElement.classList.remove("dark");
-    localStorage.setItem("theme", "light");
+    if (rootElement.classList.contains("dark")) {
+      rootElement.classList.remove("dark");
+    }
+    try {
+      localStorage.setItem("theme", "light");
+    } catch (error) {
+      console.warn("Failed to save theme to localStorage.");
+    }
   }
 
   // Toggle dark mode on button click
@@ -76,10 +100,18 @@ document.addEventListener("DOMContentLoaded", () => {
     darkModeToggle.addEventListener("click", () => {
       if (rootElement.classList.contains("dark")) {
         rootElement.classList.remove("dark");
-        localStorage.setItem("theme", "light");
+        try {
+          localStorage.setItem("theme", "light");
+        } catch (error) {
+          console.warn("Failed to save theme to localStorage.");
+        }
       } else {
         rootElement.classList.add("dark");
-        localStorage.setItem("theme", "dark");
+        try {
+          localStorage.setItem("theme", "dark");
+        } catch (error) {
+          console.warn("Failed to save theme to localStorage.");
+        }
       }
     });
   }
@@ -90,12 +122,10 @@ document.addEventListener("DOMContentLoaded", () => {
  * @listens click
  */
 document.addEventListener("click", (event) => {
-  // Handle feedback close button clicks
-  if (event.target.matches("#feedback-close")) {
+  const target = event.target;
+  if (target && target.matches("#feedback-close")) {
     const feedbackMessage = document.getElementById("feedback-message");
-    if (feedbackMessage) {
-      feedbackMessage.classList.add("hidden");
-    }
+    feedbackMessage?.classList.add("hidden");
   }
 });
 
@@ -140,7 +170,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Handle click outside to close tooltips
     document.addEventListener("click", (event) => {
-      if (!event.target.closest("[data-tooltip]")) {
+      const target = event.target;
+      if (!target || !target.closest("[data-tooltip]")) {
         tooltip.classList.add("hidden");
       }
     });
@@ -163,7 +194,8 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       document.addEventListener("click", (event) => {
-        if (!event.target.closest("[data-dropdown]")) {
+        const target = event.target;
+        if (!target || !target.closest("[data-dropdown]")) {
           dropdownMenu.classList.add("hidden");
         }
       });
@@ -223,9 +255,9 @@ document.addEventListener("DOMContentLoaded", () => {
  * @listens submit
  */
 document.addEventListener("submit", async (event) => {
-  if (event.target.classList.contains("ajax-form")) {
+  const form = event.target;
+  if (form && form.classList.contains("ajax-form")) {
     event.preventDefault();
-    const form = event.target;
     const formData = new FormData(form);
 
     try {
@@ -233,7 +265,7 @@ document.addEventListener("submit", async (event) => {
         method: form.method,
         body: formData,
         headers: {
-          "X-CSRFToken": getCSRFToken(),
+          "X-CSRFToken": csrfToken,
           Accept: "application/json",
         },
       });
