@@ -774,7 +774,7 @@ window.copyToClipboard = async function(text) {
         </div>
         <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
       </div>
-      <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
+      <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
     `;
     userMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
     chatBox.appendChild(userMessageDiv);
