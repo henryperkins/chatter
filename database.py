@@ -12,11 +12,11 @@ from flask.cli import with_appcontext
 logger = logging.getLogger(__name__)
 
 # Connection pool settings
-# Pool settings too aggressive for SQLite
-POOL_SIZE = 1  # SQLite supports only one writer
-MAX_OVERFLOW = 2  # Minimal overflow for read operations
+# Pool settings for SQLite
+POOL_SIZE = 5  # Increased for better concurrency
+MAX_OVERFLOW = 10  # Allow more overflow connections
 POOL_RECYCLE = 3600  # Recycle connections after 1 hour
-POOL_TIMEOUT = 30  # Wait up to 30 seconds for a connection
+POOL_TIMEOUT = 60  # Increased timeout for operations
 
 def get_db():
     """Get database connection from Flask app context using connection pool."""
@@ -33,7 +33,10 @@ def get_db():
                 max_overflow=MAX_OVERFLOW,
                 pool_recycle=POOL_RECYCLE,
                 pool_timeout=POOL_TIMEOUT,
-                connect_args={"check_same_thread": False}
+                connect_args={
+                    "check_same_thread": False,
+                    "timeout": 30  # SQLite busy timeout in seconds
+                }
             )
             g.db_session = scoped_session(
                 sessionmaker(bind=g.db_engine, autocommit=False, autoflush=False)

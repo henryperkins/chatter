@@ -239,10 +239,18 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    showFeedback("Model created successfully", "success");
-                    setTimeout(() => {
-                        window.location.href = "{{ url_for('chat.chat_interface') }}";
-                    }, 1500);
+                    if (data.success) {
+                        showFeedback("Model created successfully", "success");
+                        // Wait longer to ensure transaction is committed
+                        setTimeout(() => {
+                            window.location.href = "{{ url_for('chat.chat_interface') }}";
+                        }, 3000);
+                    } else {
+                        showFeedback(data.error || "Failed to create model", "error");
+                        submitButton.disabled = false;
+                        buttonText.textContent = "Add Model";
+                        loadingSpinner.classList.add("hidden");
+                    }
                 } else {
                     showFeedback(data.error || "Failed to create the model", "error");
                 }

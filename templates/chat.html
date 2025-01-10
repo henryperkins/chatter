@@ -247,6 +247,31 @@
 {% block scripts %}
 {{ super() }}
 <script>
+    // Function to refresh model list
+    async function refreshModelList() {
+        try {
+            const response = await fetch('/models');
+            if (response.ok) {
+                const models = await response.json();
+                const modelSelect = document.getElementById('model-select');
+                if (modelSelect) {
+                    modelSelect.innerHTML = models.map(model => 
+                        `<option value="${model.id}" ${model.is_default ? 'selected' : ''}>
+                            ${model.name}${model.is_default ? ' (Default)' : ''}
+                        </option>`
+                    ).join('');
+                }
+            }
+        } catch (error) {
+            console.error('Error refreshing model list:', error);
+        }
+    }
+
+    // Check if we're returning from add model page
+    if (document.referrer.includes('/models/add-model')) {
+        refreshModelList();
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         const editTitleBtn = document.getElementById('edit-title-btn');
         if (editTitleBtn) {

@@ -226,9 +226,9 @@ class ModelForm(FlaskForm):
         """
         try:
             value = int(field.data)
-            if not (1 <= value <= 32000):
+            if not (1 <= value <= 16384):
                 raise ValidationError(
-                    "Max completion tokens must be between 1 and 32000."
+                    "Max completion tokens must be between 1 and 16384."
                 )
             field.data = value  # Ensure the value is an integer
         except (TypeError, ValueError) as e:

@@ -151,23 +151,50 @@ class Model:
         """
         with db_session() as db:
             try:
+                # Check for existing models with same name or deployment_name (case-insensitive)
+                check_query = text("""
+                    SELECT name, deployment_name 
+                    FROM models 
+                    WHERE LOWER(name) = LOWER(:name) 
+                    OR LOWER(deployment_name) = LOWER(:deployment_name)
+                """)
+                existing = db.execute(check_query, {
+                    "name": data["name"],
+                    "deployment_name": data["deployment_name"]
+                }).fetchone()
+                
+                if existing:
+                    if existing[0].lower() == data["name"].lower():
+                        raise ValueError(f"A model with name '{data['name']}' already exists")
+                    else:
+                        raise ValueError(f"A model with deployment name '{data['deployment_name']}' already exists")
+
+                # Ensure all required fields are present
+                Model.validate_model_config(data)
+
                 if data.get("requires_o1_handling", False):
                     data["temperature"] = None
+
+                # Log the full data being inserted
+                logger.debug(f"Inserting model with data: {data}")
 
                 query = text(
                     """
                     INSERT INTO models (
                         name, deployment_name, description, api_endpoint, api_key,
                         api_version, temperature, max_tokens, max_completion_tokens,
-                        model_type, requires_o1_handling, is_default, version
+                        model_type, requires_o1_handling, is_default, version,
+                        created_at
                     ) VALUES (
                         :name, :deployment_name, :description, :api_endpoint, :api_key,
                         :api_version, :temperature, :max_tokens, :max_completion_tokens,
-                        :model_type, :requires_o1_handling, :is_default, :version
+                        :model_type, :requires_o1_handling, :is_default, :version,
+                        CURRENT_TIMESTAMP
                     )
                     RETURNING id
                 """
                 )
+                # Execute all operations and commit in a single transaction
                 result = db.execute(query, data)
                 model_id = result.scalar()
 
@@ -186,7 +213,9 @@ class Model:
                     db.execute(
                         unset_default_query, {"model_id": model_id, "is_default": True}
                     )
-                    db.commit()
+
+                # Commit all changes in one transaction
+                db.commit()
 
                 logger.info(f"Model created with ID: {model_id}")
                 return model_id
@@ -318,6 +347,35 @@ class Model:
                 config["max_completion_tokens"] = max_completion_tokens
             except (TypeError, ValueError):
                 raise ValueError("max_completion_tokens must be a valid integer")
+
+    @staticmethod
+    def delete(model_id: int) -> None:
+        """
+        Delete a model from the database.
+        """
+        with db_session() as db:
+            try:
+                # Check if model is in use by any chats
+                check_query = text(
+                    """
+                    SELECT COUNT(*) as count 
+                    FROM chats 
+                    WHERE model_id = :model_id
+                """
+                )
+                result = db.execute(check_query, {"model_id": model_id}).mappings().first()
+                if result and result["count"] > 0:
+                    raise ValueError("Cannot delete model that is in use by chats")
+
+                # Delete the model
+                query = text("DELETE FROM models WHERE id = :model_id")
+                db.execute(query, {"model_id": model_id})
+                db.commit()
+                logger.info(f"Model deleted (ID {model_id})")
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Failed to delete model {model_id}: {e}")
+                raise
 
     @staticmethod
     def cleanup_orphaned_files() -> None:
