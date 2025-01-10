@@ -1,0 +1,119 @@
+name: "CodeQL Advanced"
+
+on:
+  push:
+    branches: [ "main", "develop" ]  # Update with your actual branch names
+  pull_request:
+    branches: [ "main", "develop" ]
+  schedule:
+    - cron: '44 23 * * 6'  # Weekly scan on Saturday at 23:44
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ${{ (matrix.language == 'swift' && 'macos-latest') || 'ubuntu-latest' }}
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - language: javascript-typescript
+          build-mode: none
+        - language: python
+          build-mode: none
+
+    steps:
+    # Step 1: Checkout the repository
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Step 2: Set up Python environment
+    - if: matrix.language == 'python'
+      name: Set up Python environment
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"  # Specify Python version
+
+    # Step 3: Install Python dependencies with caching
+    - name: Cache Python dependencies
+      if: matrix.language == 'python'
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-python-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-python-
+    - name: Install Python dependencies
+      if: matrix.language == 'python'
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    # Step 4: Set up Node.js environment
+    - if: matrix.language == 'javascript-typescript'
+      name: Set up Node.js environment
+      uses: actions/setup-node@v3
+      with:
+        node-version: "18"  # Specify Node.js version
+
+    # Step 5: Install Node.js dependencies with caching
+    - name: Cache Node.js dependencies
+      if: matrix.language == 'javascript-typescript'
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+    - name: Install Node.js dependencies
+      if: matrix.language == 'javascript-typescript'
+      run: npm install
+
+    # Step 6: Build Tailwind CSS (optional, for frontend)
+    - if: matrix.language == 'javascript-typescript'
+      name: Build Tailwind CSS
+      run: npm run build:css
+
+    # Step 7: Initialize CodeQL
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        setup: false  # Disable the default setup
+        languages: ${{ matrix.language }}
+        build-mode: ${{ matrix.build-mode }}
+        queries: +security-extended,security-and-quality
+        config-file: .github/codeql/codeql-config.yml  # Optional config file
+
+    # Step 8: Perform CodeQL Analysis
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+        upload-database: true  # Enable SARIF upload for results
+
+    # Step 9: Notify on failure
+    - name: Notify on failure
+      if: failure()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '⚠️ CodeQL analysis failed! Please review the errors.'
+          })
+
+    # Step 10: Upload results as artifact (optional)
+    - name: Upload CodeQL results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: codeql-results-${{ matrix.language }}
+        path: ${{ runner.temp }}/codeql-databases
+        retention-days: 7
