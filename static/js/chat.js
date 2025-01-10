@@ -349,7 +349,7 @@ window.copyToClipboard = async function(text) {
     uploadedFiles.forEach((file, index) => {
       const fileDiv = document.createElement("div");
       fileDiv.className =
-        "flex items-center justify-between bg-gray-100 px-2 py-1 rounded text-sm";
+        "flex items-center justify-between bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm";
       fileDiv.innerHTML = `
         <div class="flex items-center">
           <svg class="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20">
@@ -732,24 +732,24 @@ window.copyToClipboard = async function(text) {
     const assistantMessageDiv = document.createElement("div");
     assistantMessageDiv.className = "flex w-full mt-2 space-x-3 max-w-xs";
     assistantMessageDiv.innerHTML = `
-      <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
+      <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
       <div class="relative max-w-lg">
-        <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
-          <div class="text-sm markdown-content"></div>
+        <div class="bg-gray-300 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
+          <div class="text-sm markdown-content dark:text-gray-200"></div>
         </div>
         <div class="absolute right-0 top-0 flex space-x-2">
-          <button class="copy-button p-1 text-gray-500 hover:text-gray-700" title="Copy to clipboard">
+          <button class="copy-button p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" title="Copy to clipboard">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
             </svg>
           </button>
-          <button class="regenerate-button p-1 text-gray-500 hover:text-gray-700" title="Regenerate response">
+          <button class="regenerate-button p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" title="Regenerate response">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </button>
         </div>
-        <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
+        <span class="text-xs text-gray-500 dark:text-gray-400 leading-none">${new Date().toLocaleTimeString()}</span>
       </div>
     `;
     assistantMessageDiv.querySelector(".markdown-content").innerHTML = renderMarkdown(message);
