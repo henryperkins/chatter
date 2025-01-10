@@ -55,6 +55,33 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+// Dark Mode Toggle
+document.addEventListener("DOMContentLoaded", () => {
+  const darkModeToggle = document.getElementById("dark-mode-toggle");
+  const rootElement = document.documentElement;
+
+  // Check and apply the saved theme on page load
+  const savedTheme = localStorage.getItem("theme");
+  if (savedTheme === "dark") {
+    rootElement.classList.add("dark");
+  } else if (savedTheme === "light") {
+    rootElement.classList.remove("dark");
+  }
+
+  // Toggle dark mode on button click
+  if (darkModeToggle) {
+    darkModeToggle.addEventListener("click", () => {
+      if (rootElement.classList.contains("dark")) {
+        rootElement.classList.remove("dark");
+        localStorage.setItem("theme", "light");
+      } else {
+        rootElement.classList.add("dark");
+        localStorage.setItem("theme", "dark");
+      }
+    });
+  }
+});
+
 /**
  * Handles global click events for dynamic elements (e.g., feedback close buttons).
  * @listens click
