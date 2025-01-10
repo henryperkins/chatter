@@ -1,9 +1,8 @@
 // static/js/base.js
 
-/**
- * Sets the default CSRF token header for Axios requests.
- */
-axios.defaults.headers.common["X-CSRFToken"] = getCSRFToken();
+// Store CSRF token in a variable
+const csrfToken = getCSRFToken();
+axios.defaults.headers.common["X-CSRFToken"] = csrfToken;
 
 /**
  * Overrides the native fetch function to include the CSRF token in all requests.
@@ -21,7 +20,7 @@ window.fetch = function (url, options = {}) {
 
   // Add CSRF token if not already present
   if (!options.headers["X-CSRFToken"]) {
-    options.headers["X-CSRFToken"] = getCSRFToken();
+    options.headers["X-CSRFToken"] = csrfToken;
   }
 
   return originalFetch(url, options);
@@ -60,12 +59,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const darkModeToggle = document.getElementById("dark-mode-toggle");
   const rootElement = document.documentElement;
 
-  // Check and apply the saved theme on page load
+  // Check system preferences on page load
   const savedTheme = localStorage.getItem("theme");
-  if (savedTheme === "dark") {
+  const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+  if (savedTheme === "dark" || (!savedTheme && systemPrefersDark)) {
     rootElement.classList.add("dark");
-  } else if (savedTheme === "light") {
+    localStorage.setItem("theme", "dark");
+  } else {
     rootElement.classList.remove("dark");
+    localStorage.setItem("theme", "light");
   }
 
   // Toggle dark mode on button click
@@ -126,10 +129,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     element.addEventListener("mouseenter", () => {
       tooltip.classList.remove("hidden");
+      const rect = element.getBoundingClientRect();
+      tooltip.style.top = `${rect.bottom + window.scrollY}px`;
+      tooltip.style.left = `${rect.left + window.scrollX}px`;
     });
 
     element.addEventListener("mouseleave", () => {
       tooltip.classList.add("hidden");
+    });
+
+    // Handle click outside to close tooltips
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest("[data-tooltip]")) {
+        tooltip.classList.add("hidden");
+      }
     });
   });
 });
@@ -149,8 +162,17 @@ document.addEventListener("DOMContentLoaded", () => {
         dropdownMenu.classList.toggle("hidden");
       });
 
-      document.addEventListener("click", () => {
-        dropdownMenu.classList.add("hidden");
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest("[data-dropdown]")) {
+          dropdownMenu.classList.add("hidden");
+        }
+      });
+
+      // Close dropdown on Escape key
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          dropdownMenu.classList.add("hidden");
+        }
       });
     }
   });
@@ -176,6 +198,20 @@ document.addEventListener("DOMContentLoaded", () => {
         button.addEventListener("click", () => {
           modal.classList.add("hidden");
         });
+      });
+
+      // Close modal on Escape key
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !modal.classList.contains("hidden")) {
+          modal.classList.add("hidden");
+        }
+      });
+
+      // Close modal when clicking outside
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          modal.classList.add("hidden");
+        }
       });
     }
   });
@@ -208,6 +244,16 @@ document.addEventListener("submit", async (event) => {
         if (data.redirect) {
           window.location.href = data.redirect;
         }
+      } else if (response.status === 400 && data.errors) {
+        // Handle validation errors
+        Object.entries(data.errors).forEach(([field, error]) => {
+          const errorElement = document.getElementById(`${field}-error`);
+          if (errorElement) {
+            errorElement.textContent = error;
+            errorElement.classList.remove("hidden");
+          }
+        });
+        showFeedback("Please fix the errors in the form.", "error");
       } else {
         showFeedback(data.error || "An error occurred.", "error");
       }
