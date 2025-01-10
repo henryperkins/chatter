@@ -269,9 +269,9 @@ class Model:
                     SET {set_clause}
                     WHERE id = :model_id
                 """
-                )
+                ).bindparams(**params)
 
-                db.execute(query, params)
+                db.execute(query)
 
                 if update_data.get("is_default", False):
                     unset_default_query = text(
