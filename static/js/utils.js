@@ -29,8 +29,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!options.credentials) {
         options.credentials = 'same-origin';
       }
-      return originalFetch(url, options);
     };
+    return originalFetch(url, options);
   }
 });
       return originalFetch(url, options);
