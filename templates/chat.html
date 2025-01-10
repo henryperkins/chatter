@@ -9,7 +9,7 @@
 {% block title %}Chat - Azure OpenAI{% endblock %}
 
 {% block content %}
-<div class="flex flex-col h-screen bg-white dark:bg-gray-900">
+<div class="flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">
     <!-- Mobile Toggle -->
     <button id="sidebar-toggle"
         class="md:hidden bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-4 py-2">
@@ -117,7 +117,7 @@
                     <button id="edit-title-btn" class="ml-4 text-sm text-blue-600 hover:underline">Edit Title</button>
                 </div>
             </div>
-            <div id="chat-box" class="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-white dark:bg-gray-900">
+            <div id="chat-box" class="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">
                 {% for message in messages %}
                 {% if message.role == 'user' %}
                 <!-- User message -->

@@ -18,7 +18,7 @@ module.exports = {
       },
     },
   },
-  darkMode: 'class',
+  darkMode: 'class', // Ensure dark mode is enabled
   plugins: [
     require('@tailwindcss/forms'),
     require('@tailwindcss/typography'), // For markdown/rich text

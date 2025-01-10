@@ -10,7 +10,7 @@ function showTypingIndicator() {
   typingIndicator.id = "typing-indicator";
   typingIndicator.className = "flex w-full mt-2 space-x-3 max-w-3xl";
   typingIndicator.innerHTML = `
-    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300"></div>
+    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
     <div class="flex-grow">
       <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
         <p class="text-sm text-gray-500">Assistant is typing...</p>
