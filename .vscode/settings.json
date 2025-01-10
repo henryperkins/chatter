@@ -40,7 +40,8 @@
   "terminal.integrated.gpuAcceleration": "on",
   "terminal.integrated.mouseWheelZoom": false,
   "terminal.integrated.scrollback": 10000,
-  "terminal.integrated.sendKeybindingsToShell": true,
+  "terminal.integrated.sendKeybindingsToShell": false,
+  "terminal.integrated.allowChords": true,
   "terminal.integrated.smoothScrolling": true,
   "terminal.integrated.stickyScroll.enabled": true,
   "terminal.integrated.suggest.enabled": true,
@@ -101,5 +102,14 @@
   "python.analysis.typeEvaluation.strictListInference": true,
   "python.analysis.typeEvaluation.strictSetInference": true,
   "workbench.experimental.cloudChanges.partialMatches.enabled": true,
-  "workbench.experimental.cloudChanges.autoStore": "onShutdown"
+  "workbench.experimental.cloudChanges.autoStore": "onShutdown",
+  "css.validate": false,
+  "tailwindCSS.includeLanguages": {
+    "html": "html",
+    "javascript": "javascript",
+    "css": "css"
+  },
+  "editor.quickSuggestions": {
+    "strings": true
+  }
 }

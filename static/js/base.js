@@ -1,7 +1,5 @@
 // static/js/base.js
 
-import { getCSRFToken, showFeedback } from "./utils.js";
-
 /**
  * Sets the default CSRF token header for Axios requests.
  */

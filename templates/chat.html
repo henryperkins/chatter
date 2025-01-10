@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prismjs/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
+{% endblock %}
+
 {% block title %}Chat - Azure OpenAI{% endblock %}
 
 {% block content %}
@@ -117,8 +123,15 @@
                 <!-- User message -->
                 <div class="flex justify-end">
                     <div class="max-w-lg text-right">
-                        <div class="bg-blue-600 text-white px-4 py-2 rounded-lg">
+                        <div class="relative bg-blue-600 text-white px-4 py-2 rounded-lg">
                             <p class="text-sm">{{ message.content }}</p>
+                            {% if loop.last %}
+                            <button class="edit-message-button absolute -left-6 top-2 text-gray-500 hover:text-gray-700" title="Edit message">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                            </button>
+                            {% endif %}
                         </div>
                         <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
                             {% if message.timestamp %}
@@ -133,9 +146,23 @@
                 <!-- Assistant message -->
                 <div class="flex">
                     <div class="max-w-lg">
-                        <div class="bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-lg">
+                        <div class="relative bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-lg">
                             <div class="prose dark:prose-invert prose-sm max-w-none">
                                 {{ message.content|safe }}
+                            </div>
+                            <div class="absolute right-0 top-0 flex space-x-2">
+                                <button class="copy-button p-1 text-gray-500 hover:text-gray-700" title="Copy to clipboard">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                    </svg>
+                                </button>
+                                {% if loop.last %}
+                                <button class="regenerate-button p-1 text-gray-500 hover:text-gray-700" title="Regenerate response">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                </button>
+                                {% endif %}
                             </div>
                         </div>
                         <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
@@ -214,40 +241,6 @@
         <div id="upload-progress-bar" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
     </div>
 </div>
-<!-- BOTTOM NAVIGATION BAR -->
-<div class="bottom-nav">
-    <div class="bottom-nav-item">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M13 5v6h6">
-            </path>
-        </svg>
-        <span class="text-xs">Home</span>
-    </div>
-    <div class="bottom-nav-item active">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-        </svg>
-        <span class="text-xs">Chat</span>
-    </div>
-    <div class="bottom-nav-item">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"></path>
-        </svg>
-        <span class="text-xs">History</span>
-    </div>
-    <div class="bottom-nav-item">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-        </svg>
-        <span class="text-xs">Upload</span>
-    </div>
-    <div class="bottom-nav-item">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-        </svg>
-        <span class="text-xs">Menu</span>
-    </div>
-</div>
 
 {% endblock %}
 
@@ -261,6 +254,7 @@
                 editChatTitle('{{ chat_id }}');
             });
         }
+
         document.querySelectorAll('.delete-chat-btn').forEach(button => {
             button.addEventListener('click', function (event) {
                 event.preventDefault();
@@ -268,6 +262,14 @@
                 deleteChat(chatId);
             });
         });
+
+        document.querySelectorAll('.copy-button').forEach(button => {
+            button.addEventListener('click', function() {
+                const messageContent = this.closest('.max-w-lg').querySelector('.prose').textContent;
+                copyToClipboard(messageContent);
+            });
+        });
+
         const modelSelect = document.getElementById('model-select');
         const editModelButton = document.getElementById('edit-model-btn');
 

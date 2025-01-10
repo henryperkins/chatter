@@ -276,6 +276,7 @@ class Model:
             "api_version",
             "model_type",
             "max_completion_tokens",
+            "version"  # Add version to required fields
         ]
 
         for field_name in required_fields:
@@ -289,6 +290,11 @@ class Model:
             or "openai.azure.com" not in api_endpoint
         ):
             raise ValueError("Invalid Azure OpenAI API endpoint.")
+
+        # Validate version field
+        version = config.get("version")
+        if version is not None and not isinstance(version, int):
+            raise ValueError("Version must be an integer")
 
         if not config.get("requires_o1_handling", False):
             temperature = config.get("temperature")

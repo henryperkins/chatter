@@ -5,7 +5,7 @@
  * @function getCSRFToken
  * @returns {string} The CSRF token or an empty string if not found.
  */
-export function getCSRFToken() {
+function getCSRFToken() {
   const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
   return csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") : "";
 }
@@ -16,7 +16,7 @@ export function getCSRFToken() {
  * @param {string} message - The feedback message to display.
  * @param {string} [type='success'] - The type of message ('success', 'error', 'warning', or 'info').
  */
-export function showFeedback(message, type = "success") {
+function showFeedback(message, type = "success") {
   const feedbackMessage = document.getElementById("feedback-message");
   if (!feedbackMessage) {
     console.warn("Feedback message element not found.");
@@ -78,7 +78,7 @@ export function showFeedback(message, type = "success") {
  * @param {FormData} formData - The FormData object to convert.
  * @returns {Object} A plain JavaScript object with key-value pairs.
  */
-export function formDataToObject(formData) {
+function formDataToObject(formData) {
   const object = {};
   for (const [key, value] of formData.entries()) {
     object[key] = value;
@@ -92,7 +92,7 @@ export function formDataToObject(formData) {
  * @param {string} email - The email address to validate.
  * @returns {boolean} True if the email is valid, false otherwise.
  */
-export function validateEmail(email) {
+function validateEmail(email) {
   const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return regex.test(email);
 }
@@ -103,7 +103,7 @@ export function validateEmail(email) {
  * @param {string} password - The password to validate.
  * @returns {boolean} True if the password is valid, false otherwise.
  */
-export function validatePassword(password) {
+function validatePassword(password) {
   const regex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
   return regex.test(password);
 }
@@ -114,7 +114,7 @@ export function validatePassword(password) {
  * @param {string} dateString - The date string to format.
  * @returns {string} The formatted date (e.g., "January 1, 2023").
  */
-export function formatDate(dateString) {
+function formatDate(dateString) {
   const date = new Date(dateString);
   return date.toLocaleDateString("en-US", {
     year: "numeric",
@@ -130,7 +130,7 @@ export function formatDate(dateString) {
  * @param {number} wait - The wait time in milliseconds.
  * @returns {Function} The debounced function.
  */
-export function debounce(func, wait) {
+function debounce(func, wait) {
   let timeout;
   return function (...args) {
     clearTimeout(timeout);
@@ -145,7 +145,7 @@ export function debounce(func, wait) {
  * @param {number} limit - The time limit in milliseconds.
  * @returns {Function} The throttled function.
  */
-export function throttle(func, limit) {
+function throttle(func, limit) {
   let inThrottle;
   return function (...args) {
     if (!inThrottle) {

@@ -1,5 +1,5 @@
 from sqlalchemy import text
-from database import get_db
+from database import get_db  
 from app import app  # Import the app object to set up the application context
 
 def make_admin(username):
@@ -11,6 +11,7 @@ def make_admin(username):
         )
         db.commit()
         print(f"User '{username}' has been made an admin.")
+
 
 if __name__ == "__main__":
     make_admin("hperkins")

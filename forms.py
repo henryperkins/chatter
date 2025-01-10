@@ -177,6 +177,14 @@ class ModelForm(FlaskForm):
         ],
     )
 
+    api_key = StringField(
+        "API Key",
+        validators=[
+            DataRequired(message="API key is required."),
+            Length(min=32, message="API key must be at least 32 characters long."),
+        ],
+    )
+
     def validate_api_endpoint(self, field: Any) -> None:
         """
         Custom validator for API endpoint.
@@ -244,6 +252,15 @@ class ModelForm(FlaskForm):
     )
     requires_o1_handling = BooleanField("Special Handling for o1-preview Models")
     is_default = BooleanField("Set as Default Model")
+    version = IntegerField(
+        "Version",
+        default=1,
+        render_kw={"type": "hidden"},  # Make it a hidden field
+        validators=[
+            DataRequired(message="Version is required."),
+            NumberRange(min=1, message="Version must be a positive integer."),
+        ],
+    )
 
     def validate_temperature(self, field: Any) -> None:
         """

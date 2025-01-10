@@ -93,7 +93,6 @@ def check_registration_attempts(ip: str) -> bool:
 
 
 @bp.route("/login", methods=["GET", "POST"])
-@limiter.limit("5/minute")
 def login():
     """
     Handle user login requests. Validates credentials and logs the user in.
@@ -126,10 +125,6 @@ def login():
 
                 # Check if user exists
                 if not user:
-                    attempts_remaining = (
-                        limiter.get_view_rate_limit()[1]
-                        - limiter.get_view_rate_limit()[0]
-                    )
                     logger.warning(
                         f"Login attempt for non-existent username: {username}"
                     )
@@ -138,7 +133,6 @@ def login():
                             {
                                 "success": False,
                                 "error": "Username not found",
-                                "attempts_remaining": attempts_remaining,
                             }
                         ),
                         401,
@@ -146,17 +140,12 @@ def login():
 
                 # Check password
                 if not bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]):
-                    attempts_remaining = (
-                        limiter.get_view_rate_limit()[1]
-                        - limiter.get_view_rate_limit()[0]
-                    )
                     logger.warning(f"Invalid password for username: {username}")
                     return (
                         jsonify(
                             {
                                 "success": False,
-                                "error": f"Incorrect password. {attempts_remaining} attempts remaining",
-                                "attempts_remaining": attempts_remaining,
+                                "error": "Incorrect password",
                             }
                         ),
                         401,
@@ -256,6 +245,10 @@ def register() -> Response:
                 hashed_password = bcrypt.hashpw(
                     password.encode("utf-8"), bcrypt.gensalt(rounds=12)
                 )
+                # Check if this is the first user
+                user_count = db.execute(text("SELECT COUNT(*) as count FROM users")).scalar()
+                role = "admin" if user_count == 0 else "user"
+
                 result = db.execute(
                     text(
                         """
@@ -268,7 +261,7 @@ def register() -> Response:
                         "username": username,
                         "email": email,
                         "password_hash": hashed_password,
-                        "role": "user",
+                        "role": role,
                     },
                 )
                 user_id = result.scalar()
@@ -276,7 +269,7 @@ def register() -> Response:
                 logger.info(f"User {username} registered successfully.")
 
                 # Create user object and log them in
-                user_obj = User(user_id, username, email, "user")
+                user_obj = User(user_id, username, email, role)
                 login_user(user_obj)
 
                 # Create a new chat for the user

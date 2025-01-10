@@ -192,6 +192,7 @@ def initialize_client_from_model(
         azure_endpoint=api_endpoint,
         api_key=api_key,
         api_version=api_version,
+        timeout=30.0,  # Set default timeout to 30 seconds
     )
 
     return (

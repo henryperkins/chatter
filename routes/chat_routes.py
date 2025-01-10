@@ -1,55 +1,31 @@
-from flask import Blueprint, request, jsonify, redirect, url_for, render_template, current_app, session
+from flask import Blueprint, request, jsonify, redirect, url_for, render_template, current_app, session, Response
 from flask_login import login_required, current_user
 from typing import Union, Tuple, List, Dict
 import os
+from datetime import datetime, timedelta
 import logging
 import bleach
 from models.model import Model
 from conversation_manager import conversation_manager
-from utils import count_tokens, secure_filename, get_azure_response
+from chat_utils import count_tokens, secure_filename, generate_new_chat_id
+from chat_api import get_azure_response, scrape_data
 from database import get_db
 from models.chat import Chat
-from extensions import csrf_protect
 import tiktoken
 
-chat_routes = Blueprint('chat_routes', __name__)
+# Configure logging
+logger = logging.getLogger(__name__)
 
-@chat_routes.route('/chat', methods=['POST'])
-def chat():
-    """
-    Handle message submissions from the chat interface.
-    """
-    user_id = request.headers.get('X-User-ID')  # Replace with actual user session handling
-    if not user_id:
-        return jsonify({'error': 'Unauthorized'}), 401
+# Constants
+ALLOWED_EXTENSIONS = {'.txt', '.md', '.py', '.js', '.html', '.css', '.json', '.csv'}
+ALLOWED_MIME_TYPES = {
+    'text/plain', 'text/markdown', 'text/python', 'text/javascript',
+    'text/html', 'text/css', 'application/json', 'text/csv'
+}
 
-    message = request.form.get('message')
-    files = request.files.getlist('files[]')
+chat_routes = Blueprint('chat', __name__)
 
-    if not message and not files:
-        return jsonify({'error': 'Message or files required'}), 400
 
-    # Save message to the database
-    db = get_db()
-    chat = Chat(user_id=user_id, message=message)
-    db.session.add(chat)
-    db.session.commit()
-
-    # Handle file uploads (if any)
-    included_files = []
-    excluded_files = []
-    for file in files:
-        try:
-            # Save file logic here
-            included_files.append({'filename': file.filename})
-        except Exception as e:
-            excluded_files.append({'filename': file.filename, 'error': str(e)})
-
-    return jsonify({
-        'response': f'Message received: {message}',
-        'included_files': included_files,
-        'excluded_files': excluded_files
-    })
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB per file
 MAX_TOTAL_FILE_SIZE = 50 * 1024 * 1024  # 50 MB for total files
 MAX_FILE_CONTENT_LENGTH = 8000  # Characters (increased to accommodate larger files)
@@ -117,14 +93,14 @@ def generate_chat_title(conversation_text: str) -> str:
     return "New Chat"
 
 
-@bp.route("/")
+@chat_routes.route("/")
 @login_required
 def index() -> Response:
     """Redirect to the chat interface."""
     return redirect(url_for("chat.chat_interface"))
 
 
-@bp.route("/new_chat", methods=["GET", "POST"])
+@chat_routes.route("/new_chat", methods=["GET", "POST"])
 @login_required
 def new_chat_route() -> Union[Response, Tuple[Response, int]]:
     """Create a new chat and return success JSON."""
@@ -140,7 +116,7 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
     return render_template("new_chat.html")
 
 
-@bp.route("/chat_interface")
+@chat_routes.route("/chat_interface")
 @login_required
 def chat_interface() -> str:
     """Render the main chat interface page."""
@@ -184,7 +160,18 @@ def chat_interface() -> str:
     )
 
 
-@bp.route("/load_chat/<chat_id>")
+@chat_routes.route("/get_chat_context/<chat_id>")
+@login_required
+def get_chat_context(chat_id: str) -> Union[Response, Tuple[Response, int]]:
+    """Get the conversation context for a chat."""
+    if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
+        logger.warning("Unauthorized access attempt to chat %s", chat_id)
+        return jsonify({"error": "Chat not found or access denied"}), 403
+
+    messages = conversation_manager.get_context(chat_id)
+    return jsonify({"messages": messages})
+
+@chat_routes.route("/load_chat/<chat_id>")
 @login_required
 def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Load and return the messages for a specific chat."""
@@ -207,7 +194,7 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         db.close()
 
 
-@bp.route("/delete_chat/<chat_id>", methods=["DELETE"])
+@chat_routes.route("/delete_chat/<chat_id>", methods=["DELETE"])
 @login_required
 def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Delete a chat and its associated messages."""
@@ -220,15 +207,6 @@ def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         )
         return jsonify({"error": "Chat not found or access denied"}), 403
 
-    # CSRF protection for AJAX requests
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        csrf_token = request.headers.get("X-CSRFToken")
-        if not csrf_token or not csrf.validate_csrf(csrf_token):
-            return (
-                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
-                400,
-            )
-
     try:
         Chat.delete(chat_id)
         logger.info("Chat %s deleted successfully", chat_id)
@@ -238,7 +216,7 @@ def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         return jsonify({"error": "Failed to delete chat"}), 500
 
 
-@bp.route("/conversations", methods=["GET"])
+@chat_routes.route("/conversations", methods=["GET"])
 @login_required
 def get_conversations() -> Response:
     """Retrieve all conversations for the current user."""
@@ -247,19 +225,10 @@ def get_conversations() -> Response:
     return jsonify(conversations)
 
 
-@bp.route("/scrape", methods=["POST"])
+@chat_routes.route("/scrape", methods=["POST"])
 @login_required
 def scrape() -> Union[Response, Tuple[Response, int]]:
     """Handle web scraping requests."""
-    # CSRF protection for AJAX requests
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        csrf_token = request.headers.get("X-CSRFToken")
-        if not csrf_token or not csrf.validate_csrf(csrf_token):
-            return (
-                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
-                400,
-            )
-
     data = request.get_json()
     query = data.get("query")
     if not query:
@@ -276,22 +245,13 @@ def scrape() -> Union[Response, Tuple[Response, int]]:
         return jsonify({"error": "An error occurred during scraping"}), 500
 
 
-@bp.route("/update_chat_title/<chat_id>", methods=["POST"])
+@chat_routes.route("/update_chat_title/<chat_id>", methods=["POST"])
 @login_required
 def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Update the title of a chat."""
     logger.debug(f"Received request to update title for chat_id: {chat_id}")
     if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
         return jsonify({"error": "Chat not found or access denied"}), 403
-
-    # CSRF protection for AJAX requests
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        csrf_token = request.headers.get("X-CSRFToken")
-        if not csrf_token or not csrf.validate_csrf(csrf_token):
-            return (
-                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
-                400,
-            )
 
     data = request.get_json()
     new_title = data.get("title")
@@ -306,20 +266,11 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         return jsonify({"error": "Failed to update chat title"}), 500
 
 
-@bp.route("/chat", methods=["POST"])
+@chat_routes.route("/chat", methods=["POST"])
 @login_required
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
     """Handle incoming chat messages and return AI responses."""
     logger.debug("Received chat message")
-
-    # CSRF protection for AJAX requests
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        csrf_token = request.headers.get("X-CSRFToken")
-        if not csrf_token or not csrf.validate_csrf(csrf_token):
-            return (
-                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
-                400,
-            )
 
     chat_id = session.get("chat_id")
     if not chat_id:
@@ -481,7 +432,7 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             "requires_o1_handling": model_obj.requires_o1_handling,
         }
 
-        timeout_seconds = 30
+        timeout_seconds = 120  # Increased timeout to 2 minutes
         model_response = get_azure_response(
             **model_config, timeout_seconds=timeout_seconds
         )

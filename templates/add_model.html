@@ -76,6 +76,18 @@
             {% endif %}
         </div>
 
+        <!-- API Key -->
+        <div class="mb-6">
+            {{ form.api_key.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
+            <p class="text-xs text-gray-500 mb-2">Your Azure OpenAI API key</p>
+            {{ form.api_key(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none
+            focus:ring-2 focus:ring-blue-500 focus:border-transparent", type="password",
+            placeholder="Enter your API key") }}
+            {% if form.api_key.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.api_key.errors[0] }}</p>
+            {% endif %}
+        </div>
+
         <!-- Model Type -->
         <div class="mb-6">
             {{ form.model_type.label(class="text-sm font-semibold text-gray-700 block mb-1") }}

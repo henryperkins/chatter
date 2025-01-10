@@ -74,6 +74,7 @@ def create_model():
             "deployment_name": form.deployment_name.data,
             "description": form.description.data,
             "api_endpoint": form.api_endpoint.data,
+            "api_key": form.api_key.data,
             "temperature": form.temperature.data,
             "max_tokens": form.max_tokens.data,
             "max_completion_tokens": form.max_completion_tokens.data,
@@ -81,6 +82,7 @@ def create_model():
             "api_version": form.api_version.data,
             "requires_o1_handling": form.requires_o1_handling.data,
             "is_default": form.is_default.data,
+            "version": 1,  # Add default version
         }
 
         logger.debug(
@@ -221,7 +223,8 @@ def edit_model(model_id):
                     "api_version": form.api_version.data,
                     "requires_o1_handling": form.requires_o1_handling.data,
                     "is_default": form.is_default.data,
-                    "api_key": existing_model.api_key,  # Preserve existing API key
+                    "api_key": form.api_key.data if form.api_key.data else existing_model.api_key,  # Update API key if provided
+                    "version": form.version.data,  # Include version field
                 }
                 logger.debug(
                     "Updating model %d with data: %s",

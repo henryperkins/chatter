@@ -1,7 +1,5 @@
 // static/js/form_handler.js
 
-import { getCSRFToken, showFeedback } from "./utils.js";
-
 document.addEventListener("DOMContentLoaded", () => {
   // Add ajax-form class to login form
   const loginForm = document.getElementById("login-form");

@@ -1,5 +1,21 @@
 import uuid
 from typing import List, Dict
+from werkzeug.utils import secure_filename as werkzeug_secure_filename
+
+
+def count_tokens(text: str, model_name: str) -> int:
+    """
+    Count the number of tokens in a given text for a specific model.
+    This is a placeholder function. Replace with actual token counting logic.
+    """
+    return len(text.split())
+
+
+def secure_filename(filename: str) -> str:
+    """
+    Sanitize a filename to ensure it is safe for storage.
+    """
+    return werkzeug_secure_filename(filename)
 
 
 def generate_new_chat_id() -> str:

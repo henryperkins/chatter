@@ -50,6 +50,17 @@
             {% endif %}
         </div>
 
+        <!-- API Key -->
+        <div class="mb-6">
+            {{ form.api_key.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
+            {{ form.api_key(class="w-full border border-gray-300 rounded-lg shadow-sm px-3 py-2 focus:outline-none
+            focus:ring-2 focus:ring-blue-500 focus:border-transparent", type="password",
+            placeholder="Enter new API key (leave blank to keep current)") }}
+            {% if form.api_key.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.api_key.errors[0] }}</p>
+            {% endif %}
+        </div>
+
         <!-- Model Type -->
         <div class="mb-6">
             {{ form.model_type.label(class="text-sm font-semibold text-gray-700 block mb-1") }}
@@ -225,6 +236,10 @@
                 // Convert boolean fields
                 formData.set('requires_o1_handling', formData.get('requires_o1_handling') === 'y');
                 formData.set('is_default', formData.get('is_default') === 'y');
+
+                // Increment version number
+                const currentVersion = parseInt(formData.get('version'), 10);
+                formData.set('version', currentVersion + 1);
 
                 const response = await fetch(form.action, {
                     method: "POST",

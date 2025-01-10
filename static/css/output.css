@@ -3383,10 +3383,6 @@ body {
   --tw-ring-offset-width: 2px;
 }
 
-.disabled\:pointer-events-none:disabled {
-  pointer-events: none;
-}
-
 .disabled\:cursor-not-allowed:disabled {
   cursor: not-allowed;
 }

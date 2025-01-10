@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS model_versions (
     description TEXT,
     model_type TEXT NOT NULL,
     api_endpoint TEXT NOT NULL,
+    api_key TEXT NOT NULL, -- API key for authentication
     temperature REAL DEFAULT 1.0,
     max_tokens INTEGER,
     max_completion_tokens INTEGER NOT NULL,
@@ -109,4 +110,3 @@ CREATE INDEX IF NOT EXISTS idx_uploaded_files_chat_id ON uploaded_files (chat_id
 CREATE INDEX IF NOT EXISTS idx_model_versions_model_id ON model_versions (model_id); -- Speeds up version history lookups
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages (timestamp); -- Speeds up fetching messages by timestamp
 CREATE INDEX IF NOT EXISTS idx_chats_created_at ON chats (created_at); -- Speeds up fetching chats by creation time
-

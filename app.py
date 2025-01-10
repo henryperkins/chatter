@@ -11,10 +11,10 @@ from flask_wtf.csrf import CSRFError
 from werkzeug.exceptions import HTTPException
 from database import close_db, init_db, init_app, get_db
 from sqlalchemy import text
-from models import User, Chat, Model, UploadedFile
+from models import User
 from extensions import limiter, login_manager, csrf
 from routes.auth_routes import bp as auth_bp
-from routes.chat_routes import bp as chat_bp
+from routes.chat_routes import chat_routes
 from routes.model_routes import bp as model_bp
 from typing import Dict, Optional
 
@@ -81,7 +81,8 @@ init_app(app)
 
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix="/auth")
-app.register_blueprint(chat_bp)
+chat_routes.name = 'chat'  # Set the blueprint name to 'chat'
+app.register_blueprint(chat_routes)
 app.register_blueprint(model_bp, url_prefix="/models")
 
 # Initialize database tables
