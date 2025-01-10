@@ -305,10 +305,27 @@ window.copyToClipboard = async function(text) {
       });
     }
 
-    // Fallback basic sanitization
-    return html
-      .replace(/<script.*?>.*?<\/script>/gi, "")
-      .replace(/on\w+="[^"]*"/gi, "");
+    // Ensure DOMPurify is used for sanitization
+    if (typeof DOMPurify !== "undefined" && DOMPurify.sanitize) {
+      return DOMPurify.sanitize(html, {
+        USE_PROFILES: { html: true },
+        ALLOWED_TAGS: [
+          "p",
+          "strong",
+          "em",
+          "br",
+          "ul",
+          "ol",
+          "li",
+          "a",
+          "img",
+          "pre",
+          "code",
+        ],
+        ALLOWED_ATTR: ["href", "target", "rel", "src", "alt", "class", "style"],
+      });
+    }
+    return html;
   }
 
   // File Handling Functions
