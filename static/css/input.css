@@ -18,11 +18,11 @@
     }
 
     .nav-link-active {
-        @apply text-blue-600 bg-blue-50;
+        @apply text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-gray-700;
     }
 
     .nav-link-default {
-        @apply text-gray-700 hover:text-gray-900 hover:bg-gray-100;
+        @apply text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800;
     }
 
     /* Mobile menu components */

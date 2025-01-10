@@ -31,7 +31,7 @@
 
 <body class="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
     <!-- Navbar -->
-    <nav class="bg-white dark:bg-gray-800 shadow-lg fixed w-full top-0 z-50" role="navigation">
+    <nav class="bg-white dark:bg-gray-800 shadow-lg fixed w-full top-0 z-50 text-gray-700 dark:text-gray-300" role="navigation">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <!-- Left side (Brand + Mobile toggle) -->
@@ -54,17 +54,17 @@
                 <!-- Desktop navigation -->
                 <div class="hidden md:ml-6 md:flex md:space-x-4">
                     <a href="{{ url_for('chat.chat_interface') }}"
-                        class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'chat.chat_interface' %}text-blue-600 bg-blue-50{% else %}text-gray-700 hover:text-gray-900 hover:bg-gray-100{% endif %}">
+                        class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'chat.chat_interface' %}text-blue-600 bg-blue-50 dark:bg-gray-700 dark:text-gray-100{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-gray-100 dark:hover:bg-gray-800{% endif %}">
                         Home
                     </a>
                     {% if current_user.is_authenticated %}
                     {% if current_user.role == 'admin' %}
                     <a href="{{ url_for('model.add_model_page') }}"
-                        class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'model.add_model_page' %}text-blue-600 bg-blue-50{% else %}text-gray-700 hover:text-gray-900 hover:bg-gray-100{% endif %}">
+                        class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'model.add_model_page' %}text-blue-600 bg-blue-50 dark:bg-gray-700 dark:text-gray-100{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-gray-100 dark:hover:bg-gray-800{% endif %}">
                         Add Model
                     </a>
                     <a href="{{ url_for('auth.manage_users') }}"
-                        class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'auth.manage_users' %}text-blue-600 bg-blue-50{% else %}text-gray-700 hover:text-gray-900 hover:bg-gray-100{% endif %}">
+                        class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'auth.manage_users' %}text-blue-600 bg-blue-50 dark:bg-gray-700 dark:text-gray-100{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-gray-100 dark:hover:bg-gray-800{% endif %}">
                         Manage Users
                     </a>
                     {% endif %}
@@ -95,7 +95,7 @@
             <ul class="flex-grow p-4">
                 <li class="mb-2">
                     <a href="{{ url_for('chat.chat_interface') }}"
-                        class="flex items-center text-gray-700 hover:text-blue-600">
+                        class="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <title>Home</title>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -117,7 +117,7 @@
                 </li>
                 <li class="mb-2">
                     <a href="{{ url_for('auth.register') }}"
-                        class="flex items-center text-gray-700 hover:text-blue-600">
+                        class="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <title>Register</title>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
