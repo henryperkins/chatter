@@ -4,23 +4,23 @@
 <div class="container mx-auto px-4 py-8">
     <h1 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-100">Manage Users</h1>
     <div class="overflow-x-auto">
-        <table class="min-w-full bg-white dark:bg-gray-800">
+        <table class="min-w-full bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-sm">
             <thead class="bg-gray-100 dark:bg-gray-700">
                 <tr>
-                    <th class="py-2 px-4 text-left">Username</th>
-                    <th class="py-2 px-4 text-left">Email</th>
-                    <th class="py-2 px-4 text-left">Role</th>
-                    <th class="py-2 px-4 text-left">Actions</th>
+                    <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Username</th>
+                    <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Email</th>
+                    <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Role</th>
+                    <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                 {% for user in users %}
-                <tr class="border-b">
-                    <td class="py-2 px-4">{{ user.username }}</td>
-                    <td class="py-2 px-4">{{ user.email }}</td>
-                    <td class="py-2 px-4">{{ user.role }}</td>
-                    <td class="py-2 px-4">
-                        <select class="role-select border rounded px-2 py-1" data-user-id="{{ user.id }}">
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <td class="py-3 px-4 text-sm text-gray-800 dark:text-gray-200">{{ user.username }}</td>
+                    <td class="py-3 px-4 text-sm text-gray-800 dark:text-gray-200">{{ user.email }}</td>
+                    <td class="py-3 px-4 text-sm text-gray-800 dark:text-gray-200">{{ user.role }}</td>
+                    <td class="py-3 px-4">
+                        <select class="role-select border rounded px-2 py-1 text-sm bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200" data-user-id="{{ user.id }}">
                             <option value="user" {% if user.role == 'user' %}selected="selected"{% endif %}>User</option>
                             <option value="admin" {% if user.role == 'admin' %}selected="selected"{% endif %}>Admin</option>
                         </select>
