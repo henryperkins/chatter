@@ -5,10 +5,31 @@
  * @function getCSRFToken
  * @returns {string} The CSRF token or an empty string if not found.
  */
+// CSRF Token Management
+let csrfToken = null;
+
 function getCSRFToken() {
-  const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
-  return csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") : "";
+  if (!csrfToken) {
+    const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
+    csrfToken = csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") : "";
+  }
+  return csrfToken;
 }
+
+// Initialize CSRF token for all fetch requests
+document.addEventListener("DOMContentLoaded", () => {
+  const token = getCSRFToken();
+  if (token) {
+    axios.defaults.headers.common["X-CSRFToken"] = token;
+    window.fetch = (url, options = {}) => {
+      if (!options.headers) options.headers = {};
+      if (!options.headers["X-CSRFToken"]) {
+        options.headers["X-CSRFToken"] = token;
+      }
+      return originalFetch(url, options);
+    };
+  }
+});
 
 /**
  * Shows a feedback message to the user.
@@ -16,59 +37,62 @@ function getCSRFToken() {
  * @param {string} message - The feedback message to display.
  * @param {string} [type='success'] - The type of message ('success', 'error', 'warning', or 'info').
  */
-function showFeedback(message, type = "success") {
-  const feedbackMessage = document.getElementById("feedback-message");
+function showFeedback(message, type = "success", options = {}) {
+  const { duration = 5000, position = "top" } = options;
+  let feedbackMessage = document.getElementById("feedback-message");
+
+  // Create feedback element if it doesn't exist
   if (!feedbackMessage) {
-    console.warn("Feedback message element not found.");
-    return;
+    feedbackMessage = document.createElement("div");
+    feedbackMessage.id = "feedback-message";
+    feedbackMessage.setAttribute("role", "alert");
+    feedbackMessage.setAttribute("aria-live", "assertive");
+    document.body.appendChild(feedbackMessage);
   }
 
-  // Set the message content and styling based on the type
+  // Set position classes
+  const positionClasses = {
+    top: "top-4 left-1/2 transform -translate-x-1/2",
+    bottom: "bottom-4 left-1/2 transform -translate-x-1/2",
+    "top-right": "top-4 right-4",
+    "bottom-right": "bottom-4 right-4"
+  };
+
+  // Set color classes
+  const colorClasses = {
+    success: "bg-green-500 text-white",
+    error: "bg-red-500 text-white",
+    warning: "bg-yellow-500 text-black",
+    info: "bg-blue-500 text-white"
+  };
+
+  // Build message content
   feedbackMessage.innerHTML = `
-    <div class="flex items-center justify-between">
+    <div class="flex items-center justify-between p-4 rounded-lg shadow-lg max-w-md w-full text-center ${
+      colorClasses[type] || colorClasses.info
+    }">
       <span>${message}</span>
-      ${
-        type === "error" || type === "warning"
-          ? '<button id="feedback-close" class="ml-4 text-lg" aria-label="Close">&times;</button>'
-          : ""
-      }
+      <button id="feedback-close" class="ml-4 text-lg" aria-label="Close">&times;</button>
     </div>
   `;
 
-  // Set accessibility attributes
-  feedbackMessage.setAttribute("role", "alert");
-  feedbackMessage.setAttribute("aria-live", "assertive");
-
-  // Apply styling based on the type
-  feedbackMessage.className = `
-    fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-md shadow-lg z-50 max-w-md w-full text-center
-    ${
-      type === "success"
-        ? "bg-green-500 text-white"
-        : type === "error"
-        ? "bg-red-500 text-white"
-        : type === "warning"
-        ? "bg-yellow-500 text-black"
-        : "bg-blue-500 text-white"
-    }
-  `;
-
-  // Show the feedback message
+  // Apply position and visibility
+  feedbackMessage.className = `fixed z-50 ${positionClasses[position] || positionClasses.top}`;
   feedbackMessage.classList.remove("hidden");
 
-  // Automatically hide the message after 5 seconds for success/feedback
-  if (type === "success" || type === "info") {
+  // Handle close button
+  const closeButton = feedbackMessage.querySelector("#feedback-close");
+  if (closeButton) {
+    closeButton.addEventListener("click", () => {
+      feedbackMessage.classList.add("hidden");
+    });
+  }
+
+  // Auto-hide for non-error messages
+  if (type !== "error" && duration > 0) {
     setTimeout(() => {
       feedbackMessage.classList.add("hidden");
-    }, 5000);
-  } else if (type === "error" || type === "warning") {
-    // Add a close button for errors/warnings
-    const closeButton = document.getElementById("feedback-close");
-    if (closeButton) {
-      closeButton.addEventListener("click", () => {
-        feedbackMessage.classList.add("hidden");
-      });
-    }
+    }, duration);
   }
 }
 
@@ -154,4 +178,28 @@ function throttle(func, limit) {
       setTimeout(() => (inThrottle = false), limit);
     }
   };
+}
+
+// Loading State Management
+function showLoading(element, options = {}) {
+  const { text = "Loading...", size = "1.5rem" } = options;
+  element.disabled = true;
+  element.innerHTML = `
+    <div class="flex items-center justify-center">
+      <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white" style="width: ${size}; height: ${size}"></div>
+      ${text ? `<span class="ml-2">${text}</span>` : ''}
+    </div>
+  `;
+}
+
+function hideLoading(element, originalContent) {
+  element.disabled = false;
+  element.innerHTML = originalContent;
+}
+
+function withLoading(element, callback, options = {}) {
+  const originalContent = element.innerHTML;
+  showLoading(element, options);
+  return Promise.resolve(callback())
+    .finally(() => hideLoading(element, originalContent));
 }
