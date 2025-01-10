@@ -165,7 +165,8 @@ def chat_interface() -> str:
 def get_chat_context(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Get the conversation context for a chat."""
     if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
-        logger.warning("Unauthorized access attempt to chat %s", chat_id)
+        sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
+        logger.warning("Unauthorized access attempt to chat %s", sanitized_chat_id)
         return jsonify({"error": "Chat not found or access denied"}), 403
 
     messages = conversation_manager.get_context(chat_id)
@@ -184,7 +185,8 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         )
 
         if not chat:
-            logger.warning("Unauthorized access attempt to chat %s", chat_id)
+            sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
+            logger.warning("Unauthorized access attempt to chat %s", sanitized_chat_id)
             return jsonify({"error": "Chat not found or access denied"}), 403
 
         messages = conversation_manager.get_context(chat_id)
@@ -198,7 +200,8 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 @login_required
 def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Delete a chat and its associated messages."""
-    logger.debug(f"Received request to delete chat_id: {chat_id}")
+    sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
+    logger.debug(f"Received request to delete chat_id: {sanitized_chat_id}")
     if not Chat.is_chat_owned_by_user(chat_id, current_user.id):
         logger.warning(
             "Unauthorized delete attempt for chat %s by user %s",
@@ -209,10 +212,12 @@ def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 
     try:
         Chat.delete(chat_id)
-        logger.info("Chat %s deleted successfully", chat_id)
+        sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
+        logger.info("Chat %s deleted successfully", sanitized_chat_id)
         return jsonify({"success": True})
     except Exception as e:
-        logger.error(f"Error deleting chat {chat_id}: {e}")
+        sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
+        logger.error(f"Error deleting chat {sanitized_chat_id}: {e}")
         return jsonify({"error": "Failed to delete chat"}), 500
 
 

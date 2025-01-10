@@ -269,9 +269,9 @@ class Model:
                     SET {set_clause}
                     WHERE id = :model_id
                 """
-                )
+                ).bindparams(**params)
 
-                db.execute(query, params)
+                db.execute(query)
 
                 if update_data.get("is_default", False):
                     unset_default_query = text(
@@ -371,10 +371,13 @@ class Model:
                 query = text("DELETE FROM models WHERE id = :model_id")
                 db.execute(query, {"model_id": model_id})
                 db.commit()
-                logger.info(f"Model deleted (ID {model_id})")
+                sanitized_model_id = str(model_id).replace('\n', '').replace('\r', '')
+                logger.info(f"Model deleted (ID {sanitized_model_id})")
             except Exception as e:
                 db.rollback()
-                logger.error(f"Failed to delete model {model_id}: {e}")
+                sanitized_model_id = str(model_id).replace('\n', '').replace('\r', '')
+                sanitized_error = str(e).replace('\n', ' ').replace('\r', ' ')
+                logger.error(f"Failed to delete model {sanitized_model_id}: {sanitized_error}")
                 raise
 
     @staticmethod
