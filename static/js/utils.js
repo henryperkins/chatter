@@ -16,16 +16,23 @@ function getCSRFToken() {
   return csrfToken;
 }
 
-// Initialize CSRF token for all fetch requests
 document.addEventListener("DOMContentLoaded", () => {
   const token = getCSRFToken();
   if (token) {
     axios.defaults.headers.common["X-CSRFToken"] = token;
+    const originalFetch = window.fetch;
     window.fetch = (url, options = {}) => {
       if (!options.headers) options.headers = {};
       if (!options.headers["X-CSRFToken"]) {
         options.headers["X-CSRFToken"] = token;
       }
+      if (!options.credentials) {
+        options.credentials = 'same-origin';
+      }
+      return originalFetch(url, options);
+    };
+  }
+});
       return originalFetch(url, options);
     };
   }
