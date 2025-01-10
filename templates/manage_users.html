@@ -23,8 +23,8 @@
                         <select class="role-select border rounded px-2 py-1 text-sm bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200" 
                                 data-user-id="{{ user.id }}"
                                 aria-label="Select role for {{ user.username }}">
-                            <option value="user" {% if user.role == 'user' %}selected="selected"{% endif %}>User</option>
-                            <option value="admin" {% if user.role == 'admin' %}selected="selected"{% endif %}>Admin</option>
+                            <option value="user" {% if user.role == 'user' %}selected{% endif %}>User</option>
+                            <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
                         </select>
                         <div id="role-feedback-{{ user.id }}" class="text-xs mt-1 hidden"></div>
                     </td>
