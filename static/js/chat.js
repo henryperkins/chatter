@@ -459,9 +459,10 @@
 
     async function createNewChat() {
         try {
-            const data = await makeFetchRequest('/chat/new_chat', {
+            const data = await fetchWithCSRF('/new_chat', {
                 method: 'POST',
                 headers: {
+                    'X-CSRFToken': getCSRFToken(),
                     'Content-Type': 'application/json',
                 },
             });
