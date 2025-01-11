@@ -12,6 +12,60 @@
         }
     });
 
+    // Function to edit chat title
+    async function editChatTitle(chatId) {
+        const newTitle = prompt('Enter new chat title:');
+        if (newTitle) {
+            try {
+                const response = await makeFetchRequest(`/update_chat_title/${chatId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ title: newTitle })
+                });
+                if (response.success) {
+                    document.getElementById('chat-title').textContent = newTitle;
+                    showFeedback('Chat title updated successfully', 'success');
+                } else {
+                    throw new Error(response.error || 'Unknown error');
+                }
+            } catch (error) {
+                console.error('Error updating chat title:', error);
+                showFeedback('Failed to update chat title', 'error');
+            }
+        }
+    }
+
+    // Function to delete a chat
+    async function deleteChat(chatId) {
+        if (confirm('Are you sure you want to delete this chat?')) {
+            try {
+                const response = await makeFetchRequest(`/delete_chat/${chatId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                if (response.success) {
+                    location.reload();
+                } else {
+                    throw new Error(response.error || 'Unknown error');
+                }
+            } catch (error) {
+                console.error('Error deleting chat:', error);
+                showFeedback('Failed to delete chat', 'error');
+            }
+        }
+    }
+
+    // Expose functions to the global scope
+    window.editChatTitle = editChatTitle;
+    window.deleteChat = deleteChat;
+
     // Global variables and state
     let uploadedFiles = [];
     const MAX_FILES = 5;
