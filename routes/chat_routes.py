@@ -224,7 +224,7 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         return jsonify({"error": "Failed to update chat title"}), 500
 
 
-@chat_routes.route("/chat", methods=["POST"])
+@chat_routes.route("/", methods=["POST"])
 @login_required
 @csrf.exempt
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
