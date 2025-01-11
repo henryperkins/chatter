@@ -1,6 +1,9 @@
+import { getCSRFToken, showFeedback, debounce, fetchWithCSRF } from './utils.js';
+import md from 'markdown-it';
+import DOMPurify from 'dompurify';
+import Prism from 'prismjs';
+
 (function () {
-    // Destructure required functions from utils
-    const { getCSRFToken, showFeedback, debounce, fetchWithCSRF } = utils;
 
     // Function to edit chat title
     async function editChatTitle(chatId) {
@@ -62,7 +65,6 @@
     const MAX_FILES = 5;
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     const MAX_MESSAGE_LENGTH = 1000;
-    const FEEDBACK_TIMEOUT = 3000;
     const ALLOWED_FILE_TYPES = [
         'text/plain',
         'application/pdf',
@@ -82,16 +84,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         console.debug('DOMContentLoaded event triggered. Initializing elements.');
         
-        // Cache DOM elements
-
-        // Verify critical elements exist
-        if (!messageInput || !sendButton || !chatBox) {
-            console.error('Critical chat elements not found');
-            showFeedback('Chat interface not loaded properly', 'error');
-            return;
-        }
-
-        // Cache DOM elements
+        // Cache DOM elements first
         messageInput = document.getElementById('message-input');
         sendButton = document.getElementById('send-button');
         chatBox = document.getElementById('chat-box');
@@ -106,9 +99,13 @@
         console.log('Send button:', sendButton);
         console.log('Chat box:', chatBox);
 
-        // Verify critical elements exist
+        // Verify critical elements exist after caching
         if (!messageInput || !sendButton || !chatBox) {
-            console.error('Critical chat elements not found');
+            console.error('Critical chat elements not found', {
+                messageInput,
+                sendButton, 
+                chatBox
+            });
             showFeedback('Chat interface not loaded properly', 'error');
             return;
         }
@@ -294,13 +291,13 @@
 
         const contentDiv = messageDiv.querySelector('.prose');
         if (contentDiv) {
-            const renderedHtml = md.render(message);
-            const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
-                ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a'],
-                ALLOWED_ATTR: ['href']
-            });
-            contentDiv.innerHTML = sanitizedHtml;
-            Prism.highlightAllUnder(contentDiv);
+const renderedHtml = md().render(message);
+const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
+    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a'],
+    ALLOWED_ATTR: ['href']
+});
+contentDiv.innerHTML = sanitizedHtml;
+Prism.highlightAllUnder(contentDiv);
         }
 
         chatBox.appendChild(messageDiv);
@@ -396,26 +393,6 @@
         if (indicator) {
             indicator.style.display = 'none';
         }
-    }
-
-    function showFeedback(message, type = 'info') {
-        const feedbackDiv = document.getElementById('feedback-message') || createFeedbackElement();
-        feedbackDiv.className = `fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 ${
-            type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-blue-500'
-        } text-white`;
-        feedbackDiv.textContent = message;
-        feedbackDiv.classList.remove('hidden');
-
-        setTimeout(() => {
-            feedbackDiv.classList.add('hidden');
-        }, FEEDBACK_TIMEOUT);
-    }
-
-    function createFeedbackElement() {
-        const div = document.createElement('div');
-        div.id = 'feedback-message';
-        document.body.appendChild(div);
-        return div;
     }
 
 
