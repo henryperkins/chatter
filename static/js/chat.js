@@ -62,6 +62,31 @@
         }
     }
 
+    /**
+     * Function to make fetch requests with CSRF token
+     * @param {string} url - The URL to send the request to.
+     * @param {object} options - Additional options for the fetch request.
+     * @returns {Promise<object>} - The JSON response from the server.
+     */
+    async function makeFetchRequest(url, options = {}) {
+        const defaultHeaders = {
+            'X-CSRFToken': getCSRFToken(),
+            'X-Requested-With': 'XMLHttpRequest',
+        };
+        options.headers = { ...defaultHeaders, ...options.headers };
+        try {
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'An error occurred.');
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Fetch error:', error);
+            throw error;
+        }
+    }
+
     // Expose functions to the global scope
     window.editChatTitle = editChatTitle;
     window.deleteChat = deleteChat;
