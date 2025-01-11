@@ -203,6 +203,7 @@
     }
 
     async function sendMessage() {
+        console.log('sendMessage function called'); // Debugging statement
         console.debug('Send button clicked. Preparing to send message:', messageInput.value.trim());
         console.debug('Uploaded files:', uploadedFiles);
 
@@ -246,6 +247,7 @@
             console.debug('Making POST request to /chat with formData:', formData);
             console.log('CSRF Token:', getCSRFToken());
 
+            console.log('Preparing to send request to /chat'); // Debugging statement
             const data = await makeFetchRequest('/chat', {
                 method: 'POST',
                 body: formData,
