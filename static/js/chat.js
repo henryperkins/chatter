@@ -81,8 +81,15 @@
 
         // Send button handler
         console.debug('Initializing sendButton:', sendButton);
-        console.debug('Attaching sendMessage to sendButton:', sendButton);
-        sendButton.addEventListener('click', sendMessage);
+        if (sendButton) {
+            console.debug('Attaching sendMessage to sendButton:', sendButton);
+            sendButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                sendMessage();
+            });
+        } else {
+            console.error('Send button not found!');
+        }
 
         // File upload handlers
         if (fileInput && uploadButton) {
@@ -143,6 +150,10 @@
             const data = await makeFetchRequest('/chat', {
                 method: 'POST',
                 body: formData,
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
             });
 
             if (data.response) {
@@ -329,7 +340,7 @@
         const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
         if (!token) {
             console.error('CSRF token not found. Ensure the meta tag is included in the HTML.');
-            throw new Error('CSRF token missing');
+            return ''; // Return empty string instead of throwing error
         }
         return token;
     }
