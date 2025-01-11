@@ -36,6 +36,7 @@
     // DOM Content Loaded
     document.addEventListener('DOMContentLoaded', function () {
         console.debug('DOMContentLoaded event triggered. Initializing elements.');
+        
         // Cache DOM elements
         messageInput = document.getElementById('message-input');
         sendButton = document.getElementById('send-button');
@@ -46,6 +47,13 @@
         modelSelect = document.getElementById('model-select');
         newChatBtn = document.getElementById('new-chat-btn');
         dropZone = document.getElementById('drop-zone');
+
+        // Verify critical elements exist
+        if (!messageInput || !sendButton || !chatBox) {
+            console.error('Critical chat elements not found');
+            showFeedback('Chat interface not loaded properly', 'error');
+            return;
+        }
 
         // Verify critical elements exist
         if (!messageInput || !sendButton || !chatBox) {
@@ -67,6 +75,13 @@
 
     function initializeEventListeners() {
         console.debug('Initializing event listeners.');
+        
+        // Verify critical elements exist
+        if (!messageInput || !sendButton || !chatBox) {
+            console.error('Critical chat elements not found');
+            return;
+        }
+
         // Message input handlers
         messageInput.addEventListener('input', debounce(function () {
             adjustTextareaHeight(this);
@@ -81,14 +96,31 @@
 
         // Send button handler
         console.debug('Initializing sendButton:', sendButton);
-        if (sendButton) {
-            console.debug('Attaching sendMessage to sendButton:', sendButton);
-            sendButton.addEventListener('click', function(e) {
-                e.preventDefault();
-                sendMessage();
-            });
-        } else {
-            console.error('Send button not found!');
+        sendButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Send button clicked');
+            sendMessage();
+        });
+
+        // File upload handlers
+        if (fileInput && uploadButton) {
+            uploadButton.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+        }
+
+        // New chat button handler
+        if (newChatBtn) {
+            newChatBtn.addEventListener('click', createNewChat);
+        }
+
+        // Model selection handler
+        if (modelSelect) {
+            modelSelect.addEventListener('change', handleModelChange);
+        }
+
+        // Chat box message action handlers
+        if (chatBox) {
+            chatBox.addEventListener('click', handleMessageActions);
         }
 
         // File upload handlers
@@ -117,8 +149,16 @@
         console.debug('Send button clicked. Preparing to send message:', messageInput.value.trim());
         console.debug('Uploaded files:', uploadedFiles);
 
+        // Validate input
         if (!messageInput.value.trim() && uploadedFiles.length === 0) {
             showFeedback('Please enter a message or upload files.', 'error');
+            return;
+        }
+
+        // Check if chatBox exists
+        if (!chatBox) {
+            console.error('Chat box element not found');
+            showFeedback('Chat interface not loaded properly', 'error');
             return;
         }
 
