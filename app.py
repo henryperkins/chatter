@@ -71,8 +71,8 @@ login_manager.login_message_category = "info"
 # Initialize CSRF Protection
 csrf.init_app(app)
 
-# Initialize Flask-Limiter
-limiter.init_app(app)
+# Configure Flask-Limiter to use memory storage
+limiter.init_app(app, storage_uri="memory://")
 
 # Initialize database
 init_app(app)
