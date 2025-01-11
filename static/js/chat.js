@@ -1,9 +1,12 @@
-import { getCSRFToken, showFeedback, debounce, fetchWithCSRF } from './utils.js';
-import md from 'markdown-it';
-import DOMPurify from 'dompurify';
-import Prism from 'prismjs';
-
 (function () {
+    // Access utility functions from window.utils
+    const { getCSRFToken, showFeedback, debounce, fetchWithCSRF } = window.utils;
+    
+    // Access markdown-it instance from the global window object
+    const md = window.markdownit();
+
+    // DOMPurify and Prism are already available globally (from your script tags)
+    // No need to import them or access them differently
 
     // Function to edit chat title
     async function editChatTitle(chatId) {
@@ -300,7 +303,7 @@ import Prism from 'prismjs';
 
         const contentDiv = messageDiv.querySelector('.prose');
         if (contentDiv) {
-const renderedHtml = md().render(message);
+const renderedHtml = md.render(message);
 const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
     ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a'],
     ALLOWED_ATTR: ['href']
