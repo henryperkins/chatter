@@ -377,11 +377,17 @@
     }
 
     function getCSRFToken() {
-        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-        if (!token) {
-            console.error('CSRF token not found. Ensure the meta tag is included in the HTML.');
-            return ''; // Return empty string instead of throwing error
+        const tokenElement = document.querySelector('meta[name="csrf-token"]');
+        if (!tokenElement) {
+            console.error('CSRF token meta element not found');
+            return '';
         }
+        const token = tokenElement.getAttribute('content');
+        if (!token) {
+            console.error('CSRF token content is empty');
+            return '';
+        }
+        console.log('Retrieved CSRF token:', token);
         return token;
     }
 
