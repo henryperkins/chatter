@@ -1,16 +1,61 @@
 (function () {
-    // Initialize required libraries
-    const md = window.markdownit({
-        html: false,
-        linkify: true,
-        typographer: true,
-        highlight(str, lang) {
-            if (lang && Prism.languages[lang]) {
-                return Prism.highlight(str, Prism.languages[lang], lang);
+    // Destructure required functions from utils
+    const { getCSRFToken, showFeedback, debounce, fetchWithCSRF } = utils;
+
+    // Function to edit chat title
+    async function editChatTitle(chatId) {
+        const newTitle = prompt('Enter new chat title:');
+        if (newTitle) {
+            try {
+                const response = await fetchWithCSRF(`/update_chat_title/${chatId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({ title: newTitle })
+                });
+                if (response.success) {
+                    document.getElementById('chat-title').textContent = newTitle;
+                    showFeedback('Chat title updated successfully', 'success');
+                } else {
+                    throw new Error(response.error || 'Unknown error');
+                }
+            } catch (error) {
+                console.error('Error updating chat title:', error);
+                showFeedback('Failed to update chat title', 'error');
             }
-            return '';
         }
-    });
+    }
+
+    // Function to delete a chat
+    async function deleteChat(chatId) {
+        if (confirm('Are you sure you want to delete this chat?')) {
+            try {
+                const response = await fetchWithCSRF(`/delete_chat/${chatId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                if (response.success) {
+                    location.reload();
+                } else {
+                    throw new Error(response.error || 'Unknown error');
+                }
+            } catch (error) {
+                console.error('Error deleting chat:', error);
+                showFeedback('Failed to delete chat', 'error');
+            }
+        }
+    }
+
+
+    // Expose functions to the global scope
+    window.editChatTitle = editChatTitle;
+    window.deleteChat = deleteChat;
 
     // Global variables and state
     let uploadedFiles = [];
@@ -36,6 +81,16 @@
     // DOM Content Loaded
     document.addEventListener('DOMContentLoaded', function () {
         console.debug('DOMContentLoaded event triggered. Initializing elements.');
+        
+        // Cache DOM elements
+
+        // Verify critical elements exist
+        if (!messageInput || !sendButton || !chatBox) {
+            console.error('Critical chat elements not found');
+            showFeedback('Chat interface not loaded properly', 'error');
+            return;
+        }
+
         // Cache DOM elements
         messageInput = document.getElementById('message-input');
         sendButton = document.getElementById('send-button');
@@ -47,9 +102,14 @@
         newChatBtn = document.getElementById('new-chat-btn');
         dropZone = document.getElementById('drop-zone');
 
+        console.log('Message input:', messageInput);
+        console.log('Send button:', sendButton);
+        console.log('Chat box:', chatBox);
+
         // Verify critical elements exist
         if (!messageInput || !sendButton || !chatBox) {
             console.error('Critical chat elements not found');
+            showFeedback('Chat interface not loaded properly', 'error');
             return;
         }
 
@@ -63,10 +123,25 @@
 
         // Initialize message input
         adjustTextareaHeight(messageInput);
+
+        // Test send button functionality
+        console.log('Testing send button click handler...');
+        sendButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Send button clicked'); // Debugging statement
+            sendMessage();
+        });
     });
 
     function initializeEventListeners() {
         console.debug('Initializing event listeners.');
+        
+        // Verify critical elements exist
+        if (!messageInput || !sendButton || !chatBox) {
+            console.error('Critical chat elements not found');
+            return;
+        }
+
         // Message input handlers
         messageInput.addEventListener('input', debounce(function () {
             adjustTextareaHeight(this);
@@ -81,8 +156,11 @@
 
         // Send button handler
         console.debug('Initializing sendButton:', sendButton);
-        console.debug('Attaching sendMessage to sendButton:', sendButton);
-        sendButton.addEventListener('click', sendMessage);
+        sendButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Send button clicked');
+            sendMessage();
+        });
 
         // File upload handlers
         if (fileInput && uploadButton) {
@@ -107,11 +185,20 @@
     }
 
     async function sendMessage() {
+        console.log('sendMessage function called'); // Debugging statement
         console.debug('Send button clicked. Preparing to send message:', messageInput.value.trim());
         console.debug('Uploaded files:', uploadedFiles);
 
+        // Validate input
         if (!messageInput.value.trim() && uploadedFiles.length === 0) {
             showFeedback('Please enter a message or upload files.', 'error');
+            return;
+        }
+
+        // Check if chatBox exists
+        if (!chatBox) {
+            console.error('Chat box element not found');
+            showFeedback('Chat interface not loaded properly', 'error');
             return;
         }
 
@@ -125,12 +212,12 @@
         sendButton.disabled = true;
         sendButton.innerHTML = '<span class="animate-spin">↻</span>';
 
-        // Create form data
-        const formData = new FormData();
-        formData.append('message', messageInput.value.trim());
-        uploadedFiles.forEach(file => formData.append('files[]', file));
-
         try {
+            // Create form data
+            const formData = new FormData();
+            formData.append('message', messageInput.value.trim());
+            uploadedFiles.forEach(file => formData.append('files[]', file));
+
             // Append user message immediately
             appendUserMessage(messageInput.value.trim());
             messageInput.value = '';
@@ -140,10 +227,15 @@
             showTypingIndicator();
 
             console.debug('Making POST request to /chat with formData:', formData);
-            const data = await makeFetchRequest('/chat', {
+            console.log('CSRF Token:', getCSRFToken());
+
+            console.log('Preparing to send request to /chat'); // Debugging statement
+            const data = await fetchWithCSRF('/chat', {
                 method: 'POST',
                 body: formData,
             });
+
+            console.log('Response from server:', data);
 
             if (data.response) {
                 appendAssistantMessage(data.response);
@@ -158,13 +250,14 @@
             }
         } catch (error) {
             console.error('Error sending message:', error);
-            showFeedback(error.message, 'error');
+            console.error('Error details:', error.stack);
+            showFeedback(`Error: ${error.message}`, 'error');
         } finally {
             messageInput.disabled = false;
             sendButton.disabled = false;
             sendButton.innerHTML = 'Send';
             removeTypingIndicator();
-            messageInput.focus(); // Return focus to the input field
+            messageInput.focus();
         }
     }
 
@@ -325,21 +418,13 @@
         return div;
     }
 
-    function getCSRFToken() {
-        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-        if (!token) {
-            console.error('CSRF token not found. Ensure the meta tag is included in the HTML.');
-            throw new Error('CSRF token missing');
-        }
-        return token;
-    }
 
     function escapeHtml(unsafe) {
         return unsafe
             .replace(/&/g, "&")
             .replace(/</g, "<")
             .replace(/>/g, ">")
-            .replace(/"/g, """)
+            .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
     }
 
@@ -374,7 +459,7 @@
 
     async function createNewChat() {
         try {
-            const data = await makeFetchRequest('/chat/new_chat', {
+            const data = await fetchWithCSRF('/new_chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -452,7 +537,7 @@
             const formData = new FormData();
             formData.append('message', lastUserMessage);
 
-            const data = await makeFetchRequest('/chat', {
+            const data = await fetchWithCSRF('/chat', {
                 method: 'POST',
                 body: formData,
             });
@@ -471,26 +556,6 @@
         }
     }
 
-    async function makeFetchRequest(url, options = {}) {
-        const defaultHeaders = {
-            'X-CSRFToken': getCSRFToken(),
-            'X-Requested-With': 'XMLHttpRequest',
-        };
-
-        options.headers = { ...defaultHeaders, ...options.headers };
-
-        try {
-            const response = await fetch(url, options);
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'An error occurred.');
-            }
-            return await response.json();
-        } catch (error) {
-            console.error('Fetch error:', error);
-            throw error;
-        }
-    }
 
     window.removeFile = removeFile;
 })();

@@ -71,7 +71,12 @@ login_manager.login_message_category = "info"
 # Initialize CSRF Protection
 csrf.init_app(app)
 
-# Initialize Flask-Limiter
+# Configure Flask-Limiter with in-memory storage
+app.config.update({
+    "RATELIMIT_STORAGE_URL": "memory://",
+    "RATELIMIT_STRATEGY": "fixed-window",  # Use simpler strategy
+    "RATELIMIT_DEFAULT": "200 per day;50 per hour"  # Set reasonable defaults
+})
 limiter.init_app(app)
 
 # Initialize database
