@@ -1,16 +1,6 @@
 (function () {
-    // Initialize required libraries
-    const md = window.markdownit({
-        html: false,
-        linkify: true,
-        typographer: true,
-        highlight(str, lang) {
-            if (lang && Prism.languages[lang]) {
-                return Prism.highlight(str, Prism.languages[lang], lang);
-            }
-            return '';
-        }
-    });
+    // Destructure required functions from utils
+    const { getCSRFToken, showFeedback, debounce, fetchWithCSRF } = utils;
 
     // Function to edit chat title
     async function editChatTitle(chatId) {
