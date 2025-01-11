@@ -172,12 +172,12 @@
         sendButton.disabled = true;
         sendButton.innerHTML = '<span class="animate-spin">↻</span>';
 
-        // Create form data
-        const formData = new FormData();
-        formData.append('message', messageInput.value.trim());
-        uploadedFiles.forEach(file => formData.append('files[]', file));
-
         try {
+            // Create form data
+            const formData = new FormData();
+            formData.append('message', messageInput.value.trim());
+            uploadedFiles.forEach(file => formData.append('files[]', file));
+
             // Append user message immediately
             appendUserMessage(messageInput.value.trim());
             messageInput.value = '';
@@ -187,6 +187,8 @@
             showTypingIndicator();
 
             console.debug('Making POST request to /chat with formData:', formData);
+            console.log('CSRF Token:', getCSRFToken());
+
             const data = await makeFetchRequest('/chat', {
                 method: 'POST',
                 body: formData,
@@ -195,6 +197,8 @@
                     'X-Requested-With': 'XMLHttpRequest'
                 }
             });
+
+            console.log('Response from server:', data);
 
             if (data.response) {
                 appendAssistantMessage(data.response);
@@ -209,13 +213,14 @@
             }
         } catch (error) {
             console.error('Error sending message:', error);
-            showFeedback(error.message, 'error');
+            console.error('Error details:', error.stack);
+            showFeedback(`Error: ${error.message}`, 'error');
         } finally {
             messageInput.disabled = false;
             sendButton.disabled = false;
             sendButton.innerHTML = 'Send';
             removeTypingIndicator();
-            messageInput.focus(); // Return focus to the input field
+            messageInput.focus();
         }
     }
 
