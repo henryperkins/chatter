@@ -25,6 +25,57 @@ bp = Blueprint("model", __name__)
 logger = logging.getLogger(__name__)
 
 
+# Utility Functions
+def validate_csrf_token():
+    """
+    Validate the CSRF token for AJAX requests.
+    """
+    csrf_token = request.headers.get("X-CSRFToken")
+    if not csrf_token or not csrf.validate_csrf(csrf_token):
+        return jsonify({"success": False, "error": "CSRF token invalid or missing"}), 400
+    return None
+
+
+def handle_error(exception, message="An unexpected error occurred", status_code=500):
+    """
+    Handle errors consistently across routes.
+    """
+    logger.exception(message)
+    return jsonify({"error": str(exception), "success": False}), status_code
+
+
+def extract_model_data(form):
+    """
+    Extract model data from a form.
+    """
+    return {
+        "name": form.name.data,
+        "deployment_name": form.deployment_name.data,
+        "description": form.description.data,
+        "api_endpoint": form.api_endpoint.data,
+        "api_key": form.api_key.data,
+        "temperature": form.temperature.data,
+        "max_tokens": form.max_tokens.data,
+        "max_completion_tokens": form.max_completion_tokens.data,
+        "model_type": form.model_type.data,
+        "api_version": form.api_version.data,
+        "requires_o1_handling": form.requires_o1_handling.data,
+        "is_default": form.is_default.data,
+        "version": form.version.data,
+    }
+
+
+def validate_immutable_fields(model_id, data):
+    """
+    Validate that immutable fields are not being updated.
+    """
+    immutable_fields = Model.get_immutable_fields(model_id)
+    for field in immutable_fields:
+        if field in data:
+            raise ValueError(f"{field} is immutable and cannot be updated")
+
+
+# Routes
 @bp.route("/models", methods=["GET"])
 @login_required
 def get_models():
@@ -52,8 +103,7 @@ def get_models():
         return jsonify(model_list)
 
     except Exception as e:
-        logger.error("Error retrieving models: %s", str(e))
-        return jsonify({"error": "An error occurred while retrieving models"}), 500
+        return handle_error(e, "Error retrieving models")
 
 
 @bp.route("/models", methods=["POST"])
@@ -69,57 +119,18 @@ def create_model():
         return jsonify({"error": form.errors, "success": False}), 400
 
     try:
-        data = {
-            "name": form.name.data,
-            "deployment_name": form.deployment_name.data,
-            "description": form.description.data,
-            "api_endpoint": form.api_endpoint.data,
-            "api_key": form.api_key.data,
-            "temperature": form.temperature.data,
-            "max_tokens": form.max_tokens.data,
-            "max_completion_tokens": form.max_completion_tokens.data,
-            "model_type": form.model_type.data,
-            "api_version": form.api_version.data,
-            "requires_o1_handling": form.requires_o1_handling.data,
-            "is_default": form.is_default.data,
-            "version": 1,  # Add default version
-        }
-
-        logger.debug(
-            "Creating model with data: %s",
-            {k: v for k, v in data.items() if k != "api_key"},
-        )
-
+        data = extract_model_data(form)
+        logger.debug("Creating model with data: %s", {k: v if k != "api_key" else "****" for k, v in data.items()})
         Model.validate_model_config(data)
-
         model_id = Model.create(data)
-        return jsonify(
-            {
-                "id": model_id,
-                "success": True,
-                "message": "Model created successfully",
-            }
-        )
+        return jsonify({"id": model_id, "success": True, "message": "Model created successfully"})
 
     except ValueError as e:
-        logger.error("Validation error: %s", str(e))
-        return jsonify({"error": str(e), "success": False}), 400
+        return handle_error(e, "Validation error", 400)
     except Exception as e:
-        logger.exception("Error creating model")
         if "UNIQUE constraint failed: models.deployment_name" in str(e):
-            return (
-                jsonify(
-                    {
-                        "error": "A model with this deployment name already exists",
-                        "success": False,
-                    }
-                ),
-                400,
-            )
-        return (
-            jsonify({"error": "An unexpected error occurred", "success": False}),
-            500,
-        )
+            return jsonify({"error": "A model with this deployment name already exists", "success": False}), 400
+        return handle_error(e, "Error creating model")
 
 
 @bp.route("/models/<int:model_id>", methods=["PUT"])
@@ -129,28 +140,24 @@ def update_model(model_id: int):
     """
     Update an existing model (admin-only).
     """
-    # Verify CSRF token for AJAX requests
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        csrf_token = request.headers.get("X-CSRFToken")
-        if not csrf_token or not csrf.validate_csrf(csrf_token):
-            return (
-                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
-                400,
-            )
+        csrf_error = validate_csrf_token()
+        if csrf_error:
+            return csrf_error
 
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided", "success": False}), 400
 
     try:
+        validate_immutable_fields(model_id, data)
         Model.update(model_id, data)
-        return jsonify({"success": True})
+        return jsonify({"success": True, "message": "Model updated successfully"})
+
     except ValueError as e:
-        logger.error("Validation error during model update: %s", str(e))
-        return jsonify({"error": str(e), "success": False}), 400
+        return handle_error(e, "Validation error during model update", 400)
     except Exception as e:
-        logger.exception("Unexpected error during model update: %s", str(e))
-        return jsonify({"error": str(e), "success": False}), 500
+        return handle_error(e, "Unexpected error during model update")
 
 
 @bp.route("/models/<int:model_id>", methods=["DELETE"])
@@ -160,26 +167,19 @@ def delete_model(model_id: int):
     """
     Delete a model (admin-only).
     """
-    # Verify CSRF token for AJAX requests
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        csrf_token = request.headers.get("X-CSRFToken")
-        if not csrf_token or not csrf.validate_csrf(csrf_token):
-            return (
-                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
-                400,
-            )
+        csrf_error = validate_csrf_token()
+        if csrf_error:
+            return csrf_error
 
     try:
         Model.delete(model_id)
-        return jsonify({"success": True})
+        return jsonify({"success": True, "message": "Model deleted successfully"})
+
     except ValueError as e:
-        error_msg = str(e)
-        logger.error("Attempted to delete a model in use: %s", error_msg)
-        return jsonify({"error": error_msg, "success": False}), 400
+        return handle_error(e, "Error deleting model", 400)
     except Exception as e:
-        error_msg = str(e)
-        logger.exception("Unexpected error during model deletion: %s", error_msg)
-        return jsonify({"error": error_msg, "success": False}), 500
+        return handle_error(e, "Unexpected error during model deletion")
 
 
 @bp.route("/add-model", methods=["GET"])
@@ -197,7 +197,9 @@ def add_model_page():
 @login_required
 @admin_required
 def edit_model(model_id):
-    """Edit model route handler"""
+    """
+    Edit model route handler.
+    """
     try:
         model = Model.get_by_id(model_id)
         if not model:
@@ -208,34 +210,19 @@ def edit_model(model_id):
         if request.method == "POST":
             if form.validate_on_submit():
                 try:
-                    data = {
-                        "name": form.name.data,
-                        "deployment_name": form.deployment_name.data,
-                        "description": form.description.data,
-                        "api_endpoint": form.api_endpoint.data,
-                        "temperature": form.temperature.data,
-                        "max_tokens": form.max_tokens.data,
-                        "max_completion_tokens": form.max_completion_tokens.data,
-                        "model_type": form.model_type.data,
-                        "api_version": form.api_version.data,
-                        "requires_o1_handling": form.requires_o1_handling.data,
-                        "is_default": form.is_default.data,
-                        "version": form.version.data
-                    }
-                    
+                    data = extract_model_data(form)
+                    validate_immutable_fields(model_id, data)
                     Model.update(model_id, data)
-                    return jsonify({"success": True})
-                    
+                    return jsonify({"success": True, "message": "Model updated successfully"})
                 except Exception as e:
-                    return jsonify({"error": str(e)}), 400
-            
+                    return handle_error(e, "Error updating model", 400)
+
             return jsonify({"error": form.errors}), 400
-            
+
         return render_template("edit_model.html", form=form, model=model)
-        
+
     except Exception as e:
-        logger.exception("Error in edit_model: %s", str(e))
-        return jsonify({"error": str(e)}), 500
+        return handle_error(e, "Error in edit_model")
 
 
 @bp.route("/models/default/<int:model_id>", methods=["POST"])
@@ -245,21 +232,16 @@ def set_default_model(model_id: int):
     """
     Set a model as the default (admin-only).
     """
-    # Verify CSRF token for AJAX requests
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        csrf_token = request.headers.get("X-CSRFToken")
-        if not csrf_token or not csrf.validate_csrf(csrf_token):
-            return (
-                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
-                400,
-            )
+        csrf_error = validate_csrf_token()
+        if csrf_error:
+            return csrf_error
 
     try:
         Model.set_default(model_id)
-        return jsonify({"success": True})
-    except Exception:
-        logger.exception("Unexpected error setting default model")
-        return jsonify({"error": "An unexpected error occurred", "success": False}), 500
+        return jsonify({"success": True, "message": "Model set as default successfully"})
+    except Exception as e:
+        return handle_error(e, "Unexpected error setting default model")
 
 
 @bp.route("/models/<int:model_id>/immutable-fields", methods=["GET"])
@@ -272,11 +254,7 @@ def get_immutable_fields(model_id: int):
         immutable_fields = Model.get_immutable_fields(model_id)
         return jsonify(immutable_fields)
     except Exception as e:
-        logger.error("Error retrieving immutable fields: %s", str(e))
-        return (
-            jsonify({"error": f"Error retrieving immutable fields: {str(e)}"}),
-            500,
-        )
+        return handle_error(e, "Error retrieving immutable fields")
 
 
 @bp.route("/models/<int:model_id>/versions", methods=["GET"])
@@ -286,15 +264,12 @@ def get_version_history(model_id: int):
     Retrieve version history for a model.
     """
     try:
-        versions = Model.get_version_history(model_id)
+        limit = request.args.get("limit", 10, type=int)
+        offset = request.args.get("offset", 0, type=int)
+        versions = Model.get_version_history(model_id, limit, offset)
         return jsonify(versions)
     except Exception as e:
-        error_msg = str(e)
-        logger.error("Error retrieving version history: %s", error_msg)
-        return (
-            jsonify({"error": error_msg}),
-            500,
-        )
+        return handle_error(e, "Error retrieving version history")
 
 
 @bp.route("/models/<int:model_id>/revert/<int:version>", methods=["POST"])
@@ -304,21 +279,15 @@ def revert_to_version(model_id: int, version: int):
     """
     Revert a model to a previous version (admin-only).
     """
-    # Verify CSRF token for AJAX requests
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        csrf_token = request.headers.get("X-CSRFToken")
-        if not csrf_token or not csrf.validate_csrf(csrf_token):
-            return (
-                jsonify({"success": False, "error": "CSRF token invalid or missing"}),
-                400,
-            )
+        csrf_error = validate_csrf_token()
+        if csrf_error:
+            return csrf_error
+
     try:
         Model.revert_to_version(model_id, version)
-        return jsonify({"success": True})
+        return jsonify({"success": True, "message": "Model reverted to version successfully"})
     except ValueError as e:
-        logger.error("Error reverting model: %s", str(e))
-        return jsonify({"error": str(e), "success": False}), 400
+        return handle_error(e, "Error reverting model", 400)
     except Exception as e:
-        error_msg = str(e)
-        logger.exception("Unexpected error during model revert: %s", error_msg)
-        return jsonify({"error": error_msg, "success": False}), 500
+        return handle_error(e, "Unexpected error during model revert")

@@ -17,39 +17,35 @@ import logging
 import bleach
 from models.model import Model
 from conversation_manager import conversation_manager
-from chat_utils import count_tokens, secure_filename, generate_new_chat_id
+from chat_utils import (
+    count_tokens,
+    secure_filename,
+    generate_new_chat_id,
+    truncate_message,
+    allowed_file,
+    generate_chat_title,
+    process_file,
+)
 from chat_api import get_azure_response, scrape_data
 from models.chat import Chat
 import tiktoken
+from extensions import csrf
+from flask_limiter import Limiter
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 # Constants
-ALLOWED_EXTENSIONS = {".txt", ".md", ".py", ".js", ".html", ".css", ".json", ".csv"}
-ALLOWED_MIME_TYPES = {
-    "text/plain",
-    "text/markdown",
-    "text/python",
-    "text/javascript",
-    "text/html",
-    "text/css",
-    "application/json",
-    "text/csv",
-}
+MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", 10 * 1024 * 1024))  # 10 MB per file
+MAX_TOTAL_FILE_SIZE = int(os.getenv("MAX_TOTAL_FILE_SIZE", 50 * 1024 * 1024))  # 50 MB
+MAX_FILE_CONTENT_LENGTH = int(os.getenv("MAX_FILE_CONTENT_LENGTH", 8000))  # Characters
+MAX_INPUT_TOKENS = int(os.getenv("MAX_INPUT_TOKENS", 8192))  # Max input tokens
+MAX_CONTEXT_TOKENS = int(
+    os.getenv("MAX_CONTEXT_TOKENS", 128000)
+)  # Max context tokens
+MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")  # Model name for tiktoken encoding
 
-chat_routes = Blueprint("chat", __name__)
-
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB per file
-MAX_TOTAL_FILE_SIZE = 50 * 1024 * 1024  # 50 MB for total files
-MAX_FILE_CONTENT_LENGTH = 8000  # Characters (increased to accommodate larger files)
-MAX_INPUT_TOKENS = 8192  # Max tokens allowed for input (user message + file content)
-MAX_CONTEXT_TOKENS = (
-    128000  # Max tokens allowed for the entire context window (messages in database)
-)
-MODEL_NAME = "gpt-4"  # Model name for tiktoken encoding
-
-# Initialize tokenizer outside the route handlers
+# Initialize tokenizer
 try:
     encoding = tiktoken.encoding_for_model(MODEL_NAME)
 except KeyError:
@@ -58,53 +54,15 @@ except KeyError:
     )
     encoding = tiktoken.get_encoding("cl100k_base")
 
+# Blueprint setup
+chat_routes = Blueprint("chat", __name__)
+from flask_limiter.util import get_remote_address
+limiter = Limiter(key_func=get_remote_address)
 
-def allowed_file(filename: str) -> bool:
-    """Check if the file has an allowed extension."""
-    return os.path.splitext(filename)[1].lower() in ALLOWED_EXTENSIONS
-
-
-def truncate_message(message: str, max_tokens: int) -> str:
-    """Truncates a message to a specified number of tokens using tiktoken."""
-    tokens = encoding.encode(message)
-    if len(tokens) > max_tokens:
-        truncated_tokens = tokens[:max_tokens]
-        truncated_message = encoding.decode(truncated_tokens)
-        truncated_message += (
-            "\n\n[Note: The input was too long and has been truncated.]"
-        )
-        return truncated_message
-    return message
-
-
-def generate_chat_title(conversation_text: str) -> str:
-    """Generate a chat title based on the first 5 messages."""
-    # Extract key topics from the conversation
-    lines = conversation_text.split("\n")
-    user_messages = []
-    for line in lines:
-        if line.startswith("user:") and ": " in line:
-            parts = line.split(": ", 1)
-            if len(parts) == 2:
-                user_messages.append(parts[1])
-
-    if not user_messages:
-        return "New Chat"
-
-    # Combine first 3 user messages to find common themes
-    combined = " ".join(user_messages[:3])
-    words = [word.lower() for word in combined.split() if len(word) > 3]
-
-    # Count word frequencies and get top 2 most common
-    word_counts = {}
-    for word in words:
-        word_counts[word] = word_counts.get(word, 0) + 1
-    top_words = sorted(word_counts, key=word_counts.get, reverse=True)[:2]
-
-    # Create title from top words or fallback to default
-    if top_words:
-        return " ".join([word.capitalize() for word in top_words])
-    return "New Chat"
+# Secure upload folder
+UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "uploads")
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 @chat_routes.route("/")
@@ -132,7 +90,7 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
         return render_template("new_chat.html")
     except Exception as e:
         logger.error(f"Error creating new chat: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to create new chat"}), 500
 
 
 @chat_routes.route("/chat_interface")
@@ -163,7 +121,13 @@ def chat_interface() -> str:
 
     messages = conversation_manager.get_context(chat_id)
     models = Model.get_all()
-    conversations = Chat.get_user_chats(current_user.id)
+    conversations = [
+        {
+            **conversation,
+            "timestamp": datetime.strptime(conversation["timestamp"], "%Y-%m-%d %H:%M:%S"),
+        }
+        for conversation in Chat.get_user_chats(current_user.id)
+    ]
 
     today = datetime.now().strftime("%Y-%m-%d")
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -187,34 +151,19 @@ def chat_interface() -> str:
 def get_chat_context(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Get the conversation context for a chat."""
     if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
-        sanitized_chat_id = chat_id.replace("\r\n", "").replace("\n", "")
-        logger.warning("Unauthorized access attempt to chat %s", sanitized_chat_id)
+        logger.warning("Unauthorized access attempt to chat %s", chat_id)
         return jsonify({"error": "Chat not found or access denied"}), 403
 
     messages = conversation_manager.get_context(chat_id)
     return jsonify({"messages": messages})
 
 
-@chat_routes.route("/load_chat/<chat_id>")
-@login_required
-def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
-    """Load and return the messages for a specific chat."""
-    if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
-        sanitized_chat_id = chat_id.replace("\r\n", "").replace("\n", "")
-        logger.warning("Unauthorized access attempt to chat %s", sanitized_chat_id)
-        return jsonify({"error": "Chat not found or access denied"}), 403
-
-    messages = conversation_manager.get_context(chat_id)
-    messages_to_send = [msg for msg in messages if msg["role"] != "system"]
-    return jsonify({"messages": messages_to_send})
-
-
 @chat_routes.route("/delete_chat/<chat_id>", methods=["DELETE"])
 @login_required
+@csrf.exempt
 def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Delete a chat and its associated messages."""
-    sanitized_chat_id = chat_id.replace("\r\n", "").replace("\n", "")
-    logger.debug(f"Received request to delete chat_id: {sanitized_chat_id}")
+    logger.debug(f"Received request to delete chat_id: {chat_id}")
     if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
         logger.warning(
             "Unauthorized delete attempt for chat %s by user %s",
@@ -224,27 +173,17 @@ def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         return jsonify({"error": "Chat not found or access denied"}), 403
 
     try:
-        Chat.delete(chat_id)
-        sanitized_chat_id = chat_id.replace("\r\n", "").replace("\n", "")
-        logger.info("Chat %s deleted successfully", sanitized_chat_id)
+        Chat.soft_delete(chat_id)  # Use soft-delete instead of hard delete
+        logger.info("Chat %s deleted successfully", chat_id)
         return jsonify({"success": True})
     except Exception as e:
-        sanitized_chat_id = chat_id.replace("\r\n", "").replace("\n", "")
-        logger.error(f"Error deleting chat {sanitized_chat_id}: {e}")
+        logger.error(f"Error deleting chat {chat_id}: {e}")
         return jsonify({"error": "Failed to delete chat"}), 500
-
-
-@chat_routes.route("/conversations", methods=["GET"])
-@login_required
-def get_conversations() -> Response:
-    """Retrieve all conversations for the current user."""
-    user_id = int(current_user.id)
-    conversations = Chat.get_user_chats(user_id)
-    return jsonify(conversations)
 
 
 @chat_routes.route("/scrape", methods=["POST"])
 @login_required
+@limiter.limit("5 per minute")
 def scrape() -> Union[Response, Tuple[Response, int]]:
     """Handle web scraping requests."""
     data = request.get_json()
@@ -265,6 +204,7 @@ def scrape() -> Union[Response, Tuple[Response, int]]:
 
 @chat_routes.route("/update_chat_title/<chat_id>", methods=["POST"])
 @login_required
+@csrf.exempt
 def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Update the title of a chat."""
     logger.debug(f"Received request to update title for chat_id: {chat_id}")
@@ -273,8 +213,8 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 
     data = request.get_json()
     new_title = data.get("title")
-    if not new_title:
-        return jsonify({"error": "Title is required"}), 400
+    if not new_title or len(new_title) > 100:
+        return jsonify({"error": "Title is required and must be under 100 characters"}), 400
 
     try:
         Chat.update_title(chat_id, new_title)
@@ -286,6 +226,7 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 
 @chat_routes.route("/chat", methods=["POST"])
 @login_required
+@csrf.exempt
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
     """Handle incoming chat messages and return AI responses."""
     logger.debug("Received chat message")
@@ -301,23 +242,9 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         logger.error(f"No model associated with chat ID {chat_id}.")
         return jsonify({"error": "No model associated with this chat."}), 400
 
-    if not model_obj.deployment_name:
-        logger.error("Invalid model configuration: deployment name is missing.")
-        return (
-            jsonify(
-                {"error": "Invalid model configuration. Please select a valid model."}
-            ),
-            400,
-        )
-
-    if not model_obj.api_key or not model_obj.api_endpoint:
-        logger.error("Invalid model configuration: API key or endpoint is missing.")
-        return (
-            jsonify(
-                {"error": "Invalid model configuration. Please check the API settings."}
-            ),
-            400,
-        )
+    if not model_obj.deployment_name or not model_obj.api_key or not model_obj.api_endpoint:
+        logger.error("Invalid model configuration.")
+        return jsonify({"error": "Invalid model configuration. Please check the settings."}), 400
 
     # Sanitize user input before processing
     user_message = bleach.clean(request.form.get("message", "").strip())
@@ -325,192 +252,54 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
 
     # Handle file uploads
     uploaded_files = request.files.getlist("files[]")
-    included_files: List[Dict[str, str]] = []
-    excluded_files: List[Dict[str, str]] = []
-    file_contents: List[str] = []
-
-    logger.debug(f"Processing {len(uploaded_files)} uploaded files")
-    total_tokens = count_tokens(user_message, MODEL_NAME) if user_message else 0
-    logger.debug(f"Initial message tokens: {total_tokens}")
+    included_files, excluded_files, file_contents, total_tokens = [], [], [], 0
 
     for file in uploaded_files:
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            mime_type = file.mimetype
-
-            # Check MIME type
-            logger.debug(f"Validating file: {filename} (type: {mime_type})")
-            if mime_type not in ALLOWED_MIME_TYPES:
-                error_message = f"File type ({mime_type}) not allowed: {filename}"
-                logger.warning(error_message)
-                excluded_files.append({"filename": filename, "error": error_message})
-                logger.debug(f"File excluded: {error_message}")
-                continue
-
-            # Check file size
-            file.seek(0, os.SEEK_END)
-            file_length = file.tell()
-            file.seek(0)
-            if file_length > MAX_FILE_SIZE:
-                error_message = f"File too large: {filename} exceeds the {MAX_FILE_SIZE} byte limit."
-                logger.warning(error_message)
-                excluded_files.append({"filename": filename, "error": error_message})
-                continue
-
             try:
-                # Read text-based file content directly from the file object
-                if mime_type.startswith("text/"):
-                    logger.debug(f"Processing text file: {filename}")
-                    file_content = file.read().decode("utf-8")
-                    logger.debug(f"Original file size: {len(file_content)} characters")
-
-                    # Truncate file content if it exceeds the token limit
-                    truncated_content = truncate_message(
-                        file_content, MAX_FILE_CONTENT_LENGTH
-                    )
-                    logger.debug(
-                        f"Truncated file size: {len(truncated_content)} characters"
-                    )
-
-                    formatted_content = (
-                        f"\nFile '{filename}' content:\n```\n{truncated_content}\n```\n"
-                    )
-
-                    # Check if adding the file content would exceed the total token limit
-                    content_tokens = count_tokens(formatted_content, MODEL_NAME)
-                    logger.debug(f"File content tokens: {content_tokens}")
-                    logger.debug(f"Current total tokens: {total_tokens}")
-
-                    if total_tokens + content_tokens > MAX_INPUT_TOKENS:
-                        error_message = f"File {filename} skipped: Adding it would exceed the {MAX_INPUT_TOKENS} token limit (current: {total_tokens}, file: {content_tokens})"
-                        logger.warning(error_message)
-                        excluded_files.append(
-                            {"filename": filename, "error": error_message}
-                        )
-                        continue
-
-                    total_tokens += content_tokens
-                    file_contents.append(formatted_content)
-                    file.seek(0)  # Reset file pointer after reading
-                    logger.debug(
-                        f"File {filename} successfully processed. New total tokens: {total_tokens}"
-                    )
-                else:
-                    logger.info(
-                        f"Skipping reading content for non-text file: {filename}"
-                    )
-
-                # Save the file
-                file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
-                file.save(file_path)
+                filename, content, tokens = process_file(file)
+                if total_tokens + tokens > MAX_INPUT_TOKENS:
+                    excluded_files.append({"filename": filename, "error": "Exceeds token limit"})
+                    continue
                 included_files.append({"filename": filename})
-
-            except UnicodeDecodeError as e:
-                error_message = f"Failed to decode file {filename}: {str(e)}"
-                logger.error(error_message)
-                excluded_files.append({"filename": filename, "error": error_message})
-            except OSError as e:
-                error_message = f"Failed to save file {filename}: {str(e)}"
-                logger.error(error_message)
-                excluded_files.append({"filename": filename, "error": error_message})
-
+                file_contents.append(content)
+                total_tokens += tokens
             except Exception as e:
-                error_message = f"Error processing file {filename}: {e}"
-                logger.error(error_message)
-                excluded_files.append({"filename": filename, "error": error_message})
-                continue
+                logger.error(f"Error processing file {file.filename}: {e}")
+                excluded_files.append({"filename": file.filename, "error": str(e)})
         else:
-            if file.filename:
-                error_message = (
-                    f"File type not allowed or file is empty: {file.filename}"
-                )
-            else:
-                error_message = "Empty file received."
-
-            logger.warning(error_message)
-            excluded_files.append(
-                {"filename": file.filename or "Unknown", "error": error_message}
-            )
+            excluded_files.append({"filename": file.filename or "Unknown", "error": "Invalid file type"})
 
     # Combine user message and file contents
-    if file_contents:
-        combined_message = (
-            (user_message + "\n" + "".join(file_contents))
-            if user_message
-            else "".join(file_contents)
-        )
-        logger.debug(f"Combined message: {combined_message}")
-    else:
-        combined_message = user_message
+    combined_message = (user_message + "\n" + "".join(file_contents)) if file_contents else user_message
 
-    # Update chat title after 5 messages if it's still the default
-    if combined_message and Chat.is_title_default(chat_id):
-        messages = conversation_manager.get_context(chat_id)
-        if len(messages) >= 5:
-            # Generate title from first 5 messages
-            conversation_text = "\n".join(
-                f"{msg['role']}: {msg['content']}" for msg in messages[:5]
-            )
-            new_title = generate_chat_title(conversation_text)
-            Chat.update_title(chat_id, new_title)
+    # Update chat title if necessary
+    if Chat.is_title_default(chat_id) and len(conversation_manager.get_context(chat_id)) >= 5:
+        conversation_text = "\n".join(
+            f"{msg['role']}: {msg['content']}" for msg in conversation_manager.get_context(chat_id)[:5]
+        )
+        Chat.update_title(chat_id, generate_chat_title(conversation_text))
 
     # Add the combined message to the conversation history
-    model_max_tokens = model_obj.max_tokens or 16384
-    if combined_message:
-        conversation_manager.add_message(
-            chat_id, "user", combined_message, model_max_tokens=model_max_tokens
-        )
+    conversation_manager.add_message(chat_id, "user", combined_message, model_max_tokens=model_obj.max_tokens)
 
-    # Prepare the messages for the API call, excluding system messages if required
-    history = conversation_manager.get_context(
-        chat_id, include_system=not model_obj.requires_o1_handling
-    )
-    logger.debug(f"History context: {history}")
+    # Prepare the messages for the API call
+    history = conversation_manager.get_context(chat_id, include_system=not model_obj.requires_o1_handling)
 
-    # Get the response from Azure OpenAI
     try:
-        model_config = {
-            "messages": history,
-            "deployment_name": model_obj.deployment_name,
-            "max_completion_tokens": model_obj.max_completion_tokens,
-            "api_endpoint": model_obj.api_endpoint,
-            "api_key": model_obj.api_key,
-            "api_version": model_obj.api_version,
-            "requires_o1_handling": model_obj.requires_o1_handling,
-        }
-
-        timeout_seconds = 120  # Increased timeout to 2 minutes
-        logger.debug(f"Sending request to Azure with config: {model_config}")
-
         model_response = get_azure_response(
-            **model_config, timeout_seconds=timeout_seconds
+            messages=history,
+            deployment_name=model_obj.deployment_name,
+            max_completion_tokens=model_obj.max_completion_tokens,
+            api_endpoint=model_obj.api_endpoint,
+            api_key=model_obj.api_key,
+            api_version=model_obj.api_version,
+            requires_o1_handling=model_obj.requires_o1_handling,
+            timeout_seconds=120,
         )
 
-        logger.debug(
-            f"Received Azure response: {model_response[:200]}..."
-        )  # Log first 200 chars
-        logger.debug(f"Full Azure response: {model_response}")
-
-        # Add the assistant's response to the conversation history
-        conversation_manager.add_message(
-            chat_id, "assistant", model_response, model_max_tokens=model_max_tokens
-        )
-        logger.info(f"Successfully processed response for chat {chat_id}")
-
-        # Prepare the response data
-        response_data = {"response": model_response}
-        if included_files:
-            response_data["included_files"] = included_files
-        if excluded_files:
-            response_data["excluded_files"] = excluded_files
-
-        return jsonify(response_data)
-
+        conversation_manager.add_message(chat_id, "assistant", model_response, model_max_tokens=model_obj.max_tokens)
+        return jsonify({"response": model_response, "included_files": included_files, "excluded_files": excluded_files})
     except Exception as ex:
-        logger.error(f"Error during chat handling for chat {chat_id}: {str(ex)}")
-        logger.debug(f"Failed model config: {model_config}")
-        logger.debug(f"History context: {history}")
-        return (
-            jsonify({"error": "An unexpected error occurred.", "details": str(ex)}),
-            500,
-        )
+        logger.error(f"Error during chat handling: {ex}")
+        return jsonify({"error": "An unexpected error occurred.", "details": str(ex)}), 500

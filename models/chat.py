@@ -15,7 +15,6 @@ class Chat:
     """
     Represents a chat session in the system.
     """
-
     id: str
     user_id: int
     title: str = "New Chat"
@@ -36,15 +35,11 @@ class Chat:
                     """
                     SELECT id FROM chats 
                     WHERE id = :chat_id AND user_id = :user_id
-                """
+                    """
                 )
-                chat = db.execute(
-                    query, {"chat_id": chat_id, "user_id": user_id}
-                ).fetchone()
+                chat = db.execute(query, {"chat_id": chat_id, "user_id": user_id}).fetchone()
                 ownership = chat is not None
-                logger.debug(
-                    f"Ownership check for chat_id {chat_id} and user_id {user_id}: {ownership}"
-                )
+                logger.debug(f"Ownership check for chat_id {chat_id} and user_id {user_id}: {ownership}")
                 return ownership
             except Exception as e:
                 logger.error(f"Error checking ownership for chat_id {chat_id}: {e}")
@@ -57,13 +52,11 @@ class Chat:
         Admin users can access all chats.
         Regular users can only access their own chats.
         """
-        if user_role == 'admin':
-            # Admins can access all chats, but still verify chat exists
+        if user_role == "admin":
             try:
                 with db_session() as db:
                     query = text("SELECT COUNT(1) FROM chats WHERE id = :chat_id")
                     result = db.execute(query, {"chat_id": chat_id}).scalar()
-                    logger.debug(f"Query result for chat_id {chat_id}: {result}")
                     exists = result > 0
                     logger.debug(f"Admin access check for chat_id {chat_id}: {exists}")
                     return exists
@@ -71,7 +64,6 @@ class Chat:
                 logger.error(f"Error checking chat existence for chat_id {chat_id}: {e}")
                 raise
         else:
-            # Regular users can only access their own chats
             return Chat.is_chat_owned_by_user(chat_id, user_id)
 
     @staticmethod
@@ -106,22 +98,18 @@ class Chat:
                     UPDATE chats 
                     SET title = :title 
                     WHERE id = :chat_id
-                """
+                    """
                 )
                 db.execute(query, {"title": new_title, "chat_id": chat_id})
                 db.commit()
-                logger.info(
-                    f"Chat title updated for chat_id {chat_id} to '{new_title}'"
-                )
+                logger.info(f"Chat title updated for chat_id {chat_id} to '{new_title}'")
             except Exception as e:
                 db.rollback()
                 logger.error(f"Failed to update chat title for chat_id {chat_id}: {e}")
                 raise
 
     @staticmethod
-    def get_user_chats(
-        user_id: int, limit: int = 10, offset: int = 0
-    ) -> List[Dict[str, Union[str, int]]]:
+    def get_user_chats(user_id: int, limit: int = 10, offset: int = 0) -> List[Dict[str, Union[str, int]]]:
         """
         Retrieve paginated chat history for a user.
         """
@@ -138,85 +126,47 @@ class Chat:
                     WHERE c.user_id = :user_id
                     ORDER by c.created_at DESC
                     LIMIT :limit OFFSET :offset
-                """
+                    """
                 )
-                chats = (
-                    db.execute(
-                        query, {"user_id": user_id, "limit": limit, "offset": offset}
-                    )
-                    .mappings()
-                    .all()
-                )
+                chats = db.execute(query, {"user_id": user_id, "limit": limit, "offset": offset}).mappings().all()
 
-                from datetime import datetime
-
-                chat_list = []
-
-                for chat in chats:
-                    chat_dict = {
+                return [
+                    {
                         "id": chat["id"],
                         "user_id": chat["user_id"],
                         "title": chat["title"],
                         "model_id": chat["model_id"],
-                        "model_name": (
-                            chat["model_name"]
-                            if chat["model_name"]
-                            else "Unknown Model"
-                        ),
-                        "timestamp": (
-                            datetime.strptime(chat["timestamp"], "%Y-%m-%d %H:%M:%S")
-                            if chat["timestamp"]
-                            else None
-                        ),
+                        "model_name": chat["model_name"] or "Unknown Model",
+                        "timestamp": chat["timestamp"],
                     }
-                    chat_list.append(chat_dict)
-
-                logger.debug(f"Retrieved {len(chat_list)} chats for user_id {user_id}")
-                return chat_list
-
+                    for chat in chats
+                ]
             except Exception as e:
                 logger.error(f"Error retrieving chats for user_id {user_id}: {e}")
                 raise
 
     @staticmethod
-    def get_by_id(chat_id: str) -> Optional["Chat"]:
+    def get_default_model_id() -> Optional[int]:
         """
-        Retrieve a chat by its ID.
+        Retrieve the ID of the default model.
         """
         with db_session() as db:
             try:
-                query = text("SELECT id, user_id, title, model_id FROM chats WHERE id = :chat_id")
-                row = db.execute(query, {"chat_id": chat_id}).mappings().first()
+                query = text("SELECT id FROM models WHERE is_default = 1 LIMIT 1")
+                row = db.execute(query).mappings().first()
                 if row:
-                    chat_dict = dict(row)
-                    return Chat(**chat_dict)
+                    logger.debug(f"Default model ID retrieved: {row['id']}")
+                    return row["id"]
+                logger.warning("No default model found.")
                 return None
             except Exception as e:
-                logger.error(f"Error retrieving chat by ID {chat_id}: {e}")
+                logger.error(f"Error retrieving default model ID: {e}")
                 raise
 
-    @staticmethod
-    def get_default_model_id() -> Optional[int]:
-        """Get the ID of the default model."""
-        with db_session() as db:
-            try:
-                query = text("SELECT id FROM models WHERE is_default = :is_default")
-                row = db.execute(query, {"is_default": True}).mappings().first()
-                model_id = row["id"] if row else None
-                logger.debug(f"Default model ID: {model_id}")
-                return model_id
-            except Exception as e:
-                logger.error(f"Error getting default model ID: {e}")
-                raise
-
-    @staticmethod
-    def create(
-        chat_id: str,
-        user_id: int,
-        title: str = "New Chat",
-        model_id: Optional[int] = None,
-    ) -> None:
-        """Create a new chat record."""
+    def create(chat_id: str, user_id: int, title: str = "New Chat", model_id: Optional[int] = None) -> None:
+        """
+        Create a new chat record.
+        """
         if len(title) > 50:
             title = title[:50]
 
@@ -230,72 +180,64 @@ class Chat:
                     """
                     INSERT INTO chats (id, user_id, title, model_id) 
                     VALUES (:chat_id, :user_id, :title, :model_id)
-                """
+                    """
                 )
-                logger.debug(f"Attempting to insert chat with ID: {chat_id}, user_id: {user_id}, title: {title}, model_id: {model_id}")
-                db.execute(
-                    query,
-                    {
-                        "chat_id": chat_id,
-                        "user_id": user_id,
-                        "title": title,
-                        "model_id": model_id,
-                    },
-                )
+                db.execute(query, {"chat_id": chat_id, "user_id": user_id, "title": title, "model_id": model_id})
                 db.commit()
-                logger.info(
-                    f"Chat created: {chat_id} for user {user_id} with model {model_id or 'default'}"
-                )
+                logger.info(f"Chat created: {chat_id} for user {user_id} with model {model_id or 'default'}")
             except Exception as e:
                 db.rollback()
                 logger.error(f"Failed to create chat {chat_id}: {e}")
                 raise
 
     @staticmethod
-    def delete(chat_id: str) -> None:
+    def soft_delete(chat_id: str) -> None:
         """
-        Delete a chat and its associated messages efficiently.
+        Soft-delete a chat by marking it as deleted.
         """
         with db_session() as db:
             try:
-                pragma_query = text("PRAGMA foreign_keys = ON;")
-                db.execute(pragma_query)
-
-                delete_query = text("DELETE FROM chats WHERE id = :chat_id")
-                db.execute(delete_query, {"chat_id": chat_id})
+                query = text(
+                    """
+                    UPDATE chats 
+                    SET is_deleted = 1 
+                    WHERE id = :chat_id
+                    """
+                )
+                db.execute(query, {"chat_id": chat_id})
                 db.commit()
-                logger.info(f"Chat deleted: {chat_id}")
+                logger.info(f"Chat soft-deleted: {chat_id}")
             except Exception as e:
                 db.rollback()
-                logger.error(f"Failed to delete chat {chat_id}: {e}")
+                logger.error(f"Failed to soft-delete chat {chat_id}: {e}")
+                raise
+
+    @staticmethod
+    def get_by_id(chat_id: str) -> Optional["Chat"]:
+        """
+        Retrieve a chat by its ID.
+        """
+        with db_session() as db:
+            try:
+                query = text("SELECT id, user_id, title, model_id FROM chats WHERE id = :chat_id")
+                row = db.execute(query, {"chat_id": chat_id}).mappings().first()
+                return Chat(**row) if row else None
+            except Exception as e:
+                logger.error(f"Error retrieving chat by ID {chat_id}: {e}")
                 raise
 
     @staticmethod
     def get_model(chat_id: str) -> Optional["Model"]:
         """
         Retrieve the model object associated with a given chat.
-
-        Args:
-            chat_id: The chat's unique identifier
-
-        Returns:
-            Optional[Model]: The associated model object or None
         """
-        from .model import Model  # Import here to avoid circular imports
-
         with db_session() as db:
             try:
                 query = text("SELECT model_id FROM chats WHERE id = :chat_id")
                 row = db.execute(query, {"chat_id": chat_id}).mappings().first()
-                model_id = row["model_id"] if row else None
-
-                logger.debug(f"Model ID for chat_id {chat_id}: {model_id}")
-
-                if model_id:
-                    model = Model.get_by_id(model_id)
-                    return model
+                if row and row["model_id"]:
+                    return Model.get_by_id(row["model_id"])
                 return None
-
             except Exception as e:
                 logger.error(f"Error retrieving model for chat_id {chat_id}: {e}")
                 raise
