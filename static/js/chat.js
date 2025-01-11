@@ -273,13 +273,9 @@
             console.log('CSRF Token:', getCSRFToken());
 
             console.log('Preparing to send request to /chat'); // Debugging statement
-            const data = await makeFetchRequest('/chat', {
+            const data = await fetchWithCSRF('/chat', {
                 method: 'POST',
                 body: formData,
-                headers: {
-                    'X-CSRFToken': getCSRFToken(),
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
             });
 
             console.log('Response from server:', data);
