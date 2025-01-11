@@ -227,12 +227,21 @@ import Prism from 'prismjs';
             console.log('CSRF Token:', getCSRFToken());
 
             console.log('Preparing to send request to /chat'); // Debugging statement
-            const data = await fetchWithCSRF('/chat', {
+
+            const response = await fetch('/chat', {
                 method: 'POST',
-                body: formData,
+                headers: {
+                    'X-CSRFToken': getCSRFToken(),
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
             });
 
-            console.log('Response from server:', data);
+            const data = await response.json(); // Parse the JSON response
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to send message');
+            }
 
             if (data.response) {
                 appendAssistantMessage(data.response);
