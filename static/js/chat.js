@@ -462,7 +462,6 @@
             const data = await fetchWithCSRF('/new_chat', {
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': getCSRFToken(),
                     'Content-Type': 'application/json',
                 },
             });
