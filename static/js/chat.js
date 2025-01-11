@@ -55,9 +55,25 @@
             return;
         }
 
+        // Cache DOM elements
+        messageInput = document.getElementById('message-input');
+        sendButton = document.getElementById('send-button');
+        chatBox = document.getElementById('chat-box');
+        fileInput = document.getElementById('file-input');
+        uploadButton = document.getElementById('upload-button');
+        uploadedFilesDiv = document.getElementById('uploaded-files');
+        modelSelect = document.getElementById('model-select');
+        newChatBtn = document.getElementById('new-chat-btn');
+        dropZone = document.getElementById('drop-zone');
+
+        console.log('Message input:', messageInput);
+        console.log('Send button:', sendButton);
+        console.log('Chat box:', chatBox);
+
         // Verify critical elements exist
         if (!messageInput || !sendButton || !chatBox) {
             console.error('Critical chat elements not found');
+            showFeedback('Chat interface not loaded properly', 'error');
             return;
         }
 
@@ -71,6 +87,14 @@
 
         // Initialize message input
         adjustTextareaHeight(messageInput);
+
+        // Test send button functionality
+        console.log('Testing send button click handler...');
+        sendButton.addEventListener('click', function(e) {
+            console.log('Send button clicked!');
+            e.preventDefault();
+            sendMessage();
+        });
     });
 
     function initializeEventListeners() {
@@ -101,27 +125,6 @@
             console.log('Send button clicked');
             sendMessage();
         });
-
-        // File upload handlers
-        if (fileInput && uploadButton) {
-            uploadButton.addEventListener('click', () => fileInput.click());
-            fileInput.addEventListener('change', handleFileSelect);
-        }
-
-        // New chat button handler
-        if (newChatBtn) {
-            newChatBtn.addEventListener('click', createNewChat);
-        }
-
-        // Model selection handler
-        if (modelSelect) {
-            modelSelect.addEventListener('change', handleModelChange);
-        }
-
-        // Chat box message action handlers
-        if (chatBox) {
-            chatBox.addEventListener('click', handleMessageActions);
-        }
 
         // File upload handlers
         if (fileInput && uploadButton) {
