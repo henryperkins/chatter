@@ -145,8 +145,8 @@
         // Test send button functionality
         console.log('Testing send button click handler...');
         sendButton.addEventListener('click', function(e) {
-            console.log('Send button clicked!');
             e.preventDefault();
+            console.log('Send button clicked'); // Debugging statement
             sendMessage();
         });
     });
