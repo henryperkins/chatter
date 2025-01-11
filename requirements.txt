@@ -1,7 +1,7 @@
 Flask==2.3.2
 Flask-Login==0.6.2
 Flask-WTF==1.2.1
-Flask-Limiter[memory]==3.5.0
+Flask-Limiter==3.5.0
 Werkzeug==2.3.7
 bcrypt==4.0.1
 python-dotenv==1.0.1
