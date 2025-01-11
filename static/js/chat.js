@@ -7,7 +7,7 @@
         const newTitle = prompt('Enter new chat title:');
         if (newTitle) {
             try {
-                const response = await makeFetchRequest(`/update_chat_title/${chatId}`, {
+                const response = await fetchWithCSRF(`/update_chat_title/${chatId}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -33,7 +33,7 @@
     async function deleteChat(chatId) {
         if (confirm('Are you sure you want to delete this chat?')) {
             try {
-                const response = await makeFetchRequest(`/delete_chat/${chatId}`, {
+                const response = await fetchWithCSRF(`/delete_chat/${chatId}`, {
                     method: 'DELETE',
                     headers: {
                         'X-CSRFToken': getCSRFToken(),
@@ -83,15 +83,6 @@
         console.debug('DOMContentLoaded event triggered. Initializing elements.');
         
         // Cache DOM elements
-        messageInput = document.getElementById('message-input');
-        sendButton = document.getElementById('send-button');
-        chatBox = document.getElementById('chat-box');
-        fileInput = document.getElementById('file-input');
-        uploadButton = document.getElementById('upload-button');
-        uploadedFilesDiv = document.getElementById('uploaded-files');
-        modelSelect = document.getElementById('model-select');
-        newChatBtn = document.getElementById('new-chat-btn');
-        dropZone = document.getElementById('drop-zone');
 
         // Verify critical elements exist
         if (!messageInput || !sendButton || !chatBox) {
@@ -560,7 +551,7 @@
             const formData = new FormData();
             formData.append('message', lastUserMessage);
 
-            const data = await makeFetchRequest('/chat', {
+            const data = await fetchWithCSRF('/chat', {
                 method: 'POST',
                 body: formData,
             });
