@@ -197,62 +197,45 @@ def add_model_page():
 @login_required
 @admin_required
 def edit_model(model_id):
-    """
-    Render the edit model page (GET) and handle form submission (POST).
-    """
-    model = Model.get_by_id(model_id)
-    if not model:
-        flash("Model not found", "error")
-        return redirect(url_for("chat.chat_interface"))
+    """Edit model route handler"""
+    try:
+        model = Model.get_by_id(model_id)
+        if not model:
+            return jsonify({"error": "Model not found"}), 404
 
-    form = ModelForm(obj=model)
+        form = ModelForm(obj=model)
 
-    if request.method == "POST":
-        if form.validate_on_submit():
-            try:
-                existing_model = Model.get_by_id(model_id)
-                data = {
-                    "name": form.name.data,
-                    "deployment_name": form.deployment_name.data,
-                    "description": form.description.data,
-                    "api_endpoint": form.api_endpoint.data,
-                    "temperature": form.temperature.data,
-                    "max_tokens": form.max_tokens.data,
-                    "max_completion_tokens": form.max_completion_tokens.data,
-                    "model_type": form.model_type.data,
-                    "api_version": form.api_version.data,
-                    "requires_o1_handling": form.requires_o1_handling.data,
-                    "is_default": form.is_default.data,
-                    "api_key": form.api_key.data if form.api_key.data else existing_model.api_key,  # Update API key if provided
-                    "version": form.version.data,  # Include version field
-                }
-                logger.debug(
-                    "Updating model %d with data: %s",
-                    model_id,
-                    {k: v for k, v in data.items() if k != "api_key"},
-                )
-                Model.update(model_id, data)
-
-                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                    return jsonify(
-                        {"success": True, "message": "Model updated successfully"}
-                    )
-                else:
-                    flash("Model updated successfully", "success")
-                    return redirect(url_for("chat.chat_interface"))
-
-            except Exception as e:
-                logger.exception("Error updating model %d: %s", model_id, str(e))
-                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                    return jsonify({"error": str(e), "success": False}), 400
-                else:
-                    flash(f"Error updating model: {str(e)}", "error")
-                    return render_template("edit_model.html", form=form, model=model)
-        else:
-            logger.error("Form validation failed: %s", form.errors)
-            return jsonify({"error": form.errors, "success": False}), 400
-
-    return render_template("edit_model.html", form=form, model=model)
+        if request.method == "POST":
+            if form.validate_on_submit():
+                try:
+                    data = {
+                        "name": form.name.data,
+                        "deployment_name": form.deployment_name.data,
+                        "description": form.description.data,
+                        "api_endpoint": form.api_endpoint.data,
+                        "temperature": form.temperature.data,
+                        "max_tokens": form.max_tokens.data,
+                        "max_completion_tokens": form.max_completion_tokens.data,
+                        "model_type": form.model_type.data,
+                        "api_version": form.api_version.data,
+                        "requires_o1_handling": form.requires_o1_handling.data,
+                        "is_default": form.is_default.data,
+                        "version": form.version.data
+                    }
+                    
+                    Model.update(model_id, data)
+                    return jsonify({"success": True})
+                    
+                except Exception as e:
+                    return jsonify({"error": str(e)}), 400
+            
+            return jsonify({"error": form.errors}), 400
+            
+        return render_template("edit_model.html", form=form, model=model)
+        
+    except Exception as e:
+        logger.exception("Error in edit_model: %s", str(e))
+        return jsonify({"error": str(e)}), 500
 
 
 @bp.route("/models/default/<int:model_id>", methods=["POST"])

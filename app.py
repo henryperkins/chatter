@@ -261,5 +261,5 @@ if __name__ == "__main__":
         os.environ.get("PORT", 5000)
     )  # Get port from environment or use 5000 as default
     app.run(
-        host="0.0.0.0", port=port, debug=False
-    )  # Ensure `debug=False` in production
+        host="0.0.0.0", port=port, debug=True
+    )  # Set debug=True for development

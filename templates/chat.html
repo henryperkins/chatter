@@ -1,247 +1,224 @@
 {% extends "base.html" %}
 
-{% block head %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prismjs/1.29.0/prism.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
-{% endblock %}
-
 {% block title %}Chat - Azure OpenAI{% endblock %}
 
 {% block content %}
-<div class="flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">
-    <!-- Mobile Toggle -->
-    <button id="sidebar-toggle"
-        class="md:hidden bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-4 py-2 hover:bg-gray-200 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500">
-        Toggle Sidebar
-    </button>
+<div class="flex h-screen overflow-hidden bg-white dark:bg-gray-900">
+    <!-- Sidebar -->
+    <nav id="sidebar" class="hidden md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+        <div class="p-4 space-y-4">
+            <!-- New Chat Button -->
+            <button id="new-chat-btn" class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                New Chat
+            </button>
 
-    <div class="flex flex-1 overflow-hidden">
-        <!-- SIDEBAR -->
-        <nav id="sidebar"
-            class="hidden md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
-            <div class="p-4 space-y-4">
-                <!-- New Chat Button -->
-                <button id="new-chat-btn"
-                    class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    New Chat
+            <!-- Model Selection -->
+            {% if models %}
+            <div>
+                <label for="model-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model:</label>
+                <select id="model-select" class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                    {% for model in models %}
+                    <option value="{{ model.id }}" {% if model.is_default %}selected{% endif %}>
+                        {{ model.name }}{% if model.is_default %} (Default){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            <!-- Admin Buttons -->
+            {% if current_user.role == 'admin' %}
+            <div class="space-y-2">
+                <a href="{{ url_for('model.add_model_page') }}" 
+                   class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center">
+                    Add Model
+                </a>
+                <button id="edit-model-btn" 
+                        class="block w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-center">
+                    Edit Model
                 </button>
+            </div>
+            {% endif %}
 
-                <!-- Model Selection -->
-                {% if models %}
-                <div>
-                    <label for="model-select"
-                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model:</label>
-                    <select id="model-select"
-                        class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
-                        {% for model in models %}
-                        <option value="{{ model.id }}" {% if model.is_default %}selected{% endif %}>
-                            {{ model.name }}{% if model.is_default %} (Default){% endif %}
-                        </option>
-                        {% endfor %}
-                    </select>
+            <!-- Chat List -->
+            <div class="space-y-4">
+                {% set ns = namespace(current_date=None) %}
+                {% for conversation in conversations|sort(attribute='timestamp', reverse=True) %}
+                {% set chat_date = conversation.timestamp.strftime('%Y-%m-%d') %}
+
+                {% if chat_date != ns.current_date %}
+                {% set ns.current_date = chat_date %}
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider pt-4 first:pt-0">
+                    {% if chat_date == today %}
+                        Today
+                    {% elif chat_date == yesterday %}
+                        Yesterday
+                    {% else %}
+                        {{ conversation.timestamp.strftime('%B %d, %Y') }}
+                    {% endif %}
                 </div>
                 {% endif %}
 
-                <!-- Admin-Only Buttons -->
-                {% if current_user.role == 'admin' %}
-                <div class="space-y-2">
-                    <a href="{{ url_for('model.add_model_page') }}"
-                        class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center">
-                        Add Model
+                <div class="relative group">
+                    <a href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
+                       class="block p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 
+                              {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                {{ conversation.title }} - {{ conversation.model_name }}
+                            </span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                                {{ conversation.timestamp.strftime('%I:%M %p') }}
+                            </span>
+                        </div>
                     </a>
-                    <button id="edit-model-btn"
-                        class="block w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-center">
-                        Edit Model
+                    <button class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center h-8 w-8 rounded-full hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 delete-chat-btn focus:ring-2 focus:ring-red-500"
+                            data-chat-id="{{ conversation.id }}" title="Delete chat">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
                     </button>
                 </div>
-                {% endif %}
-
-                <!-- Chat List -->
-                <div class="space-y-4">
-                    {% set ns = namespace(current_date=None) %}
-                    {% for conversation in conversations|sort(attribute='timestamp', reverse=True) %}
-                    {% set chat_date = conversation.timestamp.strftime('%Y-%m-%d') %}
-
-                    {% if chat_date != ns.current_date %}
-                    {% set ns.current_date = chat_date %}
-                    <div
-                        class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider pt-4 first:pt-0">
-                        {% if chat_date == today %}
-                        Today
-                        {% elif chat_date == yesterday %}
-                        Yesterday
-                        {% else %}
-                        {{ conversation.timestamp.strftime('%B %d, %Y') }}
-                        {% endif %}
-                    </div>
-                    {% endif %}
-
-                    <div class="relative group">
-<a href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
-    class="block p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}">
-                            <div class="flex justify-between items-center">
-                                <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                    {{ conversation.title }} - {{ conversation.model_name }}
-                                </span>
-                                <span class="text-xs text-gray-500 dark:text-gray-400">
-                                    {{ conversation.timestamp.strftime('%I:%M %p') }}
-                                </span>
-                            </div>
-                        </a>
-<button
-    class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center h-8 w-8 rounded-full hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 delete-chat-btn focus:ring-2 focus:ring-red-500"
-                            data-chat-id="{{ conversation.id }}" title="Delete chat">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                        </button>
-                    </div>
-                    {% endfor %}
-                </div>
+                {% endfor %}
             </div>
-        </nav>
+        </div>
+    </nav>
 
-        <!-- MAIN CHAT AREA -->
-        <div class="flex-1 flex flex-col">
-            <div
-                class="chat-header px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <div class="flex items-center">
-                    <h2 id="chat-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        {{ chat_title }} - {{ model_name }}
-                    </h2>
-                    <button id="edit-title-btn" class="ml-4 text-sm text-blue-600 hover:underline">Edit Title</button>
-                </div>
+    <!-- Main Chat Area -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Chat Header -->
+        <div class="chat-header px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+            <div class="flex items-center">
+                <h2 id="chat-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    {{ chat_title }} - {{ model_name }}
+                </h2>
+                <button id="edit-title-btn" class="ml-4 text-sm text-blue-600 hover:underline">
+                    Edit Title
+                </button>
             </div>
-            <div id="chat-box" class="flex-1 overflow-y-auto px-4 py-6 space-y-4 bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">
-                {% for message in messages %}
+        </div>
+
+        <!-- Messages Area -->
+        <div id="chat-box" class="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+            {% for message in messages %}
                 {% if message.role == 'user' %}
-                <!-- User message -->
-                <div class="flex justify-end">
-                    <div class="max-w-lg text-right">
-                        <div class="relative bg-blue-600 text-white px-4 py-2 rounded-lg">
-                            <p class="text-sm">{{ message.content }}</p>
-                            {% if loop.last %}
-                            <button class="edit-message-button absolute -left-6 top-2 text-gray-500 hover:text-gray-700" title="Edit message">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                            </button>
-                            {% endif %}
-                        </div>
-                        <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
-                            {% if message.timestamp %}
-                            {{ message.timestamp.strftime('%I:%M %p') }}
-                            {% else %}
-                            {{ now().strftime('%I:%M %p') }}
-                            {% endif %}
-                        </span>
-                    </div>
-                </div>
-                {% else %}
-                <!-- Assistant message -->
-                <div class="flex">
-                    <div class="max-w-lg">
-                        <div class="relative bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-lg">
-                            <div class="prose dark:prose-invert prose-sm max-w-none">
-                                {{ message.content|safe }}
-                            </div>
-                            <div class="absolute right-0 top-0 flex space-x-2">
-                <button class="copy-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" title="Copy to clipboard">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                                    </svg>
-                                </button>
+                    <!-- User message -->
+                    <div class="flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end">
+                        <div>
+                            <div class="relative bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
+                                <p class="text-sm">{{ message.content }}</p>
                                 {% if loop.last %}
-                                <button class="regenerate-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" title="Regenerate response">
+                                <button class="edit-message-button absolute -left-6 top-2 text-gray-500 hover:text-gray-700" 
+                                        title="Edit message">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                     </svg>
                                 </button>
                                 {% endif %}
                             </div>
+                            <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                                {{ message.timestamp.strftime('%I:%M %p') if message.timestamp else now().strftime('%I:%M %p') }}
+                            </span>
                         </div>
-                        <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
-                            {% if message.timestamp %}
-                            {{ message.timestamp.strftime('%I:%M %p') }}
-                            {% else %}
-                            {{ now().strftime('%I:%M %p') }}
-                            {% endif %}
-                        </span>
                     </div>
-                </div>
+                {% else %}
+                    <!-- Assistant message -->
+                    <div class="flex w-full mt-2 space-x-3 max-w-lg">
+                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
+                        <div class="relative max-w-lg">
+                            <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
+                                <div class="prose dark:prose-invert prose-sm max-w-none">
+                                    {{ message.content|safe }}
+                                </div>
+                            </div>
+                            <div class="absolute right-0 top-0 flex space-x-2">
+                                <button class="copy-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" 
+                                        title="Copy to clipboard">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                    </svg>
+                                </button>
+                                {% if loop.last %}
+                                <button class="regenerate-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" 
+                                        title="Regenerate response">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                    </svg>
+                                </button>
+                                {% endif %}
+                            </div>
+                            <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                                {{ message.timestamp.strftime('%I:%M %p') if message.timestamp else now().strftime('%I:%M %p') }}
+                            </span>
+                        </div>
+                    </div>
                 {% endif %}
-                {% endfor %}
-            </div>
+            {% endfor %}
+        </div>
 
-            <!-- FILE UPLOAD AREA -->
-            <div id="uploaded-files"
-                class="hidden px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-                <h3 class="text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                    Uploaded Files
-                </h3>
-                <div id="file-list" class="space-y-2 dark:text-gray-300"></div>
-            </div>
+        <!-- File Upload Area -->
+        <div id="uploaded-files" class="hidden px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+            <h3 class="text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
+                Uploaded Files
+            </h3>
+            <div id="file-list" class="space-y-2"></div>
+        </div>
 
-            <!-- INPUT AREA -->
-            <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-900">
-                <div class="flex items-end space-x-3 message-input-area">
-                    <!-- Upload Button -->
-                    <button id="upload-button"
-                        class="p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center"
-                        aria-label="Upload files">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span>Upload</span>
-                    </button>
-                    <input type="file" id="file-input" class="hidden" multiple aria-label="Upload files">
+        <!-- Input Area -->
+        <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-900">
+            <div class="flex items-end space-x-3">
+                <!-- Upload Button -->
+                <button id="upload-button" class="p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <span>Upload</span>
+                </button>
+                <input type="file" id="file-input" class="hidden" multiple>
 
-                    <!-- Message Input -->
-                    <div class="flex-1">
-                        <textarea id="message-input"
-                            class="w-full px-3 py-2 resize-none border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-400"
-                            placeholder="Type your message..." rows="1"></textarea>
-                    </div>
-
-                    <!-- Send Button -->
-                    <button id="send-button"
-                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
-                        <span>Send</span>
-                    </button>
+                <!-- Message Input -->
+                <div class="flex-1">
+                    <textarea id="message-input" class="w-full px-3 py-2 resize-none border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200" 
+                              placeholder="Type your message..." rows="1"></textarea>
                 </div>
+
+                <!-- Send Button -->
+                <button id="send-button" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+                    <span>Send</span>
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- DROP ZONE -->
+<!-- Drop Zone -->
 <div id="drop-zone" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
     <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl text-center">
-        <p class="text-xl font-semibold text-gray-800 dark:text-gray-100">
-            Drop files here
-        </p>
-        <p class="text-gray-500 dark:text-gray-400 mt-2">
-            Release to upload
-        </p>
+        <p class="text-xl font-semibold text-gray-800 dark:text-gray-100">Drop files here</p>
+        <p class="text-gray-500 dark:text-gray-400 mt-2">Release to upload</p>
     </div>
 </div>
 
-<!-- UPLOAD PROGRESS -->
-<div id="upload-progress"
-    class="hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 w-64">
-    <div class="text-sm mb-2 text-gray-800 dark:text-gray-100">
-        Uploading files...
-    </div>
+<!-- Upload Progress -->
+<div id="upload-progress" class="hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 w-64">
+    <div class="text-sm mb-2 text-gray-800 dark:text-gray-100">Uploading files...</div>
     <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
         <div id="upload-progress-bar" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
     </div>
 </div>
 
+<!-- Feedback Message -->
+<div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center"></div>
+
+<!-- CSRF Token -->
+<meta name="csrf-token" content="{{ csrf_token() }}">
 {% endblock %}
 
 {% block scripts %}
@@ -272,37 +249,38 @@
         refreshModelList();
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', function() {
+        // Edit title button
         const editTitleBtn = document.getElementById('edit-title-btn');
         if (editTitleBtn) {
-            editTitleBtn.addEventListener('click', function () {
+            editTitleBtn.addEventListener('click', function() {
                 editChatTitle('{{ chat_id }}');
             });
         }
 
+        // Delete chat buttons
         document.querySelectorAll('.delete-chat-btn').forEach(button => {
-            button.addEventListener('click', function (event) {
+            button.addEventListener('click', function(event) {
                 event.preventDefault();
                 const chatId = this.getAttribute('data-chat-id');
                 deleteChat(chatId);
             });
         });
 
-        document.querySelectorAll('.copy-button').forEach(button => {
-            button.addEventListener('click', function() {
-                const messageContent = this.closest('.max-w-lg').querySelector('.prose').textContent;
-                copyToClipboard(messageContent);
-            });
-        });
-
+        // Model select and edit model button
         const modelSelect = document.getElementById('model-select');
         const editModelButton = document.getElementById('edit-model-btn');
 
         if (modelSelect && editModelButton) {
-            editModelButton.addEventListener('click', function () {
+            editModelButton.addEventListener('click', function() {
                 const selectedModelId = modelSelect.value;
                 window.location.href = `{{ url_for('model.edit_model', model_id=0) }}`.replace('0', selectedModelId);
             });
+        }
+
+        // Initialize message handlers from chat.js
+        if (typeof initializeMessageHandlers === 'function') {
+            initializeMessageHandlers();
         }
     });
 </script>

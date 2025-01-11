@@ -68,7 +68,7 @@
   "window.autoDetectColorScheme": true,
   "window.closeWhenEmpty": true,
   "workbench.colorTheme": "Default Dark Modern",
-  "workbench.preferredDarkColorTheme": "Default Light Modern",
+  "workbench.preferredDarkColorTheme": "Default Dark Modern",
   "workbench.iconTheme": "vs-minimal",
   "workbench.view.alwaysShowHeaderActions": true,
   "workbench.editor.centeredLayoutFixedWidth": true,

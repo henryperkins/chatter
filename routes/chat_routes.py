@@ -1,4 +1,14 @@
-from flask import Blueprint, request, jsonify, redirect, url_for, render_template, current_app, session, Response
+from flask import (
+    Blueprint,
+    request,
+    jsonify,
+    redirect,
+    url_for,
+    render_template,
+    current_app,
+    session,
+    Response,
+)
 from flask_login import login_required, current_user
 from typing import Union, Tuple, List, Dict
 import os
@@ -16,14 +26,19 @@ import tiktoken
 logger = logging.getLogger(__name__)
 
 # Constants
-ALLOWED_EXTENSIONS = {'.txt', '.md', '.py', '.js', '.html', '.css', '.json', '.csv'}
+ALLOWED_EXTENSIONS = {".txt", ".md", ".py", ".js", ".html", ".css", ".json", ".csv"}
 ALLOWED_MIME_TYPES = {
-    'text/plain', 'text/markdown', 'text/python', 'text/javascript',
-    'text/html', 'text/css', 'application/json', 'text/csv'
+    "text/plain",
+    "text/markdown",
+    "text/python",
+    "text/javascript",
+    "text/html",
+    "text/css",
+    "application/json",
+    "text/csv",
 }
 
-chat_routes = Blueprint('chat', __name__)
-
+chat_routes = Blueprint("chat", __name__)
 
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB per file
 MAX_TOTAL_FILE_SIZE = 50 * 1024 * 1024  # 50 MB for total files
@@ -125,7 +140,7 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
 def chat_interface() -> str:
     """Render the main chat interface page."""
     logger.debug(f"Current user: id={current_user.id}, role={current_user.role}")
-    
+
     # Get chat_id from query params or session
     chat_id = request.args.get("chat_id") or session.get("chat_id")
 
@@ -172,19 +187,20 @@ def chat_interface() -> str:
 def get_chat_context(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Get the conversation context for a chat."""
     if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
-        sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
+        sanitized_chat_id = chat_id.replace("\r\n", "").replace("\n", "")
         logger.warning("Unauthorized access attempt to chat %s", sanitized_chat_id)
         return jsonify({"error": "Chat not found or access denied"}), 403
 
     messages = conversation_manager.get_context(chat_id)
     return jsonify({"messages": messages})
 
+
 @chat_routes.route("/load_chat/<chat_id>")
 @login_required
 def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Load and return the messages for a specific chat."""
     if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
-        sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
+        sanitized_chat_id = chat_id.replace("\r\n", "").replace("\n", "")
         logger.warning("Unauthorized access attempt to chat %s", sanitized_chat_id)
         return jsonify({"error": "Chat not found or access denied"}), 403
 
@@ -197,7 +213,7 @@ def load_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 @login_required
 def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     """Delete a chat and its associated messages."""
-    sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
+    sanitized_chat_id = chat_id.replace("\r\n", "").replace("\n", "")
     logger.debug(f"Received request to delete chat_id: {sanitized_chat_id}")
     if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
         logger.warning(
@@ -209,11 +225,11 @@ def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 
     try:
         Chat.delete(chat_id)
-        sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
+        sanitized_chat_id = chat_id.replace("\r\n", "").replace("\n", "")
         logger.info("Chat %s deleted successfully", sanitized_chat_id)
         return jsonify({"success": True})
     except Exception as e:
-        sanitized_chat_id = chat_id.replace('\r\n', '').replace('\n', '')
+        sanitized_chat_id = chat_id.replace("\r\n", "").replace("\n", "")
         logger.error(f"Error deleting chat {sanitized_chat_id}: {e}")
         return jsonify({"error": "Failed to delete chat"}), 500
 
@@ -305,6 +321,7 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
 
     # Sanitize user input before processing
     user_message = bleach.clean(request.form.get("message", "").strip())
+    logger.debug(f"User message: {user_message}")
 
     # Handle file uploads
     uploaded_files = request.files.getlist("files[]")
@@ -312,7 +329,9 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
     excluded_files: List[Dict[str, str]] = []
     file_contents: List[str] = []
 
+    logger.debug(f"Processing {len(uploaded_files)} uploaded files")
     total_tokens = count_tokens(user_message, MODEL_NAME) if user_message else 0
+    logger.debug(f"Initial message tokens: {total_tokens}")
 
     for file in uploaded_files:
         if file and allowed_file(file.filename):
@@ -320,10 +339,12 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             mime_type = file.mimetype
 
             # Check MIME type
+            logger.debug(f"Validating file: {filename} (type: {mime_type})")
             if mime_type not in ALLOWED_MIME_TYPES:
                 error_message = f"File type ({mime_type}) not allowed: {filename}"
                 logger.warning(error_message)
                 excluded_files.append({"filename": filename, "error": error_message})
+                logger.debug(f"File excluded: {error_message}")
                 continue
 
             # Check file size
@@ -339,19 +360,29 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             try:
                 # Read text-based file content directly from the file object
                 if mime_type.startswith("text/"):
+                    logger.debug(f"Processing text file: {filename}")
                     file_content = file.read().decode("utf-8")
+                    logger.debug(f"Original file size: {len(file_content)} characters")
+
                     # Truncate file content if it exceeds the token limit
                     truncated_content = truncate_message(
                         file_content, MAX_FILE_CONTENT_LENGTH
                     )
+                    logger.debug(
+                        f"Truncated file size: {len(truncated_content)} characters"
+                    )
+
                     formatted_content = (
                         f"\nFile '{filename}' content:\n```\n{truncated_content}\n```\n"
                     )
 
                     # Check if adding the file content would exceed the total token limit
                     content_tokens = count_tokens(formatted_content, MODEL_NAME)
+                    logger.debug(f"File content tokens: {content_tokens}")
+                    logger.debug(f"Current total tokens: {total_tokens}")
+
                     if total_tokens + content_tokens > MAX_INPUT_TOKENS:
-                        error_message = f"File {filename} skipped: Adding it would exceed the {MAX_INPUT_TOKENS} token limit"
+                        error_message = f"File {filename} skipped: Adding it would exceed the {MAX_INPUT_TOKENS} token limit (current: {total_tokens}, file: {content_tokens})"
                         logger.warning(error_message)
                         excluded_files.append(
                             {"filename": filename, "error": error_message}
@@ -361,6 +392,9 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                     total_tokens += content_tokens
                     file_contents.append(formatted_content)
                     file.seek(0)  # Reset file pointer after reading
+                    logger.debug(
+                        f"File {filename} successfully processed. New total tokens: {total_tokens}"
+                    )
                 else:
                     logger.info(
                         f"Skipping reading content for non-text file: {filename}"
@@ -370,6 +404,15 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                 file_path = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
                 file.save(file_path)
                 included_files.append({"filename": filename})
+
+            except UnicodeDecodeError as e:
+                error_message = f"Failed to decode file {filename}: {str(e)}"
+                logger.error(error_message)
+                excluded_files.append({"filename": filename, "error": error_message})
+            except OSError as e:
+                error_message = f"Failed to save file {filename}: {str(e)}"
+                logger.error(error_message)
+                excluded_files.append({"filename": filename, "error": error_message})
 
             except Exception as e:
                 error_message = f"Error processing file {filename}: {e}"
@@ -396,6 +439,7 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             if user_message
             else "".join(file_contents)
         )
+        logger.debug(f"Combined message: {combined_message}")
     else:
         combined_message = user_message
 
@@ -421,6 +465,7 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
     history = conversation_manager.get_context(
         chat_id, include_system=not model_obj.requires_o1_handling
     )
+    logger.debug(f"History context: {history}")
 
     # Get the response from Azure OpenAI
     try:
@@ -435,14 +480,22 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         }
 
         timeout_seconds = 120  # Increased timeout to 2 minutes
+        logger.debug(f"Sending request to Azure with config: {model_config}")
+
         model_response = get_azure_response(
             **model_config, timeout_seconds=timeout_seconds
         )
+
+        logger.debug(
+            f"Received Azure response: {model_response[:200]}..."
+        )  # Log first 200 chars
+        logger.debug(f"Full Azure response: {model_response}")
 
         # Add the assistant's response to the conversation history
         conversation_manager.add_message(
             chat_id, "assistant", model_response, model_max_tokens=model_max_tokens
         )
+        logger.info(f"Successfully processed response for chat {chat_id}")
 
         # Prepare the response data
         response_data = {"response": model_response}
@@ -454,5 +507,10 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         return jsonify(response_data)
 
     except Exception as ex:
-        logger.exception("Error during chat handling: %s", ex)
-        return jsonify({"error": "An unexpected error occurred."}), 500
+        logger.error(f"Error during chat handling for chat {chat_id}: {str(ex)}")
+        logger.debug(f"Failed model config: {model_config}")
+        logger.debug(f"History context: {history}")
+        return (
+            jsonify({"error": "An unexpected error occurred.", "details": str(ex)}),
+            500,
+        )

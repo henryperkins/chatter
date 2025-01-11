@@ -1,48 +1,48 @@
-// static/js/utils.js
+import axios from 'axios';
 
 /**
  * Retrieves the CSRF token from a meta tag.
  * @function getCSRFToken
  * @returns {string} The CSRF token or an empty string if not found.
  */
-// CSRF Token Management
-let csrfToken = null;
-
 function getCSRFToken() {
-  if (!csrfToken) {
     const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
-    csrfToken = csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") : "";
-  }
-  return csrfToken;
+    return csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") || "" : "";
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const token = getCSRFToken();
-  if (token) {
-    axios.defaults.headers.common["X-CSRFToken"] = token;
-    const originalFetch = window.fetch;
-    window.fetch = (url, options = {}) => {
-      if (!options.headers) options.headers = {};
-      if (!options.headers["X-CSRFToken"]) {
-        options.headers["X-CSRFToken"] = token;
-      }
-      if (!options.credentials) {
-        options.credentials = 'same-origin';
-      }
-    };
-    return originalFetch(url, options);
-  }
-});
-      return originalFetch(url, options);
-    };
-  }
+    const token = getCSRFToken();
+    if (token) {
+        // Set default CSRF token for axios
+        if (typeof axios !== 'undefined') {
+            axios.defaults.headers.common["X-CSRFToken"] = token;
+        }
+
+        // Override fetch to include CSRF token
+        const originalFetch = window.fetch;
+        window.fetch = function(input, init = {}) {
+            const options = { ...init };
+            options.headers = options.headers || {};
+            
+            if (!options.headers["X-CSRFToken"]) {
+                options.headers["X-CSRFToken"] = token;
+            }
+            
+            if (!options.credentials) {
+                options.credentials = 'same-origin';
+            }
+            
+            return originalFetch.call(window, input, options);
+        };
+    }
 });
 
 /**
  * Shows a feedback message to the user.
  * @function showFeedback
- * @param {string} message - The feedback message to display.
- * @param {string} [type='success'] - The type of message ('success', 'error', 'warning', or 'info').
+ * @param {string} message - The feedback message to display
+ * @param {('success'|'error'|'warning'|'info')} [type='success'] - The type of message
+ * @param {Object} [options={}] - Additional options for the feedback
  */
 function showFeedback(message, type = "success", options = {}) {
   const { duration = 5000, position = "top" } = options;

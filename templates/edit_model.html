@@ -5,9 +5,11 @@
 {% block content %}
 <div class="container mx-auto px-4 py-8 bg-white dark:bg-gray-900">
     <h1 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-100">Edit Model: {{ model.name }}</h1>
-    <form id="edit-model-form" method="POST" action="{{ url_for('model.edit_model', model_id=model.id) }}"
-        class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 ajax-form">
+<form id="edit-model-form" method="POST" action="{{ url_for('model.edit_model', model_id=model.id) }}"
+    class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 ajax-form"
+    data-version="{{ model.version }}">
         {{ form.hidden_tag() }}
+        <input type="hidden" name="version" value="{{ model.version }}">
 
         <!-- Model Name -->
         <div class="mb-6">
@@ -196,41 +198,32 @@
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
 
-            // Show loading state
-            submitButton.disabled = true;
-            buttonText.textContent = "Updating Model...";
-            loadingSpinner.classList.remove("hidden");
-
             try {
                 const formData = new FormData(form);
-
-                // Convert and validate max_completion_tokens
-                const maxCompletionTokens = parseInt(formData.get('max_completion_tokens'), 10);
-                if (isNaN(maxCompletionTokens) || maxCompletionTokens < 1 || maxCompletionTokens > 16384) {
-                    showFeedback("Max completion tokens must be between 1 and 16384", "error");
-                    return;
-                }
-                formData.set('max_completion_tokens', maxCompletionTokens);
-
-                // Convert temperature to number if present
-                const temperature = formData.get('temperature');
-                if (temperature) {
-                    formData.set('temperature', parseFloat(temperature));
+                
+                // Add version field if not present
+                if (!formData.get('version')) {
+                    formData.set('version', parseInt(form.dataset.version) || 1);
                 }
 
-                // Convert max_tokens to number if present
-                const maxTokens = formData.get('max_tokens');
-                if (maxTokens) {
-                    formData.set('max_tokens', parseInt(maxTokens, 10));
+                // Convert numeric fields
+                const numericFields = {
+                    'max_completion_tokens': parseInt,
+                    'max_tokens': parseInt,
+                    'temperature': parseFloat,
+                    'version': parseInt
+                };
+
+                for (const [field, converter] of Object.entries(numericFields)) {
+                    const value = formData.get(field);
+                    if (value) {
+                        formData.set(field, converter(value));
+                    }
                 }
 
                 // Convert boolean fields
-                formData.set('requires_o1_handling', formData.get('requires_o1_handling') === 'y');
-                formData.set('is_default', formData.get('is_default') === 'y');
-
-                // Increment version number
-                const currentVersion = parseInt(formData.get('version'), 10);
-                formData.set('version', currentVersion + 1);
+                formData.set('requires_o1_handling', formData.get('requires_o1_handling') === 'on');
+                formData.set('is_default', formData.get('is_default') === 'on');
 
                 const response = await fetch(form.action, {
                     method: "POST",
@@ -244,24 +237,16 @@
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    showFeedback(data.message || "Model updated successfully", "success");
-                    // Update the displayed value
-                    document.getElementById('max-completion-tokens-value').textContent = formData.get('max_completion_tokens');
+                    showFeedback("Model updated successfully", "success");
                     setTimeout(() => {
                         window.location.href = "{{ url_for('chat.chat_interface') }}";
                     }, 1500);
                 } else {
-                    let errorMessage = "Failed to update the model";
-                    if (data.error) {
-                        errorMessage = typeof data.error === 'object'
-                            ? Object.values(data.error).join(', ')
-                            : data.error;
-                    }
-                    showFeedback(errorMessage, "error");
+                    showFeedback(data.error || "Failed to update model", "error");
                 }
             } catch (error) {
                 console.error("Error:", error);
-                showFeedback("An unexpected error occurred. Please try again.", "error");
+                showFeedback("An unexpected error occurred", "error");
             } finally {
                 submitButton.disabled = false;
                 buttonText.textContent = "Update Model";

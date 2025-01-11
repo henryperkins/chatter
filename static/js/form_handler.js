@@ -1,6 +1,8 @@
 // static/js/form_handler.js
 
 document.addEventListener("DOMContentLoaded", () => {
+  console.log("Form handler initialized");
+
   // Add ajax-form class to login form
   const loginForm = document.getElementById("login-form");
   if (loginForm) {
@@ -15,6 +17,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // Function to handle form submissions
   async function handleFormSubmit(event) {
     event.preventDefault(); // Prevent the default form submission
+    console.log("Form submission started");
+
     const form = event.target;
     const formData = new FormData(form);
 
@@ -52,6 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
 
     try {
+      console.log("Sending request");
       const response = await fetch(form.action, {
         method: form.method,
         body: formData,
@@ -61,35 +66,43 @@ document.addEventListener("DOMContentLoaded", () => {
         },
         signal: controller.signal,
       });
+      console.log("Response received:", response.status);
       clearTimeout(timeoutId);
 
       let data;
       try {
         data = await response.json();
+        console.log("Response data:", data);
       } catch (jsonError) {
         // Non-JSON response handling
         const errorText = await response.text();
+        console.error("Non-JSON response error:", errorText)
         showFeedback(`Server Error ${response.status}: ${errorText}`, "error");
         return;
       }
 
       if (response.ok && data.success) {
         // Handle successful form submission
+        console.log("Success, showing feedback");
         showFeedback(data.message || "Operation successful!", "success");
         if (data.redirect) {
+          console.log("Redirecting to:", data.redirect);
           window.location.href = data.redirect; // Redirect if needed
         }
       } else {
         // Handle errors returned from the backend
         if (data.errors) {
+          console.log("API error (validation):", data.errors);
           displayErrors(form, data.errors); // Display validation errors
         } else {
+          console.log("API error:", data.error);
           showFeedback(data.error || "An error occurred.", "error");
         }
       }
     } catch (error) {
       clearTimeout(timeoutId);
       if (error.name === "AbortError") {
+        console.error("Request timed out:", error);
         showFeedback("Request timed out. Please try again.", "error");
       } else {
         // Handle network or unexpected errors
@@ -150,4 +163,24 @@ document.addEventListener("DOMContentLoaded", () => {
       submitButton.disabled = false; // Re-enable the button
     }
   }
+
+  // Function to show feedback messages - consolidated version
+  function showFeedback(message, type = "success") {
+    console.log("Showing feedback:", message, type);
+    const feedbackDiv = document.getElementById('feedback-message');
+    if (!feedbackDiv) {
+        console.error("Feedback div not found");
+        return;
+    }
+    
+    feedbackDiv.textContent = message;
+    feedbackDiv.className = `fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 ${
+        type === 'success' ? 'bg-green-500' : 'bg-red-500'
+    } text-white`;
+    feedbackDiv.classList.remove('hidden');
+    
+    setTimeout(() => {
+        feedbackDiv.classList.add('hidden');
+    }, 3000);
+}
 });

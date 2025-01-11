@@ -101,11 +101,14 @@ def get_azure_response(
         # Set parameters based on model type
         if requires_o1_handling:
             # Required parameters for o1-preview
-            api_params.update({
-                "temperature": 1,  # Must be 1 for o1-preview
-                "max_completion_tokens": max_completion_tokens or 8500,  # Use model config or default to 8500
-                "stream": False  # Streaming not supported
-            })
+            api_params.update(
+                {
+                    "temperature": 1,  # Must be 1 for o1-preview
+                    "max_completion_tokens": max_completion_tokens
+                    or 8500,  # Use model config or default to 8500
+                    "stream": False,  # Streaming not supported
+                }
+            )
             # Ensure max_tokens is not present
             api_params.pop("max_tokens", None)
         else:
@@ -117,22 +120,25 @@ def get_azure_response(
 
         # Log the final API parameters for debugging
         logger.debug("Final API parameters: %s", api_params)
+        logger.debug("Sending request to Azure OpenAI with parameters: %s", api_params)
 
         # Make the API call
         response = client.chat.completions.create(**api_params)
 
         # Log full response for debugging
         logger.debug("Raw API response: %s", response.model_dump_json())
+        logger.debug(f"Azure API response status code: {response.status_code}")
+        logger.debug(f"Azure API response headers: {response.headers}")
 
         # Extract model response with enhanced error checking
         if not response.choices:
             logger.error("No choices in model response")
             raise ValueError("Model response contained no choices")
-            
+
         if not response.choices[0].message:
             logger.error("No message in first choice")
             raise ValueError("Model response choice contained no message")
-            
+
         model_response = response.choices[0].message.content
         if not model_response:
             logger.error("Empty content in model response")
@@ -142,7 +148,11 @@ def get_azure_response(
         logger.info(
             "Response received from the model (length: %d): %s",
             len(model_response),
-            model_response[:100] + "..." if len(model_response) > 100 else model_response
+            (
+                model_response[:100] + "..."
+                if len(model_response) > 100
+                else model_response
+            ),
         )
         return model_response
 
@@ -150,15 +160,17 @@ def get_azure_response(
         logger.error(
             "OpenAI API error with %s model: %s",
             "o1-preview" if requires_o1_handling else "standard",
-            str(e)
+            str(e),
         )
+        logger.debug("API parameters at the time of error: %s", api_params)
         raise
     except Exception as e:
         logger.error(
             "Error in get_azure_response (%s model): %s",
             "o1-preview" if requires_o1_handling else "standard",
-            str(e)
+            str(e),
         )
+        logger.debug("API parameters at the time of error: %s", api_params)
         raise
 
 
@@ -203,11 +215,16 @@ def scrape_weather(location: str) -> str:
             "Chrome/91.0.4472.124 Safari/537.36"
         )
     }
+    logger.debug(f"Request headers for {url}: {headers}")
     try:
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()  # Raise an exception for bad status codes
+        logger.debug(f"Response status code for {url}: {response.status_code}")
+        logger.debug(f"Response content snippet for {url}: {response.text[:200]}")
     except requests.exceptions.RequestException as e:
         logger.error("Error during web request for weather: %s", str(e))
+        logger.debug(f"Failed URL: {url}")
+        logger.debug(f"Request headers: {headers}")
         return "Could not retrieve weather information due to a network error."
 
     soup = BeautifulSoup(response.text, "html.parser")
@@ -237,11 +254,16 @@ def scrape_search(search_term: str) -> str:
             "Chrome/91.0.4472.124 Safari/537.36"
         )
     }
+    logger.debug(f"Request headers for {url}: {headers}")
     try:
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
+        logger.debug(f"Response status code for {url}: {response.status_code}")
+        logger.debug(f"Response content snippet for {url}: {response.text[:200]}")
     except requests.exceptions.RequestException as e:
         logger.error("Error during web request for search: %s", str(e))
+        logger.debug(f"Failed URL: {url}")
+        logger.debug(f"Request headers: {headers}")
         return "Could not retrieve search results due to a network error."
 
     soup = BeautifulSoup(response.text, "html.parser")

@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,170 +12,272 @@
     <!-- Tailwind CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
 
-    <!-- Required Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/markdown-it/dist/markdown-it.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
+    <!-- Syntax Highlighting -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
 
-    <!-- Axios CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- Custom Styles -->
+    <style>
+        /* Typing indicator animation */
+        .typing-animation {
+            display: flex;
+            gap: 4px;
+        }
+        .typing-animation .dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: typing 1.4s infinite;
+        }
+        .typing-animation .dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-animation .dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-4px); }
+        }
 
-    <!-- Include utils.js -->
-    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+        /* Dark mode transitions */
+        .dark-transition {
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
 
-    {% block extra_head %}
-    <!-- Additional styles or scripts can be added here -->
-    {% endblock %}
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #CBD5E0;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #4A5568;
+        }
+
+        /* Code block styles */
+        pre[class*="language-"] {
+            margin: 0;
+            border-radius: 0.375rem;
+        }
+        
+        /* Markdown content styles */
+        .prose {
+            max-width: 100%;
+        }
+        .prose pre {
+            margin: 0;
+            padding: 1rem;
+            background: #1a1a1a;
+            border-radius: 0.375rem;
+        }
+        .dark .prose {
+            color: #E2E8F0;
+        }
+        .dark .prose strong {
+            color: #F7FAFC;
+        }
+        .dark .prose a {
+            color: #90CDF4;
+        }
+    </style>
+
+    {% block extra_head %}{% endblock %}
 </head>
 
-<body class="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
+<body class="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
     <!-- Navbar -->
-    <nav class="bg-white dark:bg-gray-800 shadow-lg fixed w-full top-0 z-50 text-gray-700 dark:text-gray-300" role="navigation">
+    <nav class="bg-white dark:bg-gray-800 shadow-lg fixed w-full top-0 z-50" role="navigation">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <!-- Left side (Brand + Mobile toggle) -->
                 <div class="flex items-center">
-                    <!-- Mobile sidebar toggle for small devices -->
-                    <button id="sidebar-toggle"
-                        class="md:hidden mr-2 hamburger-menu inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
-                        aria-label="Toggle sidebar">
-                        <svg class="w-6 h-6 hamburger-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 6h16M4 12h16M4 18h16" />
+                    <!-- Mobile sidebar toggle -->
+                    <button id="sidebar-toggle" class="md:hidden mr-2 p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                         </svg>
                     </button>
-                    <!-- Brand name / Logo -->
+
+                    <!-- Brand -->
                     <a href="{{ url_for('chat.chat_interface') }}" class="text-xl font-bold text-blue-600">
                         Azure OpenAI Chat
                     </a>
                 </div>
 
                 <!-- Desktop navigation -->
-                <div class="hidden md:ml-6 md:flex md:space-x-4">
-                    <a href="{{ url_for('chat.chat_interface') }}"
-                        class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'chat.chat_interface' %}text-blue-600 bg-blue-50 dark:bg-gray-700 dark:text-gray-100{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-gray-100 dark:hover:bg-gray-800{% endif %}">
+                <div class="hidden md:flex md:items-center md:space-x-4">
+                    <a href="{{ url_for('chat.chat_interface') }}" 
+                       class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'chat.chat_interface' %}text-blue-600 bg-blue-50 dark:bg-gray-700{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
                         Home
                     </a>
                     {% if current_user.is_authenticated %}
-                    {% if current_user.role == 'admin' %}
-                    <a href="{{ url_for('model.add_model_page') }}"
-                        class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'model.add_model_page' %}text-blue-600 bg-blue-50 dark:bg-gray-700 dark:text-gray-100{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-gray-100 dark:hover:bg-gray-800{% endif %}">
-                        Add Model
-                    </a>
-                    <a href="{{ url_for('auth.manage_users') }}"
-                        class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'auth.manage_users' %}text-blue-600 bg-blue-50 dark:bg-gray-700 dark:text-gray-100{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-gray-100 dark:hover:bg-gray-800{% endif %}">
-                        Manage Users
-                    </a>
-                    {% endif %}
+                        {% if current_user.role == 'admin' %}
+                        <a href="{{ url_for('model.add_model_page') }}"
+                           class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'model.add_model_page' %}text-blue-600 bg-blue-50 dark:bg-gray-700{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                            Add Model
+                        </a>
+                        <a href="{{ url_for('auth.manage_users') }}"
+                           class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'auth.manage_users' %}text-blue-600 bg-blue-50 dark:bg-gray-700{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                            Manage Users
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('auth.logout') }}"
+                           class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                            Logout
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('auth.login') }}"
+                           class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                            Login
+                        </a>
+                        <a href="{{ url_for('auth.register') }}"
+                           class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                            Register
+                        </a>
                     {% endif %}
                 </div>
             </div>
         </div>
-        <!-- Dark Mode Toggle -->
-        <button id="dark-mode-toggle" class="p-2 bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded fixed top-4 right-4 z-50 hover:bg-gray-300 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500">
-            Toggle Dark Mode
-        </button>
     </nav>
 
-    <!-- Off-Canvas Menu -->
-    <div id="off-canvas-menu" class="off-canvas-menu hidden fixed inset-0 bg-white z-40" role="dialog"
-        aria-modal="true">
-        <div class="flex flex-col h-full">
-            <div class="flex items-center justify-between p-4 border-b">
-                <span class="text-lg font-semibold text-gray-900">Menu</span>
-                <button id="off-canvas-close" class="p-2 rounded-md hover:bg-gray-100" aria-label="Close menu">
-                    <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <title>Close</title>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            <ul class="flex-grow p-4">
-                <li class="mb-2">
-                    <a href="{{ url_for('chat.chat_interface') }}"
-                        class="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <title>Home</title>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M3 12h18M3 6h18M3 18h18" />
-                        </svg>
-                        Home
-                    </a>
-                </li>
-                {% if not current_user.is_authenticated %}
-                <li class="mb-2">
-                    <a href="{{ url_for('auth.login') }}" class="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <title>Login</title>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
-                        </svg>
-                        Login
-                    </a>
-                </li>
-                <li class="mb-2">
-                    <a href="{{ url_for('auth.register') }}"
-                        class="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <title>Register</title>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                        </svg>
-                        Register
-                    </a>
-                </li>
-                {% else %}
-                <li class="mb-2">
-                    <a href="{{ url_for('auth.logout') }}" class="flex items-center text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
-                        <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <title>Logout</title>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Logout
-                    </a>
-                </li>
+    <!-- Dark Mode Toggle -->
+    <button id="dark-mode-toggle" 
+            class="p-2 bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded fixed top-4 right-4 z-50 hover:bg-gray-300 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500">
+        <svg class="w-6 h-6 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                  d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+        </svg>
+        <svg class="w-6 h-6 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                  d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707"/>
+        </svg>
+    </button>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="md:hidden">
+        <div class="px-2 pt-2 pb-3 space-y-1">
+            <a href="{{ url_for('chat.chat_interface') }}" 
+               class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                Home
+            </a>
+            {% if current_user.is_authenticated %}
+                {% if current_user.role == 'admin' %}
+                <a href="{{ url_for('model.add_model_page') }}"
+                   class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    Add Model
+                </a>
+                <a href="{{ url_for('auth.manage_users') }}"
+                   class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    Manage Users
+                </a>
                 {% endif %}
-            </ul>
+                <a href="{{ url_for('auth.logout') }}"
+                   class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    Logout
+                </a>
+            {% else %}
+                <a href="{{ url_for('auth.login') }}"
+                   class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    Login
+                </a>
+                <a href="{{ url_for('auth.register') }}"
+                   class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    Register
+                </a>
+            {% endif %}
         </div>
     </div>
-
-    <!-- Overlay -->
-    <div id="overlay" class="overlay hidden fixed inset-0 bg-black opacity-50 z-30"></div>
 
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-20">
-        {% for category, message in messages %}
-        <div class="rounded-lg p-4 mb-4 {% if category == 'error' %}bg-red-100 border border-red-400 text-red-700{% else %}bg-green-100 border border-green-400 text-green-700{% endif %}"
-            role="alert" aria-live="assertive">
-            <strong class="font-bold">{{ category | title }}:</strong>
-            <span class="block sm:inline">{{ message }}</span>
+        {% if messages %}
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-20">
+            {% for category, message in messages %}
+            <div class="rounded-lg p-4 mb-4 {% if category == 'error' %}bg-red-100 border border-red-400 text-red-700{% else %}bg-green-100 border border-green-400 text-green-700{% endif %}"
+                 role="alert">
+                <strong class="font-bold">{{ category | title }}:</strong>
+                <span class="block sm:inline">{{ message }}</span>
+            </div>
+            {% endfor %}
         </div>
-        {% endfor %}
-    </div>
-    {% endif %}
+        {% endif %}
     {% endwith %}
 
     <!-- Main Content -->
-    <main class="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16">
+    <main class="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 pt-16">
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Feedback Message -->
-    <div id="feedback-message"
-        class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center"
-        role="alert" aria-live="assertive"></div>
-
-    <!-- Scripts -->
-    {% block scripts %}
-    <script src="{{ url_for('static', filename='js/base.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>
+    <!-- Required Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <!-- Core JavaScript -->
+    <script src="{{ url_for('static', filename='js/base.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+    {% block scripts %}
+    <script>
+        // Dark mode handling
+        document.addEventListener('DOMContentLoaded', () => {
+            const darkModeToggle = document.getElementById('dark-mode-toggle');
+            const html = document.documentElement;
+            
+            // Check system preference and localStorage
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const storedTheme = localStorage.getItem('theme');
+            
+            if (storedTheme === 'dark' || (!storedTheme && systemPrefersDark)) {
+                html.classList.add('dark');
+            }
+            
+            // Toggle dark mode
+            darkModeToggle?.addEventListener('click', () => {
+                html.classList.toggle('dark');
+                localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
+            });
+
+            // Mobile menu toggle
+            const mobileMenuButton = document.getElementById('sidebar-toggle');
+            const mobileMenu = document.getElementById('mobile-menu');
+            
+            mobileMenuButton?.addEventListener('click', () => {
+                mobileMenu?.classList.toggle('hidden');
+            });
+            
+            // Close mobile menu when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!mobileMenu?.contains(e.target) && !mobileMenuButton?.contains(e.target)) {
+                    mobileMenu?.classList.add('hidden');
+                }
+            });
+
+            // Flash message auto-hide
+            const flashMessages = document.querySelectorAll('[role="alert"]');
+            flashMessages.forEach(message => {
+                setTimeout(() => {
+                    message.style.opacity = '0';
+                    message.style.transition = 'opacity 0.5s ease-in-out';
+                    setTimeout(() => message.remove(), 500);
+                }, 5000);
+            });
+        });
+
+        // CSRF token handling
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        if (csrfToken) {
+            axios.defaults.headers.common['X-CSRFToken'] = csrfToken;
+        }
+    </script>
     {% endblock %}
 </body>
-
 </html>
