@@ -418,20 +418,6 @@
         return div;
     }
 
-    function getCSRFToken() {
-        const tokenElement = document.querySelector('meta[name="csrf-token"]');
-        if (!tokenElement) {
-            console.error('CSRF token meta element not found');
-            return '';
-        }
-        const token = tokenElement.getAttribute('content');
-        if (!token) {
-            console.error('CSRF token content is empty');
-            return '';
-        }
-        console.log('Retrieved CSRF token:', token);
-        return token;
-    }
 
     function escapeHtml(unsafe) {
         return unsafe
@@ -570,26 +556,6 @@
         }
     }
 
-    async function makeFetchRequest(url, options = {}) {
-        const defaultHeaders = {
-            'X-CSRFToken': getCSRFToken(),
-            'X-Requested-With': 'XMLHttpRequest',
-        };
-
-        options.headers = { ...defaultHeaders, ...options.headers };
-
-        try {
-            const response = await fetch(url, options);
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'An error occurred.');
-            }
-            return await response.json();
-        } catch (error) {
-            console.error('Fetch error:', error);
-            throw error;
-        }
-    }
 
     window.removeFile = removeFile;
 })();
