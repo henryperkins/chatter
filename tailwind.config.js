@@ -1,6 +1,5 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  // 1. More specific content paths
   content: [
     './templates/**/*.{html,jinja2}',
     './static/js/**/*.{js,jsx}',
@@ -22,11 +21,35 @@ module.exports = {
         'modal': '1050',
         'popover': '1060',
         'tooltip': '1070',
+      },
+      // Add typography configuration here instead of duplicate theme
+      typography: {
+        DEFAULT: {
+          css: {
+            maxWidth: '65ch',
+            color: false,
+            a: false,
+            strong: false,
+            blockquote: false,
+            h1: false,
+            h2: false,
+            h3: false,
+            h4: false,
+            figure: false,
+            'figure > *': false,
+            figcaption: false,
+            code: false,
+            'pre code': false,
+            'code::before': false,
+            'code::after': false,
+            'pre code::before': false,
+            'pre code::after': false,
+          }
+        }
       }
     }
   },
 
-  // 2. Disable unused core plugins
   corePlugins: {
     float: false,
     clear: false,
@@ -36,17 +59,17 @@ module.exports = {
     overscroll: false,
     placeholderColor: false,
     placeholderOpacity: false,
-    ringOffsetColor: false,
-    ringOffsetWidth: false,
     boxDecorationBreak: false,
     filter: false,
     backdropFilter: false,
     mixBlendMode: false,
     isolation: false,
     tableLayout: false,
+    // Remove these to enable ring offset features
+    // ringOffsetColor: false,
+    // ringOffsetWidth: false,
   },
 
-  // 3. Minimize variants
   variants: {
     extend: {
       backgroundColor: ['hover', 'focus', 'dark'],
@@ -54,34 +77,6 @@ module.exports = {
       borderColor: ['hover', 'focus'],
       opacity: ['hover', 'disabled'],
       scale: ['hover', 'focus'],
-    }
-  },
-
-  // 4. Configure typography plugin
-  theme: {
-    typography: {
-      DEFAULT: {
-        css: {
-          maxWidth: '65ch',
-          color: false,
-          a: false,
-          strong: false,
-          blockquote: false,
-          h1: false,
-          h2: false,
-          h3: false,
-          h4: false,
-          figure: false,
-          'figure > *': false,
-          figcaption: false,
-          code: false,
-          'pre code': false,
-          'code::before': false,
-          'code::after': false,
-          'pre code::before': false,
-          'pre code::after': false,
-        }
-      }
     }
   },
 
