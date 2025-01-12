@@ -128,8 +128,6 @@ def get_azure_response(
 
         # Log full response for debugging
         logger.debug("Raw API response: %s", response.model_dump_json())
-        logger.debug(f"Azure API response status code: {response.status_code}")
-        logger.debug(f"Azure API response headers: {response.headers}")
 
         # Extract model response with enhanced error checking
         if not response.choices:
