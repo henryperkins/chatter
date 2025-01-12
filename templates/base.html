@@ -268,7 +268,12 @@
     </main>
 
     <!-- Feedback Message -->
-    <div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-tooltip max-w-md w-full text-center bg-white dark:bg-gray-800 transition-all duration-300"></div>
+    <div
+        id="feedback-message"
+        class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center"
+        role="alert"
+        aria-live="assertive"
+    ></div>
 
     <!-- Core JavaScript -->
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
