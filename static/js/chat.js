@@ -130,13 +130,6 @@
         // Initialize message input
         adjustTextareaHeight(messageInput);
 
-        // Test send button functionality
-        console.log('Testing send button click handler...');
-        sendButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('Send button clicked'); // Debugging statement
-            sendMessage();
-        });
     });
 
     function initializeEventListeners() {
