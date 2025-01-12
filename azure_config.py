@@ -187,12 +187,12 @@ def initialize_client_from_model(
         max_completion_tokens = int(model_config.get("max_completion_tokens") or 500)
         max_tokens = int(model_config.get("max_tokens") or 16384)
 
-    # Initialize the Azure OpenAI client
+    # Initialize the Azure OpenAI client with the provided timeout
     client = AzureOpenAI(
         azure_endpoint=api_endpoint,
         api_key=api_key,
         api_version=api_version,
-        timeout=30.0,  # Set default timeout to 30 seconds
+        timeout=timeout_seconds,  # Use the passed timeout_seconds parameter
     )
 
     return (
