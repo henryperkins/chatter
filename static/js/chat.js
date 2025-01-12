@@ -227,9 +227,11 @@
         // Set up core event listeners
         console.debug('Attaching send button click handler');
         sendButton.addEventListener('click', handleSendButtonClick);
+        sendButton.addEventListener('touchend', handleSendButtonClick);
         console.debug('Attaching message input handlers');
         messageInput.addEventListener('input', handleMessageInput);
         messageInput.addEventListener('keydown', handleMessageKeydown);
+        messageInput.addEventListener('touchstart', handleMessageInput);
 
         // Add touch event listeners for mobile
         if ('ontouchstart' in window) {
