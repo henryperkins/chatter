@@ -3,12 +3,12 @@
 {% block title %}Chat - Azure OpenAI{% endblock %}
 
 {% block content %}
-<div class="flex flex-col md:flex-row h-screen overflow-hidden bg-white dark:bg-gray-900">
+<div class="flex flex-col md:flex-row h-[calc(100vh-4rem)] overflow-hidden bg-white dark:bg-gray-900">
     <!-- Sidebar -->
-    <nav id="sidebar" class="fixed md:relative z-30 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-screen">
-        <div class="p-4 space-y-4">
+    <nav id="sidebar" class="fixed md:relative z-fixed transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-hidden flex flex-col" aria-label="Chat navigation">
+        <div class="flex-none p-4 space-y-4">
             <!-- New Chat Button -->
-            <button id="new-chat-btn" class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+            <button id="new-chat-btn" class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200" aria-label="Start new chat">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
@@ -37,14 +37,15 @@
                     Add Model
                 </a>
                 <button id="edit-model-btn"
-                        class="block w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-center">
+                        class="block w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-center transition-colors duration-200"
+                        aria-label="Edit current model settings">
                     Edit Model
                 </button>
             </div>
             {% endif %}
 
             <!-- Chat List -->
-            <div class="space-y-4">
+            <div class="flex-1 overflow-y-auto space-y-4">
                 {% set ns = namespace(current_date=None) %}
                 {% for conversation in conversations|sort(attribute='timestamp', reverse=True) %}
                 {% set chat_date = conversation.timestamp.strftime('%Y-%m-%d') %}
@@ -94,7 +95,7 @@
         <div class="chat-header px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <div class="flex items-center">
                 <!-- Mobile Menu Button -->
-                <button id="mobile-menu-toggle" class="md:hidden mr-2 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+                <button id="mobile-menu-toggle" class="md:hidden mr-2 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200" aria-label="Toggle chat sidebar">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                     </svg>
@@ -102,21 +103,21 @@
                 <h2 id="chat-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">
                     {{ chat_title }} - {{ model_name }}
                 </h2>
-                <button id="edit-title-btn" class="ml-4 text-sm text-blue-600 hover:underline">
+                <button id="edit-title-btn" class="ml-4 text-sm text-blue-600 hover:underline transition-colors duration-200" aria-label="Edit chat title">
                     Edit Title
                 </button>
             </div>
         </div>
 
         <!-- Messages Area -->
-        <div id="chat-box" class="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+        <div id="chat-box" class="flex-1 overflow-y-auto px-4 py-6 space-y-4" role="log" aria-live="polite">
             {% for message in messages %}
                 {% if message.role == 'user' %}
                     <!-- User message -->
-                    <div class="flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end">
+                    <div class="flex w-full mt-2 space-x-3 max-w-2xl ml-auto justify-end">
                         <div>
                             <div class="relative bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
-                                <p class="text-sm">{{ message.content }}</p>
+                                <p class="text-sm break-words overflow-x-auto">{{ message.content }}</p>
                                 {% if loop.last %}
                                 <button class="edit-message-button absolute -left-6 top-2 text-gray-500 hover:text-gray-700"
                                         title="Edit message">
@@ -134,11 +135,11 @@
                     </div>
                 {% else %}
                     <!-- Assistant message -->
-                    <div class="flex w-full mt-2 space-x-3 max-w-lg">
-                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
-                        <div class="relative max-w-lg">
+                    <div class="flex w-full mt-2 space-x-3 max-w-3xl">
+                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700" role="img" aria-label="Assistant avatar"></div>
+                        <div class="relative max-w-3xl">
                             <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
-                                <div class="prose dark:prose-invert prose-sm max-w-none">
+                                <div class="prose dark:prose-invert prose-sm max-w-none overflow-x-auto">
                                     {{ message.content|safe }}
                                 </div>
                             </div>
@@ -181,7 +182,7 @@
         <div class="border-t border-gray-200 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-900">
             <div class="flex items-end space-x-3">
                 <!-- Upload Button -->
-                <button id="upload-button" class="p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center">
+                <button id="upload-button" class="p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center transition-colors duration-200" aria-label="Upload files">
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
@@ -191,14 +192,19 @@
 
                 <!-- Message Input -->
                 <div class="flex-1">
-                    <textarea id="message-input" class="w-full px-3 py-2 resize-none border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
-                              placeholder="Type your message..." rows="1"></textarea>
+                    <textarea id="message-input"
+                              class="w-full px-3 py-2 resize-none border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 transition-colors duration-200"
+                              placeholder="Type your message..."
+                              rows="1"
+                              aria-label="Message input"
+                              maxlength="1000"></textarea>
                 </div>
 
                 <!-- Send Button -->
                 <button id="send-button"
-                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        type="button">
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
+                        type="button"
+                        aria-label="Send message">
                     <span class="relative">Send</span>
                 </button>
             </div>
@@ -207,7 +213,7 @@
 </div>
 
 <!-- Drop Zone -->
-<div id="drop-zone" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+<div id="drop-zone" class="hidden fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-modal flex items-center justify-center transition-opacity duration-300" role="dialog" aria-label="File drop zone">
     <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl text-center">
         <p class="text-xl font-semibold text-gray-800 dark:text-gray-100">Drop files here</p>
         <p class="text-gray-500 dark:text-gray-400 mt-2">Release to upload</p>
@@ -215,7 +221,7 @@
 </div>
 
 <!-- Upload Progress -->
-<div id="upload-progress" class="hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 w-64">
+<div id="upload-progress" class="hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 w-64 transition-all duration-300 transform translate-y-0" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
     <div class="text-sm mb-2 text-gray-800 dark:text-gray-100">Uploading files...</div>
     <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
         <div id="upload-progress-bar" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>

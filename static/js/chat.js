@@ -33,27 +33,6 @@
     if (window.chatInitialized) return;
     window.chatInitialized = true;
 
-    // Mobile-specific setup
-    if (window.innerWidth < 768) {
-        // Adjust textarea height for mobile
-        messageInput.style.minHeight = '2.5rem';
-        messageInput.style.maxHeight = '6rem';
-        
-        // Hide sidebar by default on mobile
-        const sidebar = document.getElementById('sidebar');
-        if (sidebar) {
-            sidebar.classList.add('-translate-x-full');
-        }
-    }
-
-    // Add touch event listeners for mobile
-    if ('ontouchstart' in window) {
-        messageInput.addEventListener('touchstart', handleMessageInput);
-        if (sendButton) {
-            sendButton.addEventListener('touchend', handleSendButtonClick);
-        }
-    }
-
     // Cache and verify DOM elements
     const requiredElements = {
       'message-input': el => messageInput = el,
@@ -93,6 +72,66 @@
       const element = document.getElementById(id);
       if (element) {
         setter(element);
+      }
+    }
+
+    // Initialize chat box for accessibility
+    if (chatBox) {
+      chatBox.setAttribute('role', 'log');
+      chatBox.setAttribute('aria-live', 'polite');
+      chatBox.setAttribute('aria-label', 'Chat messages');
+    }
+
+    // Mobile-specific setup
+    if (window.innerWidth < 768) {
+      // Adjust textarea height for mobile
+      messageInput.style.minHeight = '2.5rem';
+      messageInput.style.maxHeight = '6rem';
+
+      // Handle mobile menu
+      const sidebar = document.getElementById('sidebar');
+      const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+      const backdrop = document.createElement('div');
+      backdrop.id = 'sidebar-backdrop';
+      backdrop.className = 'fixed inset-0 bg-black bg-opacity-50 z-modal-backdrop hidden transition-opacity duration-300 ease-in-out opacity-0';
+      backdrop.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(backdrop);
+
+      if (sidebar && mobileMenuToggle) {
+        sidebar.classList.add('-translate-x-full');
+
+        mobileMenuToggle.addEventListener('click', () => {
+          sidebar.classList.remove('-translate-x-full');
+          backdrop.classList.remove('hidden');
+          requestAnimationFrame(() => {
+            backdrop.classList.remove('opacity-0');
+          });
+          sidebar.setAttribute('aria-expanded', 'true');
+        });
+
+        backdrop.addEventListener('click', () => {
+          sidebar.classList.add('-translate-x-full');
+          backdrop.classList.add('opacity-0');
+          setTimeout(() => {
+            backdrop.classList.add('hidden');
+          }, 300);
+          sidebar.setAttribute('aria-expanded', 'false');
+        });
+
+        // Add keyboard navigation
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && !sidebar.classList.contains('-translate-x-full')) {
+            backdrop.click();
+          }
+        });
+      }
+    }
+
+    // Add touch event listeners for mobile
+    if ('ontouchstart' in window) {
+      messageInput.addEventListener('touchstart', handleMessageInput);
+      if (sendButton) {
+        sendButton.addEventListener('touchend', handleSendButtonClick);
       }
     }
 
@@ -152,7 +191,7 @@
     // Disable controls and show loading state
     messageInput.disabled = true;
     sendButton.disabled = true;
-    sendButton.innerHTML = '<span class="animate-spin">↻</span> Sending...';
+    sendButton.innerHTML = '<span class="animate-spin" aria-hidden="true">↻</span> <span class="sr-only">Sending...</span>';
 
     try {
       // Prepare form data
@@ -291,13 +330,14 @@
   function appendUserMessage(message) {
     console.debug('Appending user message:', message);
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end';
+    messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-2xl ml-auto justify-end';
+    messageDiv.setAttribute('role', 'listitem');
     messageDiv.innerHTML = `
       <div>
         <div class="relative bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
-          <p class="text-sm">${escapeHtml(message)}</p>
+          <p class="text-sm break-words overflow-x-auto">${escapeHtml(message)}</p>
         </div>
-        <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
+        <span class="text-xs text-gray-500 dark:text-gray-400 leading-none">${new Date().toLocaleTimeString()}</span>
       </div>
     `;
     chatBox.appendChild(messageDiv);
@@ -311,12 +351,22 @@
     }
 
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-lg';
+    messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-3xl';
+    messageDiv.setAttribute('role', 'listitem');
     messageDiv.innerHTML = `
-      <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
-      <div class="relative max-w-lg">
+      <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700" role="img" aria-label="Assistant avatar"></div>
+      <div class="relative max-w-3xl">
         <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
-          <div class="prose dark:prose-invert prose-sm max-w-none"></div>
+          <div class="prose dark:prose-invert prose-sm max-w-none overflow-x-auto"></div>
+        </div>
+        <div class="absolute right-0 top-0 flex space-x-2">
+          <button class="copy-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200"
+                  title="Copy to clipboard" aria-label="Copy message to clipboard">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+            </svg>
+          </button>
         </div>
         <span class="text-xs text-gray-500 dark:text-gray-400 leading-none">
           ${new Date().toLocaleTimeString()}
@@ -333,10 +383,17 @@
           'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br',
           'hr', 'span', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
         ],
-        ALLOWED_ATTR: ['href', 'src', 'alt', 'class']
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'aria-label', 'role']
       });
       contentDiv.innerHTML = sanitizedHtml;
       Prism.highlightAllUnder(contentDiv);
+
+      // Make code blocks accessible
+      contentDiv.querySelectorAll('pre').forEach(pre => {
+        pre.setAttribute('role', 'region');
+        pre.setAttribute('aria-label', 'Code block');
+        pre.tabIndex = 0;
+      });
     } else {
       console.error('Content div not found in assistant message');
     }
@@ -433,7 +490,9 @@
       fileDiv.className = 'flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-2 rounded mb-2';
       fileDiv.innerHTML = `
         <span class="text-sm truncate">${escapeHtml(file.name)}</span>
-        <button class="text-red-500 hover:text-red-700" data-index="${index}">
+        <button class="text-red-500 hover:text-red-700 transition-colors duration-200"
+                data-index="${index}"
+                aria-label="Remove ${escapeHtml(file.name)}">
           Remove
         </button>
       `;
@@ -461,10 +520,12 @@
 
     indicator = document.createElement('div');
     indicator.id = 'typing-indicator';
-    indicator.className = 'flex w-full mt-2 space-x-3 max-w-lg';
+    indicator.className = 'flex w-full mt-2 space-x-3 max-w-3xl';
+    indicator.setAttribute('role', 'status');
+    indicator.setAttribute('aria-label', 'Assistant is typing');
     indicator.innerHTML = `
       <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
-      <div class="relative max-w-lg">
+      <div class="relative max-w-3xl">
         <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
           <div class="typing-animation">
             <div class="dot"></div>
@@ -493,9 +554,9 @@
 
   function escapeHtml(unsafe) {
     return unsafe
-      .replace(/&/g, "&")
-      .replace(/</g, "<")
-      .replace(/>/g, ">")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
   }
@@ -607,7 +668,7 @@
 
     try {
       if (target.classList.contains('copy-button')) {
-        const content = target.closest('.max-w-lg').querySelector('.prose').textContent;
+        const content = target.closest('.max-w-3xl').querySelector('.prose').textContent;
         await navigator.clipboard.writeText(content);
         showFeedback('Copied to clipboard!', 'success');
       } else if (target.classList.contains('regenerate-button')) {

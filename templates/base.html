@@ -20,6 +20,36 @@
 
     <!-- Custom Styles -->
     <style>
+        /* Global scrollbar styles */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #CBD5E0 transparent;
+        }
+
+        .dark * {
+            scrollbar-color: #4A5568 transparent;
+        }
+
+        *::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        *::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        *::-webkit-scrollbar-thumb {
+            background-color: #CBD5E0;
+            border-radius: 4px;
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
+
+        .dark *::-webkit-scrollbar-thumb {
+            background-color: #4A5568;
+        }
+
         /* Typing indicator animation */
         .typing-animation {
             display: flex;
@@ -37,27 +67,6 @@
         @keyframes typing {
             0%, 60%, 100% { transform: translateY(0); }
             30% { transform: translateY(-4px); }
-        }
-
-        /* Dark mode transitions */
-        .dark-transition {
-            transition: background-color 0.3s ease, color 0.3s ease;
-        }
-
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #CBD5E0;
-            border-radius: 4px;
-        }
-        .dark ::-webkit-scrollbar-thumb {
-            background: #4A5568;
         }
 
         /* Code block styles */
@@ -85,20 +94,33 @@
         .dark .prose a {
             color: #90CDF4;
         }
+
+        /* Smooth transitions */
+        .transition-all {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 200ms;
+        }
+
+        /* Mobile menu backdrop */
+        .menu-backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
     </style>
 
     {% block extra_head %}{% endblock %}
 </head>
 
-<body class="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+<body class="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
     <!-- Navbar -->
-    <nav class="bg-white dark:bg-gray-800 shadow-lg fixed w-full top-0 z-50" role="navigation">
+    <nav class="bg-white dark:bg-gray-800 shadow-lg fixed w-full top-0 z-sticky transition-colors duration-200" role="navigation">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <!-- Left side (Brand + Mobile toggle) -->
                 <div class="flex items-center">
                     <!-- Mobile sidebar toggle -->
-                    <button id="sidebar-toggle" class="md:hidden mr-2 p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button id="sidebar-toggle" class="md:hidden mr-2 p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200">
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                         </svg>
@@ -113,31 +135,31 @@
                 <!-- Desktop navigation -->
                 <div class="hidden md:flex md:items-center md:space-x-4">
                     <a href="{{ url_for('chat.chat_interface') }}"
-                       class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'chat.chat_interface' %}text-blue-600 bg-blue-50 dark:bg-gray-700{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                       class="px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 {% if request.endpoint == 'chat.chat_interface' %}text-blue-600 bg-blue-50 dark:bg-gray-700{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
                         Home
                     </a>
                     {% if current_user.is_authenticated %}
                         {% if current_user.role == 'admin' %}
                         <a href="{{ url_for('model.add_model_page') }}"
-                           class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'model.add_model_page' %}text-blue-600 bg-blue-50 dark:bg-gray-700{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                           class="px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 {% if request.endpoint == 'model.add_model_page' %}text-blue-600 bg-blue-50 dark:bg-gray-700{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
                             Add Model
                         </a>
                         <a href="{{ url_for('auth.manage_users') }}"
-                           class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'auth.manage_users' %}text-blue-600 bg-blue-50 dark:bg-gray-700{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                           class="px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 {% if request.endpoint == 'auth.manage_users' %}text-blue-600 bg-blue-50 dark:bg-gray-700{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
                             Manage Users
                         </a>
                         {% endif %}
                         <a href="{{ url_for('auth.logout') }}"
-                           class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                           class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200">
                             Logout
                         </a>
                     {% else %}
                         <a href="{{ url_for('auth.login') }}"
-                           class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                           class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200">
                             Login
                         </a>
                         <a href="{{ url_for('auth.register') }}"
-                           class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                           class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200">
                             Register
                         </a>
                     {% endif %}
@@ -148,7 +170,8 @@
 
     <!-- Dark Mode Toggle -->
     <button id="dark-mode-toggle"
-            class="p-2 bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded fixed top-4 right-4 z-50 hover:bg-gray-300 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500">
+            class="p-2 bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded fixed top-4 right-4 z-fixed hover:bg-gray-300 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 transition-colors duration-200"
+            aria-label="Toggle dark mode">
         <svg class="w-6 h-6 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
@@ -159,43 +182,46 @@
         </svg>
     </button>
 
+    <!-- Mobile Menu Backdrop -->
+    <div id="mobile-menu-backdrop" class="fixed inset-0 z-modal-backdrop hidden menu-backdrop transition-opacity duration-300 opacity-0"></div>
+
     <!-- Mobile Menu -->
-    <div id="mobile-menu" class="md:hidden fixed inset-0 z-40 bg-white dark:bg-gray-800 transform transition-transform duration-300 ease-in-out -translate-x-full">
+    <div id="mobile-menu" class="md:hidden fixed inset-y-0 left-0 z-modal w-64 bg-white dark:bg-gray-800 transform transition-transform duration-300 ease-in-out -translate-x-full overflow-y-auto">
         <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
             <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Menu</h2>
-            <button id="mobile-menu-close" class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+            <button id="mobile-menu-close" class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
             </button>
         </div>
         <div class="p-4 space-y-2">
-            <a href="{{ url_for('chat.chat_interface') }}" 
-               class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+            <a href="{{ url_for('chat.chat_interface') }}"
+               class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200">
                 Home
             </a>
             {% if current_user.is_authenticated %}
                 {% if current_user.role == 'admin' %}
-                <a href="{{ url_for('model.add_model_page') }}" 
-                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                <a href="{{ url_for('model.add_model_page') }}"
+                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200">
                     Add Model
                 </a>
-                <a href="{{ url_for('auth.manage_users') }}" 
-                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                <a href="{{ url_for('auth.manage_users') }}"
+                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200">
                     Manage Users
                 </a>
                 {% endif %}
-                <a href="{{ url_for('auth.logout') }}" 
-                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                <a href="{{ url_for('auth.logout') }}"
+                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200">
                     Logout
                 </a>
             {% else %}
-                <a href="{{ url_for('auth.login') }}" 
-                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                <a href="{{ url_for('auth.login') }}"
+                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200">
                     Login
                 </a>
-                <a href="{{ url_for('auth.register') }}" 
-                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+                <a href="{{ url_for('auth.register') }}"
+                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200">
                     Register
                 </a>
             {% endif %}
@@ -205,12 +231,19 @@
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-20">
+        <div class="fixed top-20 left-1/2 transform -translate-x-1/2 w-full max-w-lg z-tooltip px-4">
             {% for category, message in messages %}
-            <div class="rounded-lg p-4 mb-4 {% if category == 'error' %}bg-red-100 border border-red-400 text-red-700{% else %}bg-green-100 border border-green-400 text-green-700{% endif %}"
+            <div class="rounded-lg p-4 mb-4 flex items-center justify-between transition-all duration-300 {% if category == 'error' %}bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900/50 border border-green-400 dark:border-green-800 text-green-700 dark:text-green-200{% endif %}"
                  role="alert">
-                <strong class="font-bold">{{ category | title }}:</strong>
-                <span class="block sm:inline">{{ message }}</span>
+                <div class="flex-1">
+                    <strong class="font-bold">{{ category | title }}:</strong>
+                    <span class="block sm:inline">{{ message }}</span>
+                </div>
+                <button onclick="this.parentElement.remove()" class="ml-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none transition-colors duration-200" aria-label="Dismiss">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
             </div>
             {% endfor %}
         </div>
@@ -223,7 +256,7 @@
     </main>
 
     <!-- Feedback Message -->
-    <div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center"></div>
+    <div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-tooltip max-w-md w-full text-center bg-white dark:bg-gray-800 transition-all duration-300"></div>
 
     <!-- Required Libraries -->
     <!-- Core dependencies first -->
@@ -265,8 +298,8 @@
         <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
         <script src="{{ url_for('static', filename='js/base.js') }}"></script>
         <script>
-            // Dark mode handling
             document.addEventListener('DOMContentLoaded', () => {
+                // Dark mode handling
                 const darkModeToggle = document.getElementById('dark-mode-toggle');
                 const html = document.documentElement;
 
@@ -284,29 +317,58 @@
                     localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
                 });
 
-                // Mobile menu toggle
+                // Mobile menu handling
                 const mobileMenuButton = document.getElementById('sidebar-toggle');
+                const mobileMenuClose = document.getElementById('mobile-menu-close');
                 const mobileMenu = document.getElementById('mobile-menu');
+                const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
 
-                mobileMenuButton?.addEventListener('click', () => {
-                    mobileMenu?.classList.toggle('hidden');
-                });
+                const openMobileMenu = () => {
+                    mobileMenu?.classList.remove('-translate-x-full');
+                    mobileMenuBackdrop?.classList.remove('hidden');
+                    setTimeout(() => {
+                        mobileMenuBackdrop?.classList.remove('opacity-0');
+                    }, 10);
+                };
 
-                // Close mobile menu when clicking outside
-                document.addEventListener('click', (e) => {
-                    if (!mobileMenu?.contains(e.target) && !mobileMenuButton?.contains(e.target)) {
-                        mobileMenu?.classList.add('hidden');
-                    }
-                });
+                const closeMobileMenu = () => {
+                    mobileMenu?.classList.add('-translate-x-full');
+                    mobileMenuBackdrop?.classList.add('opacity-0');
+                    setTimeout(() => {
+                        mobileMenuBackdrop?.classList.add('hidden');
+                    }, 300);
+                };
 
-                // Flash message auto-hide
+                mobileMenuButton?.addEventListener('click', openMobileMenu);
+                mobileMenuClose?.addEventListener('click', closeMobileMenu);
+                mobileMenuBackdrop?.addEventListener('click', closeMobileMenu);
+
+                // Flash message handling
                 const flashMessages = document.querySelectorAll('[role="alert"]');
                 flashMessages.forEach(message => {
-                    setTimeout(() => {
+                    const dismissButton = message.querySelector('button');
+                    let timeoutId;
+
+                    const removeMessage = () => {
                         message.style.opacity = '0';
-                        message.style.transition = 'opacity 0.5s ease-in-out';
-                        setTimeout(() => message.remove(), 500);
-                    }, 5000);
+                        message.style.transform = 'translateY(-10px)';
+                        setTimeout(() => message.remove(), 300);
+                    };
+
+                    // Auto-dismiss after 5 seconds
+                    timeoutId = setTimeout(removeMessage, 5000);
+
+                    // Cancel auto-dismiss when hovering
+                    message.addEventListener('mouseenter', () => clearTimeout(timeoutId));
+                    message.addEventListener('mouseleave', () => {
+                        timeoutId = setTimeout(removeMessage, 5000);
+                    });
+
+                    // Manual dismiss
+                    dismissButton?.addEventListener('click', () => {
+                        clearTimeout(timeoutId);
+                        removeMessage();
+                    });
                 });
             });
 
