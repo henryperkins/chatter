@@ -350,6 +350,22 @@ def get_chat_stats(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
     """Handle incoming chat messages and return AI responses."""
     try:
+        # Manually validate CSRF token
+        csrf_token = request.headers.get('X-CSRFToken')
+        if not csrf_token:
+            return jsonify({'error': 'Missing CSRF token.'}), 400
+
+        try:
+            validate_csrf(csrf_token)
+        except CSRFError as e:
+            return jsonify({'error': 'Invalid CSRF token.'}), 400
+
+        # Add logging to inspect request data
+        logger.debug(f"Request headers: {dict(request.headers)}")
+        logger.debug(f"Request content type: {request.content_type}")
+        logger.debug(f"Request form data: {request.form}")
+        logger.debug(f"Request files: {request.files}")
+
         chat_id = request.headers.get("X-Chat-ID") or session.get("chat_id")
         if not chat_id:
             return jsonify({"error": "Chat ID not found."}), 400
