@@ -35,7 +35,9 @@ class Chat:
                 query = text(
                     """
                     SELECT id FROM chats
-                    WHERE id = :chat_id AND user_id = :user_id
+                    WHERE id = :chat_id
+                    AND user_id = :user_id
+                    AND (is_deleted = 0 OR is_deleted IS NULL)
                     """
                 )
                 chat = db.execute(query, {"chat_id": chat_id, "user_id": user_id}).fetchone()
@@ -56,7 +58,7 @@ class Chat:
         if user_role == "admin":
             try:
                 with db_session() as db:
-                    query = text("SELECT COUNT(1) FROM chats WHERE id = :chat_id")
+                    query = text("SELECT COUNT(1) FROM chats WHERE id = :chat_id AND (is_deleted = 0 OR is_deleted IS NULL)")
                     result = db.execute(query, {"chat_id": chat_id}).scalar() or 0
                     exists = bool(result)
                     logger.debug(f"Admin access check for chat_id {chat_id}: {exists}")
@@ -74,7 +76,7 @@ class Chat:
         """
         with db_session() as db:
             try:
-                query = text("SELECT title FROM chats WHERE id = :chat_id")
+                query = text("SELECT title FROM chats WHERE id = :chat_id AND (is_deleted = 0 OR is_deleted IS NULL)")
                 row = db.execute(query, {"chat_id": chat_id}).mappings().first()
                 is_default = bool(row) and row["title"] == "New Chat"
                 logger.debug(f"Title default check for chat_id {chat_id}: {is_default}")
@@ -136,6 +138,7 @@ class Chat:
                     FROM chats c
                     LEFT JOIN models m ON c.model_id = m.id
                     WHERE c.user_id = :user_id
+                    AND (c.is_deleted = 0 OR c.is_deleted IS NULL)
                     ORDER by c.created_at DESC
                     LIMIT :limit OFFSET :offset
                     """
@@ -238,7 +241,7 @@ class Chat:
         """
         with db_session() as db:
             try:
-                query = text("SELECT id, user_id, title, model_id FROM chats WHERE id = :chat_id")
+                query = text("SELECT id, user_id, title, model_id FROM chats WHERE id = :chat_id AND (is_deleted = 0 OR is_deleted IS NULL)")
                 row = db.execute(query, {"chat_id": chat_id}).mappings().first()
                 return Chat(**row) if row else None
             except Exception as e:
@@ -252,7 +255,7 @@ class Chat:
         """
         with db_session() as db:
             try:
-                query = text("SELECT model_id FROM chats WHERE id = :chat_id")
+                query = text("SELECT model_id FROM chats WHERE id = :chat_id AND (is_deleted = 0 OR is_deleted IS NULL)")
                 row = db.execute(query, {"chat_id": chat_id}).mappings().first()
                 if row and row["model_id"]:
                     return Model.get_by_id(row["model_id"])
