@@ -1,6 +1,7 @@
 import logging
+import json
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Union
+from typing import Optional, List, Dict, Union, Any
 
 from sqlalchemy import text
 
@@ -34,7 +35,9 @@ class Chat:
                 query = text(
                     """
                     SELECT id FROM chats
-                    WHERE id = :chat_id AND user_id = :user_id
+                    WHERE id = :chat_id
+                    AND user_id = :user_id
+                    AND (is_deleted = 0 OR is_deleted IS NULL)
                     """
                 )
                 chat = db.execute(query, {"chat_id": chat_id, "user_id": user_id}).fetchone()
@@ -55,7 +58,7 @@ class Chat:
         if user_role == "admin":
             try:
                 with db_session() as db:
-                    query = text("SELECT COUNT(1) FROM chats WHERE id = :chat_id")
+                    query = text("SELECT COUNT(1) FROM chats WHERE id = :chat_id AND (is_deleted = 0 OR is_deleted IS NULL)")
                     result = db.execute(query, {"chat_id": chat_id}).scalar() or 0
                     exists = bool(result)
                     logger.debug(f"Admin access check for chat_id {chat_id}: {exists}")
@@ -73,7 +76,7 @@ class Chat:
         """
         with db_session() as db:
             try:
-                query = text("SELECT title FROM chats WHERE id = :chat_id")
+                query = text("SELECT title FROM chats WHERE id = :chat_id AND (is_deleted = 0 OR is_deleted IS NULL)")
                 row = db.execute(query, {"chat_id": chat_id}).mappings().first()
                 is_default = bool(row) and row["title"] == "New Chat"
                 logger.debug(f"Title default check for chat_id {chat_id}: {is_default}")
@@ -135,6 +138,7 @@ class Chat:
                     FROM chats c
                     LEFT JOIN models m ON c.model_id = m.id
                     WHERE c.user_id = :user_id
+                    AND (c.is_deleted = 0 OR c.is_deleted IS NULL)
                     ORDER by c.created_at DESC
                     LIMIT :limit OFFSET :offset
                     """
@@ -242,7 +246,7 @@ class Chat:
         """
         with db_session() as db:
             try:
-                query = text("SELECT id, user_id, title, model_id FROM chats WHERE id = :chat_id")
+                query = text("SELECT id, user_id, title, model_id FROM chats WHERE id = :chat_id AND (is_deleted = 0 OR is_deleted IS NULL)")
                 row = db.execute(query, {"chat_id": chat_id}).mappings().first()
                 return Chat(**row) if row else None
             except Exception as e:
@@ -256,11 +260,82 @@ class Chat:
         """
         with db_session() as db:
             try:
-                query = text("SELECT model_id FROM chats WHERE id = :chat_id")
+                query = text("SELECT model_id FROM chats WHERE id = :chat_id AND (is_deleted = 0 OR is_deleted IS NULL)")
                 row = db.execute(query, {"chat_id": chat_id}).mappings().first()
                 if row and row["model_id"]:
                     return Model.get_by_id(row["model_id"])
                 return None
             except Exception as e:
                 logger.error(f"Error retrieving model for chat_id {chat_id}: {e}")
+                raise
+
+    @staticmethod
+    def add_message(chat_id: str, role: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Add a message to the chat with optional metadata.
+
+        Args:
+            chat_id: The ID of the chat to add the message to
+            role: The role of the message sender ('user', 'assistant', or 'system')
+            content: The content of the message
+            metadata: Optional metadata dictionary for the message
+        """
+        with db_session() as db:
+            try:
+                query = text("""
+                    INSERT INTO messages (chat_id, role, content, metadata)
+                    VALUES (:chat_id, :role, :content, :metadata)
+                """)
+
+                db.execute(query, {
+                    "chat_id": chat_id,
+                    "role": role,
+                    "content": content,
+                    "metadata": json.dumps(metadata or {})
+                })
+                db.commit()
+                logger.info(f"Added message to chat {chat_id}")
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error adding message to chat {chat_id}: {e}")
+                raise
+
+    @staticmethod
+    def get_messages(chat_id: str, include_system: bool = False) -> List[Dict[str, Union[int, str, Dict[str, Any]]]]:
+        """
+        Get messages for a chat with optional filtering.
+
+        Args:
+            chat_id: The ID of the chat to get messages for
+            include_system: Whether to include system messages in the result
+
+        Returns:
+            List of message dictionaries containing id, role, content, metadata, and timestamp
+        """
+        with db_session() as db:
+            try:
+                conditions = ["chat_id = :chat_id"]
+                if not include_system:
+                    conditions.append("role != 'system'")
+
+                query = text(f"""
+                    SELECT id, role, content, metadata,
+                           strftime('%Y-%m-%d %H:%M:%S', timestamp) as timestamp
+                    FROM messages
+                    WHERE {' AND '.join(conditions)}
+                    ORDER BY timestamp ASC
+                """)
+
+                result = db.execute(query, {"chat_id": chat_id}).mappings().all()
+                messages: List[Dict[str, Union[int, str, Dict[str, Any]]]] = []
+                for row in result:
+                    message = dict(row)
+                    try:
+                        message['metadata'] = json.loads(message['metadata']) if message['metadata'] else {}
+                    except (json.JSONDecodeError, TypeError):
+                        message['metadata'] = {}
+                    messages.append(message)
+                return messages
+            except Exception as e:
+                logger.error(f"Error getting messages for chat {chat_id}: {e}")
                 raise

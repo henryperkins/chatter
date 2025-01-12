@@ -186,7 +186,13 @@ def chat_interface() -> Response:
     chat_title = chat.title
     model_name = model.name if model else "Default Model"
 
+    # Get messages and process them for display
     messages = conversation_manager.get_context(chat_id)
+    for message in messages:
+        if message['role'] == 'assistant':
+            # Escape any Jinja2 template syntax in stored messages
+            message['content'] = message['content'].replace("{%", "&#123;%").replace("%}", "%&#125;")
+
     models = Model.get_all()
     conversations = [
         {
@@ -224,6 +230,10 @@ def get_chat_context(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         return jsonify({"error": "Chat not found or access denied"}), 403
 
     messages = conversation_manager.get_context(chat_id)
+    # Process messages to escape Jinja2 template syntax
+    for message in messages:
+        if message['role'] == 'assistant':
+            message['content'] = message['content'].replace("{%", "&#123;%").replace("%}", "%&#125;")
     return cast(Response, jsonify({"messages": messages}))
 
 
@@ -316,59 +326,50 @@ def validate_model(model_obj: Optional[Model]) -> Optional[str]:
     return None
 
 
+@chat_routes.route("/stats/<chat_id>", methods=["GET"])
+@login_required
+def get_chat_stats(chat_id: str) -> Union[Response, Tuple[Response, int]]:
+    """Get chat usage statistics."""
+    try:
+        if not validate_chat_access(chat_id):
+            return jsonify({"error": "Unauthorized access to chat"}), 403
+
+        stats = conversation_manager.get_usage_stats(chat_id)
+        return cast(Response, jsonify({
+            "success": True,
+            "stats": stats
+        }))
+    except Exception as e:
+        logger.error(f"Error getting chat stats: {e}")
+        return jsonify({"error": "Failed to get chat statistics"}), 500
+
+
 @chat_routes.route("/", methods=["POST"])
 @login_required
 @limiter.limit(CHAT_RATE_LIMIT)
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
     """Handle incoming chat messages and return AI responses."""
-    # Initialize all variables that might be used in error handling
-    chat_id = None
-    model_obj = None
-    user_message = ""
-    combined_message = ""
-    included_files = []
-    excluded_files = []
-    file_contents = []
-    total_tokens = 0
-    model_response = ""
-
     try:
-        logger.debug(
-            "Received chat message from user %s with data: %s",
-            current_user.id,
-            {
-                "form": request.form.to_dict(),
-                "files": (
-                    [f.filename for f in request.files.getlist("files[]")]
-                    if request.files
-                    else []
-                ),
-                "headers": dict(request.headers),
-            },
-        )
-
         chat_id = request.headers.get("X-Chat-ID") or session.get("chat_id")
         if not chat_id:
-            logger.error(
-                "Chat ID not found in headers or session for user %s", current_user.id
-            )
             return jsonify({"error": "Chat ID not found."}), 400
 
         if not validate_chat_access(chat_id):
-            logger.error(
-                "User %s attempted to access unauthorized chat %s",
-                current_user.id,
-                chat_id,
-            )
             return jsonify({"error": "Unauthorized access to chat"}), 403
 
         model_obj = Chat.get_model(chat_id)
         model_error = validate_model(model_obj)
         if model_error:
-            logger.error(model_error)
             return jsonify({"error": model_error}), 400
 
+        # Validate message is present in form data
+        if "message" not in request.form:
+            return jsonify({"error": "Message is required."}), 400
+
         user_message = bleach.clean(request.form.get("message", "").strip())
+        if not user_message and not request.files:
+            return jsonify({"error": "Message or files are required."}), 400
+
         logger.debug(f"User message: {user_message}")
 
         included_files, excluded_files, file_contents, total_tokens = process_uploaded_files(
@@ -388,18 +389,22 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             )
             Chat.update_title(chat_id, generate_chat_title(conversation_text))
 
+        # Add user message with metadata
         conversation_manager.add_message(
-            chat_id,
-            "user",
-            combined_message,
+            chat_id=chat_id,
+            role="user",
+            content=combined_message,
             model_max_tokens=getattr(model_obj, 'max_tokens', None),
-            requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False),
+            requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False)
         )
 
+        # Get optimized context
         history = conversation_manager.get_context(
-            chat_id, include_system=not getattr(model_obj, 'requires_o1_handling', False)
+            chat_id,
+            include_system=not getattr(model_obj, 'requires_o1_handling', False)
         )
 
+        # Get Azure response
         logger.debug("Sending request to Azure API")
         model_response = get_azure_response(
             messages=history,
@@ -413,32 +418,24 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         )
         logger.debug("Received API response: %d chars", len(model_response))
 
+        # Process model response to escape any Jinja2 template syntax
+        processed_response = model_response.replace("{%", "&#123;%").replace("%}", "%&#125;")
+
+        # Add assistant response with metadata
         conversation_manager.add_message(
-            chat_id,
-            "assistant",
-            model_response,
+            chat_id=chat_id,
+            role="assistant",
+            content=processed_response,
             model_max_tokens=getattr(model_obj, 'max_tokens', None),
-            requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False),
+            requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False)
         )
 
         return cast(Response, jsonify({
-            "response": model_response,
+            "response": processed_response,
             "included_files": included_files,
             "excluded_files": excluded_files,
         }))
 
     except Exception as ex:
         logger.error("Error during chat handling: %s", str(ex), exc_info=True)
-        logger.error(
-            "Failed request details: %s",
-            {
-                "chat_id": chat_id,
-                "model": getattr(model_obj, 'deployment_name', None) if model_obj else None,
-                "message_length": len(combined_message),
-                "file_count": len(included_files),
-                "error": str(ex),
-            },
-        )
-        return jsonify({
-            "error": "An unexpected error occurred."
-        }), 500
+        return jsonify({"error": "An unexpected error occurred."}), 500

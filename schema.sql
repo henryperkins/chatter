@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS chats (
     user_id INTEGER NOT NULL, -- Foreign key referencing users table
     title TEXT NOT NULL DEFAULT 'New Chat', -- Title of the chat (updated after first message)
     model_id INTEGER DEFAULT NULL, -- Foreign key referencing models table
+    is_deleted BOOLEAN DEFAULT 0, -- Soft delete flag
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     FOREIGN KEY (model_id) REFERENCES models (id) ON DELETE RESTRICT
@@ -72,6 +73,7 @@ CREATE TABLE IF NOT EXISTS messages (
     chat_id TEXT NOT NULL, -- Foreign key referencing chats table
     role TEXT NOT NULL, -- 'user', 'assistant', or 'system'
     content TEXT NOT NULL, -- Contents of the message
+    metadata JSON, -- Metadata for the message (token count, timestamps, etc.)
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
 );
@@ -99,4 +101,6 @@ CREATE INDEX IF NOT EXISTS idx_models_is_default ON models (is_default); -- Ensu
 CREATE INDEX IF NOT EXISTS idx_uploaded_files_chat_id ON uploaded_files (chat_id); -- Speeds up file lookups by chat
 CREATE INDEX IF NOT EXISTS idx_model_versions_model_id ON model_versions (model_id); -- Speeds up version history lookups
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages (timestamp); -- Speeds up fetching messages by timestamp
+CREATE INDEX IF NOT EXISTS idx_messages_metadata ON messages((json_extract(metadata, '$.summarized'))); -- Speeds up metadata queries
+CREATE INDEX IF NOT EXISTS idx_messages_role ON messages(role); -- Speeds up role-based filtering
 CREATE INDEX IF NOT EXISTS idx_chats_created_at ON chats (created_at); -- Speeds up fetching chats by creation time

@@ -1,11 +1,13 @@
 import logging
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
+from datetime import datetime, timezone
 
+import tiktoken
 from sqlalchemy import text
 from database import get_db
+from models.chat import Chat
 from token_utils import count_tokens
-import tiktoken
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +19,7 @@ TOKENS_PER_ASSISTANT_REPLY: int = 3  # Accounts for assistant's reply tokens
 # Configurable Environment Variables (with defaults)
 MAX_MESSAGES: int = int(os.getenv("MAX_MESSAGES", "20"))
 MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "16384"))  # Adjusted for GPT-4 16K model
-MAX_MESSAGE_TOKENS: int = int(
-    os.getenv("MAX_MESSAGE_TOKENS", "8192")
-)  # GPT-4 input limit
+MAX_MESSAGE_TOKENS: int = int(os.getenv("MAX_MESSAGE_TOKENS", "8192"))  # GPT-4 input limit
 MODEL_NAME: str = os.getenv("MODEL_NAME", "gpt-4")  # Model for token counting
 
 
@@ -60,9 +60,7 @@ class ConversationManager:
         num_tokens += TOKENS_PER_ASSISTANT_REPLY
         return num_tokens
 
-    def get_context(
-        self, chat_id: str, include_system: bool = False
-    ) -> List[Dict[str, str]]:
+    def get_context(self, chat_id: str, include_system: bool = False) -> List[Dict[str, str]]:
         """
         Retrieve the conversation context for a specific chat ID.
 
@@ -73,37 +71,17 @@ class ConversationManager:
         Returns:
             A list of message dictionaries with 'role' and 'content'.
         """
-        db = get_db()
-        try:
-            messages = (
-                db.execute(
-                    text(
-                        """
-                SELECT id, role, content
-                FROM messages
-                WHERE chat_id = :chat_id
-                ORDER BY timestamp ASC
-                """
-                    ),
-                    {"chat_id": chat_id},
-                )
-                .mappings()
-                .all()
-            )
-
-            if include_system:
-                return [
-                    {"id": msg["id"], "role": msg["role"], "content": msg["content"]}
-                    for msg in messages
-                ]
-            else:
-                return [
-                    {"id": msg["id"], "role": msg["role"], "content": msg["content"]}
-                    for msg in messages
-                    if msg["role"] != "system"
-                ]
-        finally:
-            db.close()
+        messages = Chat.get_messages(chat_id=chat_id, include_system=include_system)
+        context: List[Dict[str, str]] = []
+        for msg in messages:
+            role = msg.get("role")
+            content = msg.get("content")
+            if isinstance(role, str) and isinstance(content, str):
+                context.append({
+                    "role": role,
+                    "content": content
+                })
+        return context
 
     def add_message(
         self,
@@ -114,15 +92,14 @@ class ConversationManager:
         requires_o1_handling: bool = False,
     ) -> None:
         """
-        Add a message to the conversation context.
-        Truncate user messages if they exceed MAX_MESSAGE_TOKENS.
-        Assistant messages are stored without truncation.
+        Add a message to the conversation context with metadata and token management.
 
         Args:
             chat_id: The unique identifier for the chat session.
             role: The role of the message sender ("user", "assistant", or "system").
             content: The message content to add.
             model_max_tokens: The maximum number of tokens allowed for the model.
+            requires_o1_handling: Whether the message requires o1-preview handling.
 
         Raises:
             Exception: If there's an error adding the message to the database.
@@ -138,143 +115,135 @@ class ConversationManager:
             else:
                 model_max_tokens = MAX_TOKENS  # Default for other models
 
-        if role == "user":
-            # Truncate user messages if necessary
-            tokens = encoding.encode(content)
-            content = self.truncate_message(
-                content, max_tokens=MAX_MESSAGE_TOKENS, tokens=tokens
-            )
-        # Assistant messages are not truncated
+        # Calculate tokens and prepare metadata
+        tokens = len(encoding.encode(content))
+        metadata: Dict[str, Any] = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "token_count": tokens,
+            "requires_o1": requires_o1_handling,
+            "model_max_tokens": model_max_tokens
+        }
 
-        db = get_db()
-        try:
-            # Insert new message
-            db.execute(
-                text(
-                    """
-                    INSERT INTO messages (chat_id, role, content)
-                    VALUES (:chat_id, :role, :content)
-                    """
-                ),
-                {"chat_id": chat_id, "role": role, "content": content},
-            )
-            db.commit()
+        if role == "user" and tokens > MAX_MESSAGE_TOKENS:
+            content = self._truncate_content(content, encoding)
+            metadata["truncated"] = True
 
-            # Retrieve all messages including the new one
-            messages = (
-                db.execute(
-                    text(
-                        """
-                    SELECT id, role, content
-                    FROM messages
-                    WHERE chat_id = :chat_id
-                    ORDER BY timestamp ASC
-                    """
-                    ),
-                    {"chat_id": chat_id},
-                )
-                .mappings()
-                .all()
-            )
+        # Add message using Chat model
+        Chat.add_message(
+            chat_id=chat_id,
+            role=role,
+            content=content,
+            metadata=metadata
+        )
 
-            # Convert to message dicts
-            message_dicts = [
-                {"id": msg["id"], "role": msg["role"], "content": msg["content"]}
-                for msg in messages
-            ]
+        # Manage context window
+        self._manage_context_window(chat_id, model_max_tokens)
 
-            # Maintain a running total of tokens
-            total_tokens = sum(
-                self.num_tokens_from_messages([msg]) for msg in message_dicts
-            )
-
-            while total_tokens > model_max_tokens and len(message_dicts) > 1:
-                # Remove oldest message to stay within token limit
-                msg_to_remove = message_dicts.pop(0)
-                msg_tokens = self.num_tokens_from_messages([msg_to_remove])
-                db.execute(
-                    text("DELETE FROM messages WHERE id = :id"),
-                    {"id": msg_to_remove["id"]},
-                )
-                db.commit()
-                total_tokens -= msg_tokens
-
-            logger.debug(f"Added message to chat {chat_id}: {role}: {content[:50]}...")
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error adding message to chat {chat_id}: {e}")
-            raise
-        finally:
-            db.close()
-
-    def clear_context(self, chat_id: str) -> None:
-        """Clear the conversation context for a specific chat ID."""
-        db = get_db()
-        try:
-            db.execute(
-                text("DELETE FROM messages WHERE chat_id = :chat_id"),
-                {"chat_id": chat_id},
-            )
-            db.commit()
-            logger.debug(f"Cleared context for chat {chat_id}")
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error clearing context for chat {chat_id}: {e}")
-            raise
-        finally:
-            db.close()
-
-    def truncate_message(
-        self, message: str, max_tokens: int, tokens: Optional[List[int]] = None
-    ) -> str:
+    def _truncate_content(self, content: str, encoding: Any) -> str:
         """
-        Truncate a message to fit within the maximum token limit.
+        Truncate content to fit within token limit.
 
         Args:
-            message: The message to truncate.
-            max_tokens: Maximum number of tokens allowed.
-            tokens: Optional pre-encoded tokens to avoid re-encoding.
+            content: The content to truncate
+            encoding: The tiktoken encoding to use
 
         Returns:
-            The original message or a truncated version if it exceeds the token limit.
+            Truncated content with a note
         """
+        tokens = encoding.encode(content)[:MAX_MESSAGE_TOKENS]
+        truncated = encoding.decode(tokens)
+        return f"{truncated}\n\n[Note: Content truncated to fit token limit]"
+
+    def _manage_context_window(self, chat_id: str, max_tokens: int) -> None:
+        """
+        Manage context window to stay within token limits.
+
+        Args:
+            chat_id: The chat ID to manage context for
+            max_tokens: Maximum tokens allowed
+        """
+        messages = Chat.get_messages(chat_id)
+        current_tokens = 0
+        messages_to_keep: List[Dict[str, Any]] = []
+
+        # Calculate tokens from newest to oldest
+        for msg in reversed(messages):
+            metadata = msg.get("metadata", {})
+            if isinstance(metadata, dict):
+                msg_tokens = metadata.get("token_count", 0)
+                if isinstance(msg_tokens, (int, float)) and current_tokens + msg_tokens <= max_tokens:
+                    messages_to_keep.append(msg)
+                    current_tokens += msg_tokens
+                else:
+                    break
+
+        # If we need to remove messages
+        if len(messages_to_keep) < len(messages):
+            keep_ids = [msg["id"] for msg in messages_to_keep if isinstance(msg.get("id"), int)]
+            self._remove_old_messages(chat_id, keep_ids)
+
+    def _remove_old_messages(self, chat_id: str, keep_ids: List[int]) -> None:
+        """
+        Remove old messages while keeping specified ones.
+
+        Args:
+            chat_id: The chat ID to remove messages from
+            keep_ids: List of message IDs to keep
+        """
+        if not keep_ids:
+            return
+
+        db = get_db()
         try:
-            encoding = tiktoken.encoding_for_model(MODEL_NAME)
-        except KeyError:
-            encoding = tiktoken.get_encoding("cl100k_base")
-
-        # Use provided tokens if available, otherwise encode the message
-        message_tokens = tokens if tokens is not None else encoding.encode(message)
-        num_tokens = len(message_tokens)
-
-        if num_tokens > max_tokens:
-            truncated_tokens = message_tokens[:max_tokens]
-            truncated_message = encoding.decode(truncated_tokens)
-            truncated_message += "\n\n[Note: The input was truncated.]"
-            logger.warning(
-                f"Message truncated to {max_tokens} tokens. Original tokens: {num_tokens}."
-            )
-            return truncated_message
-        return message
+            query = text("""
+                DELETE FROM messages
+                WHERE chat_id = :chat_id
+                AND id NOT IN :keep_ids
+            """)
+            db.execute(query, {
+                "chat_id": chat_id,
+                "keep_ids": tuple(keep_ids)
+            })
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error removing old messages from chat {chat_id}: {e}")
+            raise
+        finally:
+            db.close()
 
     def get_usage_stats(self, chat_id: str) -> Dict[str, int]:
         """
-        Get usage statistics for a chat session.
+        Get detailed usage statistics.
 
         Args:
-            chat_id: The unique identifier for the chat session.
+            chat_id: The chat ID to get stats for
 
         Returns:
-            Dictionary containing:
-            - total_messages: Number of messages in the chat
-            - total_tokens: Total number of tokens used by all messages
+            Dictionary containing usage statistics
         """
-        messages = self.get_context(chat_id, include_system=True)
-        total_tokens = self.num_tokens_from_messages(messages)
-        return {
+        messages = Chat.get_messages(chat_id, include_system=True)
+
+        stats = {
             "total_messages": len(messages),
-            "total_tokens": total_tokens,
+            "total_tokens": 0,
+            "user_messages": 0,
+            "assistant_messages": 0,
+            "system_messages": 0
         }
+
+        for msg in messages:
+            metadata = msg.get("metadata", {})
+            if isinstance(metadata, dict):
+                tokens = metadata.get("token_count", 0)
+                if isinstance(tokens, (int, float)):
+                    stats["total_tokens"] += int(tokens)
+
+            role = msg.get("role", "")
+            if isinstance(role, str) and role in ["user", "assistant", "system"]:
+                stats[f"{role}_messages"] += 1
+
+        return stats
 
 
 # Export an instance of ConversationManager

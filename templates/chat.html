@@ -11,9 +11,7 @@
         <div class="flex-none p-4 space-y-4">
             <!-- New Chat Button -->
             <button id="new-chat-btn" class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200" aria-label="Start new chat">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                </svg>
+                <i class="fas fa-plus mr-2"></i>
                 New Chat
             </button>
 
@@ -36,11 +34,13 @@
             <div class="space-y-2">
                 <a href="{{ url_for('model.add_model_page') }}"
                    class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center">
+                    <i class="fas fa-plus-circle mr-2"></i>
                     Add Model
                 </a>
                 <button id="edit-model-btn"
                         class="block w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-center transition-colors duration-200"
                         aria-label="Edit current model settings">
+                    <i class="fas fa-edit mr-2"></i>
                     Edit Model
                 </button>
             </div>
@@ -80,10 +80,7 @@
                     </a>
                     <button class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center h-8 w-8 rounded-full hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 delete-chat-btn focus:ring-2 focus:ring-red-500"
                             data-chat-id="{{ conversation.id }}" title="Delete chat">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                        </svg>
+                        <i class="fas fa-trash-alt"></i>
                     </button>
                 </div>
                 {% endfor %}
@@ -98,15 +95,13 @@
             <div class="flex items-center">
                 <!-- Mobile Menu Button -->
                 <button id="mobile-menu-toggle" class="md:hidden mr-2 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200" aria-label="Toggle chat sidebar">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                    </svg>
+                    <i class="fas fa-bars"></i>
                 </button>
                 <h2 id="chat-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">
                     {{ chat_title }} - {{ model_name }}
                 </h2>
                 <button id="edit-title-btn" class="ml-4 text-sm text-blue-600 hover:underline transition-colors duration-200" aria-label="Edit chat title">
-                    Edit Title
+                    <i class="fas fa-edit"></i>
                 </button>
             </div>
         </div>
@@ -123,10 +118,7 @@
                                 {% if loop.last %}
                                 <button class="edit-message-button absolute -left-6 top-2 text-gray-500 hover:text-gray-700"
                                         title="Edit message">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                    </svg>
+                                    <i class="fas fa-pen"></i>
                                 </button>
                                 {% endif %}
                             </div>
@@ -148,18 +140,12 @@
                             <div class="absolute right-0 top-0 flex space-x-2">
                                 <button class="copy-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                                         title="Copy to clipboard">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
-                                    </svg>
+                                    <i class="fas fa-copy"></i>
                                 </button>
                                 {% if loop.last %}
                                 <button class="regenerate-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                                         title="Regenerate response">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                                    </svg>
+                                    <i class="fas fa-sync-alt"></i>
                                 </button>
                                 {% endif %}
                             </div>
@@ -185,9 +171,7 @@
             <div class="flex flex-col sm:flex-row items-start sm:items-end space-y-2 sm:space-y-0 sm:space-x-3">
                 <!-- Upload Button -->
                 <button id="upload-button" class="w-full sm:w-auto p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors duration-200" aria-label="Upload files">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
+                    <i class="fas fa-upload mr-2"></i>
                     <span class="hidden sm:inline">Upload</span>
                 </button>
                 <input type="file" id="file-input" class="hidden" multiple>
@@ -208,10 +192,8 @@
                             class="px-4 py-2 bg-blue-600 text-white rounded-lg sm:rounded-l-none sm:rounded-r-lg hover:bg-blue-700 flex items-center justify-center transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 min-w-[4rem] filter hover:brightness-110"
                             type="button"
                             aria-label="Send message">
+                        <i class="fas fa-paper-plane mr-2"></i>
                         <span class="relative hidden sm:inline">Send</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18l9-2zm0 0v-8"/>
-                        </svg>
                     </button>
                 </div>
             </div>
