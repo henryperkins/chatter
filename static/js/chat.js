@@ -89,7 +89,7 @@
   }
 
   async function sendMessage() {
-    if (!messageInput.value.trim() && uploadedFiles.length === 0) {
+    if (messageInput.value.trim() === '' && uploadedFiles.length === 0) {
       showFeedback('Please enter a message or upload files.', 'error');
       return;
     }
@@ -120,7 +120,7 @@
       showTypingIndicator();
 
       // Send request
-      const chatId = new URLSearchParams(window.location.search).get('chat_id');
+      const chatId = window.CHAT_CONFIG.chatId;
       const data = await window.utils.fetchWithCSRF('/chat/', {
         method: 'POST',
         body: formData,
@@ -153,6 +153,7 @@
       messageInput.disabled = false;
       sendButton.disabled = false;
       sendButton.innerHTML = originalButtonText;
+      // Remove typing indicator after assistant's message is appended
       removeTypingIndicator();
       messageInput.focus();
     }
