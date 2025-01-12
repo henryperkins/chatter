@@ -1,6 +1,5 @@
 (function () {
-  // Wait for all dependencies to be loaded
-  document.addEventListener('DOMContentLoaded', () => {
+  function init() {
     // Verify dependencies
     if (!window.utils || !window.md || !window.DOMPurify || !window.Prism) {
       console.error('Required dependencies not loaded');
@@ -218,7 +217,7 @@
         deleteButtons.forEach(btn => {
           const chatId = btn.dataset.chatId;
           console.debug(`Setting up delete button for chat ${chatId}`);
-          btn.addEventListener('click', (e) => {
+          btn.addEventListener('click', () => {
             console.debug(`Delete button clicked for chat ${chatId}`);
             if (chatId) {
               deleteChat(chatId);
@@ -241,6 +240,7 @@
     initializeChat();
 
     async function sendMessage() {
+      console.debug('sendMessage called');
       if (messageInput.value.trim() === '' && uploadedFiles.length === 0) {
         showFeedback('Please enter a message or upload files.', 'error');
         return;
@@ -273,6 +273,7 @@
 
         // Send request
         const chatId = window.CHAT_CONFIG?.chatId;
+        console.debug('Using chat ID:', chatId);
         const data = await fetchWithCSRF('/chat/', {
           method: 'POST',
           body: formData,
@@ -316,12 +317,16 @@
     }
 
     function handleSendButtonClick(e) {
+      console.debug('Send button clicked');
       e.preventDefault();
       if (!sendButton.disabled) {
+        console.debug('Send button not disabled, proceeding with send');
         sendMessage().catch(error => {
           console.error('Error in sendMessage:', error);
           showFeedback('Failed to send message', 'error');
         });
+      } else {
+        console.debug('Send button is disabled, ignoring click');
       }
     }
 
@@ -433,12 +438,6 @@
                     title="Copy to clipboard" aria-label="Copy message to clipboard">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
-              </svg>
-            </button>
-          </div>
-          <span class="text-xs text-gray-500 dark:text-gray-400 leading-none">
-            ${new Date().toLocaleTimeString()}
           </span>
         </div>
       `;
@@ -818,5 +817,12 @@
     window.editChatTitle = editChatTitle;
     window.deleteChat = deleteChat;
     window.removeFile = removeFile;
-  });
+  }
+
+  // Initialize either when DOM is ready or immediately if already loaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
