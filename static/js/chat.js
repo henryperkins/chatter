@@ -282,6 +282,9 @@
         formData.append('message', messageText);
         uploadedFiles.forEach(file => formData.append('files[]', file));
 
+        // Add CSRF token to FormData
+        formData.append('csrf_token', utils.getCSRFToken());
+
         // Update UI immediately
         appendUserMessage(messageText);
         messageInput.value = '';
