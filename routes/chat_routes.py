@@ -144,9 +144,13 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
         chat_id = generate_new_chat_id()
         user_id = int(current_user.id)
 
-        Chat.create(chat_id=chat_id, user_id=user_id, title="New Chat")
-        session["chat_id"] = chat_id
-        logger.info("New chat created with ID: %s", chat_id)
+        try:
+            Chat.create(chat_id=chat_id, user_id=user_id, title="New Chat")
+            session["chat_id"] = chat_id
+            logger.info("New chat created with ID: %s", chat_id)
+        except ValueError as e:
+            logger.error(f"No model available to create chat: {e}")
+            return jsonify({"error": "No AI models are configured. Please contact your administrator."}), 500
 
         if request.method == "POST":
             return cast(Response, jsonify({"success": True, "chat_id": chat_id}))

@@ -184,6 +184,9 @@ class Chat:
             user_id: ID of the user creating the chat
             title: Title of the chat (default: "New Chat")
             model_id: Optional ID of the model to use
+
+        Raises:
+            ValueError: If no model ID could be determined
         """
         # Validate and clean the title
         cleaned_title = title.strip()[:50]
@@ -191,6 +194,8 @@ class Chat:
         # Get default model if no model specified
         if model_id is None:
             model_id = Chat.get_default_model_id()
+            if model_id is None:
+                raise ValueError("No default model available and no model_id provided")
 
         with db_session() as db:
             try:
