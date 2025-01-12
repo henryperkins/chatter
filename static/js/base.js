@@ -9,6 +9,9 @@
         const mobileMenuClose = document.getElementById('mobile-menu-close');
         const sidebar = document.getElementById('sidebar');
 
+        // Only proceed if required elements exist
+        if (!mobileMenu || !mobileMenuToggle) return;
+
         function toggleMobileMenu() {
             const expanded = mobileMenuToggle.getAttribute('aria-expanded') === 'true';
             mobileMenu.classList.toggle('-translate-x-full');
@@ -16,12 +19,12 @@
         }
 
         function toggleSidebar() {
-            sidebar.classList.toggle('-translate-x-full');
+            if (sidebar) {
+                sidebar.classList.toggle('-translate-x-full');
+            }
         }
 
-        if (mobileMenuToggle) {
-            mobileMenuToggle.addEventListener('click', toggleSidebar);
-        }
+        mobileMenuToggle.addEventListener('click', toggleSidebar);
 
         if (mobileMenuClose) {
             mobileMenuClose.addEventListener('click', toggleMobileMenu);
@@ -29,10 +32,10 @@
 
         // Close menu when clicking outside
         document.addEventListener('click', (e) => {
-            if (!mobileMenu.contains(e.target) && !mobileMenuToggle.contains(e.target)) {
+            if (mobileMenu && !mobileMenu.contains(e.target) && !mobileMenuToggle.contains(e.target)) {
                 mobileMenu.classList.add('-translate-x-full');
             }
-            if (!sidebar.contains(e.target) && !mobileMenuToggle.contains(e.target)) {
+            if (sidebar && !sidebar.contains(e.target) && !mobileMenuToggle.contains(e.target)) {
                 sidebar.classList.add('-translate-x-full');
             }
         });

@@ -2,10 +2,10 @@
 
 {% block title %}Chat - Azure OpenAI{% endblock %}
 
-{% block main_classes %}container mx-auto p-0{% endblock %}
+{% block main_classes %}container mx-auto p-0 h-[calc(100vh-4rem)] flex{% endblock %}
 
 {% block content %}
-<div class="flex flex-col h-screen overflow-hidden bg-white dark:bg-gray-900">
+<div class="flex flex-col h-full overflow-hidden bg-white dark:bg-gray-900">
     <!-- Sidebar -->
     <nav id="sidebar" class="hidden md:block fixed md:relative z-40 md:z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto flex flex-col" aria-label="Chat navigation">
         <div class="flex-none p-4 space-y-4">
@@ -113,7 +113,7 @@
         </div>
 
         <!-- Messages Area -->
-        <div id="chat-box" class="flex-1 overflow-y-auto px-2 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4" role="log" aria-live="polite" style="display: block;">
+        <div id="chat-box" class="flex-1 overflow-y-auto px-2 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 min-h-[200px]" role="log" aria-live="polite">
             {% if messages %}
                 {% for message in messages %}
                     {% if message.role == 'user' %}
@@ -179,7 +179,7 @@
         </div>
 
         <!-- Input Area -->
-        <div class="border-t border-gray-200 dark:border-gray-700 px-2 sm:px-4 py-2 sm:py-3 bg-white dark:bg-gray-900">
+        <div class="sticky bottom-0 border-t border-gray-200 dark:border-gray-700 px-2 sm:px-4 py-2 sm:py-3 bg-white dark:bg-gray-900">
             <div class="flex flex-col sm:flex-row items-start sm:items-end space-y-2 sm:space-y-0 sm:space-x-3">
                 <!-- Upload Button -->
                 <button id="upload-button" class="w-full sm:w-auto p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors duration-200" aria-label="Upload files">
@@ -200,7 +200,8 @@
                     </div>
 
                     <!-- Send Button -->
-                    <button id="send-button" class="flex items-center justify-center"
+                    <button id="send-button"
+                            class="flex items-center justify-center p-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200"
                             type="button" aria-label="Send message">
                         <i class="fas fa-paper-plane"></i>
                     </button>
@@ -293,6 +294,5 @@
 </script>
 
 <!-- Load chat.js -->
-<script src="{{ url_for('static', filename='js/markdown-it.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/chat.js') }}" defer></script>
 {% endblock %}

@@ -49,42 +49,28 @@
         window[initKey] = true;
 
         // Cache and verify DOM elements
-        console.debug('Caching DOM elements...');
         const requiredElements = {
           'message-input': el => {
-            console.debug('Found message-input');
             messageInput = el;
+            // Optimize textarea behavior
+            el.style.minHeight = '2.5rem';
+            el.style.maxHeight = window.innerWidth < 768 ? '6rem' : '12rem';
+            adjustTextareaHeight(el);
           },
           'send-button': el => {
-            console.debug('Found send-button');
             sendButton = el;
           },
           'chat-box': el => {
-            console.debug('Found chat-box');
             chatBox = el;
+            // Improve scrolling performance
+            el.style.scrollBehavior = 'smooth';
+            // Add intersection observer for lazy loading
+            setupScrollObserver(el);
           }
         };
 
-        const optionalElements = {
-          'file-input': el => fileInput = el,
-          'upload-button': el => uploadButton = el,
-          'uploaded-files': el => uploadedFilesDiv = el,
-          'model-select': el => modelSelect = el,
-          'new-chat-btn': el => newChatBtn = el,
-          'drop-zone': el => dropZone = el,
-          'edit-title-btn': el => el.addEventListener('click', () => {
-            const chatId = window.CHAT_CONFIG?.chatId;
-            if (chatId) {
-              editChatTitle(chatId);
-            } else {
-              showFeedback('Chat ID not found', 'error');
-            }
-          })
-        };
-
-        let missingElements = false;
-
         // Verify required elements exist
+        let missingElements = false;
         for (const [id, setter] of Object.entries(requiredElements)) {
           const element = document.getElementById(id);
           if (!element) {
@@ -92,7 +78,6 @@
             missingElements = true;
           } else {
             setter(element);
-            console.debug(`Element #${id} initialized`);
           }
         }
 
@@ -102,158 +87,176 @@
         }
 
         // Set optional elements if they exist
-        console.debug('Setting up optional elements...');
-        for (const [id, setter] of Object.entries(optionalElements)) {
+        const optionalElements = {
+          'file-input': el => fileInput = el,
+          'upload-button': el => uploadButton = el,
+          'uploaded-files': el => uploadedFilesDiv = el,
+          'model-select': el => modelSelect = el,
+          'new-chat-btn': el => newChatBtn = el,
+          'drop-zone': el => dropZone = el
+        };
+
+        Object.entries(optionalElements).forEach(([id, setter]) => {
           const element = document.getElementById(id);
+          if (element) setter(element);
+        });
+
+        // Add resize observer for message input
+        const resizeObserver = new ResizeObserver(() => {
+          if (messageInput) {
+            adjustTextareaHeight(messageInput);
+          }
+        });
+
+        if (messageInput) {
+          resizeObserver.observe(messageInput);
+        }
+
+        // Optimize event listeners
+        const eventHandlers = {
+          'message-input': {
+            'input': debounce(handleMessageInput, 100),
+            'keydown': handleMessageKeydown
+          },
+          'send-button': {
+            'click': handleSendButtonClick,
+            'touchend': handleSendButtonClick
+          }
+        };
+
+        // Attach optimized event listeners
+        Object.entries(eventHandlers).forEach(([elementId, handlers]) => {
+          const element = document.getElementById(elementId);
           if (element) {
-            console.debug(`Found optional element: ${id}`);
-            setter(element);
-          } else {
-            console.debug(`Optional element not found: ${id}`);
+            Object.entries(handlers).forEach(([event, handler]) => {
+              element.addEventListener(event, handler, { passive: true });
+            });
           }
-        }
+        });
 
-        // Initialize chat box for accessibility
-        if (chatBox) {
-          chatBox.setAttribute('role', 'log');
-          chatBox.setAttribute('aria-live', 'polite');
-          chatBox.setAttribute('aria-label', 'Chat messages');
-        }
-
-        // Mobile-specific setup
+        // Mobile-specific optimizations
         if (window.innerWidth < 768) {
-          // Adjust textarea height for mobile
-          messageInput.style.minHeight = '2.5rem';
-          messageInput.style.maxHeight = '6rem';
-
-          // Handle mobile menu
-          const sidebar = document.getElementById('sidebar');
-          const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-          const backdrop = document.createElement('div');
-          backdrop.id = 'sidebar-backdrop';
-          backdrop.className = 'fixed inset-0 bg-black bg-opacity-50 z-modal-backdrop hidden';
-          backdrop.setAttribute('aria-hidden', 'true');
-          document.body.appendChild(backdrop);
-
-          if (sidebar && mobileMenuToggle) {
-            // Initially hide the sidebar on mobile by adding 'hidden' class
-            sidebar.classList.add('hidden');
-
-            mobileMenuToggle.addEventListener('click', () => {
-              sidebar.classList.toggle('hidden');
-              backdrop.classList.toggle('hidden');
-              const isExpanded = sidebar.classList.contains('hidden') ? 'false' : 'true';
-              sidebar.setAttribute('aria-expanded', isExpanded);
-            });
-
-            backdrop.addEventListener('click', () => {
-              sidebar.classList.add('hidden');
-              backdrop.classList.add('hidden');
-              sidebar.setAttribute('aria-expanded', 'false');
-            });
-
-            // Add keyboard navigation for the Escape key
-            document.addEventListener('keydown', (e) => {
-              if (e.key === 'Escape' && !sidebar.classList.contains('hidden')) {
-                backdrop.click();
-              }
-            });
-          }
+          setupMobileLayout();
         }
 
         // Set up file handling
-        console.debug('Setting up file handling...');
         if (fileInput && uploadButton) {
-          console.debug('Attaching file input handlers');
-          uploadButton.addEventListener('click', () => {
-            console.debug('Upload button clicked');
-            fileInput.click();
-          });
-          fileInput.addEventListener('change', handleFileSelect);
-        } else {
-          console.debug('File input elements not found');
+          setupFileHandling();
         }
 
         // Set up additional handlers
-        console.debug('Setting up additional handlers...');
         if (newChatBtn) {
-          console.debug('Attaching new chat button handler');
           newChatBtn.addEventListener('click', createNewChat);
         }
         if (modelSelect) {
-          console.debug('Attaching model select handler');
           modelSelect.addEventListener('change', handleModelChange);
-
-          // Set up edit model button handler
-          const editModelBtn = document.getElementById('edit-model-btn');
-          if (editModelBtn) {
-            editModelBtn.addEventListener('click', () => {
-              const selectedModelId = modelSelect.value;
-              if (selectedModelId) {
-                const baseEditUrl = window.CHAT_CONFIG.editModelUrl;
-                const editUrl = baseEditUrl.replace('/0', `/${selectedModelId}`);
-                window.location.href = editUrl;
-              } else {
-                showFeedback('No model selected', 'error');
-              }
-            });
-          }
         }
         if (chatBox) {
-          console.debug('Attaching chat box message action handlers');
           chatBox.addEventListener('click', handleMessageActions);
         }
 
         // Set up delete chat buttons
-        console.debug('Setting up delete chat buttons...');
-        const deleteButtons = document.querySelectorAll('.delete-chat-btn');
-        console.debug(`Found ${deleteButtons.length} delete buttons`);
-        deleteButtons.forEach(btn => {
-          const chatId = btn.dataset.chatId;
-          console.debug(`Setting up delete button for chat ${chatId}`);
-          btn.addEventListener('click', () => {
-            console.debug(`Delete button clicked for chat ${chatId}`);
-            if (chatId) {
-              deleteChat(chatId);
-            } else {
-              showFeedback('Chat ID not found', 'error');
-            }
-          });
-        });
+        setupDeleteButtons();
 
-        // Set up core event listeners
-        console.debug('Setting up core event listeners...');
-
-        // Set up core event listeners
-        console.debug('Attaching send button click handler');
-        sendButton.addEventListener('click', handleSendButtonClick);
-        sendButton.addEventListener('touchend', handleSendButtonClick);
-        sendButton.addEventListener('touchend', handleSendButtonClick);
-        console.debug('Attaching message input handlers');
-        messageInput.addEventListener('input', handleMessageInput);
-        messageInput.addEventListener('keydown', handleMessageKeydown);
-
-        // Add touch event listeners for mobile devices
-        if ('ontouchstart' in window) {
-            sendButton.addEventListener('touchend', handleSendButtonClick);
-        }
-        messageInput.addEventListener('touchstart', handleMessageInput);
-
-        // Add touch event listeners for mobile
-        if ('ontouchstart' in window) {
-          console.debug('Setting up mobile touch handlers');
-          messageInput.addEventListener('touchstart', handleMessageInput);
-          sendButton.addEventListener('touchend', handleSendButtonClick);
-        }
-
-        // Initialize UI
+        // Set up drag and drop
         setupDragAndDrop();
-        adjustTextareaHeight(messageInput);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', cleanup);
 
         console.debug('Chat initialization completed successfully');
       } catch (error) {
         console.error('Error initializing chat:', error);
         showFeedback('Failed to initialize chat interface', 'error');
+      }
+    }
+
+    function setupMobileLayout() {
+      const sidebarToggle = document.getElementById('sidebar-toggle');
+      const sidebar = document.getElementById('sidebar');
+
+      if (sidebarToggle && sidebar) {
+        const toggleSidebar = () => {
+          sidebar.classList.toggle('-translate-x-full');
+          document.body.classList.toggle('overflow-hidden');
+        };
+
+        sidebarToggle.addEventListener('click', toggleSidebar);
+
+        // Close sidebar when clicking outside
+        document.addEventListener('click', (e) => {
+          if (!sidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
+            sidebar.classList.add('-translate-x-full');
+            document.body.classList.remove('overflow-hidden');
+          }
+        });
+      }
+
+      // Adjust textarea for mobile
+      if (messageInput) {
+        messageInput.style.fontSize = '16px'; // Prevent zoom on iOS
+      }
+    }
+
+    function setupScrollObserver(chatBox) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('visible');
+            }
+          });
+        },
+        { root: chatBox, threshold: 0.1 }
+      );
+
+      // Observe message elements
+      chatBox.querySelectorAll('.message').forEach(message => {
+        observer.observe(message);
+      });
+    }
+
+    function setupFileHandling() {
+      uploadButton.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', handleFileSelect);
+    }
+
+    function setupDeleteButtons() {
+      const deleteButtons = document.querySelectorAll('.delete-chat-btn');
+      deleteButtons.forEach(btn => {
+        const chatId = btn.dataset.chatId;
+        if (chatId) {
+          btn.addEventListener('click', () => deleteChat(chatId));
+        }
+      });
+    }
+
+    function debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    }
+
+    function cleanup() {
+      try {
+        // Remove event listeners
+        if (messageInput) {
+          messageInput.removeEventListener('input', handleMessageInput);
+          messageInput.removeEventListener('keydown', handleMessageKeydown);
+        }
+        if (sendButton) {
+          sendButton.removeEventListener('click', handleSendButtonClick);
+          sendButton.removeEventListener('touchend', handleSendButtonClick);
+        }
+        console.debug('Chat cleanup completed successfully');
+      } catch (error) {
+        console.error('Error during cleanup:', error);
       }
     }
 
