@@ -410,7 +410,7 @@
 
     function handleMessageInput(e) {
       if (e.type === 'touchstart') {
-        e.preventDefault();
+        // e.preventDefault(); // Removed to allow default touch behavior
       }
       adjustTextareaHeight(this);
     }
