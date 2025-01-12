@@ -310,13 +310,13 @@
 
         const contentDiv = messageDiv.querySelector('.prose');
         if (contentDiv) {
-const renderedHtml = md.render(message);
-const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
-    ALLOWED_TAGS: [
-        'b', 'i', 'em', 'strong', 'a', 'p', 'blockquote', 'code', 'pre',
-        'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br',
-        'hr', 'span', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
-    ],
+            const renderedHtml = md.render(message);
+            const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
+                ALLOWED_TAGS: [
+                    'b', 'i', 'em', 'strong', 'a', 'p', 'blockquote', 'code', 'pre',
+                    'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br',
+                    'hr', 'span', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
+                ],
     ALLOWED_ATTR: ['href', 'src', 'alt', 'class']
 });
 contentDiv.innerHTML = sanitizedHtml;
