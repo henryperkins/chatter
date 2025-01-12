@@ -1,9 +1,11 @@
 (function () {
   // Access utility functions from window.utils
-  const { getCSRFToken, showFeedback, debounce, fetchWithCSRF } = window.utils;
+  const { showFeedback, debounce, fetchWithCSRF } = window.utils;
 
   // Access markdown-it instance from the global window object
   const md = window.markdownit().use(window.markdownitPrism);
+  const DOMPurify = window.DOMPurify;
+  const Prism = window.Prism;
 
   // Global variables and state
   let uploadedFiles = [];
@@ -25,10 +27,8 @@
   let messageInput, sendButton, chatBox, fileInput, uploadButton,
     uploadedFilesDiv, modelSelect, newChatBtn, dropZone;
 
-  // DOM Content Loaded
-  document.addEventListener('DOMContentLoaded', function () {
-    console.debug('DOMContentLoaded event triggered. Initializing elements.');
-
+  // Initialize chat interface
+  function initializeChat() {
     // Cache DOM elements
     messageInput = document.getElementById('message-input');
     sendButton = document.getElementById('send-button');
@@ -40,80 +40,55 @@
     newChatBtn = document.getElementById('new-chat-btn');
     dropZone = document.getElementById('drop-zone');
 
-    // Verify critical elements exist after caching
-    if (!messageInput || !sendButton || !chatBox) {
-      console.error('Critical chat elements not found', {
-        messageInput,
-        sendButton,
-        chatBox
-      });
-      showFeedback('Chat interface not loaded properly', 'error');
-      return;
-    }
-
-    console.debug('Elements initialized:', { messageInput, sendButton, chatBox });
-
-    // Initialize event listeners
-    initializeEventListeners();
-
-    // Set up file drag and drop
-    setupDragAndDrop();
-
-    // Initialize message input
-    adjustTextareaHeight(messageInput);
-  });
-
-  function initializeEventListeners() {
-    console.debug('Initializing event listeners.');
-
-    // Send button handler - Moved to the top and corrected
-    sendButton.addEventListener('click', function (e) {
+    // Set up core event listeners
+    sendButton.addEventListener('click', (e) => {
       e.preventDefault();
-      console.log('Send button clicked');
-      sendMessage();
+      if (!sendButton.disabled) {
+        sendMessage();
+      }
     });
 
-    // Message input handlers
-    messageInput.addEventListener('input', debounce(function () {
+    messageInput.addEventListener('input', debounce(function() {
       adjustTextareaHeight(this);
     }, 300));
 
-    messageInput.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
+    messageInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey && !sendButton.disabled) {
         e.preventDefault();
         sendMessage();
       }
     });
 
-    // File upload handlers
+    // Set up file handling
     if (fileInput && uploadButton) {
       uploadButton.addEventListener('click', () => fileInput.click());
       fileInput.addEventListener('change', handleFileSelect);
     }
 
-    // New chat button handler
+    // Set up additional handlers
     if (newChatBtn) {
       newChatBtn.addEventListener('click', createNewChat);
     }
-
-    // Model selection handler
     if (modelSelect) {
       modelSelect.addEventListener('change', handleModelChange);
     }
-
-    // Chat box message action handlers
     if (chatBox) {
       chatBox.addEventListener('click', handleMessageActions);
     }
+
+    // Initialize UI
+    setupDragAndDrop();
+    adjustTextareaHeight(messageInput);
+  }
+
+  // Only initialize once when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeChat);
+  } else {
+    initializeChat();
   }
 
   async function sendMessage() {
-    console.log('sendMessage function called');
-    console.debug('Preparing to send message:', messageInput.value.trim());
-    console.log('Message input value:', messageInput.value);
-    console.debug('Uploaded files:', uploadedFiles);
-
-    // Validate input
     if (!messageInput.value.trim() && uploadedFiles.length === 0) {
       showFeedback('Please enter a message or upload files.', 'error');
       return;
@@ -124,133 +99,120 @@
       return;
     }
 
-    // Disable input controls
-    messageInput.disabled = true;
-    sendButton.disabled = true;
-    sendButton.innerHTML = '<span class="animate-spin">↻</span> Sending...'; // Added text for clarity
+    const originalButtonText = sendButton.innerHTML;
+    const messageText = messageInput.value.trim();
 
     try {
-      // Create form data
+      // Disable controls and show loading state
+      messageInput.disabled = true;
+      sendButton.disabled = true;
+      sendButton.innerHTML = '<span class="animate-spin">↻</span> Sending...';
+
+      // Prepare form data
       const formData = new FormData();
-      formData.append('message', messageInput.value.trim());
+      formData.append('message', messageText);
       uploadedFiles.forEach(file => formData.append('files[]', file));
 
-      // Append user message immediately
-      appendUserMessage(messageInput.value.trim());
+      // Update UI immediately
+      appendUserMessage(messageText);
       messageInput.value = '';
       adjustTextareaHeight(messageInput);
-
-      // Show typing indicator
       showTypingIndicator();
 
-      console.debug('Making POST request to /chat with formData:', formData);
-      console.log('CSRF Token:', getCSRFToken());
-
-      const response = await fetch('/chat', {
+      // Send request
+      const chatId = new URLSearchParams(window.location.search).get('chat_id');
+      const data = await window.utils.fetchWithCSRF('/chat/', {
         method: 'POST',
+        body: formData,
         headers: {
-          'X-CSRFToken': getCSRFToken(),
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: formData
+          'X-Chat-ID': chatId
+        }
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send message');
-      }
-
+      // Handle response
       if (data.response) {
         appendAssistantMessage(data.response);
         uploadedFiles = [];
         renderFileList();
+      } else {
+        throw new Error('No response received from server');
       }
 
-      if (data.excluded_files) {
+      // Handle any excluded files
+      if (Array.isArray(data.excluded_files)) {
         data.excluded_files.forEach(file => {
           showFeedback(`Failed to upload ${file.filename}: ${file.error}`, 'error');
         });
       }
     } catch (error) {
-      console.error('Error sending message:', error);
-      console.error('Error details:', error.stack);
-      showFeedback(`Error: ${error.message}`, 'error');
+      showFeedback(error.message || 'Failed to send message', 'error');
+      // Restore message on failure
+      messageInput.value = messageText;
+      adjustTextareaHeight(messageInput);
     } finally {
       messageInput.disabled = false;
       sendButton.disabled = false;
-      sendButton.innerHTML = 'Send'; // Reset to original text
+      sendButton.innerHTML = originalButtonText;
       removeTypingIndicator();
       messageInput.focus();
     }
   }
 
-    // Function to edit chat title
-    async function editChatTitle(chatId) {
-        const newTitle = prompt('Enter new chat title:');
-        if (newTitle) {
-            try {
-                const response = await fetchWithCSRF(`/update_chat_title/${chatId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCSRFToken(),
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: JSON.stringify({ title: newTitle })
-                });
-                if (response.success) {
-                    document.getElementById('chat-title').textContent = newTitle;
-                    showFeedback('Chat title updated successfully', 'success');
-                } else {
-                    throw new Error(response.error || 'Unknown error');
-                }
-            } catch (error) {
-                console.error('Error updating chat title:', error);
-                showFeedback('Failed to update chat title', 'error');
-            }
+  async function editChatTitle(chatId) {
+    const newTitle = prompt('Enter new chat title:');
+    if (newTitle) {
+      try {
+        const response = await fetchWithCSRF(`/chat/update_chat_title/${chatId}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ title: newTitle })
+        });
+        if (response.success) {
+          document.getElementById('chat-title').textContent = newTitle;
+          showFeedback('Chat title updated successfully', 'success');
+        } else {
+          throw new Error(response.error || 'Unknown error');
         }
+      } catch (error) {
+        console.error('Error updating chat title:', error);
+        showFeedback('Failed to update chat title', 'error');
+      }
     }
+  }
 
-    // Function to delete a chat
-    async function deleteChat(chatId) {
-        if (confirm('Are you sure you want to delete this chat?')) {
-            try {
-                const response = await fetchWithCSRF(`/delete_chat/${chatId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRFToken': getCSRFToken(),
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                });
-                if (response.success) {
-                    location.reload();
-                } else {
-                    throw new Error(response.error || 'Unknown error');
-                }
-            } catch (error) {
-                console.error('Error deleting chat:', error);
-                showFeedback('Failed to delete chat', 'error');
-            }
+  async function deleteChat(chatId) {
+    if (confirm('Are you sure you want to delete this chat?')) {
+      try {
+        const response = await fetchWithCSRF(`/chat/delete_chat/${chatId}`, {
+          method: 'DELETE',
+          headers: {}
+        });
+        if (response.success) {
+          location.reload();
+        } else {
+          throw new Error(response.error || 'Unknown error');
         }
+      } catch (error) {
+        console.error('Error deleting chat:', error);
+        showFeedback('Failed to delete chat', 'error');
+      }
     }
-
-    // Expose functions to the global scope
-    window.editChatTitle = editChatTitle;
-    window.deleteChat = deleteChat;
+  }
 
   function appendUserMessage(message) {
     console.debug('Appending user message:', message);
     const messageDiv = document.createElement('div');
     messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end';
     messageDiv.innerHTML = `
-            <div>
-                <div class="relative bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
-                    <p class="text-sm">${escapeHtml(message)}</p>
-                </div>
-                <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
-            </div>
-        `;
+      <div>
+        <div class="relative bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
+          <p class="text-sm">${escapeHtml(message)}</p>
+        </div>
+        <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
+      </div>
+    `;
     chatBox.appendChild(messageDiv);
     chatBox.scrollTop = chatBox.scrollHeight;
   }
@@ -259,16 +221,16 @@
     const messageDiv = document.createElement('div');
     messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-lg';
     messageDiv.innerHTML = `
-            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
-            <div class="relative max-w-lg">
-                <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
-                    <div class="prose dark:prose-invert prose-sm max-w-none"></div>
-                </div>
-                <span class="text-xs text-gray-500 dark:text-gray-400 leading-none">
-                    ${new Date().toLocaleTimeString()}
-                </span>
-            </div>
-        `;
+      <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
+      <div class="relative max-w-lg">
+        <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
+          <div class="prose dark:prose-invert prose-sm max-w-none"></div>
+        </div>
+        <span class="text-xs text-gray-500 dark:text-gray-400 leading-none">
+          ${new Date().toLocaleTimeString()}
+        </span>
+      </div>
+    `;
 
     const contentDiv = messageDiv.querySelector('.prose');
     if (contentDiv) {
@@ -332,11 +294,11 @@
       const fileDiv = document.createElement('div');
       fileDiv.className = 'flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-2 rounded mb-2';
       fileDiv.innerHTML = `
-                <span class="text-sm truncate">${escapeHtml(file.name)}</span>
-                <button class="text-red-500 hover:text-red-700" data-index="${index}">
-                    Remove
-                </button>
-            `;
+        <span class="text-sm truncate">${escapeHtml(file.name)}</span>
+        <button class="text-red-500 hover:text-red-700" data-index="${index}">
+          Remove
+        </button>
+      `;
       fileList.appendChild(fileDiv);
     });
 
@@ -363,22 +325,21 @@
     indicator.id = 'typing-indicator';
     indicator.className = 'flex w-full mt-2 space-x-3 max-w-lg';
     indicator.innerHTML = `
-            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
-            <div class="relative max-w-lg">
-                <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
-                    <div class="typing-animation">
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                    </div>
-                </div>
-                <span class="text-xs text-gray-500 dark:text-gray-400 leading-none">
-                    ${new Date().toLocaleTimeString()}
-                </span>
-            </div>
-        `;
+      <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
+      <div class="relative max-w-lg">
+        <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
+          <div class="typing-animation">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+          </div>
+        </div>
+        <span class="text-xs text-gray-500 dark:text-gray-400 leading-none">
+          ${new Date().toLocaleTimeString()}
+        </span>
+      </div>
+    `;
 
-    // Append the typing indicator to the chat box
     chatBox.appendChild(indicator);
     chatBox.scrollTop = chatBox.scrollHeight;
   }
@@ -430,7 +391,7 @@
 
   async function createNewChat() {
     try {
-      const data = await fetchWithCSRF('/new_chat', {
+      const data = await fetchWithCSRF('/chat/new_chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -508,7 +469,7 @@
       const formData = new FormData();
       formData.append('message', lastUserMessage);
 
-      const data = await fetchWithCSRF('/chat', {
+      const data = await fetchWithCSRF('/chat/', {
         method: 'POST',
         body: formData,
       });
@@ -527,5 +488,8 @@
     }
   }
 
+  // Expose necessary functions to global scope
+  window.editChatTitle = editChatTitle;
+  window.deleteChat = deleteChat;
   window.removeFile = removeFile;
 })();

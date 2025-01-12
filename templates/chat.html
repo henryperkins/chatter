@@ -190,8 +190,10 @@
                 </div>
 
                 <!-- Send Button -->
-                <button id="send-button" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
-                    <span>Send</span>
+                <button id="send-button" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        type="button">
+                    <span class="relative">Send</span>
                 </button>
             </div>
         </div>
@@ -221,68 +223,46 @@
 <meta name="csrf-token" content="{{ csrf_token() }}">
 {% endblock %}
 
+{% block head %}
+{{ super() }}
+<!-- Pre-initialize chat configuration -->
+<script>
+    window.CHAT_CONFIG = {
+        chatId: "{{ chat_id }}",
+        editModelUrl: "{{ url_for('model.edit_model', model_id=0) }}"
+    };
+</script>
+{% endblock %}
+
 {% block scripts %}
 {{ super() }}
+<!-- Load chat functionality first -->
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+
+<!-- Handle model list refresh after chat.js loads -->
 <script>
-    // Function to refresh model list
-    async function refreshModelList() {
-        try {
-            const response = await fetch('/models');
-            if (response.ok) {
-                const models = await response.json();
-                const modelSelect = document.getElementById('model-select');
-                if (modelSelect) {
-                    modelSelect.innerHTML = models.map(model => 
-                        `<option value="${model.id}" ${model.is_default ? 'selected' : ''}>
-                            ${model.name}${model.is_default ? ' (Default)' : ''}
-                        </option>`
-                    ).join('');
-                }
-            }
-        } catch (error) {
-            console.error('Error refreshing model list:', error);
-        }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initModelRefresh);
+    } else {
+        initModelRefresh();
     }
 
-    // Check if we're returning from add model page
-    if (document.referrer.includes('/models/add-model')) {
-        refreshModelList();
+    function initModelRefresh() {
+        if (document.referrer.includes('/models/add-model')) {
+            fetch('/models')
+                .then(response => response.ok ? response.json() : Promise.reject('Failed to fetch models'))
+                .then(models => {
+                    const modelSelect = document.getElementById('model-select');
+                    if (modelSelect) {
+                        modelSelect.innerHTML = models
+                            .map(model => 
+                                `<option value="${model.id}"${model.is_default ? ' selected' : ''}>${model.name}${model.is_default ? ' (Default)' : ''}</option>`
+                            )
+                            .join('');
+                    }
+                })
+                .catch(error => console.error('Error refreshing model list:', error));
+        }
     }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        // Edit title button
-        const editTitleBtn = document.getElementById('edit-title-btn');
-        if (editTitleBtn) {
-            editTitleBtn.addEventListener('click', function() {
-                editChatTitle('{{ chat_id }}');
-            });
-        }
-
-        // Delete chat buttons
-        document.querySelectorAll('.delete-chat-btn').forEach(button => {
-            button.addEventListener('click', function(event) {
-                event.preventDefault();
-                const chatId = this.getAttribute('data-chat-id');
-                deleteChat(chatId);
-            });
-        });
-
-        // Model select and edit model button
-        const modelSelect = document.getElementById('model-select');
-        const editModelButton = document.getElementById('edit-model-btn');
-
-        if (modelSelect && editModelButton) {
-            editModelButton.addEventListener('click', function() {
-                const selectedModelId = modelSelect.value;
-                window.location.href = `{{ url_for('model.edit_model', model_id=0) }}`.replace('0', selectedModelId);
-            });
-        }
-
-        // Initialize message handlers from chat.js
-        if (typeof initializeMessageHandlers === 'function') {
-            initializeMessageHandlers();
-        }
-    });
 </script>
 {% endblock %}

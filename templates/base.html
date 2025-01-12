@@ -215,15 +215,39 @@
     </main>
 
     <!-- Required Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/markdown-it-prism@2.2.0/markdown-it-prism.min.js"></script>
+    <!-- Core dependencies first -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
+    
+    <!-- Prism and its components -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
+    
+    <!-- Markdown processing -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it-prism@2.2.0/markdown-it-prism.min.js"></script>
+    
+    <!-- Axios for HTTP requests -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <!-- Initialize required globals -->
+    <script>
+        // Verify critical dependencies
+        if (typeof Prism === 'undefined') {
+            console.error('Prism is not loaded');
+        }
+        if (typeof DOMPurify === 'undefined') {
+            console.error('DOMPurify is not loaded');
+        }
+        
+        // Make libraries available globally
+        window.Prism = Prism;
+        window.DOMPurify = DOMPurify;
+        window.markdownit = markdownit;
+    </script>
 
     <!-- Core JavaScript -->
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>

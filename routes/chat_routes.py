@@ -5,12 +5,11 @@ from flask import (
     redirect,
     url_for,
     render_template,
-    current_app,
     session,
     Response,
 )
 from flask_login import login_required, current_user
-from typing import Union, Tuple, List, Dict
+from typing import Union, Tuple
 import os
 from datetime import datetime, timedelta
 import logging
@@ -18,12 +17,9 @@ import bleach
 from models.model import Model
 from conversation_manager import conversation_manager
 from chat_utils import (
-    count_tokens,
-    secure_filename,
-    generate_new_chat_id,
-    truncate_message,
     allowed_file,
     generate_chat_title,
+    generate_new_chat_id,
     process_file,
 )
 from chat_api import get_azure_response, scrape_data
@@ -31,6 +27,7 @@ from models.chat import Chat
 import tiktoken
 from extensions import csrf
 from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -56,7 +53,6 @@ except KeyError:
 
 # Blueprint setup
 chat_routes = Blueprint("chat", __name__)
-from flask_limiter.util import get_remote_address
 limiter = Limiter(key_func=get_remote_address)
 
 # Secure upload folder
@@ -226,73 +222,86 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 
 @chat_routes.route("/", methods=["POST"])
 @login_required
-@csrf.exempt
+@csrf.exempt  # Using CSRF token in request headers instead
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
     """Handle incoming chat messages and return AI responses."""
-    logger.debug("Received chat message")
-
-    chat_id = session.get("chat_id")
-    if not chat_id:
-        logger.error("Chat ID not found in session.")
-        return jsonify({"error": "Chat ID not found."}), 400
-
-    # Fetch the model associated with the chat
-    model_obj = Chat.get_model(chat_id)
-    if model_obj is None:
-        logger.error(f"No model associated with chat ID {chat_id}.")
-        return jsonify({"error": "No model associated with this chat."}), 400
-
-    if not model_obj.deployment_name or not model_obj.api_key or not model_obj.api_endpoint:
-        logger.error("Invalid model configuration.")
-        return jsonify({"error": "Invalid model configuration. Please check the settings."}), 400
-
-    # Sanitize user input before processing
-    user_message = bleach.clean(request.form.get("message", "").strip())
-    logger.debug(f"User message: {user_message}")
-
-    # Handle file uploads
-    uploaded_files = request.files.getlist("files[]")
-    included_files, excluded_files, file_contents, total_tokens = [], [], [], 0
-
-    for file in uploaded_files:
-        if file and allowed_file(file.filename):
-            try:
-                filename, content, tokens = process_file(file)
-                if total_tokens + tokens > MAX_INPUT_TOKENS:
-                    excluded_files.append({"filename": filename, "error": "Exceeds token limit"})
-                    continue
-                included_files.append({"filename": filename})
-                file_contents.append(content)
-                total_tokens += tokens
-            except Exception as e:
-                logger.error(f"Error processing file {file.filename}: {e}")
-                excluded_files.append({"filename": file.filename, "error": str(e)})
-        else:
-            excluded_files.append({"filename": file.filename or "Unknown", "error": "Invalid file type"})
-
-    # Combine user message and file contents
-    combined_message = (user_message + "\n" + "".join(file_contents)) if file_contents else user_message
-
-    # Update chat title if necessary
-    if Chat.is_title_default(chat_id) and len(conversation_manager.get_context(chat_id)) >= 5:
-        conversation_text = "\n".join(
-            f"{msg['role']}: {msg['content']}" for msg in conversation_manager.get_context(chat_id)[:5]
-        )
-        Chat.update_title(chat_id, generate_chat_title(conversation_text))
-
-    # Add the combined message to the conversation history
-    conversation_manager.add_message(
-        chat_id,
-        "user",
-        combined_message,
-        model_max_tokens=model_obj.max_tokens,
-        requires_o1_handling=model_obj.requires_o1_handling,
-    )
-
-    # Prepare the messages for the API call
-    history = conversation_manager.get_context(chat_id, include_system=not model_obj.requires_o1_handling)
-
     try:
+        logger.debug("Received chat message from user %s with data: %s", 
+                    current_user.id, 
+                    {
+                        'form': request.form.to_dict(),
+                        'files': [f.filename for f in request.files.getlist('files[]')] if request.files else [],
+                        'headers': dict(request.headers)
+                    })
+
+        # Try to get chat_id from headers first, then session
+        chat_id = request.headers.get('X-Chat-ID') or session.get("chat_id")
+        if not chat_id:
+            logger.error("Chat ID not found in headers or session for user %s", current_user.id)
+            return jsonify({"error": "Chat ID not found."}), 400
+
+        # Verify chat access
+        if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
+            logger.error("User %s attempted to access unauthorized chat %s", current_user.id, chat_id)
+            return jsonify({"error": "Unauthorized access to chat"}), 403
+
+        # Fetch the model associated with the chat
+        model_obj = Chat.get_model(chat_id)
+        if model_obj is None:
+            logger.error(f"No model associated with chat ID {chat_id}.")
+            return jsonify({"error": "No model associated with this chat."}), 400
+
+        if not model_obj.deployment_name or not model_obj.api_key or not model_obj.api_endpoint:
+            logger.error("Invalid model configuration.")
+            return jsonify({"error": "Invalid model configuration. Please check the settings."}), 400
+
+        # Sanitize user input before processing
+        user_message = bleach.clean(request.form.get("message", "").strip())
+        logger.debug(f"User message: {user_message}")
+
+        # Handle file uploads
+        uploaded_files = request.files.getlist("files[]")
+        included_files, excluded_files, file_contents, total_tokens = [], [], [], 0
+
+        for file in uploaded_files:
+            if file and allowed_file(file.filename):
+                try:
+                    filename, content, tokens = process_file(file)
+                    if total_tokens + tokens > MAX_INPUT_TOKENS:
+                        excluded_files.append({"filename": filename, "error": "Exceeds token limit"})
+                        continue
+                    included_files.append({"filename": filename})
+                    file_contents.append(content)
+                    total_tokens += tokens
+                except Exception as e:
+                    logger.error(f"Error processing file {file.filename}: {e}")
+                    excluded_files.append({"filename": file.filename, "error": str(e)})
+            else:
+                excluded_files.append({"filename": file.filename or "Unknown", "error": "Invalid file type"})
+
+        # Combine user message and file contents
+        combined_message = (user_message + "\n" + "".join(file_contents)) if file_contents else user_message
+
+        # Update chat title if necessary
+        if Chat.is_title_default(chat_id) and len(conversation_manager.get_context(chat_id)) >= 5:
+            conversation_text = "\n".join(
+                f"{msg['role']}: {msg['content']}" for msg in conversation_manager.get_context(chat_id)[:5]
+            )
+            Chat.update_title(chat_id, generate_chat_title(conversation_text))
+
+        # Add the combined message to the conversation history
+        conversation_manager.add_message(
+            chat_id,
+            "user",
+            combined_message,
+            model_max_tokens=model_obj.max_tokens,
+            requires_o1_handling=model_obj.requires_o1_handling,
+        )
+
+        # Prepare the messages for the API call
+        history = conversation_manager.get_context(chat_id, include_system=not model_obj.requires_o1_handling)
+
+        logger.debug("Sending request to Azure API")
         model_response = get_azure_response(
             messages=history,
             deployment_name=model_obj.deployment_name,
@@ -303,7 +312,9 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             requires_o1_handling=model_obj.requires_o1_handling,
             timeout_seconds=120,
         )
+        logger.debug("Received API response: %d chars", len(model_response))
 
+        logger.debug("Adding assistant response to conversation")
         conversation_manager.add_message(
             chat_id,
             "assistant",
@@ -311,7 +322,23 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             model_max_tokens=model_obj.max_tokens,
             requires_o1_handling=model_obj.requires_o1_handling,
         )
-        return jsonify({"response": model_response, "included_files": included_files, "excluded_files": excluded_files})
+        
+        logger.debug("Returning successful response")
+        return jsonify({
+            "response": model_response, 
+            "included_files": included_files, 
+            "excluded_files": excluded_files
+        })
     except Exception as ex:
-        logger.error(f"Error during chat handling: {ex}")
-        return jsonify({"error": "An unexpected error occurred.", "details": str(ex)}), 500
+        logger.error("Error during chat handling: %s", str(ex), exc_info=True)
+        logger.error("Failed request details: %s", {
+            "chat_id": chat_id,
+            "model": model_obj.deployment_name if 'model_obj' in locals() else None,
+            "message_length": len(combined_message) if 'combined_message' in locals() else 0,
+            "file_count": len(included_files) if 'included_files' in locals() else 0,
+            "error": str(ex)
+        })
+        return jsonify({
+            "error": "An unexpected error occurred.", 
+            "details": str(ex)
+        }), 500
