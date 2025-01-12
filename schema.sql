@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS messages (
     chat_id TEXT NOT NULL, -- Foreign key referencing chats table
     role TEXT NOT NULL, -- 'user', 'assistant', or 'system'
     content TEXT NOT NULL, -- Contents of the message
+    metadata JSON, -- Metadata for the message (token count, timestamps, etc.)
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (chat_id) REFERENCES chats (id) ON DELETE CASCADE
 );

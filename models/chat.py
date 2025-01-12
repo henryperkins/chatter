@@ -1,6 +1,7 @@
 import logging
+import json
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Union
+from typing import Optional, List, Dict, Union, Any
 
 from sqlalchemy import text
 
@@ -258,4 +259,75 @@ class Chat:
                 return None
             except Exception as e:
                 logger.error(f"Error retrieving model for chat_id {chat_id}: {e}")
+                raise
+
+    @staticmethod
+    def add_message(chat_id: str, role: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Add a message to the chat with optional metadata.
+
+        Args:
+            chat_id: The ID of the chat to add the message to
+            role: The role of the message sender ('user', 'assistant', or 'system')
+            content: The content of the message
+            metadata: Optional metadata dictionary for the message
+        """
+        with db_session() as db:
+            try:
+                query = text("""
+                    INSERT INTO messages (chat_id, role, content, metadata)
+                    VALUES (:chat_id, :role, :content, :metadata)
+                """)
+
+                db.execute(query, {
+                    "chat_id": chat_id,
+                    "role": role,
+                    "content": content,
+                    "metadata": json.dumps(metadata or {})
+                })
+                db.commit()
+                logger.info(f"Added message to chat {chat_id}")
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error adding message to chat {chat_id}: {e}")
+                raise
+
+    @staticmethod
+    def get_messages(chat_id: str, include_system: bool = False) -> List[Dict[str, Union[int, str, Dict[str, Any]]]]:
+        """
+        Get messages for a chat with optional filtering.
+
+        Args:
+            chat_id: The ID of the chat to get messages for
+            include_system: Whether to include system messages in the result
+
+        Returns:
+            List of message dictionaries containing id, role, content, metadata, and timestamp
+        """
+        with db_session() as db:
+            try:
+                conditions = ["chat_id = :chat_id"]
+                if not include_system:
+                    conditions.append("role != 'system'")
+
+                query = text(f"""
+                    SELECT id, role, content, metadata,
+                           strftime('%Y-%m-%d %H:%M:%S', timestamp) as timestamp
+                    FROM messages
+                    WHERE {' AND '.join(conditions)}
+                    ORDER BY timestamp ASC
+                """)
+
+                result = db.execute(query, {"chat_id": chat_id}).mappings().all()
+                messages: List[Dict[str, Union[int, str, Dict[str, Any]]]] = []
+                for row in result:
+                    message = dict(row)
+                    try:
+                        message['metadata'] = json.loads(message['metadata']) if message['metadata'] else {}
+                    except (json.JSONDecodeError, TypeError):
+                        message['metadata'] = {}
+                    messages.append(message)
+                return messages
+            except Exception as e:
+                logger.error(f"Error getting messages for chat {chat_id}: {e}")
                 raise
