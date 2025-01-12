@@ -106,7 +106,7 @@ class ConversationManager:
             db.close()
 
     def add_message(
-        self, chat_id: str, role: str, content: str, model_max_tokens: int = MAX_TOKENS
+        self, chat_id: str, role: str, content: str, model_max_tokens: Optional[int] = None, requires_o1_handling: bool = False
     ) -> None:
         """
         Add a message to the conversation context.
@@ -126,6 +126,12 @@ class ConversationManager:
             encoding = tiktoken.encoding_for_model(MODEL_NAME)
         except KeyError:
             encoding = tiktoken.get_encoding("cl100k_base")
+
+        if model_max_tokens is None:
+            if requires_o1_handling:
+                model_max_tokens = MAX_MESSAGE_TOKENS  # Default for o1-preview
+            else:
+                model_max_tokens = MAX_TOKENS  # Default for other models
 
         if role == "user":
             # Truncate user messages if necessary

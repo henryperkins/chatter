@@ -23,7 +23,9 @@ class Model:
     api_endpoint: str
     api_key: str
     temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
+    max_tokens: Optional[int] = None  # Should be None for o1-preview
+    max_completion_tokens: Optional[int] = None  # Set to the appropriate value
+    requires_o1_handling: bool = False  # Set to True for o1-preview models
     max_completion_tokens: int = 8300  # o1-preview model can handle up to 8300 tokens
     is_default: bool = False
     requires_o1_handling: bool = False

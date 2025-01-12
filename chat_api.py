@@ -104,12 +104,11 @@ def get_azure_response(
             api_params.update(
                 {
                     "temperature": 1,  # Must be 1 for o1-preview
-                    "max_completion_tokens": max_completion_tokens
-                    or 8500,  # Use model config or default to 8500
+                    "max_completion_tokens": max_completion_tokens or 8500,
                     "stream": False,  # Streaming not supported
                 }
             )
-            # Ensure max_tokens is not present
+            # Remove 'max_tokens' if present
             api_params.pop("max_tokens", None)
         else:
             # Parameters for other models
@@ -117,6 +116,8 @@ def get_azure_response(
                 api_params["temperature"] = temperature
             if max_tokens is not None:
                 api_params["max_tokens"] = max_tokens
+            # Remove 'max_completion_tokens' if present
+            api_params.pop("max_completion_tokens", None)
 
         # Log the final API parameters for debugging
         logger.debug("Final API parameters: %s", api_params)
