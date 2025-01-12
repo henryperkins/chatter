@@ -251,6 +251,7 @@ class ModelForm(FlaskForm):
         default="2024-12-01-preview",
     )
     requires_o1_handling = BooleanField("Special Handling for o1-preview Models")
+    supports_streaming = BooleanField("Enable Response Streaming")
     is_default = BooleanField("Set as Default Model")
     version = IntegerField(
         "Version",
@@ -281,15 +282,16 @@ class ModelForm(FlaskForm):
             field.data = None
         elif field.data is not None and field.data <= 0:
             raise ValidationError("Max tokens must be a positive integer.")
-
-    def validate_requires_o1_handling(self, field: Any) -> None:
-        """
-        Additional validation when special handling is required.
-        """
-        if field.data:
-            # When requires_o1_handling is True, automatically set temperature and max_tokens to None
-            self.temperature.data = None
-            self.max_tokens.data = None
+def validate_requires_o1_handling(self, field: Any) -> None:
+    """
+    Additional validation when special handling is required.
+    """
+    if field.data:
+        # When requires_o1_handling is True, automatically set temperature and max_tokens to None
+        # and disable streaming support
+        self.temperature.data = None
+        self.max_tokens.data = None
+        self.supports_streaming.data = False
 
 
 class ResetPasswordForm(FlaskForm):

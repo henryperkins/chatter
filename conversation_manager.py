@@ -90,6 +90,7 @@ class ConversationManager:
         content: str,
         model_max_tokens: Optional[int] = None,
         requires_o1_handling: bool = False,
+        streaming_stats: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Add a message to the conversation context with metadata and token management.
@@ -115,14 +116,33 @@ class ConversationManager:
             else:
                 model_max_tokens = MAX_TOKENS  # Default for other models
 
+        """
+        Add a message to the conversation context with metadata and token management.
+
+        Args:
+            chat_id: The unique identifier for the chat session.
+            role: The role of the message sender ("user", "assistant", or "system").
+            content: The message content to add.
+            model_max_tokens: The maximum number of tokens allowed for the model.
+            requires_o1_handling: Whether the message requires o1-preview handling.
+            streaming_stats: Optional statistics from streaming response.
+
+        Raises:
+            Exception: If there's an error adding the message to the database.
+        """
         # Calculate tokens and prepare metadata
         tokens = len(encoding.encode(content))
         metadata: Dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "token_count": tokens,
             "requires_o1": requires_o1_handling,
-            "model_max_tokens": model_max_tokens
+            "model_max_tokens": model_max_tokens,
         }
+
+        # Add streaming stats if provided
+        if streaming_stats:
+            metadata["streaming"] = True
+            metadata["streaming_stats"] = streaming_stats
 
         if role == "user" and tokens > MAX_MESSAGE_TOKENS:
             content = self._truncate_content(content, encoding)

@@ -151,7 +151,19 @@
                     </span>
                 </label>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">Enable this for models that require special handling
-                    (disables temperature and max tokens settings)</p>
+                    (disables temperature, max tokens, and streaming)</p>
+            </div>
+
+            <!-- Streaming Support -->
+            <div class="mb-4">
+                <label class="inline-flex items-center">
+                    {{ form.supports_streaming(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500
+                    focus:ring-2") }}
+                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
+                        {{ form.supports_streaming.label.text }}
+                    </span>
+                </label>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">Enable streaming responses (not available for o1-preview models)</p>
             </div>
 
             <!-- Default Model Option -->

@@ -1,12 +1,17 @@
 import logging
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TypeVar, cast
 
 from sqlalchemy import text
+from sqlalchemy.engine.result import Row
 
 from .base import db_session
 
 logger = logging.getLogger(__name__)
+
+# Type variable for model dictionary
+ModelDict = Dict[str, Any]
+T = TypeVar('T')
 
 
 @dataclass
@@ -27,6 +32,7 @@ class Model:
     max_completion_tokens: Optional[int] = 8300  # o1-preview model can handle up to 8300 tokens
     is_default: bool = False
     requires_o1_handling: bool = False
+    supports_streaming: bool = False  # Whether the model supports streaming responses
     api_version: str = "2024-10-01-preview"
     version: int = 1
     created_at: Optional[str] = None
@@ -92,7 +98,7 @@ class Model:
                     .mappings()
                     .all()
                 )
-                models = []
+                models: List[Model] = []
                 for row in rows:
                     model_dict = dict(row)
                     models.append(Model(**model_dict))
@@ -145,7 +151,7 @@ class Model:
                 raise
 
     @staticmethod
-    def create(data: Dict[str, Any]) -> Optional[int]:
+    def create(data: ModelDict) -> Optional[int]:
         """
         Create a new model record in the database.
         """
@@ -174,6 +180,7 @@ class Model:
 
                 if data.get("requires_o1_handling", False):
                     data["temperature"] = None
+                    data["supports_streaming"] = False  # Disable streaming for o1-preview models
 
                 # Log the full data being inserted
                 logger.debug(f"Inserting model with data: {data}")
@@ -183,12 +190,12 @@ class Model:
                     INSERT INTO models (
                         name, deployment_name, description, api_endpoint, api_key,
                         api_version, temperature, max_tokens, max_completion_tokens,
-                        model_type, requires_o1_handling, is_default, version,
+                        model_type, requires_o1_handling, supports_streaming, is_default, version,
                         created_at
                     ) VALUES (
                         :name, :deployment_name, :description, :api_endpoint, :api_key,
                         :api_version, :temperature, :max_tokens, :max_completion_tokens,
-                        :model_type, :requires_o1_handling, :is_default, :version,
+                        :model_type, :requires_o1_handling, :supports_streaming, :is_default, :version,
                         CURRENT_TIMESTAMP
                     )
                     RETURNING id
@@ -228,7 +235,7 @@ class Model:
                 raise
 
     @staticmethod
-    def update(model_id: int, data: Dict[str, Any]) -> None:
+    def update(model_id: int, data: ModelDict) -> None:
         """
         Update an existing model's attributes.
         """
@@ -252,6 +259,7 @@ class Model:
                     "max_completion_tokens",
                     "model_type",
                     "requires_o1_handling",
+                    "supports_streaming",
                     "is_default",
                     "version",
                 }
@@ -263,8 +271,12 @@ class Model:
                     logger.info(f"No valid fields to update for model ID {model_id}")
                     return
 
+                # If o1-preview handling is enabled, disable streaming
+                if update_data.get("requires_o1_handling", False):
+                    update_data["supports_streaming"] = False
+
                 set_clause = ", ".join(f"{key} = :{key}" for key in update_data)
-                params = {**update_data, "model_id": model_id}
+                params = cast(Dict[str, Any], {**update_data, "model_id": model_id})
 
                 query = text(
                     f"""
@@ -299,7 +311,7 @@ class Model:
                 raise
 
     @staticmethod
-    def validate_model_config(config: Dict[str, Any]) -> None:
+    def validate_model_config(config: ModelDict) -> None:
         """
         Validate model configuration parameters.
         """
@@ -330,6 +342,10 @@ class Model:
         version = config.get("version")
         if version is not None and not isinstance(version, int):
             raise ValueError("Version must be an integer")
+
+        # Validate streaming support
+        if config.get("requires_o1_handling") and config.get("supports_streaming"):
+            raise ValueError("o1-preview models do not support streaming")
 
         if not config.get("requires_o1_handling", False):
             temperature = config.get("temperature")
@@ -432,7 +448,7 @@ class Model:
         return ['id', 'created_at']
 
     @staticmethod
-    def get_version_history(model_id: int, limit: int = 10, offset: int = 0) -> List[Dict]:
+    def get_version_history(model_id: int, limit: int = 10, offset: int = 0) -> List[ModelDict]:
         """Get version history for model."""
         with db_session() as db:
             query = text("""
@@ -475,13 +491,15 @@ class Model:
                 db.commit()
             except json.JSONDecodeError as e:
                 db.rollback()
+                logger.error(f"Invalid version data format: {e}")
                 raise ValueError(f"Invalid version data format: {e}")
             except Exception as e:
                 db.rollback()
+                logger.error(f"Failed to revert model {model_id} to version {version}: {e}")
                 raise
 
     @staticmethod
-    def create_version(model_id: int, data: Dict[str, Any]) -> None:
+    def create_version(model_id: int, data: ModelDict) -> None:
         """Create new version record."""
         import json
         with db_session() as db:
@@ -506,4 +524,5 @@ class Model:
                 db.commit()
             except Exception as e:
                 db.rollback()
+                logger.error(f"Failed to create version for model {model_id}: {e}")
                 raise

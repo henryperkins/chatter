@@ -6,13 +6,19 @@ including sending chat messages and getting responses, as well as web scraping.
 """
 
 import logging
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union, Generator, Any, cast
 import requests
 from bs4 import BeautifulSoup
-from openai import OpenAIError
+from openai import OpenAIError, Client
+from openai.types.chat import ChatCompletion
+from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
 
 from azure_config import initialize_client_from_model
 from models import Model
+
+# Type aliases for better readability
+ResponseType = Union[str, Generator[ChatCompletionChunk, None, None]]
+ApiParams = Dict[str, Any]
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +32,9 @@ def get_azure_response(
     api_key: Optional[str] = None,
     api_version: Optional[str] = None,
     requires_o1_handling: bool = False,
+    stream: bool = False,
     timeout_seconds: int = 600,  # Increased timeout to 10 minutes
-) -> str:
+) -> ResponseType:
     """
     Sends a chat message to the Azure OpenAI API and returns the response.
 
@@ -51,9 +58,10 @@ def get_azure_response(
         Exception: If any other error occurs.
     """
     try:
-        # Initialize defaults
-        api_params = {
+        # Initialize defaults with proper types
+        api_params: Dict[str, Any] = {
             "messages": [],  # Will be populated based on model type
+            "stream": stream and not requires_o1_handling,  # Enable streaming if requested and supported
         }
 
         # Create model config from provided credentials or get from database
@@ -129,7 +137,12 @@ def get_azure_response(
         # Make the API call
         response = client.chat.completions.create(**api_params)
 
-        # Log full response for debugging
+        # Handle streaming response
+        if stream and not requires_o1_handling:
+            logger.debug("Returning streaming response")
+            return response
+
+        # Handle non-streaming response
         logger.debug("Raw API response: %s", response.model_dump_json())
 
         # Extract model response with enhanced error checking
@@ -150,11 +163,7 @@ def get_azure_response(
         logger.info(
             "Response received from the model (length: %d): %s",
             len(model_response),
-            (
-                model_response[:100] + "..."
-                if len(model_response) > 100
-                else model_response
-            ),
+            model_response[:100] + "..." if len(model_response) > 100 else model_response,
         )
         return model_response
 

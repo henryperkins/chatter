@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional
 
 from flask import (
     Blueprint,
@@ -12,7 +12,6 @@ from flask_wtf.csrf import validate_csrf as flask_validate_csrf
 from werkzeug.exceptions import HTTPException
 
 from decorators import admin_required
-from extensions import csrf
 from forms import ModelForm
 from models import Model
 
@@ -38,9 +37,15 @@ def handle_error(error: Exception, message: str, status_code: int = 500) -> tupl
     logger.error(f"{message}: {str(error)}")
     return jsonify({"error": str(error), "success": False}), status_code
 
-def extract_model_data(form):
+def extract_model_data(form: ModelForm) -> dict[str, any]:
     """
     Extract model data from a form.
+
+    Args:
+        form: The ModelForm instance containing form data
+
+    Returns:
+        dict: Dictionary containing model configuration data
     """
     return {
         "name": form.name.data,
@@ -54,12 +59,13 @@ def extract_model_data(form):
         "model_type": form.model_type.data,
         "api_version": form.api_version.data,
         "requires_o1_handling": form.requires_o1_handling.data,
+        "supports_streaming": form.supports_streaming.data,
         "is_default": form.is_default.data,
         "version": form.version.data,
     }
 
 
-def validate_immutable_fields(model_id, data):
+def validate_immutable_fields(model_id: int, data: dict) -> None:
     """
     Validate that immutable fields are not being updated.
     """
@@ -266,8 +272,6 @@ def get_immutable_fields(model_id: int):
         return jsonify(immutable_fields)
     except Exception as e:
         return handle_error(e, "Error retrieving immutable fields")
-
-
 
 @bp.route("/models/<int:model_id>/versions", methods=["GET"])
 @login_required

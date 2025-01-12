@@ -137,7 +137,19 @@
                     </span>
                 </label>
                 <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">Enable this for o1-preview models (sets temperature to 1.0
-                    and disables max tokens settings)</p>
+                    and disables max tokens and streaming settings)</p>
+            </div>
+
+            <!-- Streaming Support -->
+            <div class="mb-4">
+                <label class="inline-flex items-center">
+                    {{ form.supports_streaming(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500
+                    focus:ring-2", checked=model.supports_streaming) }}
+                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
+                        {{ form.supports_streaming.label.text }}
+                    </span>
+                </label>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">Enable streaming responses (not available for o1-preview models)</p>
             </div>
 
             <!-- Default Model Option -->
@@ -200,7 +212,7 @@
 
             try {
                 const formData = new FormData(form);
-                
+
                 // Add version field if not present
                 if (!formData.get('version')) {
                     formData.set('version', parseInt(form.dataset.version) || 1);
@@ -224,6 +236,12 @@
                 // Convert boolean fields
                 formData.set('requires_o1_handling', formData.get('requires_o1_handling') === 'on');
                 formData.set('is_default', formData.get('is_default') === 'on');
+                formData.set('supports_streaming', formData.get('supports_streaming') === 'on');
+
+                // Handle o1-preview and streaming interaction
+                if (formData.get('requires_o1_handling')) {
+                    formData.set('supports_streaming', false);
+                }
 
                 const response = await fetch(form.action, {
                     method: "POST",

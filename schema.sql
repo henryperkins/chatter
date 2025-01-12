@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS models (
     max_completion_tokens INTEGER NOT NULL DEFAULT 500, -- Max tokens the model can generate in completion
     is_default BOOLEAN DEFAULT 0, -- Whether this is the default model
     requires_o1_handling BOOLEAN DEFAULT 0, -- Special handling for o1-preview (e.g., no system messages)
+    supports_streaming BOOLEAN DEFAULT 0, -- Whether the model supports streaming responses
     api_version TEXT DEFAULT '2024-10-01-preview', -- API version for the model
     version INTEGER DEFAULT 1, -- Version for tracking changes
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -104,3 +105,4 @@ CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages (timestamp); -- Sp
 CREATE INDEX IF NOT EXISTS idx_messages_metadata ON messages((json_extract(metadata, '$.summarized'))); -- Speeds up metadata queries
 CREATE INDEX IF NOT EXISTS idx_messages_role ON messages(role); -- Speeds up role-based filtering
 CREATE INDEX IF NOT EXISTS idx_chats_created_at ON chats (created_at); -- Speeds up fetching chats by creation time
+CREATE INDEX IF NOT EXISTS idx_messages_streaming ON messages((json_extract(metadata, '$.streamed'))); -- Speeds up streaming metadata queries

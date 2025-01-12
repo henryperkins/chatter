@@ -187,7 +187,7 @@
         if (modelSelect) {
           console.debug('Attaching model select handler');
           modelSelect.addEventListener('change', handleModelChange);
-          
+
           // Set up edit model button handler
           const editModelBtn = document.getElementById('edit-model-btn');
           if (editModelBtn) {
@@ -290,32 +290,85 @@
         adjustTextareaHeight(messageInput);
         showTypingIndicator();
 
+        // Get model info
+        const modelSelect = document.getElementById('model-select');
+        const modelId = modelSelect?.value;
+        const model = window.CHAT_CONFIG.models?.find(m => m.id === parseInt(modelId));
+        const useStreaming = model?.supports_streaming && !model?.requires_o1_handling;
+
         // Send request
         const chatId = window.CHAT_CONFIG?.chatId;
         console.debug('Using chat ID:', chatId);
-        const data = await fetchWithCSRF('/chat/', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'X-Chat-ID': chatId,
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        });
 
-        // Handle response
-        if (data.response) {
-          appendAssistantMessage(data.response);
-          uploadedFiles = [];
-          renderFileList();
-        } else if (data.error) {
-          throw new Error(data.error);
+        let responseData;
+
+        if (useStreaming) {
+          const response = await fetch('/chat/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-Chat-ID': chatId,
+              'X-CSRFToken': window.utils.getCSRFToken(),
+              'Accept': 'text/event-stream',
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let accumulatedResponse = '';
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const streamData = line.slice(6);
+                if (streamData === '[DONE]') break;
+                accumulatedResponse += streamData;
+                appendAssistantMessage(accumulatedResponse, true);
+              }
+            }
+          }
+
+          // Final update with complete response
+          appendAssistantMessage(accumulatedResponse, false);
+          responseData = { response: accumulatedResponse };
         } else {
-          throw new Error('No response received from server');
+          responseData = await fetchWithCSRF('/chat/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-Chat-ID': chatId,
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          });
+
+          // Handle response
+          if (responseData.response) {
+            appendAssistantMessage(responseData.response);
+          } else if (responseData.error) {
+            throw new Error(responseData.error);
+          } else {
+            throw new Error('No response received from server');
+          }
         }
 
+        // Clean up after successful response
+        uploadedFiles = [];
+        renderFileList();
+
         // Handle any excluded files
-        if (Array.isArray(data.excluded_files)) {
-          data.excluded_files.forEach(file => {
+        if (Array.isArray(responseData?.excluded_files)) {
+          responseData.excluded_files.forEach(file => {
             showFeedback(`Failed to upload ${file.filename}: ${file.error}`, 'error');
           });
         }
@@ -437,74 +490,82 @@
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    function appendAssistantMessage(message) {
+    function appendAssistantMessage(message, isStreaming = false) {
       if (!message || typeof message !== 'string') {
         console.error('Invalid message content.');
         return;
       }
 
-      const messageDiv = document.createElement('div');
-      messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-3xl';
-      messageDiv.setAttribute('role', 'listitem');
-      messageDiv.innerHTML = `
-        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700" role="img" aria-label="Assistant avatar"></div>
-        <div class="relative max-w-3xl">
-          <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
-            <div class="prose dark:prose-invert prose-sm max-w-none overflow-x-auto"></div>
-          </div>
-          <div class="absolute right-0 top-0 flex space-x-2">
-            <button class="copy-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200"
-                    title="Copy to clipboard" aria-label="Copy message to clipboard">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
-              </svg>
-            </button>
-            <button class="regenerate-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                    title="Regenerate response">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-              </svg>
-            </button>
-          </div>
-          <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
-            ${new Date().toLocaleTimeString()}
-          </span>
-        </div>
-      `;
+      // For streaming updates, update the last message instead of creating a new one
+      let messageDiv;
+      let contentDiv;
 
-      const contentDiv = messageDiv.querySelector('.prose');
-      if (contentDiv) {
-        try {
-          const renderedHtml = md.render(message);
-          const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
-            ALLOWED_TAGS: [
-              'b', 'i', 'em', 'strong', 'a', 'p', 'blockquote', 'code', 'pre',
-              'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br',
-              'hr', 'span', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
-            ],
-            ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'aria-label', 'role']
-          });
-          contentDiv.innerHTML = sanitizedHtml;
-          Prism.highlightAllUnder(contentDiv);
-
-          // Make code blocks accessible
-          contentDiv.querySelectorAll('pre').forEach(pre => {
-            pre.setAttribute('role', 'region');
-            pre.setAttribute('aria-label', 'Code block');
-            pre.tabIndex = 0;
-          });
-        } catch (error) {
-          console.error('Error rendering markdown:', error);
-          contentDiv.innerHTML = `<pre>${DOMPurify.sanitize(message)}</pre>`;
+      if (isStreaming && chatBox.lastElementChild) {
+        messageDiv = chatBox.lastElementChild;
+        contentDiv = messageDiv.querySelector('.prose');
+        if (!contentDiv) {
+          console.error('Content div not found in existing message');
+          return;
         }
       } else {
-        console.error('Content div not found in assistant message');
+        messageDiv = document.createElement('div');
+        messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-3xl';
+        messageDiv.setAttribute('role', 'listitem');
+        messageDiv.innerHTML = `
+          <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700" role="img" aria-label="Assistant avatar"></div>
+          <div class="relative max-w-3xl">
+            <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
+              <div class="prose dark:prose-invert prose-sm max-w-none overflow-x-auto"></div>
+            </div>
+            <div class="absolute right-0 top-0 flex space-x-2">
+              <button class="copy-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200"
+                      title="Copy to clipboard" aria-label="Copy message to clipboard">
+                <i class="fas fa-copy"></i>
+              </button>
+              <button class="regenerate-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                      title="Regenerate response">
+                <i class="fas fa-sync-alt"></i>
+              </button>
+            </div>
+            <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+              ${new Date().toLocaleTimeString()}
+            </span>
+          </div>
+        `;
+        contentDiv = messageDiv.querySelector('.prose');
       }
 
-      chatBox.appendChild(messageDiv);
-      chatBox.scrollTop = chatBox.scrollHeight;
+      try {
+        const renderedHtml = md.render(message);
+        const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
+          ALLOWED_TAGS: [
+            'b', 'i', 'em', 'strong', 'a', 'p', 'blockquote', 'code', 'pre',
+            'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br',
+            'hr', 'span', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
+          ],
+          ALLOWED_ATTR: ['href', 'src', 'alt', 'class', 'aria-label', 'role']
+        });
+
+        contentDiv.innerHTML = sanitizedHtml;
+        Prism.highlightAllUnder(contentDiv);
+
+        // Make code blocks accessible
+        contentDiv.querySelectorAll('pre').forEach(pre => {
+          pre.setAttribute('role', 'region');
+          pre.setAttribute('aria-label', 'Code block');
+          pre.tabIndex = 0;
+        });
+
+        // Only append the message div if it's not already in the chat box
+        if (!isStreaming || !chatBox.lastElementChild) {
+          chatBox.appendChild(messageDiv);
+        }
+
+        chatBox.scrollTop = chatBox.scrollHeight;
+      } catch (error) {
+        console.error('Error rendering markdown:', error);
+        contentDiv.innerHTML = `<pre>${DOMPurify.sanitize(message)}</pre>`;
+      }
     }
 
     function handleFileSelect(event) {
@@ -822,19 +883,69 @@
         const formData = new FormData();
         formData.append('message', lastUserMessage);
 
-        const data = await fetchWithCSRF('/chat/', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'X-Chat-ID': window.CHAT_CONFIG.chatId,
-            'X-Requested-With': 'XMLHttpRequest'
-          }
-        });
+        // Get model info for streaming
+        const modelSelect = document.getElementById('model-select');
+        const modelId = modelSelect?.value;
+        const model = window.models?.find(m => m.id === parseInt(modelId));
+        const useStreaming = model?.supports_streaming && !model?.requires_o1_handling;
 
-        if (data.response) {
-          appendAssistantMessage(data.response);
+        let responseData;
+
+        if (useStreaming) {
+          const response = await fetch('/chat/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-Chat-ID': window.CHAT_CONFIG.chatId,
+              'X-CSRFToken': window.utils.getCSRFToken(),
+              'Accept': 'text/event-stream',
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let accumulatedResponse = '';
+
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const streamData = line.slice(6);
+                if (streamData === '[DONE]') break;
+                accumulatedResponse += streamData;
+                appendAssistantMessage(accumulatedResponse, true);
+              }
+            }
+          }
+
+          // Final update with complete response
+          appendAssistantMessage(accumulatedResponse, false);
+          responseData = { response: accumulatedResponse };
         } else {
-          throw new Error(data.error || 'Failed to regenerate response');
+          responseData = await fetchWithCSRF('/chat/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'X-Chat-ID': window.CHAT_CONFIG.chatId,
+              'X-Requested-With': 'XMLHttpRequest'
+            }
+          });
+
+          if (responseData.response) {
+            appendAssistantMessage(responseData.response);
+          } else {
+            throw new Error(responseData.error || 'Failed to regenerate response');
+          }
         }
       } catch (error) {
         console.error('Error regenerating response:', error);

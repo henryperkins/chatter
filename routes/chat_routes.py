@@ -426,8 +426,16 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         )
 
         # Get Azure response
+        # Check if streaming is requested and supported
+        use_streaming = (
+            request.headers.get("Accept") == "text/event-stream"
+            and getattr(model_obj, "supports_streaming", False)
+            and not getattr(model_obj, "requires_o1_handling", False)
+        )
+
+        # Get Azure response
         logger.debug("Sending request to Azure API")
-        model_response = get_azure_response(
+        response = get_azure_response(
             messages=history,
             deployment_name=getattr(model_obj, 'deployment_name', ''),
             max_completion_tokens=getattr(model_obj, 'max_completion_tokens', 0),
@@ -435,28 +443,71 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             api_key=getattr(model_obj, 'api_key', ''),
             api_version=getattr(model_obj, 'api_version', ''),
             requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False),
+            stream=use_streaming,
             timeout_seconds=120,
         )
-        logger.debug("Received API response: %d chars", len(model_response))
 
-        # Process model response to escape any Jinja2 template syntax
-        processed_response = model_response.replace("{%", "&#123;%").replace("%}", "%&#125;")
+        if use_streaming:
+            def generate():
+                accumulated_response = []
+                streaming_stats = {
+                    "start_time": datetime.now().isoformat(),
+                    "chunk_count": 0,
+                }
 
-        # Add assistant response with metadata
-        conversation_manager.add_message(
-            chat_id=chat_id,
-            role="assistant",
-            content=processed_response,
-            model_max_tokens=getattr(model_obj, 'max_tokens', None),
-            requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False)
-        )
+                try:
+                    for chunk in response:
+                        if chunk.choices[0].delta.content:
+                            content = chunk.choices[0].delta.content
+                            accumulated_response.append(content)
+                            streaming_stats["chunk_count"] += 1
+                            yield f"data: {content}\n\n"
 
-        return cast(Response, jsonify({
-            "response": processed_response,
-            "included_files": included_files,
-            "excluded_files": excluded_files,
-        }))
+                    # Complete streaming stats
+                    streaming_stats["end_time"] = datetime.now().isoformat()
 
+                    # Save complete message
+                    complete_response = "".join(accumulated_response)
+                    processed_response = complete_response.replace("{%", "&#123;%").replace("%}", "%&#125;")
+                    conversation_manager.add_message(
+                        chat_id=chat_id,
+                        role="assistant",
+                        content=processed_response,
+                        model_max_tokens=getattr(model_obj, 'max_tokens', None),
+                        requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False),
+                        streaming_stats=streaming_stats
+                    )
+                except Exception as e:
+                    logger.error(f"Streaming error: {e}")
+                    yield f"data: Error: {str(e)}\n\n"
+                finally:
+                    yield "data: [DONE]\n\n"
+
+            return Response(
+                generate(),
+                mimetype='text/event-stream',
+                headers={
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'X-Accel-Buffering': 'no'
+                }
+            )
+        else:
+            # Handle non-streaming response
+            logger.debug("Received API response: %d chars", len(response))
+            processed_response = response.replace("{%", "&#123;%").replace("%}", "%&#125;")
+            conversation_manager.add_message(
+                chat_id=chat_id,
+                role="assistant",
+                content=processed_response,
+                model_max_tokens=getattr(model_obj, 'max_tokens', None),
+                requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False)
+            )
+            return cast(Response, jsonify({
+                "response": processed_response,
+                "included_files": included_files,
+                "excluded_files": excluded_files,
+            }))
     except Exception as ex:
         logger.error("Error during chat handling: %s", str(ex), exc_info=True)
         return jsonify({"error": "An unexpected error occurred."}), 500
