@@ -1627,109 +1627,6 @@ select {
   margin-bottom: 0;
 }
 
-/* Layout components */
-
-/* Navigation components */
-
-/* Mobile menu components */
-@media (max-width: 767px) {
-    .chat-header {
-        padding: 0.5rem;
-    }
-    
-    #chat-box {
-        padding: 0.5rem;
-    }
-    
-    .message-input-container {
-        padding: 0.5rem;
-    }
-    
-    .message-input {
-        min-height: 2.5rem;
-        max-height: 6rem;
-    }
-    
-    .upload-button {
-        padding: 0.5rem;
-    }
-    
-    .send-button {
-        padding: 0.5rem 1rem;
-    }
-    
-    .chat-title {
-        font-size: 1rem;
-    }
-    
-    .model-select {
-        width: 100%;
-        margin-bottom: 0.5rem;
-    }
-    
-    .new-chat-btn {
-        width: 100%;
-        margin-bottom: 0.5rem;
-    }
-}
-
-/* Smooth transitions for mobile menu */
-#mobile-menu {
-    transition: transform 0.3s ease-in-out;
-}
-
-#sidebar {
-    transition: transform 0.3s ease-in-out;
-}
-
-/* Better touch targets for mobile */
-button, a {
-    min-width: 44px;
-    min-height: 44px;
-}
-
-/* Improved input fields for mobile */
-input, textarea {
-    font-size: 16px; /* Prevent iOS zoom on focus */
-}
-
-/* Better scrolling behavior */
-#chat-box {
-    -webkit-overflow-scrolling: touch;
-}
-
-/* Adjust message bubbles for mobile */
-@media (max-width: 767px) {
-    .message-bubble {
-        max-width: 90%;
-        margin: 0.5rem;
-    }
-    
-    .assistant-message {
-        flex-direction: column;
-    }
-    
-    .assistant-avatar {
-        margin-bottom: 0.5rem;
-    }
-}
-
-/* Button components */
-
-/* Card components */
-
-/* Form components */
-
-/* Alert components */
-
-.alert {
-  margin-bottom: 1rem;
-  border-radius: 0.5rem;
-  padding: 1rem;
-}
-
-/* Markdown content */
-
 .static {
   position: static;
 }
@@ -1792,6 +1689,14 @@ input, textarea {
 
 .top-4 {
   top: 1rem;
+}
+
+.z-30 {
+  z-index: 30;
+}
+
+.z-40 {
+  z-index: 40;
 }
 
 .z-50 {
@@ -2017,6 +1922,11 @@ input, textarea {
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
 }
 
+.-translate-x-full {
+  --tw-translate-x: -100%;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
 .-translate-y-1\/2 {
   --tw-translate-y: -50%;
   transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
@@ -2101,12 +2011,6 @@ input, textarea {
   --tw-space-x-reverse: 0;
   margin-right: calc(0.75rem * var(--tw-space-x-reverse));
   margin-left: calc(0.75rem * calc(1 - var(--tw-space-x-reverse)));
-}
-
-.space-y-1 > :not([hidden]) ~ :not([hidden]) {
-  --tw-space-y-reverse: 0;
-  margin-top: calc(0.25rem * calc(1 - var(--tw-space-y-reverse)));
-  margin-bottom: calc(0.25rem * var(--tw-space-y-reverse));
 }
 
 .space-y-2 > :not([hidden]) ~ :not([hidden]) {
@@ -2406,20 +2310,12 @@ input, textarea {
   padding-bottom: 2rem;
 }
 
-.pb-3 {
-  padding-bottom: 0.75rem;
-}
-
 .pl-4 {
   padding-left: 1rem;
 }
 
 .pt-16 {
   padding-top: 4rem;
-}
-
-.pt-2 {
-  padding-top: 0.5rem;
 }
 
 .pt-4 {
@@ -2447,11 +2343,6 @@ input, textarea {
 .text-4xl {
   font-size: 2.25rem;
   line-height: 2.5rem;
-}
-
-.text-base {
-  font-size: 1rem;
-  line-height: 1.5rem;
 }
 
 .text-lg {
@@ -2622,6 +2513,12 @@ input, textarea {
   transition-duration: 150ms;
 }
 
+.transition-transform {
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
 .duration-150 {
   transition-duration: 150ms;
 }
@@ -2630,145 +2527,12 @@ input, textarea {
   transition-duration: 200ms;
 }
 
+.duration-300 {
+  transition-duration: 300ms;
+}
+
 .ease-in-out {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Custom styles */
-
-.off-canvas-menu {
-  position: fixed;
-  top: 0px;
-  left: 0px;
-  z-index: 50;
-  height: 100%;
-  width: 16rem;
-  --tw-translate-x: -100%;
-  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
-  --tw-bg-opacity: 1;
-  background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
-  --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);
-  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
-  transition-property: transform;
-  transition-duration: 300ms;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.off-canvas-menu.open {
-  --tw-translate-x: 0px;
-  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
-}
-
-.overlay {
-  position: fixed;
-  inset: 0px;
-  z-index: 40;
-  display: none;
-  background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1));
-  --tw-bg-opacity: 0.5;
-  transition-property: opacity;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 300ms;
-}
-
-.bottom-nav {
-  position: fixed;
-  bottom: 0px;
-  left: 0px;
-  z-index: 30;
-  width: 100%;
-  border-top-width: 1px;
-  --tw-border-opacity: 1;
-  border-color: rgb(229 231 235 / var(--tw-border-opacity, 1));
-  --tw-bg-opacity: 1;
-  background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
-}
-
-@media (min-width: 768px) {
-  .bottom-nav {
-    display: none;
-  }
-}
-
-/* Ensure main content doesn't get hidden under fixed elements */
-
-body {
-  padding-top: 4rem;
-  padding-bottom: 4rem;
-}
-
-@media (min-width: 768px) {
-  body {
-    padding-bottom: 0px;
-  }
-}
-
-/* Improve dropdown menu positioning */
-
-.dropdown-menu {
-  position: absolute;
-  right: 0px;
-  margin-top: 0.5rem;
-  width: 12rem;
-  border-radius: 0.375rem;
-  --tw-bg-opacity: 1;
-  background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
-  padding-top: 0.25rem;
-  padding-bottom: 0.25rem;
-  --tw-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);
-  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
-  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
-  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color);
-  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
-  --tw-ring-color: rgb(0 0 0 / var(--tw-ring-opacity, 1));
-  --tw-ring-opacity: 0.05;
-}
-
-.dropdown-menu:focus {
-  outline: 2px solid transparent;
-  outline-offset: 2px;
-}
-
-/* Fix flash messages positioning */
-
-.flash-messages {
-  position: fixed;
-  top: 5rem;
-  left: 50%;
-  z-index: 50;
-  width: 100%;
-  max-width: 32rem;
-  --tw-translate-x: -50%;
-  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
-}
-
-/* Scrollbar styles for the chat input textarea */
-
-#message-input::-webkit-scrollbar {
-  width: 12px;
-}
-
-#message-input::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-#message-input::-webkit-scrollbar-thumb {
-  background-color: #888;
-  border-radius: 10px;
-  border: 3px solid #f1f1f1;
-}
-
-/* Dark mode scrollbar styles */
-
-.dark #message-input::-webkit-scrollbar-track {
-  background: #2d3748;
-}
-
-.dark #message-input::-webkit-scrollbar-thumb {
-  background-color: #4a5568;
-  border: 3px solid #2d3748;
 }
 
 .dark\:prose-invert:is(.dark *) {
@@ -3111,8 +2875,8 @@ body {
 }
 
 @media (min-width: 768px) {
-  .md\:block {
-    display: block;
+  .md\:relative {
+    position: relative;
   }
 
   .md\:flex {
@@ -3127,8 +2891,17 @@ body {
     width: 33.333333%;
   }
 
+  .md\:translate-x-0 {
+    --tw-translate-x: 0px;
+    transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+  }
+
   .md\:grid-cols-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .md\:flex-row {
+    flex-direction: row;
   }
 
   .md\:items-center {
