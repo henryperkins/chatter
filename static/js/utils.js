@@ -8,7 +8,9 @@
      */
     function getCSRFToken() {
         const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
-        return csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") || "" : "";
+        const csrfToken = csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") || "" : "";
+        console.debug("Retrieved CSRF token from meta tag:", csrfToken);  // Add this line for debugging
+        return csrfToken;
     }
 
     // Set default CSRF token for axios if available

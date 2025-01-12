@@ -19,8 +19,13 @@ from typing import Dict, Optional
 # Load environment variables from .env file
 load_dotenv()
 
+from werkzeug.middleware.proxy_fix import ProxyFix
+
 # Initialize Flask app
 app = Flask(__name__)
+
+# Apply ProxyFix middleware
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Configure logging
 logging.basicConfig(
@@ -45,14 +50,14 @@ else:
 app.config["DATABASE"] = os.environ.get("DATABASE", "chat_app.db")
 
 # Session cookies and security
+is_behind_proxy = os.environ.get("BEHIND_PROXY", "False") == "True"
+
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SECURE=os.environ.get("FLASK_ENV")
-    == "production",  # Only force HTTPS in production
+    SESSION_COOKIE_SECURE=is_behind_proxy,  # Use HTTPS settings if behind a proxy
     SESSION_COOKIE_SAMESITE="Lax",
     REMEMBER_COOKIE_HTTPONLY=True,
-    REMEMBER_COOKIE_SECURE=os.environ.get("FLASK_ENV")
-    == "production",  # Only force HTTPS in production
+    REMEMBER_COOKIE_SECURE=is_behind_proxy,
     PERMANENT_SESSION_LIFETIME=timedelta(minutes=60),  # Customize as needed
 )
 

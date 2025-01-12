@@ -356,9 +356,13 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         if not csrf_token:
             return jsonify({'error': 'Missing CSRF token.'}), 400
 
+        # Log the CSRF token for debugging
+        logger.debug(f"Received CSRF token: {csrf_token}")
+
         try:
             validate_csrf(csrf_token)
         except CSRFError as e:
+            logger.error(f"CSRF validation failed: {e.description}")
             return jsonify({'error': 'Invalid CSRF token.'}), 400
 
         # Add logging to inspect request data
