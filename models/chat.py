@@ -173,6 +173,14 @@ class Chat:
                     logger.debug(f"Default model ID retrieved: {row['id']}")
                     return row["id"]
                 logger.warning("No default model found.")
+                logger.warning("No default model found. Selecting any available model.")
+                # If no default model, select any available model
+                query = text("SELECT id FROM models LIMIT 1")
+                row = db.execute(query).mappings().first()
+                if row:
+                    logger.debug(f"Using model ID {row['id']} as fallback.")
+                    return row["id"]
+                logger.error("No models available in the database.")
                 return None
             except Exception as e:
                 logger.error(f"Error retrieving default model ID: {e}")

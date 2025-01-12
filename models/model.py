@@ -178,6 +178,13 @@ class Model:
                 # Ensure all required fields are present
                 Model.validate_model_config(data)
 
+                # Check if any models exist
+                model_count_query = text("SELECT COUNT(*) as count FROM models")
+                model_count = db.execute(model_count_query).scalar()
+                if model_count == 0:
+                    # Set is_default to True for the first model
+                    data['is_default'] = True
+
                 if data.get("requires_o1_handling", False):
                     data["temperature"] = None
                     data["supports_streaming"] = False  # Disable streaming for o1-preview models
@@ -214,7 +221,7 @@ class Model:
                         """
                         UPDATE models
                         SET is_default = 0
-                        WHERE id != :model_id AND is_default = :is_default
+                        WHERE id != :model_id
                     """
                     )
                     db.execute(
