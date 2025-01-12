@@ -65,26 +65,36 @@
 
     // Initialize mobile menu toggle
     function initializeMobileMenu() {
-        const sidebarToggle = document.getElementById('sidebar-toggle');
         const mobileMenu = document.getElementById('mobile-menu');
-        const overlay = document.getElementById('overlay');
-        const closeButton = document.getElementById('off-canvas-close');
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const mobileMenuClose = document.getElementById('mobile-menu-close');
+        const sidebar = document.getElementById('sidebar');
 
-        function toggleMenu() {
-            mobileMenu?.classList.toggle('hidden');
-            overlay?.classList.toggle('hidden');
-            document.body.classList.toggle('overflow-hidden');
+        function toggleMobileMenu() {
+            mobileMenu.classList.toggle('-translate-x-full');
         }
 
-        if (sidebarToggle && mobileMenu) {
-            sidebarToggle.addEventListener('click', toggleMenu);
-            // Close menu when clicking outside
-            document.addEventListener('click', (event) => {
-                if (!mobileMenu.contains(event.target) && !sidebarToggle.contains(event.target)) {
-                    mobileMenu.classList.add('hidden');
-                }
-            });
+        function toggleSidebar() {
+            sidebar.classList.toggle('-translate-x-full');
         }
+
+        if (mobileMenuToggle) {
+            mobileMenuToggle.addEventListener('click', toggleSidebar);
+        }
+
+        if (mobileMenuClose) {
+            mobileMenuClose.addEventListener('click', toggleMobileMenu);
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!mobileMenu.contains(e.target) && !mobileMenuToggle.contains(e.target)) {
+                mobileMenu.classList.add('-translate-x-full');
+            }
+            if (!sidebar.contains(e.target) && !mobileMenuToggle.contains(e.target)) {
+                sidebar.classList.add('-translate-x-full');
+            }
+        });
     }
 
     // Initialize dark mode toggle

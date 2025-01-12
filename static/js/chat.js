@@ -33,6 +33,27 @@
     if (window.chatInitialized) return;
     window.chatInitialized = true;
 
+    // Mobile-specific setup
+    if (window.innerWidth < 768) {
+        // Adjust textarea height for mobile
+        messageInput.style.minHeight = '2.5rem';
+        messageInput.style.maxHeight = '6rem';
+        
+        // Hide sidebar by default on mobile
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+            sidebar.classList.add('-translate-x-full');
+        }
+    }
+
+    // Add touch event listeners for mobile
+    if ('ontouchstart' in window) {
+        messageInput.addEventListener('touchstart', handleMessageInput);
+        if (sendButton) {
+            sendButton.addEventListener('touchend', handleSendButtonClick);
+        }
+    }
+
     // Cache and verify DOM elements
     const requiredElements = {
       'message-input': el => messageInput = el,

@@ -3,9 +3,9 @@
 {% block title %}Chat - Azure OpenAI{% endblock %}
 
 {% block content %}
-<div class="flex h-screen overflow-hidden bg-white dark:bg-gray-900">
+<div class="flex flex-col md:flex-row h-screen overflow-hidden bg-white dark:bg-gray-900">
     <!-- Sidebar -->
-    <nav id="sidebar" class="hidden md:block w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
+    <nav id="sidebar" class="fixed md:relative z-30 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-screen">
         <div class="p-4 space-y-4">
             <!-- New Chat Button -->
             <button id="new-chat-btn" class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
@@ -93,6 +93,12 @@
         <!-- Chat Header -->
         <div class="chat-header px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
             <div class="flex items-center">
+                <!-- Mobile Menu Button -->
+                <button id="mobile-menu-toggle" class="md:hidden mr-2 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
                 <h2 id="chat-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">
                     {{ chat_title }} - {{ model_name }}
                 </h2>

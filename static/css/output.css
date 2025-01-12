@@ -1632,6 +1632,87 @@ select {
 /* Navigation components */
 
 /* Mobile menu components */
+@media (max-width: 767px) {
+    .chat-header {
+        padding: 0.5rem;
+    }
+    
+    #chat-box {
+        padding: 0.5rem;
+    }
+    
+    .message-input-container {
+        padding: 0.5rem;
+    }
+    
+    .message-input {
+        min-height: 2.5rem;
+        max-height: 6rem;
+    }
+    
+    .upload-button {
+        padding: 0.5rem;
+    }
+    
+    .send-button {
+        padding: 0.5rem 1rem;
+    }
+    
+    .chat-title {
+        font-size: 1rem;
+    }
+    
+    .model-select {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    .new-chat-btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Smooth transitions for mobile menu */
+#mobile-menu {
+    transition: transform 0.3s ease-in-out;
+}
+
+#sidebar {
+    transition: transform 0.3s ease-in-out;
+}
+
+/* Better touch targets for mobile */
+button, a {
+    min-width: 44px;
+    min-height: 44px;
+}
+
+/* Improved input fields for mobile */
+input, textarea {
+    font-size: 16px; /* Prevent iOS zoom on focus */
+}
+
+/* Better scrolling behavior */
+#chat-box {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Adjust message bubbles for mobile */
+@media (max-width: 767px) {
+    .message-bubble {
+        max-width: 90%;
+        margin: 0.5rem;
+    }
+    
+    .assistant-message {
+        flex-direction: column;
+    }
+    
+    .assistant-avatar {
+        margin-bottom: 0.5rem;
+    }
+}
 
 /* Button components */
 
