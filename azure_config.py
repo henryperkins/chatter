@@ -93,6 +93,7 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
 
 def initialize_client_from_model(
     model_config: Dict[str, Any]
+, timeout_seconds: int = 30  # Add timeout_seconds parameter with default value
 ) -> Tuple[AzureOpenAI, str, Optional[float], Optional[int], int, bool]:
     """
     Initialize Azure OpenAI client from model configuration.
