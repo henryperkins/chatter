@@ -225,7 +225,6 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 
 @chat_routes.route("/", methods=["POST"])
 @login_required
-@csrf.exempt  # Using CSRF token in request headers instead
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
     """Handle incoming chat messages and return AI responses."""
     try:

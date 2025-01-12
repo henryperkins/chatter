@@ -32,11 +32,11 @@
             <!-- Admin Buttons -->
             {% if current_user.role == 'admin' %}
             <div class="space-y-2">
-                <a href="{{ url_for('model.add_model_page') }}" 
+                <a href="{{ url_for('model.add_model_page') }}"
                    class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center">
                     Add Model
                 </a>
-                <button id="edit-model-btn" 
+                <button id="edit-model-btn"
                         class="block w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-center">
                     Edit Model
                 </button>
@@ -64,7 +64,7 @@
 
                 <div class="relative group">
                     <a href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
-                       class="block p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500 
+                       class="block p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500
                               {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}">
                         <div class="flex justify-between items-center">
                             <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
@@ -78,7 +78,7 @@
                     <button class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center h-8 w-8 rounded-full hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 delete-chat-btn focus:ring-2 focus:ring-red-500"
                             data-chat-id="{{ conversation.id }}" title="Delete chat">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                         </svg>
                     </button>
@@ -112,10 +112,10 @@
                             <div class="relative bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
                                 <p class="text-sm">{{ message.content }}</p>
                                 {% if loop.last %}
-                                <button class="edit-message-button absolute -left-6 top-2 text-gray-500 hover:text-gray-700" 
+                                <button class="edit-message-button absolute -left-6 top-2 text-gray-500 hover:text-gray-700"
                                         title="Edit message">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                               d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                     </svg>
                                 </button>
@@ -137,18 +137,18 @@
                                 </div>
                             </div>
                             <div class="absolute right-0 top-0 flex space-x-2">
-                                <button class="copy-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" 
+                                <button class="copy-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                                         title="Copy to clipboard">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                               d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
                                     </svg>
                                 </button>
                                 {% if loop.last %}
-                                <button class="regenerate-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" 
+                                <button class="regenerate-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                                         title="Regenerate response">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                               d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                                     </svg>
                                 </button>
@@ -185,12 +185,12 @@
 
                 <!-- Message Input -->
                 <div class="flex-1">
-                    <textarea id="message-input" class="w-full px-3 py-2 resize-none border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200" 
+                    <textarea id="message-input" class="w-full px-3 py-2 resize-none border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
                               placeholder="Type your message..." rows="1"></textarea>
                 </div>
 
                 <!-- Send Button -->
-                <button id="send-button" 
+                <button id="send-button"
                         class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                         type="button">
                     <span class="relative">Send</span>
@@ -226,11 +226,26 @@
 {% block head %}
 {{ super() }}
 <!-- Pre-initialize chat configuration -->
-<script>
+<script type="text/javascript">
     window.CHAT_CONFIG = {
-        chatId: "{{ chat_id }}",
-        editModelUrl: "{{ url_for('model.edit_model', model_id=0) }}"
+        chatId: "{{ chat_id or '' }}",
+        editModelUrl: "{{ url_for('model.edit_model', model_id=0) }}",
+        maxFileSize: parseInt("{{ config.get('MAX_FILE_SIZE', 10 * 1024 * 1024)|string }}"),
+        maxFiles: parseInt("{{ config.get('MAX_FILES', 5)|string }}"),
+        maxMessageLength: parseInt("{{ config.get('MAX_MESSAGE_LENGTH', 1000)|string }}"),
+        allowedFileTypes: JSON.parse('{{ config.get("ALLOWED_FILE_TYPES", ["text/plain", "application/pdf", "text/x-python", "application/javascript", "text/markdown", "image/jpeg", "image/png", "text/csv"])|tojson|safe }}'),
+        csrfToken: "{{ csrf_token() }}",
+        userId: "{{ current_user.id }}",
+        userRole: "{{ current_user.role }}"
     };
+
+    // Validate chat configuration
+    if (!window.CHAT_CONFIG.chatId) {
+        console.warn('Chat ID not initialized');
+    }
+    if (!window.CHAT_CONFIG.csrfToken) {
+        console.error('CSRF token not found');
+    }
 </script>
 {% endblock %}
 
@@ -255,7 +270,7 @@
                     const modelSelect = document.getElementById('model-select');
                     if (modelSelect) {
                         modelSelect.innerHTML = models
-                            .map(model => 
+                            .map(model =>
                                 `<option value="${model.id}"${model.is_default ? ' selected' : ''}>${model.name}${model.is_default ? ' (Default)' : ''}</option>`
                             )
                             .join('');

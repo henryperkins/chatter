@@ -1,6 +1,6 @@
 (function () {
   // Access utility functions from window.utils
-  const { showFeedback, debounce, fetchWithCSRF } = window.utils;
+  const { showFeedback, fetchWithCSRF } = window.utils;
 
   // Access markdown-it instance from the global window object
   const md = window.markdownit().use(window.markdownitPrism);
@@ -29,16 +29,39 @@
 
   // Initialize chat interface
   function initializeChat() {
-    // Cache DOM elements
-    messageInput = document.getElementById('message-input');
-    sendButton = document.getElementById('send-button');
-    chatBox = document.getElementById('chat-box');
-    fileInput = document.getElementById('file-input');
-    uploadButton = document.getElementById('upload-button');
-    uploadedFilesDiv = document.getElementById('uploaded-files');
-    modelSelect = document.getElementById('model-select');
-    newChatBtn = document.getElementById('new-chat-btn');
-    dropZone = document.getElementById('drop-zone');
+    // Cache and verify DOM elements
+    const requiredElements = {
+      'message-input': el => messageInput = el,
+      'send-button': el => sendButton = el,
+      'chat-box': el => chatBox = el
+    };
+
+    const optionalElements = {
+      'file-input': el => fileInput = el,
+      'upload-button': el => uploadButton = el,
+      'uploaded-files': el => uploadedFilesDiv = el,
+      'model-select': el => modelSelect = el,
+      'new-chat-btn': el => newChatBtn = el,
+      'drop-zone': el => dropZone = el
+    };
+
+    // Verify required elements exist
+    for (const [id, setter] of Object.entries(requiredElements)) {
+      const element = document.getElementById(id);
+      if (!element) {
+        console.error(`Required element #${id} not found`);
+        return; // Exit initialization if required elements are missing
+      }
+      setter(element);
+    }
+
+    // Set optional elements if they exist
+    for (const [id, setter] of Object.entries(optionalElements)) {
+      const element = document.getElementById(id);
+      if (element) {
+        setter(element);
+      }
+    }
 
     // Set up core event listeners
     sendButton.addEventListener('click', (e) => {
@@ -125,7 +148,8 @@
         method: 'POST',
         body: formData,
         headers: {
-          'X-Chat-ID': chatId
+          'X-Chat-ID': chatId,
+          'X-Requested-With': 'XMLHttpRequest'
         }
       });
 
@@ -161,25 +185,33 @@
 
   async function editChatTitle(chatId) {
     const newTitle = prompt('Enter new chat title:');
-    if (newTitle) {
-      try {
-        const response = await fetchWithCSRF(`/chat/update_chat_title/${chatId}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ title: newTitle })
-        });
-        if (response.success) {
-          document.getElementById('chat-title').textContent = newTitle;
-          showFeedback('Chat title updated successfully', 'success');
-        } else {
-          throw new Error(response.error || 'Unknown error');
-        }
-      } catch (error) {
-        console.error('Error updating chat title:', error);
-        showFeedback('Failed to update chat title', 'error');
+    if (!newTitle) return;
+
+    if (newTitle.length > 100) {
+      showFeedback('Title must be under 100 characters', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetchWithCSRF(`/chat/update_chat_title/${chatId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Chat-ID': window.CHAT_CONFIG.chatId,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ title: newTitle.trim() })
+      });
+
+      if (response.success) {
+        document.getElementById('chat-title').textContent = newTitle;
+        showFeedback('Chat title updated successfully', 'success');
+      } else {
+        throw new Error(response.error || 'Unknown error');
       }
+    } catch (error) {
+      console.error('Error updating chat title:', error);
+      showFeedback('Failed to update chat title', 'error');
     }
   }
 
@@ -188,7 +220,10 @@
       try {
         const response = await fetchWithCSRF(`/chat/delete_chat/${chatId}`, {
           method: 'DELETE',
-          headers: {}
+          headers: {
+            'X-Chat-ID': window.CHAT_CONFIG.chatId,
+            'X-Requested-With': 'XMLHttpRequest'
+          }
         });
         if (response.success) {
           location.reload();
@@ -253,34 +288,78 @@
   }
 
   function handleFileSelect(event) {
-    const files = Array.from(event.target.files);
-    processFiles(files);
+    try {
+      if (!event.target.files) {
+        showFeedback('No files selected', 'error');
+        return;
+      }
+      const files = Array.from(event.target.files);
+      if (files.length === 0) {
+        showFeedback('No files selected', 'error');
+        return;
+      }
+      processFiles(files);
+    } catch (error) {
+      console.error('Error handling file selection:', error);
+      showFeedback('Failed to process selected files', 'error');
+    } finally {
+      // Reset file input to allow selecting the same file again
+      event.target.value = '';
+    }
   }
 
   function processFiles(files) {
     const validFiles = [];
     const errors = [];
+    const totalSize = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
 
-    files.forEach(file => {
+    for (const file of files) {
+      // Check file type
       if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-        errors.push(`${file.name}: Unsupported file type`);
-      } else if (file.size > MAX_FILE_SIZE) {
-        errors.push(`${file.name}: File too large (max ${MAX_FILE_SIZE / 1024 / 1024}MB)`);
-      } else if (uploadedFiles.length + validFiles.length >= MAX_FILES) {
-        errors.push(`${file.name}: Maximum number of files reached`);
-      } else {
-        validFiles.push(file);
+        errors.push(`${file.name}: Unsupported file type. Allowed types: ${ALLOWED_FILE_TYPES.join(', ')}`);
+        continue;
       }
-    });
+
+      // Check individual file size
+      if (file.size > MAX_FILE_SIZE) {
+        errors.push(`${file.name}: File too large (max ${MAX_FILE_SIZE / 1024 / 1024}MB)`);
+        continue;
+      }
+
+      // Check total size limit
+      if (totalSize + file.size > MAX_FILE_SIZE * MAX_FILES) {
+        errors.push(`${file.name}: Would exceed total size limit of ${MAX_FILES * MAX_FILE_SIZE / 1024 / 1024}MB`);
+        continue;
+      }
+
+      // Check file count limit
+      if (uploadedFiles.length + validFiles.length >= MAX_FILES) {
+        errors.push(`${file.name}: Maximum number of files (${MAX_FILES}) reached`);
+        continue;
+      }
+
+      // Validate file is not empty
+      if (file.size === 0) {
+        errors.push(`${file.name}: File is empty`);
+        continue;
+      }
+
+      validFiles.push(file);
+    }
 
     if (errors.length > 0) {
-      showFeedback(errors.join('\n'), 'error');
+      showFeedback(errors.join('\n'), 'error', { duration: 10000 }); // Show errors longer
     }
 
     if (validFiles.length > 0) {
       uploadedFiles = uploadedFiles.concat(validFiles);
       renderFileList();
-      showFeedback(`${validFiles.length} file(s) ready to upload`, 'success');
+      showFeedback(
+        `${validFiles.length} file(s) ready to upload. Total size: ${
+          (uploadedFiles.reduce((sum, file) => sum + file.size, 0) / 1024 / 1024).toFixed(1)
+        }MB`,
+        'success'
+      );
     }
   }
 
@@ -379,9 +458,22 @@
     });
 
     dropZone.addEventListener('drop', (e) => {
-      dropZone.classList.add('hidden');
-      const files = Array.from(e.dataTransfer.files);
-      processFiles(files);
+      try {
+        dropZone.classList.add('hidden');
+        if (!e.dataTransfer?.files) {
+          showFeedback('No files dropped', 'error');
+          return;
+        }
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length === 0) {
+          showFeedback('No files dropped', 'error');
+          return;
+        }
+        processFiles(files);
+      } catch (error) {
+        console.error('Error handling file drop:', error);
+        showFeedback('Failed to process dropped files', 'error');
+      }
     });
   }
 
@@ -396,23 +488,57 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        },
+          'X-Requested-With': 'XMLHttpRequest'
+        }
       });
 
-      if (data.success) {
+      if (data.success && data.chat_id) {
         window.location.href = `/chat/chat_interface?chat_id=${data.chat_id}`;
       } else {
-        throw new Error(data.error || 'Failed to create new chat');
+        throw new Error(data.error || 'Failed to create new chat: Invalid response');
       }
     } catch (error) {
       console.error('Error creating new chat:', error);
-      showFeedback('Failed to create new chat', 'error');
+      showFeedback(error.message || 'Failed to create new chat', 'error');
+      // Re-enable the button if it was disabled
+      if (newChatBtn) {
+        newChatBtn.disabled = false;
+      }
     }
   }
 
-  function handleModelChange() {
+  async function handleModelChange() {
+    if (!modelSelect) return;
+
     const modelId = modelSelect.value;
-    localStorage.setItem('selectedModel', modelId);
+    const originalValue = modelSelect.dataset.originalValue;
+
+    try {
+      const response = await fetchWithCSRF('/chat/update_model', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Chat-ID': window.CHAT_CONFIG.chatId,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ model_id: modelId })
+      });
+
+      if (response.success) {
+        localStorage.setItem('selectedModel', modelId);
+        modelSelect.dataset.originalValue = modelId;
+        showFeedback('Model updated successfully', 'success');
+      } else {
+        throw new Error(response.error || 'Failed to update model');
+      }
+    } catch (error) {
+      console.error('Error updating model:', error);
+      showFeedback(error.message || 'Failed to update model', 'error');
+      // Restore original value on error
+      if (originalValue && modelSelect) {
+        modelSelect.value = originalValue;
+      }
+    }
   }
 
   async function handleMessageActions(event) {
@@ -473,6 +599,10 @@
       const data = await fetchWithCSRF('/chat/', {
         method: 'POST',
         body: formData,
+        headers: {
+          'X-Chat-ID': window.CHAT_CONFIG.chatId,
+          'X-Requested-With': 'XMLHttpRequest'
+        }
       });
 
       if (data.response) {
