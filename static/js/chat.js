@@ -131,34 +131,30 @@
           const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
           const backdrop = document.createElement('div');
           backdrop.id = 'sidebar-backdrop';
-          backdrop.className = 'fixed inset-0 bg-black bg-opacity-50 z-modal-backdrop hidden transition-opacity duration-300 ease-in-out opacity-0';
+          backdrop.className = 'fixed inset-0 bg-black bg-opacity-50 z-modal-backdrop hidden';
           backdrop.setAttribute('aria-hidden', 'true');
           document.body.appendChild(backdrop);
 
           if (sidebar && mobileMenuToggle) {
-            sidebar.classList.add('-translate-x-full');
+            // Initially hide the sidebar on mobile by adding 'hidden' class
+            sidebar.classList.add('hidden');
 
             mobileMenuToggle.addEventListener('click', () => {
-              sidebar.classList.remove('-translate-x-full');
-              backdrop.classList.remove('hidden');
-              requestAnimationFrame(() => {
-                backdrop.classList.remove('opacity-0');
-              });
-              sidebar.setAttribute('aria-expanded', 'true');
+              sidebar.classList.toggle('hidden');
+              backdrop.classList.toggle('hidden');
+              const isExpanded = sidebar.classList.contains('hidden') ? 'false' : 'true';
+              sidebar.setAttribute('aria-expanded', isExpanded);
             });
 
             backdrop.addEventListener('click', () => {
-              sidebar.classList.add('-translate-x-full');
-              backdrop.classList.add('opacity-0');
-              setTimeout(() => {
-                backdrop.classList.add('hidden');
-              }, 300);
+              sidebar.classList.add('hidden');
+              backdrop.classList.add('hidden');
               sidebar.setAttribute('aria-expanded', 'false');
             });
 
-            // Add keyboard navigation
+            // Add keyboard navigation for the Escape key
             document.addEventListener('keydown', (e) => {
-              if (e.key === 'Escape' && !sidebar.classList.contains('-translate-x-full')) {
+              if (e.key === 'Escape' && !sidebar.classList.contains('hidden')) {
                 backdrop.click();
               }
             });
