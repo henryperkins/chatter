@@ -34,9 +34,12 @@
             ...options.headers
         };
 
-        // Include CSRF token in headers only if it's not a FormData request
+        // Include CSRF token in headers if possible
         if (!(options.body instanceof FormData)) {
             headers['X-CSRFToken'] = csrfToken;
+        } else {
+            // If body is FormData, append CSRF token to it
+            options.body.append('csrf_token', csrfToken);
         }
 
         try {
