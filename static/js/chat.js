@@ -1,4 +1,7 @@
 (function () {
+  // Create a unique instance ID for this initialization
+  const instanceId = Date.now();
+
   function init() {
     // Verify dependencies
     if (!window.utils || !window.md || !window.DOMPurify || !window.Prism) {
@@ -37,12 +40,13 @@
       try {
         console.debug('Initializing chat interface...');
 
-        // Prevent multiple initializations
-        if (window.chatInitialized) {
-          console.debug('Chat already initialized, skipping');
+        // Use instance-specific initialization flag
+        const initKey = `chat_initialized_${instanceId}`;
+        if (window[initKey]) {
+          console.debug('Chat already initialized for this instance, skipping');
           return;
         }
-        window.chatInitialized = true;
+        window[initKey] = true;
 
         // Cache and verify DOM elements
         console.debug('Caching DOM elements...');
@@ -161,27 +165,6 @@
           }
         }
 
-        // Add touch event listeners for mobile
-        if ('ontouchstart' in window) {
-          messageInput.addEventListener('touchstart', handleMessageInput);
-          if (sendButton) {
-            sendButton.addEventListener('touchend', handleSendButtonClick);
-          }
-        }
-
-        // Set up core event listeners
-        console.debug('Setting up core event listeners...');
-        if (!window.eventListenersAttached) {
-          window.eventListenersAttached = true;
-
-          // Set up core event listeners
-          console.debug('Attaching send button click handler');
-          sendButton.addEventListener('click', handleSendButtonClick);
-          console.debug('Attaching message input handlers');
-          messageInput.addEventListener('input', handleMessageInput);
-          messageInput.addEventListener('keydown', handleMessageKeydown);
-        }
-
         // Set up file handling
         console.debug('Setting up file handling...');
         if (fileInput && uploadButton) {
@@ -227,9 +210,28 @@
           });
         });
 
+        // Set up core event listeners
+        console.debug('Setting up core event listeners...');
+
+        // Set up core event listeners
+        console.debug('Attaching send button click handler');
+        sendButton.addEventListener('click', handleSendButtonClick);
+        console.debug('Attaching message input handlers');
+        messageInput.addEventListener('input', handleMessageInput);
+        messageInput.addEventListener('keydown', handleMessageKeydown);
+
+        // Add touch event listeners for mobile
+        if ('ontouchstart' in window) {
+          console.debug('Setting up mobile touch handlers');
+          messageInput.addEventListener('touchstart', handleMessageInput);
+          sendButton.addEventListener('touchend', handleSendButtonClick);
+        }
+
         // Initialize UI
         setupDragAndDrop();
         adjustTextareaHeight(messageInput);
+
+        console.debug('Chat initialization completed successfully');
       } catch (error) {
         console.error('Error initializing chat:', error);
         showFeedback('Failed to initialize chat interface', 'error');
@@ -438,6 +440,21 @@
                     title="Copy to clipboard" aria-label="Copy message to clipboard">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+              </svg>
+            </button>
+            {% if loop.last %}
+            <button class="regenerate-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    title="Regenerate response">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+            </button>
+            {% endif %}
+          </div>
+          <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+            ${new Date().toLocaleTimeString()}
           </span>
         </div>
       `;
