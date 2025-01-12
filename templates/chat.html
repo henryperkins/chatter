@@ -261,33 +261,38 @@
 
 {% block scripts %}
 {{ super() }}
-<!-- Load chat functionality first -->
-<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
-
-<!-- Handle model list refresh after chat.js loads -->
+<!-- Initialize chat functionality -->
 <script>
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initModelRefresh);
-    } else {
-        initModelRefresh();
-    }
-
-    function initModelRefresh() {
-        if (document.referrer.includes('/models/add-model')) {
-            fetch('/models')
-                .then(response => response.ok ? response.json() : Promise.reject('Failed to fetch models'))
-                .then(models => {
-                    const modelSelect = document.getElementById('model-select');
-                    if (modelSelect) {
-                        modelSelect.innerHTML = models
-                            .map(model =>
-                                `<option value="${model.id}"${model.is_default ? ' selected' : ''}>${model.name}${model.is_default ? ' (Default)' : ''}</option>`
-                            )
-                            .join('');
-                    }
-                })
-                .catch(error => console.error('Error refreshing model list:', error));
+    // Ensure dependencies are loaded before initializing chat
+    document.addEventListener('DOMContentLoaded', () => {
+        // Verify dependencies
+        if (!window.utils || !window.md || !window.DOMPurify || !window.Prism) {
+            console.error('Required dependencies not loaded');
+            return;
         }
-    }
+
+        // Load chat.js after dependencies are verified
+        const script = document.createElement('script');
+        script.src = "{{ url_for('static', filename='js/chat.js') }}";
+        script.onload = () => {
+            // Handle model list refresh after chat.js loads
+            if (document.referrer.includes('/models/add-model')) {
+                fetch('/models')
+                    .then(response => response.ok ? response.json() : Promise.reject('Failed to fetch models'))
+                    .then(models => {
+                        const modelSelect = document.getElementById('model-select');
+                        if (modelSelect) {
+                            modelSelect.innerHTML = models
+                                .map(model =>
+                                    `<option value="${model.id}"${model.is_default ? ' selected' : ''}>${model.name}${model.is_default ? ' (Default)' : ''}</option>`
+                                )
+                                .join('');
+                        }
+                    })
+                    .catch(error => console.error('Error refreshing model list:', error));
+            }
+        };
+        document.body.appendChild(script);
+    });
 </script>
 {% endblock %}

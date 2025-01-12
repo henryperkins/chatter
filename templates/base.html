@@ -12,11 +12,9 @@
     <!-- Tailwind CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
 
-    <!-- Syntax Highlighting -->
+    <!-- Syntax Highlighting CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
 
     <!-- Custom Styles -->
     <style>
@@ -261,36 +259,67 @@
     <!-- Required Libraries -->
     <!-- Core dependencies first -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
-    <!-- Prism and its components -->
+    <!-- Markdown processing -->
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it-prism@2.2.0/markdown-it-prism.min.js"></script>
+
+    <!-- Prism core and components -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+    <script>
+        // Initialize markdown-it and its plugins
+        try {
+            if (typeof markdownit === 'undefined') {
+                throw new Error('markdown-it not loaded');
+            }
+            // Create markdown-it instance
+            const md = markdownit();
 
-    <!-- Markdown processing -->
-    <script src="https://cdn.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/markdown-it-prism@2.2.0/markdown-it-prism.min.js"></script>
+            // Add Prism plugin if available
+            if (typeof markdownitPrism !== 'undefined') {
+                md.use(markdownitPrism);
+            }
 
-    <!-- Axios for HTTP requests -->
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+            // Make available globally
+            window.md = md;
+        } catch (error) {
+            console.error('Error initializing markdown:', error);
+            // Provide fallback
+            window.md = {
+                render: text => `<pre>${text}</pre>`
+            };
+        }
+    </script>
 
     <!-- Initialize required globals -->
     <script>
-        // Verify critical dependencies
-        if (typeof Prism === 'undefined') {
-            console.error('Prism is not loaded');
-        }
-        if (typeof DOMPurify === 'undefined') {
-            console.error('DOMPurify is not loaded');
-        }
+        document.addEventListener('DOMContentLoaded', () => {
+            // Verify critical dependencies
+            if (typeof Prism === 'undefined') {
+                console.error('Prism is not loaded');
+            }
+            if (typeof DOMPurify === 'undefined') {
+                console.error('DOMPurify is not loaded');
+            }
+            if (typeof markdownit === 'undefined') {
+                console.error('markdown-it is not loaded');
+            }
+            if (typeof markdownitPrism === 'undefined') {
+                console.error('markdown-it-prism plugin not loaded');
+            }
 
-        // Make libraries available globally
-        window.Prism = Prism;
-        window.DOMPurify = DOMPurify;
-        window.markdownit = markdownit;
+            // Make libraries available globally
+            window.Prism = Prism;
+            window.DOMPurify = DOMPurify;
+            window.markdownit = markdownit;
+            window.markdownitPrism = markdownitPrism;
+        });
     </script>
 
     {% block scripts %}

@@ -1,67 +1,6 @@
 (function() {
-    // Utility function to get CSRF token
-    function getCSRFToken() {
-        const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
-        if (!csrfTokenMetaTag) {
-            console.error('CSRF token meta tag not found.');
-            return '';
-        }
-        return csrfTokenMetaTag.getAttribute('content') || '';
-    }
-
-    // Utility function to show feedback messages
-    function showFeedback(message, type = 'info') {
-        const feedbackDiv = document.getElementById('feedback-message') || createFeedbackElement();
-        feedbackDiv.className = `fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 ${
-            type === 'error' ? 'bg-red-500 text-white' : type === 'success' ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'
-        }`;
-        feedbackDiv.textContent = message;
-        feedbackDiv.classList.remove('hidden');
-
-        setTimeout(() => {
-            feedbackDiv.classList.add('hidden');
-        }, 3000);
-    }
-
-    function createFeedbackElement() {
-        const div = document.createElement('div');
-        div.id = 'feedback-message';
-        document.body.appendChild(div);
-        return div;
-    }
-
-    // Fetch with CSRF token
-    async function fetchWithCSRF(url, options = {}) {
-        const csrfToken = getCSRFToken();
-        const headers = {
-            'X-CSRFToken': csrfToken,
-            'X-Requested-With': 'XMLHttpRequest',
-            ...options.headers
-        };
-
-        try {
-            const response = await fetch(url, { ...options, headers });
-
-            const contentType = response.headers.get('content-type');
-            let data;
-
-            if (contentType && contentType.includes('application/json')) {
-                data = await response.json();
-            } else {
-                const text = await response.text();
-                throw new Error(`Invalid response from server: ${text}`);
-            }
-
-            if (!response.ok) {
-                throw new Error(data.error || `HTTP error! status: ${response.status}`);
-            }
-
-            return data;
-        } catch (error) {
-            console.error('Error in fetchWithCSRF:', error);
-            throw error;
-        }
-    }
+    // Use showFeedback utility from utils.js
+    const { showFeedback } = window.utils;
 
     // Initialize mobile menu toggle
     function initializeMobileMenu() {
@@ -106,7 +45,7 @@
         let savedTheme;
         try {
             savedTheme = localStorage.getItem('theme');
-        } catch (error) {
+        } catch {
             console.warn('localStorage is not available. Falling back to system preferences.');
         }
 
@@ -118,7 +57,7 @@
                 const newTheme = rootElement.classList.toggle('dark') ? 'dark' : 'light';
                 try {
                     localStorage.setItem('theme', newTheme);
-                } catch (error) {
+                } catch {
                     console.warn('Failed to save theme to localStorage.');
                 }
             });
@@ -223,10 +162,5 @@
         initializeBase();
     }
 
-    // Expose utility functions if needed
-    window.baseUtils = {
-        getCSRFToken,
-        showFeedback,
-        fetchWithCSRF
-    };
+    // No need to expose utilities as they're already available through window.utils
 })();

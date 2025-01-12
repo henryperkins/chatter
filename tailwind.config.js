@@ -1,9 +1,11 @@
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
+  // 1. More specific content paths
   content: [
-    './templates/*.html',
-    './static/**/*.js',
+    './templates/**/*.{html,jinja2}',
+    './static/js/**/*.{js,jsx}',
   ],
+
   theme: {
     extend: {
       colors: {
@@ -20,18 +22,73 @@ export default {
         'modal': '1050',
         'popover': '1060',
         'tooltip': '1070',
-      },
-    },
+      }
+    }
   },
-  darkMode: 'class',
-  plugins: [
-    (await import('@tailwindcss/forms')).default,
-    (await import('@tailwindcss/typography')).default, // Ensure this plugin is included
-  ],
+
+  // 2. Disable unused core plugins
   corePlugins: {
-    // Disable unused core plugins
     float: false,
     clear: false,
     container: false,
-  }
+    objectFit: false,
+    objectPosition: false,
+    overscroll: false,
+    placeholderColor: false,
+    placeholderOpacity: false,
+    ringOffsetColor: false,
+    ringOffsetWidth: false,
+    boxDecorationBreak: false,
+    filter: false,
+    backdropFilter: false,
+    mixBlendMode: false,
+    isolation: false,
+    tableLayout: false,
+  },
+
+  // 3. Minimize variants
+  variants: {
+    extend: {
+      backgroundColor: ['hover', 'focus', 'dark'],
+      textColor: ['hover', 'focus', 'dark'],
+      borderColor: ['hover', 'focus'],
+      opacity: ['hover', 'disabled'],
+      scale: ['hover', 'focus'],
+    }
+  },
+
+  // 4. Configure typography plugin
+  theme: {
+    typography: {
+      DEFAULT: {
+        css: {
+          maxWidth: '65ch',
+          color: false,
+          a: false,
+          strong: false,
+          blockquote: false,
+          h1: false,
+          h2: false,
+          h3: false,
+          h4: false,
+          figure: false,
+          'figure > *': false,
+          figcaption: false,
+          code: false,
+          'pre code': false,
+          'code::before': false,
+          'code::after': false,
+          'pre code::before': false,
+          'pre code::after': false,
+        }
+      }
+    }
+  },
+
+  darkMode: 'class',
+
+  plugins: [
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'),
+  ]
 };
