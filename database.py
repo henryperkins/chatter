@@ -37,7 +37,7 @@ def get_db():
                     "timeout": 30  # SQLite busy timeout in seconds
                 }
             )
-            g.db_session = sessionmaker(bind=g.db_engine)
+            g.db_session = scoped_session(sessionmaker(bind=g.db_engine))
         
         g.db = g.db_session()
     return g.db
