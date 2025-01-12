@@ -30,10 +30,14 @@
     async function fetchWithCSRF(url, options = {}) {
         const csrfToken = getCSRFToken();
         const headers = {
-            'X-CSRFToken': csrfToken,
             'X-Requested-With': 'XMLHttpRequest',
             ...options.headers
         };
+
+        // Include CSRF token in headers only if it's not a FormData request
+        if (!(options.body instanceof FormData)) {
+            headers['X-CSRFToken'] = csrfToken;
+        }
 
         try {
             const response = await fetch(url, { ...options, headers });

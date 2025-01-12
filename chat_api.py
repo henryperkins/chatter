@@ -174,7 +174,7 @@ def get_azure_response(
             str(e),
         )
         logger.debug("API parameters at the time of error: %s", api_params)
-        raise
+        return {"error": str(e)}
     except Exception as e:
         logger.error(
             "Error in get_azure_response (%s model): %s",
@@ -182,7 +182,7 @@ def get_azure_response(
             str(e),
         )
         logger.debug("API parameters at the time of error: %s", api_params)
-        raise
+        return {"error": str(e)}
 
 
 def scrape_data(query: str) -> str:

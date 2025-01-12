@@ -352,18 +352,19 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
     """Handle incoming chat messages and return AI responses."""
     try:
         # Manually validate CSRF token
-        csrf_token = request.headers.get('X-CSRFToken')
-        if not csrf_token:
-            return jsonify({'error': 'Missing CSRF token.'}), 400
-
-        # Log the CSRF token for debugging
-        logger.debug(f"Received CSRF token: {csrf_token}")
-
         try:
+            # Use Flask-WTF's built-in CSRF protection
+            csrf_token = request.form.get('csrf_token')
+            if not csrf_token:
+                raise CSRFError('Missing CSRF token in form data.')
+
             validate_csrf(csrf_token)
         except CSRFError as e:
             logger.error(f"CSRF validation failed: {e.description}")
             return jsonify({'error': 'Invalid CSRF token.'}), 400
+
+        # Add logging to inspect request data
+        logger.debug(f"CSRF token in form data: {request.form.get('csrf_token')}")
 
         # Add logging to inspect request data
         logger.debug(f"Request headers: {dict(request.headers)}")
