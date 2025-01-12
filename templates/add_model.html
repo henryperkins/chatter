@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}Add Model - Azure OpenAI{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-4xl bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+    <!-- Page Header -->
+    <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6">Add a New AI Model</h1>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="mb-6">
+        {% for category, message in messages %}
+        <div
+            class="p-4 rounded-lg {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 border border-red-400 dark:border-red-600{% else %}bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 border border-green-400 dark:border-green-600{% endif %}">
+            <strong class="font-bold">{{ category | title }}:</strong>
+            <span class="block sm:inline">{{ message }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Form -->
+    <form id="add-model-form" method="POST" action="{{ url_for('model.create_model') }}"
+        class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
+        {{ form.hidden_tag() }}
+
+        <!-- Model Name -->
+        <div class="mb-6">
+            {{ form.name.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Choose a unique, descriptive name for your model (e.g., "GPT-4
+                Creative", "GPT-3.5 Technical")</p>
+            {{ form.name(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
+            {% if form.name.errors %}
+            <p class="text-sm text-red-500 dark:text-red-400 mt-1">{{ form.name.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Deployment Name -->
+        <div class="mb-6">
+            {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Enter the deployment name from your Azure OpenAI resource (e.g.,
+                "gpt-4", "gpt-35-turbo")</p>
+            {{ form.deployment_name(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
+            {% if form.deployment_name.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.deployment_name.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Description -->
+        <div class="mb-6">
+            {{ form.description.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Optional: Add notes about the model's purpose, capabilities, or usage
+                guidelines</p>
+            {{ form.description(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 h-24 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
+            {% if form.description.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.description.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- API Endpoint -->
+        <div class="mb-6">
+            {{ form.api_endpoint.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Your Azure OpenAI endpoint URL (e.g.,
+                "https://your-resource.openai.azure.com")</p>
+            {{ form.api_endpoint(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200",
+            placeholder="https://your-resource.openai.azure.com") }}
+            {% if form.api_endpoint.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- API Key -->
+        <div class="mb-6">
+            {{ form.api_key.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Your Azure OpenAI API key</p>
+            {{ form.api_key(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", type="password",
+            placeholder="Enter your API key") }}
+            {% if form.api_key.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.api_key.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Model Type -->
+        <div class="mb-6">
+            {{ form.model_type.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Select 'azure' for standard models or 'o1-preview' for preview models
+            </p>
+            {{ form.model_type(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
+            {% if form.model_type.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.model_type.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Temperature -->
+        <div class="mb-6">
+            {{ form.temperature.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Controls randomness (0.0 for focused, up to 2.0 for more creative
+                responses). Note: For o1-preview models, temperature is automatically set to 1.0.</p>
+            {{ form.temperature(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", type="number", step="0.1", min="0", max="2") }}
+            {% if form.temperature.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.temperature.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Max Tokens and Max Completion Tokens -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                {{ form.max_tokens.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Maximum input tokens (1-4000)</p>
+                {{ form.max_tokens(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", type="number", min="1",
+                max="4000") }}
+                {% if form.max_tokens.errors %}
+                <p class="text-sm text-red-500 mt-1">{{ form.max_tokens.errors[0] }}</p>
+                {% endif %}
+            </div>
+            <div>
+                {{ form.max_completion_tokens.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Maximum response length (1-16384)</p>
+                {{ form.max_completion_tokens(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", type="number", min="1",
+                max="16384") }}
+                {% if form.max_completion_tokens.errors %}
+                <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- API Version -->
+        <div class="mb-6">
+            {{ form.api_version.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Azure OpenAI API version (default: 2024-12-01-preview)</p>
+            {{ form.api_version(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
+            {% if form.api_version.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.api_version.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Advanced Settings Section -->
+        <div class="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Advanced Settings</h3>
+
+            <!-- Requires o1-preview Handling -->
+            <div class="mb-4">
+                <label class="inline-flex items-center">
+                    {{ form.requires_o1_handling(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500
+                    focus:ring-2") }}
+                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
+                        {{ form.requires_o1_handling.label.text }}
+                    </span>
+                </label>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">Enable this for models that require special handling
+                    (disables temperature and max tokens settings)</p>
+            </div>
+
+            <!-- Default Model Option -->
+            <div>
+                <label class="inline-flex items-center">
+                    {{ form.is_default(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2") }}
+                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
+                        {{ form.is_default.label.text }}
+                    </span>
+                </label>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">Make this the default model for new conversations</p>
+            </div>
+        </div>
+
+        <!-- Submit & Cancel -->
+        <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
+<button type="submit"
+    class="w-full sm:w-auto px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg font-medium hover:bg-green-600 dark:hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
+    id="submit-button">
+                <span class="inline-flex items-center">
+                    <span id="button-text">Add Model</span>
+                    <span id="loading-spinner" class="hidden ml-2">
+                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
+                            viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                            </circle>
+                            <path class="opacity-75" fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                            </path>
+                        </svg>
+                    </span>
+                </span>
+            </button>
+<a href="{{ url_for('chat.chat_interface') }}"
+    class="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white rounded-lg shadow-lg font-medium hover:bg-gray-600 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 text-center transition duration-150 ease-in-out">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Feedback Message -->
+<div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50"
+    role="alert" aria-live="assertive"></div>
+
+{% endblock content %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const form = document.getElementById("add-model-form");
+        const submitButton = document.getElementById("submit-button");
+        const buttonText = document.getElementById("button-text");
+        const loadingSpinner = document.getElementById("loading-spinner");
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+
+            // Show loading state
+            submitButton.disabled = true;
+            buttonText.textContent = "Adding Model...";
+            loadingSpinner.classList.remove("hidden");
+
+            try {
+                const formData = new FormData(form);
+                const response = await fetch(form.action, {
+                    method: "POST",
+                    body: formData,
+                    headers: {
+                        "X-CSRFToken": getCSRFToken()
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.success) {
+                        showFeedback("Model created successfully", "success");
+                        // Wait longer to ensure transaction is committed
+                        setTimeout(() => {
+                            window.location.href = "{{ url_for('chat.chat_interface') }}";
+                        }, 3000);
+                    } else {
+                        showFeedback(data.error || "Failed to create model", "error");
+                        submitButton.disabled = false;
+                        buttonText.textContent = "Add Model";
+                        loadingSpinner.classList.add("hidden");
+                    }
+                } else {
+                    showFeedback(data.error || "Failed to create the model", "error");
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                showFeedback("An unexpected error occurred. Please try again.", "error");
+            } finally {
+                submitButton.disabled = false;
+                buttonText.textContent = "Add Model";
+                loadingSpinner.classList.add("hidden");
+            }
+        });
+
+        function getCSRFToken() {
+            return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        }
+    });
+</script>
+{% endblock scripts %}

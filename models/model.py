@@ -1,0 +1,509 @@
+import logging
+from dataclasses import dataclass
+from typing import Optional, List, Dict, Any
+
+from sqlalchemy import text
+
+from .base import db_session
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Model:
+    """
+    Represents an AI model in the system.
+    """
+
+    id: int
+    name: str
+    deployment_name: str
+    description: Optional[str]
+    model_type: str
+    api_endpoint: str
+    api_key: str
+    temperature: Optional[float] = None
+    max_tokens: Optional[int] = None  # Should be None for o1-preview
+    max_completion_tokens: Optional[int] = 8300  # o1-preview model can handle up to 8300 tokens
+    is_default: bool = False
+    requires_o1_handling: bool = False
+    api_version: str = "2024-10-01-preview"
+    version: int = 1
+    created_at: Optional[str] = None
+
+    def __post_init__(self):
+        """Validate or adjust fields after dataclass initialization."""
+        self.id = int(self.id)
+
+    @staticmethod
+    def get_default() -> Optional["Model"]:
+        """
+        Retrieve the default model (where `is_default=1`).
+        """
+        with db_session() as db:
+            try:
+                query = text("SELECT * FROM models WHERE is_default = :is_default")
+                row = db.execute(query, {"is_default": True}).mappings().first()
+                if row:
+                    model_dict = dict(row)
+                    logger.debug(f"Default model retrieved: {model_dict}")
+                    return Model(**model_dict)
+                logger.info("No default model found.")
+                return None
+            except Exception:
+                logger.error("Error retrieving default model")
+                raise
+
+    @staticmethod
+    def get_by_id(model_id: int) -> Optional["Model"]:
+        """
+        Retrieve a model by its ID.
+        """
+        with db_session() as db:
+            try:
+                query = text("SELECT * FROM models WHERE id = :model_id")
+                row = db.execute(query, {"model_id": model_id}).mappings().first()
+                if row:
+                    model_dict = dict(row)
+                    logger.debug(f"Model retrieved by ID {model_id}: {model_dict}")
+                    return Model(**model_dict)
+                logger.info(f"No model found with ID: {model_id}")
+                return None
+            except Exception:
+                logger.error(f"Error retrieving model by ID {model_id}")
+                raise
+
+    @staticmethod
+    def get_all(limit: int = 10, offset: int = 0) -> List["Model"]:
+        """
+        Retrieve all models from the database, optionally paginated.
+        """
+        with db_session() as db:
+            try:
+                query = text(
+                    """
+                    SELECT * FROM models
+                    ORDER BY created_at DESC LIMIT :limit
+                    OFFSET :offset
+                """
+                )
+                rows = (
+                    db.execute(query, {"limit": limit, "offset": offset})
+                    .mappings()
+                    .all()
+                )
+                models = []
+                for row in rows:
+                    model_dict = dict(row)
+                    models.append(Model(**model_dict))
+                logger.debug(
+                    f"Retrieved {len(models)} models with limit={limit} and offset={offset}"
+                )
+                return models
+            except Exception as e:
+                logger.error(f"Error retrieving all models: {e}")
+                raise
+
+    @staticmethod
+    def set_default(model_id: int) -> None:
+        """
+        Set a model as the default, and remove the default status from any other model.
+        """
+        with db_session() as db:
+            try:
+                db.execute(
+                    text(
+                        "UPDATE models SET is_default = 0 WHERE is_default = :current_default"
+                    ),
+                    {"current_default": True},
+                )
+                db.execute(
+                    text("UPDATE models SET is_default = 1 WHERE id = :model_id"),
+                    {"model_id": model_id},
+                )
+
+                duplicate_check = (
+                    db.execute(
+                        text(
+                            """
+                    SELECT COUNT(*) as count FROM models WHERE is_default = :is_default
+                """
+                        ),
+                        {"is_default": True},
+                    )
+                    .mappings()
+                    .first()
+                )
+                if duplicate_check and duplicate_check["count"] > 1:
+                    raise ValueError("More than one default model exists.")
+
+                db.commit()
+                logger.info(f"Model set as default (ID {model_id})")
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Failed to set default model {model_id}: {e}")
+                raise
+
+    @staticmethod
+    def create(data: Dict[str, Any]) -> Optional[int]:
+        """
+        Create a new model record in the database.
+        """
+        with db_session() as db:
+            try:
+                # Check for existing models with same name or deployment_name (case-insensitive)
+                check_query = text("""
+                    SELECT name, deployment_name
+                    FROM models
+                    WHERE LOWER(name) = LOWER(:name)
+                    OR LOWER(deployment_name) = LOWER(:deployment_name)
+                """)
+                existing = db.execute(check_query, {
+                    "name": data["name"],
+                    "deployment_name": data["deployment_name"]
+                }).fetchone()
+
+                if existing:
+                    if existing[0].lower() == data["name"].lower():
+                        raise ValueError(f"A model with name '{data['name']}' already exists")
+                    else:
+                        raise ValueError(f"A model with deployment name '{data['deployment_name']}' already exists")
+
+                # Ensure all required fields are present
+                Model.validate_model_config(data)
+
+                if data.get("requires_o1_handling", False):
+                    data["temperature"] = None
+
+                # Log the full data being inserted
+                logger.debug(f"Inserting model with data: {data}")
+
+                query = text(
+                    """
+                    INSERT INTO models (
+                        name, deployment_name, description, api_endpoint, api_key,
+                        api_version, temperature, max_tokens, max_completion_tokens,
+                        model_type, requires_o1_handling, is_default, version,
+                        created_at
+                    ) VALUES (
+                        :name, :deployment_name, :description, :api_endpoint, :api_key,
+                        :api_version, :temperature, :max_tokens, :max_completion_tokens,
+                        :model_type, :requires_o1_handling, :is_default, :version,
+                        CURRENT_TIMESTAMP
+                    )
+                    RETURNING id
+                """
+                )
+                # Execute all operations and commit in a single transaction
+                result = db.execute(query, data)
+                model_id = result.scalar()
+
+                if model_id is None:
+                    logger.error("Failed to create model - no ID returned")
+                    return None
+
+                if data.get("is_default", False):
+                    unset_default_query = text(
+                        """
+                        UPDATE models
+                        SET is_default = 0
+                        WHERE id != :model_id AND is_default = :is_default
+                    """
+                    )
+                    db.execute(
+                        unset_default_query, {"model_id": model_id, "is_default": True}
+                    )
+
+                # Create initial version
+                Model.create_version(model_id, data)
+
+                # Commit all changes in one transaction
+                db.commit()
+
+                logger.info(f"Model created with ID: {model_id}")
+                return model_id
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Failed to create model: {e}")
+                raise
+
+    @staticmethod
+    def update(model_id: int, data: Dict[str, Any]) -> None:
+        """
+        Update an existing model's attributes.
+        """
+        with db_session() as db:
+            try:
+                Model.validate_model_config(data)
+
+                model = Model.get_by_id(model_id)
+                if not model:
+                    raise ValueError(f"Model with ID {model_id} not found.")
+
+                allowed_fields = {
+                    "name",
+                    "deployment_name",
+                    "description",
+                    "api_endpoint",
+                    "api_key",
+                    "api_version",
+                    "temperature",
+                    "max_tokens",
+                    "max_completion_tokens",
+                    "model_type",
+                    "requires_o1_handling",
+                    "is_default",
+                    "version",
+                }
+                update_data = {
+                    key: value for key, value in data.items() if key in allowed_fields
+                }
+
+                if not update_data:
+                    logger.info(f"No valid fields to update for model ID {model_id}")
+                    return
+
+                set_clause = ", ".join(f"{key} = :{key}" for key in update_data)
+                params = {**update_data, "model_id": model_id}
+
+                query = text(
+                    f"""
+                    UPDATE models
+                    SET {set_clause}
+                    WHERE id = :model_id
+                """
+                ).bindparams(**params)
+
+                db.execute(query)
+
+                if update_data.get("is_default", False):
+                    unset_default_query = text(
+                        """
+                        UPDATE models
+                        SET is_default = 0
+                        WHERE id != :model_id AND is_default = :is_default
+                    """
+                    )
+                    db.execute(
+                        unset_default_query, {"model_id": model_id, "is_default": True}
+                    )
+
+                # Create new version after update
+                Model.create_version(model_id, data)
+
+                db.commit()
+                logger.info(f"Model updated (ID {model_id})")
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Failed to update model {model_id}: {e}")
+                raise
+
+    @staticmethod
+    def validate_model_config(config: Dict[str, Any]) -> None:
+        """
+        Validate model configuration parameters.
+        """
+        required_fields = [
+            "name",
+            "deployment_name",
+            "api_endpoint",
+            "api_key",
+            "api_version",
+            "model_type",
+            "max_completion_tokens",
+            "version"  # Add version to required fields
+        ]
+
+        for field_name in required_fields:
+            val = config.get(field_name)
+            if not val:
+                raise ValueError(f"Missing required field: {field_name}")
+
+        api_endpoint = config["api_endpoint"]
+        if (
+            not api_endpoint.startswith("https://")
+            or "openai.azure.com" not in api_endpoint
+        ):
+            raise ValueError("Invalid Azure OpenAI API endpoint.")
+
+        # Validate version field
+        version = config.get("version")
+        if version is not None and not isinstance(version, int):
+            raise ValueError("Version must be an integer")
+
+        if not config.get("requires_o1_handling", False):
+            temperature = config.get("temperature")
+            if temperature is not None:
+                try:
+                    temperature = float(temperature)
+                    if not (0 <= temperature <= 2):
+                        raise ValueError("Temperature must be between 0 and 2.")
+                    config["temperature"] = temperature  # Ensure correct type
+                except ValueError:
+                    raise ValueError("Temperature must be a valid number between 0 and 2.")
+            else:
+                config["temperature"] = None  # Explicitly set to None if not provided
+
+        max_tokens = config.get("max_tokens", None)
+        if max_tokens is not None and int(max_tokens) <= 0:
+            raise ValueError("Max tokens must be a positive integer.")
+
+        max_completion_tokens = config.get("max_completion_tokens")
+        if max_completion_tokens is not None:
+            try:
+                max_completion_tokens = int(max_completion_tokens)
+                if not (1 <= max_completion_tokens <= 16384):
+                    raise ValueError(
+                        "max_completion_tokens must be between 1 and 16384"
+                    )
+                config["max_completion_tokens"] = max_completion_tokens
+            except (TypeError, ValueError):
+                raise ValueError("max_completion_tokens must be a valid integer")
+
+    @staticmethod
+    def delete(model_id: int) -> None:
+        """
+        Delete a model from the database.
+        """
+        with db_session() as db:
+            try:
+                # Check if model is in use by any chats
+                check_query = text(
+                    """
+                    SELECT COUNT(*) as count
+                    FROM chats
+                    WHERE model_id = :model_id
+                """
+                )
+                result = db.execute(check_query, {"model_id": model_id}).mappings().first()
+                if result and result["count"] > 0:
+                    raise ValueError("Cannot delete model that is in use by chats")
+
+                # Delete the model
+                query = text("DELETE FROM models WHERE id = :model_id")
+                db.execute(query, {"model_id": model_id})
+                db.commit()
+                sanitized_model_id = str(model_id).replace('\n', '').replace('\r', '')
+                logger.info(f"Model deleted (ID {sanitized_model_id})")
+            except Exception as e:
+                db.rollback()
+                sanitized_model_id = str(model_id).replace('\n', '').replace('\r', '')
+                sanitized_error = str(e).replace('\n', ' ').replace('\r', ' ')
+                logger.error(f"Failed to delete model {sanitized_model_id}: {sanitized_error}")
+                raise
+
+    @staticmethod
+    def cleanup_orphaned_files() -> None:
+        """Remove files without database references"""
+        # TODO: Implement file cleanup logic using `text()`
+        pass
+
+    @staticmethod
+    def get_user_chats(
+        user_id: int, limit: int = 10, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch user chats with model information to avoid N+1 query problem.
+        """
+        with db_session() as db:
+            try:
+                query = text(
+                    """
+                    SELECT c.*, m.name as model_name
+                    FROM chats c
+                    LEFT JOIN models m ON c.model_id = m.id
+                    WHERE c.user_id = :user_id
+                    ORDER BY c.created_at DESC
+                    LIMIT :limit OFFSET :offset
+                """
+                )
+                result = db.execute(
+                    query, {"user_id": user_id, "limit": limit, "offset": offset}
+                ).fetchall()
+                logger.debug(f"Retrieved {len(result)} chats for user ID {user_id}")
+                return [dict(row) for row in result]
+            except Exception as e:
+                logger.error(f"Error retrieving chats for user {user_id}: {e}")
+                raise
+
+    @staticmethod
+    def get_immutable_fields(model_id: int) -> List[str]:
+        """Get fields that cannot be modified."""
+        return ['id', 'created_at']
+
+    @staticmethod
+    def get_version_history(model_id: int, limit: int = 10, offset: int = 0) -> List[Dict]:
+        """Get version history for model."""
+        with db_session() as db:
+            query = text("""
+                SELECT * FROM model_versions
+                WHERE model_id = :model_id
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+            """)
+            result = db.execute(query, {
+                "model_id": model_id,
+                "limit": limit,
+                "offset": offset
+            })
+            return [dict(row) for row in result]
+
+    @staticmethod
+    def revert_to_version(model_id: int, version: int) -> None:
+        """Revert model to previous version."""
+        import json
+        with db_session() as db:
+            try:
+                # Get version data
+                version_query = text("""
+                    SELECT data FROM model_versions
+                    WHERE model_id = :model_id AND version = :version
+                """)
+                version_data = db.execute(version_query, {
+                    "model_id": model_id,
+                    "version": version
+                }).scalar()
+
+                if not version_data:
+                    raise ValueError(f"Version {version} not found")
+
+                # Parse JSON string back to dictionary
+                version_dict = json.loads(version_data)
+
+                # Update model with version data
+                Model.update(model_id, version_dict)
+                db.commit()
+            except json.JSONDecodeError as e:
+                db.rollback()
+                raise ValueError(f"Invalid version data format: {e}")
+            except Exception as e:
+                db.rollback()
+                raise
+
+    @staticmethod
+    def create_version(model_id: int, data: Dict[str, Any]) -> None:
+        """Create new version record."""
+        import json
+        with db_session() as db:
+            try:
+                # Get current version
+                curr_version = db.execute(text(
+                    "SELECT MAX(version) FROM model_versions WHERE model_id = :id"
+                ), {"id": model_id}).scalar() or 0
+
+                # Convert dictionary to JSON string
+                json_data = json.dumps(data)
+
+                # Insert new version
+                db.execute(text("""
+                    INSERT INTO model_versions (model_id, version, data)
+                    VALUES (:model_id, :version, :data)
+                """), {
+                    "model_id": model_id,
+                    "version": curr_version + 1,
+                    "data": json_data
+                })
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                raise

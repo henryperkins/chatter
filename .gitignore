@@ -1,0 +1,43 @@
+# Environment variables
+.env
+.env.example
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+app.log
+
+# Uploads and user-generated content
+uploads/
+
+# Aider files
+.aider*
+.aider.tags.cache.v3
+.aider.chat.history.md
+.aider.input.history
+
+# Git hooks and configuration
+.git_disabled/
+.git_disabled/hooks/
+.git_disabled/info/
+.git_disabled/logs/
+.git_disabled/refs/
+.git_disabled/config
+
+# VSCode settings
+.vscode/
+
+# Database files
+chat_app.db
+
+# Other files
+azure guide for o1-preview.md

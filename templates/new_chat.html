@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}New Chat - Azure OpenAI{% endblock %}
+
+{% block content %}
+<div class="flex h-screen antialiased text-gray-800">
+    <div class="flex flex-row h-full w-full overflow-x-hidden">
+        <!-- Main Chat Area -->
+        <div class="flex flex-col flex-auto h-full p-6">
+            <div class="flex flex-col flex-grow h-full mb-4 overflow-y-auto">
+                <div class="text-center text-gray-500">
+                    <p>This is a new chat. Start typing to begin!</p>
+                </div>
+            </div>
+
+            <!-- Message Input -->
+            <div class="flex flex-row items-center h-16 rounded-xl bg-white w-full px-4">
+                <div class="flex-grow ml-4">
+                    <div class="relative w-full">
+                        <textarea
+                            id="message-input"
+                            class="form-textarea w-full border rounded-xl focus:ring-2 focus:ring-blue-500 pl-4 h-10 resize-none dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600"
+                            rows="1"
+                            placeholder="Type your message...">
+                        </textarea>
+                    </div>
+                </div>
+                <div class="ml-4">
+                    <button id="send-button" class="flex items-center justify-center bg-indigo-500 hover:bg-indigo-600 rounded-xl text-white px-4 py-2 flex-shrink-0">
+                        <svg class="w-4 h-4 transform rotate-45 -mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Feedback Message -->
+<div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50" role="alert" aria-live="assertive"></div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const feedbackMessage = document.getElementById('feedback-message');
+
+    function adjustTextareaHeight(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+    }
+
+    messageInput.addEventListener('input', function() {
+        adjustTextareaHeight(this);
+    });
+
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keyup', function(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            sendMessage();
+        }
+    });
+
+    async function sendMessage() {
+        const message = messageInput.value.trim();
+        if (!message || message.length > 1000) {
+            showFeedback(message ? "Message is too long. Maximum length is 1000 characters." : "Message cannot be empty.", "error");
+            return;
+        }
+
+        appendUserMessage(message);
+        messageInput.value = '';
+        adjustTextareaHeight(messageInput);
+        messageInput.disabled = true;
+        sendButton.disabled = true;
+        showTypingIndicator();
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken()
+                },
+                body: JSON.stringify({ chat_id: chatId, message: message }),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                removeTypingIndicator();
+                appendAssistantMessage(data.response);
+            } else {
+                const errorData = await response.json();
+                removeTypingIndicator();
+                showFeedback(errorData.error || 'An error occurred while processing your message.', 'error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            removeTypingIndicator();
+            showFeedback('An error occurred while sending the message.', 'error');
+        } finally {
+            messageInput.disabled = false;
+            sendButton.disabled = false;
+            messageInput.focus();
+        }
+    }
+
+    function appendUserMessage(message) {
+        const chatBox = document.getElementById('chat-box');
+        const userMessageDiv = document.createElement('div');
+        userMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end';
+        userMessageDiv.innerHTML = `
+            <div>
+                <div class="bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
+                    <p class="text-sm">${message}</p>
+                </div>
+                <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
+            </div>
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
+                <!-- User avatar placeholder -->
+            </div>
+        `;
+        chatBox.appendChild(userMessageDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function appendAssistantMessage(message) {
+        const chatBox = document.getElementById('chat-box');
+        const assistantMessageDiv = document.createElement('div');
+        assistantMessageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs';
+        assistantMessageDiv.innerHTML = `
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
+                <!-- Assistant avatar placeholder -->
+            </div>
+            <div>
+                <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
+                    <p class="text-sm">${message}</p>
+                </div>
+                <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
+            </div>
+        `;
+        chatBox.appendChild(assistantMessageDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function showTypingIndicator() {
+        const chatBox = document.getElementById('chat-box');
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs typing-indicator';
+        typingDiv.innerHTML = `
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300">
+                <!-- Assistant avatar placeholder -->
+            </div>
+            <div>
+                <div class="bg-gray-300 p-3 rounded-r-lg rounded-bl-lg">
+                    <p class="text-sm">...</p>
+                </div>
+                <span class="text-xs text-gray-500 leading-none">Typing...</span>
+            </div>
+        `;
+        chatBox.appendChild(typingDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function removeTypingIndicator() {
+        const chatBox = document.getElementById('chat-box');
+        const typingIndicator = chatBox.querySelector('.typing-indicator');
+        if (typingIndicator) {
+            chatBox.removeChild(typingIndicator);
+        }
+    }
+
+
+    function getCSRFToken() {
+        return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    }
+});
+</script>
+{% endblock %}

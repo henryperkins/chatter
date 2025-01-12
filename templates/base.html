@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}Azure OpenAI Chat{% endblock %}</title>
+
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+    <!-- Tailwind CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
+
+    <!-- Syntax Highlighting CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+
+    <!-- Custom Styles -->
+    <style>
+        /* Global scrollbar styles */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #CBD5E0 transparent;
+        }
+
+        .dark * {
+            scrollbar-color: #4A5568 transparent;
+        }
+
+        *::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        *::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        *::-webkit-scrollbar-thumb {
+            background-color: #CBD5E0;
+            border-radius: 4px;
+            border: 2px solid transparent;
+            background-clip: content-box;
+        }
+
+        .dark *::-webkit-scrollbar-thumb {
+            background-color: #4A5568;
+        }
+
+        /* Typing indicator animation */
+        .typing-animation {
+            display: flex;
+            gap: 4px;
+        }
+        .typing-animation .dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: typing 1.4s infinite;
+        }
+        .typing-animation .dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-animation .dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-4px); }
+        }
+
+        /* Code block styles */
+        pre[class*="language-"] {
+            margin: 0;
+            border-radius: 0.375rem;
+        }
+
+        /* Markdown content styles */
+        .prose {
+            max-width: 100%;
+        }
+        .prose pre {
+            margin: 0;
+            padding: 1rem;
+            background: #1a1a1a;
+            border-radius: 0.375rem;
+        }
+        .dark .prose {
+            color: #E2E8F0;
+        }
+        .dark .prose strong {
+            color: #F7FAFC;
+        }
+        .dark .prose a {
+            color: #90CDF4;
+        }
+
+        /* Smooth transitions */
+        .transition-all {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+            transition-duration: 300ms;
+        }
+
+        /* Mobile menu backdrop */
+        .menu-backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        /* Dark mode transition */
+        html.transitioning * {
+            transition: background-color 300ms ease-in-out,
+                      border-color 300ms ease-in-out,
+                      color 300ms ease-in-out,
+                      fill 300ms ease-in-out,
+                      stroke 300ms ease-in-out,
+                      opacity 300ms ease-in-out,
+                      box-shadow 300ms ease-in-out,
+                      transform 300ms ease-in-out !important;
+        }
+    </style>
+
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body class="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-all duration-300 ease-in-out">
+    <!-- Navbar -->
+    <nav class="bg-white dark:bg-gray-800 shadow-lg fixed w-full top-0 z-sticky transition-all duration-300 ease-in-out" role="navigation">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <!-- Left side (Brand + Mobile toggle) -->
+                <div class="flex items-center">
+                    <!-- Mobile sidebar toggle -->
+                    <button id="sidebar-toggle" class="md:hidden mr-2 p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                        </svg>
+                    </button>
+
+                    <!-- Brand -->
+                    <a href="{{ url_for('chat.chat_interface') }}" class="text-xl font-bold text-blue-600">
+                        Azure OpenAI Chat
+                    </a>
+                </div>
+
+                <!-- Desktop navigation -->
+                <div class="hidden md:flex md:items-center md:space-x-4">
+                    <a href="{{ url_for('chat.chat_interface') }}"
+                       class="px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 {% if request.endpoint == 'chat.chat_interface' %}text-blue-600 bg-blue-50 dark:bg-gray-700{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                        Home
+                    </a>
+                    {% if current_user.is_authenticated %}
+                        {% if current_user.role == 'admin' %}
+                        <a href="{{ url_for('model.add_model_page') }}"
+                           class="px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 {% if request.endpoint == 'model.add_model_page' %}text-blue-600 bg-blue-50 dark:bg-gray-700{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                            Add Model
+                        </a>
+                        <a href="{{ url_for('auth.manage_users') }}"
+                           class="px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 {% if request.endpoint == 'auth.manage_users' %}text-blue-600 bg-blue-50 dark:bg-gray-700{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                            Manage Users
+                        </a>
+                        {% endif %}
+                        <a href="{{ url_for('auth.logout') }}"
+                           class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300">
+                            Logout
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('auth.login') }}"
+                           class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300">
+                            Login
+                        </a>
+                        <a href="{{ url_for('auth.register') }}"
+                           class="px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-300">
+                            Register
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Dark Mode Toggle -->
+    <button id="dark-mode-toggle"
+            class="p-2.5 bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 rounded-lg fixed top-4 right-4 z-fixed hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 opacity-0 shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 border border-gray-200 dark:border-gray-700 backdrop-blur-sm"
+            aria-label="Toggle dark mode">
+        <svg class="w-5 h-5 dark:hidden" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
+        </svg>
+        <svg class="w-5 h-5 hidden dark:block" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>
+        </svg>
+    </button>
+
+    <!-- Mobile Menu Backdrop -->
+    <div id="mobile-menu-backdrop" class="fixed inset-0 z-modal-backdrop hidden menu-backdrop transition-opacity duration-300 opacity-0"></div>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="md:hidden fixed inset-y-0 left-0 z-modal w-64 bg-white dark:bg-gray-800 transform transition-transform duration-300 ease-in-out -translate-x-full overflow-y-auto">
+        <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Menu</h2>
+            <button id="mobile-menu-close" class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-all duration-300">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="p-4 space-y-2">
+            <a href="{{ url_for('chat.chat_interface') }}"
+               class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
+                Home
+            </a>
+            {% if current_user.is_authenticated %}
+                {% if current_user.role == 'admin' %}
+                <a href="{{ url_for('model.add_model_page') }}"
+                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
+                    Add Model
+                </a>
+                <a href="{{ url_for('auth.manage_users') }}"
+                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
+                    Manage Users
+                </a>
+                {% endif %}
+                <a href="{{ url_for('auth.logout') }}"
+                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
+                    Logout
+                </a>
+            {% else %}
+                <a href="{{ url_for('auth.login') }}"
+                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
+                    Login
+                </a>
+                <a href="{{ url_for('auth.register') }}"
+                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
+                    Register
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="fixed top-20 left-1/2 transform -translate-x-1/2 w-full max-w-lg z-tooltip px-4">
+            {% for category, message in messages %}
+            <div class="rounded-lg p-4 mb-4 flex items-center justify-between transition-all duration-300 {% if category == 'error' %}bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-200{% else %}bg-green-100 dark:bg-green-900/50 border border-green-400 dark:border-green-800 text-green-700 dark:text-green-200{% endif %}"
+                 role="alert">
+                <div class="flex-1">
+                    <strong class="font-bold">{{ category | title }}:</strong>
+                    <span class="block sm:inline">{{ message }}</span>
+                </div>
+                <button onclick="this.parentElement.remove()" class="ml-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none transition-all duration-300" aria-label="Dismiss">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Main Content -->
+    <main class="flex-grow {% block main_classes %}container mx-auto px-4 sm:px-6 lg:px-8{% endblock %} pt-16">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Feedback Message -->
+    <div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-tooltip max-w-md w-full text-center bg-white dark:bg-gray-800 transition-all duration-300"></div>
+
+    <!-- Core JavaScript -->
+    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dark-mode.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/base.js') }}" defer></script>
+
+    {% block scripts %}
+        <!-- Initialize required globals -->
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                // Mobile menu handling
+                const mobileMenuButton = document.getElementById('sidebar-toggle');
+                const mobileMenuClose = document.getElementById('mobile-menu-close');
+                const mobileMenu = document.getElementById('mobile-menu');
+                const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
+
+                const openMobileMenu = () => {
+                    mobileMenu?.classList.remove('-translate-x-full');
+                    mobileMenuBackdrop?.classList.remove('hidden');
+                    setTimeout(() => {
+                        mobileMenuBackdrop?.classList.remove('opacity-0');
+                    }, 10);
+                };
+
+                const closeMobileMenu = () => {
+                    mobileMenu?.classList.add('-translate-x-full');
+                    mobileMenuBackdrop?.classList.add('opacity-0');
+                    setTimeout(() => {
+                        mobileMenuBackdrop?.classList.add('hidden');
+                    }, 300);
+                };
+
+                mobileMenuButton?.addEventListener('click', openMobileMenu);
+                mobileMenuClose?.addEventListener('click', closeMobileMenu);
+                mobileMenuBackdrop?.addEventListener('click', closeMobileMenu);
+
+                // Flash message handling
+                const flashMessages = document.querySelectorAll('[role="alert"]');
+                flashMessages.forEach(message => {
+                    const dismissButton = message.querySelector('button');
+                    let timeoutId;
+
+                    const removeMessage = () => {
+                        message.style.opacity = '0';
+                        message.style.transform = 'translateY(-10px)';
+                        setTimeout(() => message.remove(), 300);
+                    };
+
+                    // Auto-dismiss after 5 seconds
+                    timeoutId = setTimeout(removeMessage, 5000);
+
+                    // Cancel auto-dismiss when hovering
+                    message.addEventListener('mouseenter', () => clearTimeout(timeoutId));
+                    message.addEventListener('mouseleave', () => {
+                        timeoutId = setTimeout(removeMessage, 5000);
+                    });
+
+                    // Manual dismiss
+                    dismissButton?.addEventListener('click', () => {
+                        clearTimeout(timeoutId);
+                        removeMessage();
+                    });
+                });
+            });
+        </script>
+    {% endblock %}
+</body>
+</html>
