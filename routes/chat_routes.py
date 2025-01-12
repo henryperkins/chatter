@@ -281,7 +281,13 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         Chat.update_title(chat_id, generate_chat_title(conversation_text))
 
     # Add the combined message to the conversation history
-    conversation_manager.add_message(chat_id, "user", combined_message, model_max_tokens=model_obj.max_tokens)
+    conversation_manager.add_message(
+        chat_id,
+        "user",
+        combined_message,
+        model_max_tokens=model_obj.max_tokens,
+        requires_o1_handling=model_obj.requires_o1_handling,
+    )
 
     # Prepare the messages for the API call
     history = conversation_manager.get_context(chat_id, include_system=not model_obj.requires_o1_handling)
@@ -298,7 +304,13 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             timeout_seconds=120,
         )
 
-        conversation_manager.add_message(chat_id, "assistant", model_response, model_max_tokens=model_obj.max_tokens)
+        conversation_manager.add_message(
+            chat_id,
+            "assistant",
+            model_response,
+            model_max_tokens=model_obj.max_tokens,
+            requires_o1_handling=model_obj.requires_o1_handling,
+        )
         return jsonify({"response": model_response, "included_files": included_files, "excluded_files": excluded_files})
     except Exception as ex:
         logger.error(f"Error during chat handling: {ex}")
