@@ -26,7 +26,8 @@ class User(UserMixin):
 
     def __post_init__(self):
         """Validate or adjust fields after dataclass initialization."""
-        self.id = int(self.id)
+        if self.id is not None:
+            self.id = int(self.id)
         # Ensure password_hash is set to empty string if None
         if self.password_hash is None:
             self.password_hash = ''

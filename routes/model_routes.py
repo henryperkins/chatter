@@ -268,33 +268,6 @@ def get_immutable_fields(model_id: int):
         return handle_error(e, "Error retrieving immutable fields")
 
 
-@bp.route("/models/<int:model_id>/versions", methods=["GET"])
-@login_required
-@admin_required
-def get_version_history(model_id: int) -> Union[Response, Tuple[Response, int]]:
-    """Get version history for a model."""
-    try:
-        limit = request.args.get('limit', 10, type=int)
-        offset = request.args.get('offset', 0, type=int)
-        versions = Model.get_version_history(model_id, limit, offset)
-        return jsonify({"success": True, "versions": versions})
-    except Exception as e:
-        logger.error(f"Error getting version history: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@bp.route("/models/<int:model_id>/revert/<int:version>", methods=["POST"])
-@login_required
-@admin_required
-def revert_to_version(model_id: int, version: int) -> Union[Response, Tuple[Response, int]]:
-    """Revert model to a previous version."""
-    try:
-        Model.revert_to_version(model_id, version)
-        return jsonify({"success": True, "message": f"Model reverted to version {version}"})
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 404
-    except Exception as e:
-        logger.error(f"Error reverting version: {e}")
-        return jsonify({"error": str(e)}), 500
 
 @bp.route("/models/<int:model_id>/versions", methods=["GET"])
 @login_required

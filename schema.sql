@@ -41,25 +41,6 @@ CREATE TABLE IF NOT EXISTS models (
 -- =============================
 -- MODEL VERSION HISTORY
 -- =============================
-CREATE TABLE IF NOT EXISTS model_versions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    model_id INTEGER NOT NULL, -- Foreign key referencing models table
-    name TEXT NOT NULL,
-    deployment_name TEXT NOT NULL,
-    description TEXT,
-    model_type TEXT NOT NULL,
-    api_endpoint TEXT NOT NULL,
-    api_key TEXT NOT NULL, -- API key for authentication
-    temperature REAL DEFAULT 1.0,
-    max_tokens INTEGER,
-    max_completion_tokens INTEGER NOT NULL,
-    is_default BOOLEAN DEFAULT 0,
-    requires_o1_handling BOOLEAN DEFAULT 0,
-    api_version TEXT,
-    version INTEGER, -- Model version number
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE CASCADE
-);
 
 CREATE TABLE IF NOT EXISTS model_versions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -119,4 +100,3 @@ CREATE INDEX IF NOT EXISTS idx_uploaded_files_chat_id ON uploaded_files (chat_id
 CREATE INDEX IF NOT EXISTS idx_model_versions_model_id ON model_versions (model_id); -- Speeds up version history lookups
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages (timestamp); -- Speeds up fetching messages by timestamp
 CREATE INDEX IF NOT EXISTS idx_chats_created_at ON chats (created_at); -- Speeds up fetching chats by creation time
-CREATE UNIQUE INDEX IF NOT EXISTS idx_model_versions_model_version ON model_versions(model_id, version);

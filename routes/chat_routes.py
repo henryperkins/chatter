@@ -436,6 +436,5 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             },
         )
         return jsonify({
-            "error": "An unexpected error occurred.",
-            "details": str(ex)
+            "error": "An unexpected error occurred."
         }), 500

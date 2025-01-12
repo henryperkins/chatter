@@ -34,13 +34,10 @@ def get_db():
                 pool_recycle=POOL_RECYCLE,
                 pool_timeout=POOL_TIMEOUT,
                 connect_args={
-                    "check_same_thread": False,
                     "timeout": 30  # SQLite busy timeout in seconds
                 }
             )
-            g.db_session = scoped_session(
-                sessionmaker(bind=g.db_engine, autocommit=False, autoflush=False)
-            )
+            g.db_session = sessionmaker(bind=g.db_engine)
         
         g.db = g.db_session()
     return g.db

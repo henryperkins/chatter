@@ -25,7 +25,6 @@ class Model:
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None  # Should be None for o1-preview
     max_completion_tokens: Optional[int] = 8300  # o1-preview model can handle up to 8300 tokens
-    requires_o1_handling: bool = False  # Set to True for o1-preview models
     is_default: bool = False
     requires_o1_handling: bool = False
     api_version: str = "2024-10-01-preview"
@@ -334,10 +333,16 @@ class Model:
 
         if not config.get("requires_o1_handling", False):
             temperature = config.get("temperature")
-            if temperature is not None and not (0 <= float(temperature) <= 2):
-                raise ValueError(
-                    "Temperature must be between 0 and 2 or NULL for o1-preview models"
-                )
+            if temperature is not None:
+                try:
+                    temperature = float(temperature)
+                    if not (0 <= temperature <= 2):
+                        raise ValueError("Temperature must be between 0 and 2.")
+                    config["temperature"] = temperature  # Ensure correct type
+                except ValueError:
+                    raise ValueError("Temperature must be a valid number between 0 and 2.")
+            else:
+                config["temperature"] = None  # Explicitly set to None if not provided
 
         max_tokens = config.get("max_tokens", None)
         if max_tokens is not None and int(max_tokens) <= 0:
