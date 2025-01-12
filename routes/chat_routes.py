@@ -27,6 +27,7 @@ from models.chat import Chat
 import tiktoken
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import validate_csrf, CSRFError
 
 # Configure logging
 logger = logging.getLogger(__name__)
