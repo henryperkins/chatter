@@ -235,7 +235,6 @@
 
         // Add touch event listeners for mobile devices
         if ('ontouchstart' in window) {
-            messageInput.addEventListener('touchstart', handleMessageInput);
             sendButton.addEventListener('touchend', handleSendButtonClick);
         }
         messageInput.addEventListener('touchstart', handleMessageInput);
