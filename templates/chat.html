@@ -233,34 +233,15 @@
 
 {% endblock %}
 
-{% block head %}
-{{ super() }}
-<!-- Pre-initialize chat configuration -->
-<script type="text/javascript">
-    window.CHAT_CONFIG = {
-        chatId: "{{ chat_id or '' }}",
-        editModelUrl: "{{ url_for('model.edit_model', model_id=0) }}",
-        maxFileSize: parseInt("{{ config.get('MAX_FILE_SIZE', 10 * 1024 * 1024)|string }}"),
-        maxFiles: parseInt("{{ config.get('MAX_FILES', 5)|string }}"),
-        maxMessageLength: parseInt("{{ config.get('MAX_MESSAGE_LENGTH', 1000)|string }}"),
-        allowedFileTypes: JSON.parse('{{ config.get("ALLOWED_FILE_TYPES", ["text/plain", "application/pdf", "text/x-python", "application/javascript", "text/markdown", "image/jpeg", "image/png", "text/csv"])|tojson|safe }}'),
-        csrfToken: "{{ csrf_token() }}",
-        userId: "{{ current_user.id }}",
-        userRole: "{{ current_user.role }}"
-    };
-
-    // Validate chat configuration
-    if (!window.CHAT_CONFIG.chatId) {
-        console.warn('Chat ID not initialized');
-    }
-    if (!window.CHAT_CONFIG.csrfToken) {
-        console.error('CSRF token not found');
-    }
-</script>
-{% endblock %}
 
 {% block scripts %}
 {{ super() }}
+<!-- Include Dependency Scripts -->
+<script src="{{ url_for('static', filename='js/markdown-it.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/purify.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/prism.js') }}"></script>
+<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+
 <!-- Define CHAT_CONFIG before loading chat.js -->
 <script>
     window.CHAT_CONFIG = {
@@ -283,6 +264,7 @@
         console.error('CSRF token not found');
     }
 </script>
+
 <!-- Load chat.js directly -->
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% endblock %}
