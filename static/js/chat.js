@@ -320,7 +320,8 @@ const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
     ALLOWED_ATTR: ['href', 'src', 'alt', 'class']
 });
 contentDiv.innerHTML = sanitizedHtml;
-Prism.highlightAllUnder(contentDiv);
+    Prism.highlightAllUnder(contentDiv);
+}
         }
 
         chatBox.appendChild(messageDiv);
