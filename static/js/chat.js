@@ -1,12 +1,189 @@
 (function () {
-    // Access utility functions from window.utils
-    const { getCSRFToken, showFeedback, debounce, fetchWithCSRF } = window.utils;
-    
-    // Access markdown-it instance from the global window object
-    const md = window.markdownit().use(window.markdownitPrism);
+  // Access utility functions from window.utils
+  const { getCSRFToken, showFeedback, debounce, fetchWithCSRF } = window.utils;
 
-    // DOMPurify and Prism are already available globally (from your script tags)
-    // No need to import them or access them differently
+  // Access markdown-it instance from the global window object
+  const md = window.markdownit().use(window.markdownitPrism);
+
+  // Global variables and state
+  let uploadedFiles = [];
+  const MAX_FILES = 5;
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  const MAX_MESSAGE_LENGTH = 1000;
+  const ALLOWED_FILE_TYPES = [
+    'text/plain',
+    'application/pdf',
+    'text/x-python',
+    'application/javascript',
+    'text/markdown',
+    'image/jpeg',
+    'image/png',
+    'text/csv'
+  ];
+
+  // DOM Elements Cache - declared at the top for better scope
+  let messageInput, sendButton, chatBox, fileInput, uploadButton,
+    uploadedFilesDiv, modelSelect, newChatBtn, dropZone;
+
+  // DOM Content Loaded
+  document.addEventListener('DOMContentLoaded', function () {
+    console.debug('DOMContentLoaded event triggered. Initializing elements.');
+
+    // Cache DOM elements
+    messageInput = document.getElementById('message-input');
+    sendButton = document.getElementById('send-button');
+    chatBox = document.getElementById('chat-box');
+    fileInput = document.getElementById('file-input');
+    uploadButton = document.getElementById('upload-button');
+    uploadedFilesDiv = document.getElementById('uploaded-files');
+    modelSelect = document.getElementById('model-select');
+    newChatBtn = document.getElementById('new-chat-btn');
+    dropZone = document.getElementById('drop-zone');
+
+    // Verify critical elements exist after caching
+    if (!messageInput || !sendButton || !chatBox) {
+      console.error('Critical chat elements not found', {
+        messageInput,
+        sendButton,
+        chatBox
+      });
+      showFeedback('Chat interface not loaded properly', 'error');
+      return;
+    }
+
+    console.debug('Elements initialized:', { messageInput, sendButton, chatBox });
+
+    // Initialize event listeners
+    initializeEventListeners();
+
+    // Set up file drag and drop
+    setupDragAndDrop();
+
+    // Initialize message input
+    adjustTextareaHeight(messageInput);
+  });
+
+  function initializeEventListeners() {
+    console.debug('Initializing event listeners.');
+
+    // Send button handler - Moved to the top and corrected
+    sendButton.addEventListener('click', function (e) {
+      e.preventDefault();
+      console.log('Send button clicked');
+      sendMessage();
+    });
+
+    // Message input handlers
+    messageInput.addEventListener('input', debounce(function () {
+      adjustTextareaHeight(this);
+    }, 300));
+
+    messageInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // File upload handlers
+    if (fileInput && uploadButton) {
+      uploadButton.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', handleFileSelect);
+    }
+
+    // New chat button handler
+    if (newChatBtn) {
+      newChatBtn.addEventListener('click', createNewChat);
+    }
+
+    // Model selection handler
+    if (modelSelect) {
+      modelSelect.addEventListener('change', handleModelChange);
+    }
+
+    // Chat box message action handlers
+    if (chatBox) {
+      chatBox.addEventListener('click', handleMessageActions);
+    }
+  }
+
+  async function sendMessage() {
+    console.log('sendMessage function called');
+    console.debug('Preparing to send message:', messageInput.value.trim());
+    console.log('Message input value:', messageInput.value);
+    console.debug('Uploaded files:', uploadedFiles);
+
+    // Validate input
+    if (!messageInput.value.trim() && uploadedFiles.length === 0) {
+      showFeedback('Please enter a message or upload files.', 'error');
+      return;
+    }
+
+    if (messageInput.value.length > MAX_MESSAGE_LENGTH) {
+      showFeedback(`Message too long. Maximum length is ${MAX_MESSAGE_LENGTH} characters.`, 'error');
+      return;
+    }
+
+    // Disable input controls
+    messageInput.disabled = true;
+    sendButton.disabled = true;
+    sendButton.innerHTML = '<span class="animate-spin">↻</span> Sending...'; // Added text for clarity
+
+    try {
+      // Create form data
+      const formData = new FormData();
+      formData.append('message', messageInput.value.trim());
+      uploadedFiles.forEach(file => formData.append('files[]', file));
+
+      // Append user message immediately
+      appendUserMessage(messageInput.value.trim());
+      messageInput.value = '';
+      adjustTextareaHeight(messageInput);
+
+      // Show typing indicator
+      showTypingIndicator();
+
+      console.debug('Making POST request to /chat with formData:', formData);
+      console.log('CSRF Token:', getCSRFToken());
+
+      const response = await fetch('/chat', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': getCSRFToken(),
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send message');
+      }
+
+      if (data.response) {
+        appendAssistantMessage(data.response);
+        uploadedFiles = [];
+        renderFileList();
+      }
+
+      if (data.excluded_files) {
+        data.excluded_files.forEach(file => {
+          showFeedback(`Failed to upload ${file.filename}: ${file.error}`, 'error');
+        });
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      console.error('Error details:', error.stack);
+      showFeedback(`Error: ${error.message}`, 'error');
+    } finally {
+      messageInput.disabled = false;
+      sendButton.disabled = false;
+      sendButton.innerHTML = 'Send'; // Reset to original text
+      removeTypingIndicator();
+      messageInput.focus();
+    }
+  }
 
     // Function to edit chat title
     async function editChatTitle(chatId) {
@@ -58,223 +235,15 @@
         }
     }
 
-
     // Expose functions to the global scope
     window.editChatTitle = editChatTitle;
     window.deleteChat = deleteChat;
 
-    // Global variables and state
-    let uploadedFiles = [];
-    const MAX_FILES = 5;
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-    const MAX_MESSAGE_LENGTH = 1000;
-    const ALLOWED_FILE_TYPES = [
-        'text/plain',
-        'application/pdf',
-        'text/x-python',
-        'application/javascript',
-        'text/markdown',
-        'image/jpeg',
-        'image/png',
-        'text/csv'
-    ];
-
-    // DOM Elements Cache
-    let messageInput, sendButton, chatBox, fileInput, uploadButton,
-        uploadedFilesDiv, modelSelect, newChatBtn, dropZone;
-
-    // DOM Content Loaded
-    document.addEventListener('DOMContentLoaded', function () {
-        console.debug('DOMContentLoaded event triggered. Initializing elements.');
-        
-        // Cache DOM elements first
-        messageInput = document.getElementById('message-input');
-
-        // Verify that messageInput is not null
-        if (!messageInput) {
-            console.error('Message input element not found');
-            return;
-        }
-        sendButton = document.getElementById('send-button');
-        chatBox = document.getElementById('chat-box');
-        fileInput = document.getElementById('file-input');
-        uploadButton = document.getElementById('upload-button');
-        uploadedFilesDiv = document.getElementById('uploaded-files');
-        modelSelect = document.getElementById('model-select');
-        newChatBtn = document.getElementById('new-chat-btn');
-        dropZone = document.getElementById('drop-zone');
-
-        console.log('Message input:', messageInput);
-        console.log('Send button:', sendButton);
-        console.log('Chat box:', chatBox);
-
-        // Verify critical elements exist after caching
-        if (!messageInput || !sendButton || !chatBox) {
-            console.error('Critical chat elements not found', {
-                messageInput,
-                sendButton, 
-                chatBox
-            });
-            showFeedback('Chat interface not loaded properly', 'error');
-            return;
-        }
-
-        console.debug('Elements initialized:', { messageInput, sendButton, chatBox });
-
-        // Initialize event listeners
-        initializeEventListeners();
-
-        // Set up file drag and drop
-        setupDragAndDrop();
-
-        // Initialize message input
-        adjustTextareaHeight(messageInput);
-
-    });
-
-    function initializeEventListeners() {
-        console.debug('Initializing event listeners.');
-        
-        // Verify critical elements exist
-        if (!messageInput || !sendButton || !chatBox) {
-            console.error('Critical chat elements not found');
-            return;
-        }
-
-        // Message input handlers
-        messageInput.addEventListener('input', debounce(function () {
-            adjustTextareaHeight(this);
-        }, 300));
-
-        messageInput.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        // Send button handler
-        console.debug('Initializing sendButton:', sendButton);
-        sendButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('Send button clicked');
-            sendMessage();
-        });
-
-        // File upload handlers
-        if (fileInput && uploadButton) {
-            uploadButton.addEventListener('click', () => fileInput.click());
-            fileInput.addEventListener('change', handleFileSelect);
-        }
-
-        // New chat button handler
-        if (newChatBtn) {
-            newChatBtn.addEventListener('click', createNewChat);
-        }
-
-        // Model selection handler
-        if (modelSelect) {
-            modelSelect.addEventListener('change', handleModelChange);
-        }
-
-        // Chat box message action handlers
-        if (chatBox) {
-            chatBox.addEventListener('click', handleMessageActions);
-        }
-    }
-
-    async function sendMessage() {
-        console.log('sendMessage function called'); // Debugging statement
-        console.debug('Send button clicked. Preparing to send message:', messageInput.value.trim());
-        console.log('Message input value:', messageInput.value); // Debugging
-        console.debug('Uploaded files:', uploadedFiles);
-
-        // Validate input
-        if (!messageInput.value.trim() && uploadedFiles.length === 0) {
-            showFeedback('Please enter a message or upload files.', 'error');
-            return;
-        }
-
-        // Check if chatBox exists
-        if (!chatBox) {
-            console.error('Chat box element not found');
-            showFeedback('Chat interface not loaded properly', 'error');
-            return;
-        }
-
-        if (messageInput.value.length > MAX_MESSAGE_LENGTH) {
-            showFeedback(`Message too long. Maximum length is ${MAX_MESSAGE_LENGTH} characters.`, 'error');
-            return;
-        }
-
-        // Disable input controls
-        messageInput.disabled = true;
-        sendButton.disabled = true;
-        sendButton.innerHTML = '<span class="animate-spin">↻</span>';
-
-        try {
-            // Create form data
-            const formData = new FormData();
-            formData.append('message', messageInput.value.trim());
-            uploadedFiles.forEach(file => formData.append('files[]', file));
-
-            // Append user message immediately
-            appendUserMessage(messageInput.value.trim());
-            messageInput.value = '';
-            adjustTextareaHeight(messageInput);
-
-            // Show typing indicator
-            showTypingIndicator();
-
-            console.debug('Making POST request to /chat with formData:', formData);
-            console.log('CSRF Token:', getCSRFToken());
-
-            console.log('Preparing to send request to /chat'); // Debugging statement
-
-            const response = await fetch('/chat', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCSRFToken(),
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: formData
-            });
-
-            const data = await response.json(); // Parse the JSON response
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to send message');
-            }
-
-            if (data.response) {
-                appendAssistantMessage(data.response);
-                uploadedFiles = [];
-                renderFileList();
-            }
-
-            if (data.excluded_files) {
-                data.excluded_files.forEach(file => {
-                    showFeedback(`Failed to upload ${file.filename}: ${file.error}`, 'error');
-                });
-            }
-        } catch (error) {
-            console.error('Error sending message:', error);
-            console.error('Error details:', error.stack);
-            showFeedback(`Error: ${error.message}`, 'error');
-        } finally {
-            messageInput.disabled = false;
-            sendButton.disabled = false;
-            sendButton.innerHTML = 'Send';
-            removeTypingIndicator();
-            messageInput.focus();
-        }
-    }
-
-    function appendUserMessage(message) {
-        console.debug('Appending user message:', message);
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end';
-        messageDiv.innerHTML = `
+  function appendUserMessage(message) {
+    console.debug('Appending user message:', message);
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-xs ml-auto justify-end';
+    messageDiv.innerHTML = `
             <div>
                 <div class="relative bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
                     <p class="text-sm">${escapeHtml(message)}</p>
@@ -282,14 +251,14 @@
                 <span class="text-xs text-gray-500 leading-none">${new Date().toLocaleTimeString()}</span>
             </div>
         `;
-        chatBox.appendChild(messageDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
+    chatBox.appendChild(messageDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
 
-    function appendAssistantMessage(message) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-lg';
-        messageDiv.innerHTML = `
+  function appendAssistantMessage(message) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-lg';
+    messageDiv.innerHTML = `
             <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
             <div class="relative max-w-lg">
                 <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
@@ -301,100 +270,99 @@
             </div>
         `;
 
-        const contentDiv = messageDiv.querySelector('.prose');
-        if (contentDiv) {
-            const renderedHtml = md.render(message);
-            const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
-                ALLOWED_TAGS: [
-                    'b', 'i', 'em', 'strong', 'a', 'p', 'blockquote', 'code', 'pre',
-                    'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br',
-                    'hr', 'span', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
-                ],
-    ALLOWED_ATTR: ['href', 'src', 'alt', 'class']
-});
-contentDiv.innerHTML = sanitizedHtml;
-    Prism.highlightAllUnder(contentDiv);
-}
-        }
-
-        chatBox.appendChild(messageDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
+    const contentDiv = messageDiv.querySelector('.prose');
+    if (contentDiv) {
+      const renderedHtml = md.render(message);
+      const sanitizedHtml = DOMPurify.sanitize(renderedHtml, {
+        ALLOWED_TAGS: [
+          'b', 'i', 'em', 'strong', 'a', 'p', 'blockquote', 'code', 'pre',
+          'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br',
+          'hr', 'span', 'img', 'table', 'thead', 'tbody', 'tr', 'th', 'td'
+        ],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'class']
+      });
+      contentDiv.innerHTML = sanitizedHtml;
+      Prism.highlightAllUnder(contentDiv);
     }
 
-    function handleFileSelect(event) {
-        const files = Array.from(event.target.files);
-        processFiles(files);
+    chatBox.appendChild(messageDiv);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  function handleFileSelect(event) {
+    const files = Array.from(event.target.files);
+    processFiles(files);
+  }
+
+  function processFiles(files) {
+    const validFiles = [];
+    const errors = [];
+
+    files.forEach(file => {
+      if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+        errors.push(`${file.name}: Unsupported file type`);
+      } else if (file.size > MAX_FILE_SIZE) {
+        errors.push(`${file.name}: File too large (max ${MAX_FILE_SIZE / 1024 / 1024}MB)`);
+      } else if (uploadedFiles.length + validFiles.length >= MAX_FILES) {
+        errors.push(`${file.name}: Maximum number of files reached`);
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    if (errors.length > 0) {
+      showFeedback(errors.join('\n'), 'error');
     }
 
-    function processFiles(files) {
-        const validFiles = [];
-        const errors = [];
-
-        files.forEach(file => {
-            if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-                errors.push(`${file.name}: Unsupported file type`);
-            } else if (file.size > MAX_FILE_SIZE) {
-                errors.push(`${file.name}: File too large (max ${MAX_FILE_SIZE / 1024 / 1024}MB)`);
-            } else if (uploadedFiles.length + validFiles.length >= MAX_FILES) {
-                errors.push(`${file.name}: Maximum number of files reached`);
-            } else {
-                validFiles.push(file);
-            }
-        });
-
-        if (errors.length > 0) {
-            showFeedback(errors.join('\n'), 'error');
-        }
-
-        if (validFiles.length > 0) {
-            uploadedFiles = uploadedFiles.concat(validFiles);
-            renderFileList();
-            showFeedback(`${validFiles.length} file(s) ready to upload`, 'success');
-        }
+    if (validFiles.length > 0) {
+      uploadedFiles = uploadedFiles.concat(validFiles);
+      renderFileList();
+      showFeedback(`${validFiles.length} file(s) ready to upload`, 'success');
     }
+  }
 
-    function renderFileList() {
-        if (!uploadedFilesDiv) return;
+  function renderFileList() {
+    if (!uploadedFilesDiv) return;
 
-        const fileList = document.getElementById('file-list');
-        if (!fileList) return;
+    const fileList = document.getElementById('file-list');
+    if (!fileList) return;
 
-        fileList.innerHTML = '';
-        uploadedFiles.forEach((file, index) => {
-            const fileDiv = document.createElement('div');
-            fileDiv.className = 'flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-2 rounded mb-2';
-            fileDiv.innerHTML = `
+    fileList.innerHTML = '';
+    uploadedFiles.forEach((file, index) => {
+      const fileDiv = document.createElement('div');
+      fileDiv.className = 'flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-2 rounded mb-2';
+      fileDiv.innerHTML = `
                 <span class="text-sm truncate">${escapeHtml(file.name)}</span>
                 <button class="text-red-500 hover:text-red-700" data-index="${index}">
                     Remove
                 </button>
             `;
-            fileList.appendChild(fileDiv);
-        });
+      fileList.appendChild(fileDiv);
+    });
 
-        uploadedFilesDiv.classList.toggle('hidden', uploadedFiles.length === 0);
+    uploadedFilesDiv.classList.toggle('hidden', uploadedFiles.length === 0);
+  }
+
+  function removeFile(index) {
+    uploadedFiles.splice(index, 1);
+    renderFileList();
+  }
+
+  function adjustTextareaHeight(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }
+
+  function showTypingIndicator() {
+    let indicator = document.getElementById('typing-indicator');
+    if (indicator) {
+      indicator.remove();
     }
 
-    function removeFile(index) {
-        uploadedFiles.splice(index, 1);
-        renderFileList();
-    }
-
-    function adjustTextareaHeight(textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = `${textarea.scrollHeight}px`;
-    }
-
-    function showTypingIndicator() {
-        let indicator = document.getElementById('typing-indicator');
-        if (indicator) {
-            indicator.remove();
-        }
-
-        indicator = document.createElement('div');
-        indicator.id = 'typing-indicator';
-        indicator.className = 'flex w-full mt-2 space-x-3 max-w-lg';
-        indicator.innerHTML = `
+    indicator = document.createElement('div');
+    indicator.id = 'typing-indicator';
+    indicator.className = 'flex w-full mt-2 space-x-3 max-w-lg';
+    indicator.innerHTML = `
             <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
             <div class="relative max-w-lg">
                 <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
@@ -410,156 +378,154 @@ contentDiv.innerHTML = sanitizedHtml;
             </div>
         `;
 
-        // Append the typing indicator to the chat box
-        chatBox.appendChild(indicator);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
+    // Append the typing indicator to the chat box
+    chatBox.appendChild(indicator);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
 
-    function removeTypingIndicator() {
-        const indicator = document.getElementById('typing-indicator');
-        if (indicator) {
-            indicator.style.display = 'none';
+  function removeTypingIndicator() {
+    const indicator = document.getElementById('typing-indicator');
+    if (indicator) {
+      indicator.style.display = 'none';
+    }
+  }
+
+  function escapeHtml(unsafe) {
+    return unsafe
+      .replace(/&/g, "&")
+      .replace(/</g, "<")
+      .replace(/>/g, ">")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function setupDragAndDrop() {
+    if (!dropZone) return;
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    dropZone.addEventListener('dragenter', () => {
+      dropZone.classList.remove('hidden');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+      if (!e.relatedTarget || !dropZone.contains(e.relatedTarget)) {
+        dropZone.classList.add('hidden');
+      }
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      dropZone.classList.add('hidden');
+      const files = Array.from(e.dataTransfer.files);
+      processFiles(files);
+    });
+  }
+
+  function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  async function createNewChat() {
+    try {
+      const data = await fetchWithCSRF('/new_chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (data.success) {
+        window.location.href = `/chat/chat_interface?chat_id=${data.chat_id}`;
+      } else {
+        throw new Error(data.error || 'Failed to create new chat');
+      }
+    } catch (error) {
+      console.error('Error creating new chat:', error);
+      showFeedback('Failed to create new chat', 'error');
+    }
+  }
+
+  function handleModelChange() {
+    const modelId = modelSelect.value;
+    localStorage.setItem('selectedModel', modelId);
+  }
+
+  async function handleMessageActions(event) {
+    const target = event.target.closest('button');
+    if (!target) return;
+
+    try {
+      if (target.classList.contains('copy-button')) {
+        const content = target.closest('.max-w-lg').querySelector('.prose').textContent;
+        await navigator.clipboard.writeText(content);
+        showFeedback('Copied to clipboard!', 'success');
+      } else if (target.classList.contains('regenerate-button')) {
+        await regenerateResponse(target);
+      }
+    } catch (error) {
+      console.error('Error handling message action:', error);
+      showFeedback('Failed to perform action', 'error');
+    }
+  }
+
+  async function regenerateResponse(button) {
+    button.disabled = true;
+    try {
+      const chatId = new URLSearchParams(window.location.search).get('chat_id');
+      if (!chatId) {
+        showFeedback('Chat ID not found', 'error');
+        return;
+      }
+
+      const messages = Array.from(chatBox.children);
+      let lastUserMessage = null;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const messageDiv = messages[i];
+        if (messageDiv.querySelector('.bg-blue-600')) {
+          lastUserMessage = messageDiv.querySelector('.text-sm').textContent;
+          break;
         }
+      }
+
+      if (!lastUserMessage) {
+        showFeedback('No message found to regenerate', 'error');
+        return;
+      }
+
+      while (chatBox.lastElementChild &&
+        !chatBox.lastElementChild.querySelector('.bg-blue-600')) {
+        chatBox.lastElementChild.remove();
+      }
+      if (chatBox.lastElementChild) {
+        chatBox.lastElementChild.remove();
+      }
+
+      showTypingIndicator();
+
+      const formData = new FormData();
+      formData.append('message', lastUserMessage);
+
+      const data = await fetchWithCSRF('/chat', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (data.response) {
+        appendAssistantMessage(data.response);
+      } else {
+        throw new Error(data.error || 'Failed to regenerate response');
+      }
+    } catch (error) {
+      console.error('Error regenerating response:', error);
+      showFeedback(error.message, 'error');
+    } finally {
+      button.disabled = false;
+      removeTypingIndicator();
     }
+  }
 
-
-    function escapeHtml(unsafe) {
-        return unsafe
-            .replace(/&/g, "&")
-            .replace(/</g, "<")
-            .replace(/>/g, ">")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
-
-    function setupDragAndDrop() {
-        if (!dropZone) return;
-
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, preventDefaults, false);
-        });
-
-        dropZone.addEventListener('dragenter', () => {
-            dropZone.classList.remove('hidden');
-        });
-
-        dropZone.addEventListener('dragleave', (e) => {
-            if (!e.relatedTarget || !dropZone.contains(e.relatedTarget)) {
-                dropZone.classList.add('hidden');
-            }
-        });
-
-        dropZone.addEventListener('drop', (e) => {
-            dropZone.classList.add('hidden');
-            const files = Array.from(e.dataTransfer.files);
-            processFiles(files);
-        });
-    }
-
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-
-    async function createNewChat() {
-        try {
-            const data = await fetchWithCSRF('/new_chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (data.success) {
-                window.location.href = `/chat/chat_interface?chat_id=${data.chat_id}`;
-            } else {
-                throw new Error(data.error || 'Failed to create new chat');
-            }
-        } catch (error) {
-            console.error('Error creating new chat:', error);
-            showFeedback('Failed to create new chat', 'error');
-        }
-    }
-
-    function handleModelChange() {
-        const modelId = modelSelect.value;
-        localStorage.setItem('selectedModel', modelId);
-    }
-
-    async function handleMessageActions(event) {
-        const target = event.target.closest('button');
-        if (!target) return;
-
-        try {
-            if (target.classList.contains('copy-button')) {
-                const content = target.closest('.max-w-lg').querySelector('.prose').textContent;
-                await navigator.clipboard.writeText(content);
-                showFeedback('Copied to clipboard!', 'success');
-            } else if (target.classList.contains('regenerate-button')) {
-                await regenerateResponse(target);
-            }
-        } catch (error) {
-            console.error('Error handling message action:', error);
-            showFeedback('Failed to perform action', 'error');
-        }
-    }
-
-    async function regenerateResponse(button) {
-        button.disabled = true;
-        try {
-            const chatId = new URLSearchParams(window.location.search).get('chat_id');
-            if (!chatId) {
-                showFeedback('Chat ID not found', 'error');
-                return;
-            }
-
-            const messages = Array.from(chatBox.children);
-            let lastUserMessage = null;
-            for (let i = messages.length - 1; i >= 0; i--) {
-                const messageDiv = messages[i];
-                if (messageDiv.querySelector('.bg-blue-600')) {
-                    lastUserMessage = messageDiv.querySelector('.text-sm').textContent;
-                    break;
-                }
-            }
-
-            if (!lastUserMessage) {
-                showFeedback('No message found to regenerate', 'error');
-                return;
-            }
-
-            while (chatBox.lastElementChild &&
-                !chatBox.lastElementChild.querySelector('.bg-blue-600')) {
-                chatBox.lastElementChild.remove();
-            }
-            if (chatBox.lastElementChild) {
-                chatBox.lastElementChild.remove();
-            }
-
-            showTypingIndicator();
-
-            const formData = new FormData();
-            formData.append('message', lastUserMessage);
-
-            const data = await fetchWithCSRF('/chat', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (data.response) {
-                appendAssistantMessage(data.response);
-            } else {
-                throw new Error(data.error || 'Failed to regenerate response');
-            }
-        } catch (error) {
-            console.error('Error regenerating response:', error);
-            showFeedback(error.message, 'error');
-        } finally {
-            button.disabled = false;
-            removeTypingIndicator();
-        }
-    }
-
-
-    window.removeFile = removeFile;
+  window.removeFile = removeFile;
 })();
