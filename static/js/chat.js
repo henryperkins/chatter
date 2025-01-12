@@ -308,9 +308,9 @@
             body: formData,
             headers: {
               'X-Chat-ID': chatId,
-              'X-CSRFToken': window.utils.getCSRFToken(),
               'Accept': 'text/event-stream',
               'X-Requested-With': 'XMLHttpRequest'
+              // Do not include 'X-CSRFToken' header when using FormData
             }
           });
 
