@@ -228,9 +228,16 @@
         console.debug('Attaching send button click handler');
         sendButton.addEventListener('click', handleSendButtonClick);
         sendButton.addEventListener('touchend', handleSendButtonClick);
+        sendButton.addEventListener('touchend', handleSendButtonClick);
         console.debug('Attaching message input handlers');
         messageInput.addEventListener('input', handleMessageInput);
         messageInput.addEventListener('keydown', handleMessageKeydown);
+
+        // Add touch event listeners for mobile devices
+        if ('ontouchstart' in window) {
+            messageInput.addEventListener('touchstart', handleMessageInput);
+            sendButton.addEventListener('touchend', handleSendButtonClick);
+        }
         messageInput.addEventListener('touchstart', handleMessageInput);
 
         // Add touch event listeners for mobile
