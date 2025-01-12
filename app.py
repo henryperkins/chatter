@@ -68,6 +68,9 @@ login_manager.init_app(app)
 login_manager.login_view = "auth.login"  # Specify the login view
 login_manager.login_message_category = "info"
 
+# Add this line to tell Flask-WTF where to look for the CSRF token
+app.config['WTF_CSRF_HEADERS'] = ['X-CSRFToken']
+
 # Initialize CSRF Protection
 csrf.init_app(app)
 

@@ -282,8 +282,7 @@
         formData.append('message', messageText);
         uploadedFiles.forEach(file => formData.append('files[]', file));
 
-        // Add CSRF token to FormData
-        formData.append('csrf_token', utils.getCSRFToken());
+        // CSRF token is already sent in the headers, no need to add it to FormData
 
         // Update UI immediately
         appendUserMessage(messageText);
