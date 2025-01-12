@@ -10,7 +10,9 @@
         const sidebar = document.getElementById('sidebar');
 
         function toggleMobileMenu() {
+            const expanded = mobileMenuToggle.getAttribute('aria-expanded') === 'true';
             mobileMenu.classList.toggle('-translate-x-full');
+            mobileMenuToggle.setAttribute('aria-expanded', !expanded);
         }
 
         function toggleSidebar() {
