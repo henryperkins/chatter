@@ -71,7 +71,9 @@ login_manager.login_message_category = "info"
 # Add this line to tell Flask-WTF where to look for the CSRF token
 app.config['WTF_CSRF_HEADERS'] = ['X-CSRFToken']
 
-# Initialize CSRF Protection
+# Configure CSRF Protection
+app.config['WTF_CSRF_CHECK_DEFAULT'] = False  # Disable default CSRF checks
+app.config['WTF_CSRF_METHODS'] = []  # Disable CSRF for all methods by default
 csrf.init_app(app)
 
 # Configure Flask-Limiter with in-memory storage
