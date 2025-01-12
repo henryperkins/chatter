@@ -18,10 +18,12 @@
 
     /**
      * Fetches data from a URL with CSRF token included in the headers.
+     * Handles non-JSON responses gracefully by checking the content type.
      * @function fetchWithCSRF
      * @param {string} url - The URL to fetch data from.
      * @param {object} [options={}] - Additional fetch options.
      * @returns {Promise<object>} The response data as a JSON object.
+     * @throws {Error} If the response is not OK or not JSON.
      */
     async function fetchWithCSRF(url, options = {}) {
         const csrfToken = getCSRFToken();
@@ -33,11 +35,22 @@
 
         try {
             const response = await fetch(url, { ...options, headers });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+
+            const contentType = response.headers.get('content-type');
+            let data;
+
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                throw new Error(`Invalid response from server: ${text}`);
             }
-            return await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            }
+
+            return data;
         } catch (error) {
             console.error('Error in fetchWithCSRF:', error);
             throw error;

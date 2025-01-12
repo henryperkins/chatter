@@ -1,33 +1,8 @@
 (function() {
     console.log("Form handler initialized");
 
-    // Utility function to get CSRF token
-    function getCSRFToken() {
-        const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
-        return csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") || "" : "";
-    }
-
-    // Utility function to show feedback messages
-    function showFeedback(message, type = "success") {
-        console.log("Showing feedback:", message, type);
-        const feedbackDiv = document.getElementById('feedback-message') || createFeedbackElement();
-        feedbackDiv.className = `fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 ${
-            type === 'success' ? 'bg-green-500' : 'bg-red-500'
-        } text-white`;
-        feedbackDiv.textContent = message;
-        feedbackDiv.classList.remove('hidden');
-
-        setTimeout(() => {
-            feedbackDiv.classList.add('hidden');
-        }, 3000);
-    }
-
-    function createFeedbackElement() {
-        const div = document.createElement('div');
-        div.id = 'feedback-message';
-        document.body.appendChild(div);
-        return div;
-    }
+    // Access utility functions from window.utils
+    const { getCSRFToken, showFeedback, fetchWithCSRF } = window.utils;
 
     // Function to clear previous errors
     function clearErrors(form) {
@@ -116,37 +91,18 @@
         // Show loading spinner
         showLoadingSpinner(form);
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
-
         try {
             console.log("Sending request");
-            const response = await fetch(form.action, {
-                method: form.method,
+
+            const data = await fetchWithCSRF(form.action, {
+                method: form.method || "POST",
                 body: formData,
-                headers: {
-                    "X-CSRFToken": getCSRFToken(),
-                    Accept: "application/json",
-                },
-                signal: controller.signal,
             });
-            console.log("Response received:", response.status);
-            clearTimeout(timeoutId);
 
-            let data;
-            try {
-                data = await response.json();
-                console.log("Response data:", data);
-            } catch (jsonError) {
-                // Non-JSON response handling
-                const errorText = await response.text();
-                console.error("Non-JSON response error:", errorText);
-                showFeedback(`Server Error ${response.status}: ${errorText}`, "error");
-                return;
-            }
+            console.log("Response data:", data);
 
-            if (response.ok && data.success) {
-                // Handle successful form submission
+            // Handle successful form submission
+            if (data.success) {
                 console.log("Success, showing feedback");
                 showFeedback(data.message || "Operation successful!", "success");
                 if (data.redirect) {
@@ -164,7 +120,6 @@
                 }
             }
         } catch (error) {
-            clearTimeout(timeoutId);
             if (error.name === "AbortError") {
                 console.error("Request timed out:", error);
                 showFeedback("Request timed out. Please try again.", "error");

@@ -23,12 +23,16 @@
     'text/csv'
   ];
 
-  // DOM Elements Cache - declared at the top for better scope
+  // DOM Elements Cache
   let messageInput, sendButton, chatBox, fileInput, uploadButton,
     uploadedFilesDiv, modelSelect, newChatBtn, dropZone;
 
   // Initialize chat interface
   function initializeChat() {
+    // Prevent multiple initializations
+    if (window.chatInitialized) return;
+    window.chatInitialized = true;
+
     // Cache and verify DOM elements
     const requiredElements = {
       'message-input': el => messageInput = el,
@@ -45,14 +49,22 @@
       'drop-zone': el => dropZone = el
     };
 
+    let missingElements = false;
+
     // Verify required elements exist
     for (const [id, setter] of Object.entries(requiredElements)) {
       const element = document.getElementById(id);
       if (!element) {
         console.error(`Required element #${id} not found`);
-        return; // Exit initialization if required elements are missing
+        missingElements = true;
+      } else {
+        setter(element);
       }
-      setter(element);
+    }
+
+    if (missingElements) {
+      showFeedback('Critical UI elements are missing. Please reload the page.', 'error');
+      return;
     }
 
     // Set optional elements if they exist
@@ -64,23 +76,14 @@
     }
 
     // Set up core event listeners
-    sendButton.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (!sendButton.disabled) {
-        sendMessage();
-      }
-    });
+    if (!window.eventListenersAttached) {
+      window.eventListenersAttached = true;
 
-    messageInput.addEventListener('input', function() {
-      adjustTextareaHeight(this);
-    });
-
-    messageInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter' && !e.shiftKey && !sendButton.disabled) {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
+      // Set up core event listeners
+      sendButton.addEventListener('click', handleSendButtonClick);
+      messageInput.addEventListener('input', handleMessageInput);
+      messageInput.addEventListener('keydown', handleMessageKeydown);
+    }
 
     // Set up file handling
     if (fileInput && uploadButton) {
@@ -125,12 +128,12 @@
     const originalButtonText = sendButton.innerHTML;
     const messageText = messageInput.value.trim();
 
-    try {
-      // Disable controls and show loading state
-      messageInput.disabled = true;
-      sendButton.disabled = true;
-      sendButton.innerHTML = '<span class="animate-spin">↻</span> Sending...';
+    // Disable controls and show loading state
+    messageInput.disabled = true;
+    sendButton.disabled = true;
+    sendButton.innerHTML = '<span class="animate-spin">↻</span> Sending...';
 
+    try {
       // Prepare form data
       const formData = new FormData();
       formData.append('message', messageText);
@@ -144,7 +147,7 @@
 
       // Send request
       const chatId = window.CHAT_CONFIG.chatId;
-      const data = await window.utils.fetchWithCSRF('/chat/', {
+      const data = await fetchWithCSRF('/chat/', {
         method: 'POST',
         body: formData,
         headers: {
@@ -158,6 +161,8 @@
         appendAssistantMessage(data.response);
         uploadedFiles = [];
         renderFileList();
+      } else if (data.error) {
+        throw new Error(data.error);
       } else {
         throw new Error('No response received from server');
       }
@@ -169,17 +174,42 @@
         });
       }
     } catch (error) {
+      console.error('Error sending message:', error);
       showFeedback(error.message || 'Failed to send message', 'error');
       // Restore message on failure
       messageInput.value = messageText;
       adjustTextareaHeight(messageInput);
     } finally {
+      // Re-enable controls
       messageInput.disabled = false;
       sendButton.disabled = false;
       sendButton.innerHTML = originalButtonText;
-      // Remove typing indicator after assistant's message is appended
       removeTypingIndicator();
       messageInput.focus();
+    }
+  }
+
+  function handleSendButtonClick(e) {
+    e.preventDefault();
+    if (!sendButton.disabled) {
+      sendMessage().catch(error => {
+        console.error('Error in sendMessage:', error);
+        showFeedback('Failed to send message', 'error');
+      });
+    }
+  }
+
+  function handleMessageInput() {
+    adjustTextareaHeight(this);
+  }
+
+  function handleMessageKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey && !sendButton.disabled) {
+      e.preventDefault();
+      sendMessage().catch(error => {
+        console.error('Error on Enter key:', error);
+        showFeedback('Failed to send message', 'error');
+      });
     }
   }
 
@@ -254,6 +284,11 @@
   }
 
   function appendAssistantMessage(message) {
+    if (!message || typeof message !== 'string') {
+      console.error('Invalid message content.');
+      return;
+    }
+
     const messageDiv = document.createElement('div');
     messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-lg';
     messageDiv.innerHTML = `
@@ -281,6 +316,8 @@
       });
       contentDiv.innerHTML = sanitizedHtml;
       Prism.highlightAllUnder(contentDiv);
+    } else {
+      console.error('Content div not found in assistant message');
     }
 
     chatBox.appendChild(messageDiv);
@@ -397,8 +434,8 @@
 
   function showTypingIndicator() {
     let indicator = document.getElementById('typing-indicator');
-    if (indicator) {
-      indicator.remove();
+    if (indicator && indicator.parentNode) {
+      indicator.parentNode.removeChild(indicator);
     }
 
     indicator = document.createElement('div');
@@ -426,8 +463,10 @@
 
   function removeTypingIndicator() {
     const indicator = document.getElementById('typing-indicator');
-    if (indicator) {
-      indicator.style.display = 'none';
+    if (indicator && indicator.parentNode) {
+      indicator.parentNode.removeChild(indicator);
+    } else {
+      console.warn('Typing indicator element not found or already removed.');
     }
   }
 
@@ -617,6 +656,11 @@
       button.disabled = false;
       removeTypingIndicator();
     }
+  }
+
+  function getCSRFToken() {
+    const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
+    return csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute('content') : '';
   }
 
   // Expose necessary functions to global scope

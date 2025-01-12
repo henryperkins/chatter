@@ -19,7 +19,7 @@
             {% if models %}
             <div>
                 <label for="model-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model:</label>
-                <select id="model-select" class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
+                <select id="model-select" data-original-value="{{ model_id }}" class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200">
                     {% for model in models %}
                     <option value="{{ model.id }}" {% if model.is_default %}selected{% endif %}>
                         {{ model.name }}{% if model.is_default %} (Default){% endif %}
@@ -219,8 +219,6 @@
 <!-- Feedback Message -->
 <div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center"></div>
 
-<!-- CSRF Token -->
-<meta name="csrf-token" content="{{ csrf_token() }}">
 {% endblock %}
 
 {% block head %}

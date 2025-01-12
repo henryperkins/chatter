@@ -13,8 +13,8 @@
     function showFeedback(message, type = 'info') {
         const feedbackDiv = document.getElementById('feedback-message') || createFeedbackElement();
         feedbackDiv.className = `fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 ${
-            type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-blue-500'
-        } text-white`;
+            type === 'error' ? 'bg-red-500 text-white' : type === 'success' ? 'bg-green-500 text-white' : 'bg-blue-500 text-white'
+        }`;
         feedbackDiv.textContent = message;
         feedbackDiv.classList.remove('hidden');
 
@@ -30,7 +30,7 @@
         return div;
     }
 
-    // Utility function to fetch with CSRF token
+    // Fetch with CSRF token
     async function fetchWithCSRF(url, options = {}) {
         const csrfToken = getCSRFToken();
         const headers = {
@@ -41,11 +41,22 @@
 
         try {
             const response = await fetch(url, { ...options, headers });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+
+            const contentType = response.headers.get('content-type');
+            let data;
+
+            if (contentType && contentType.includes('application/json')) {
+                data = await response.json();
+            } else {
+                const text = await response.text();
+                throw new Error(`Invalid response from server: ${text}`);
             }
-            return await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            }
+
+            return data;
         } catch (error) {
             console.error('Error in fetchWithCSRF:', error);
             throw error;
@@ -55,20 +66,24 @@
     // Initialize mobile menu toggle
     function initializeMobileMenu() {
         const sidebarToggle = document.getElementById('sidebar-toggle');
-        const offCanvasMenu = document.getElementById('off-canvas-menu');
+        const mobileMenu = document.getElementById('mobile-menu');
         const overlay = document.getElementById('overlay');
         const closeButton = document.getElementById('off-canvas-close');
 
         function toggleMenu() {
-            offCanvasMenu?.classList.toggle('hidden');
+            mobileMenu?.classList.toggle('hidden');
             overlay?.classList.toggle('hidden');
             document.body.classList.toggle('overflow-hidden');
         }
 
-        if (sidebarToggle && offCanvasMenu && overlay && closeButton) {
+        if (sidebarToggle && mobileMenu) {
             sidebarToggle.addEventListener('click', toggleMenu);
-            closeButton.addEventListener('click', toggleMenu);
-            overlay.addEventListener('click', toggleMenu);
+            // Close menu when clicking outside
+            document.addEventListener('click', (event) => {
+                if (!mobileMenu.contains(event.target) && !sidebarToggle.contains(event.target)) {
+                    mobileMenu.classList.add('hidden');
+                }
+            });
         }
     }
 
@@ -176,31 +191,32 @@
         });
     }
 
-    // Handle global click events (e.g., feedback close buttons)
-    document.addEventListener('click', event => {
-        const target = event.target;
-        if (target && target.matches('#feedback-close')) {
-            const feedbackMessage = document.getElementById('feedback-message');
-            feedbackMessage?.classList.add('hidden');
-        }
-    });
-
-    // Handle global keydown events (e.g., closing modals with the Escape key)
-    document.addEventListener('keydown', event => {
-        if (event.key === 'Escape') {
-            const modals = document.querySelectorAll('.modal:not(.hidden)');
-            modals.forEach(modal => {
-                modal.classList.add('hidden');
-            });
-        }
-    });
-
     // Combine all initialization logic
-    document.addEventListener('DOMContentLoaded', () => {
-        initializeMobileMenu();
-        initializeDarkMode();
-        initializeTooltips();
-        initializeDropdowns();
-        initializeModals();
-    });
+    function initializeBase() {
+        try {
+            initializeMobileMenu();
+            initializeDarkMode();
+            initializeTooltips();
+            initializeDropdowns();
+            initializeModals();
+            // Other initialization functions can be added here
+        } catch (error) {
+            console.error('Error during base initialization:', error);
+            showFeedback('An error occurred during initialization. Please reload the page.', 'error');
+        }
+    }
+
+    // Only initialize once when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeBase);
+    } else {
+        initializeBase();
+    }
+
+    // Expose utility functions if needed
+    window.baseUtils = {
+        getCSRFToken,
+        showFeedback,
+        fetchWithCSRF
+    };
 })();

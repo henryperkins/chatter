@@ -65,7 +65,7 @@
             margin: 0;
             border-radius: 0.375rem;
         }
-        
+
         /* Markdown content styles */
         .prose {
             max-width: 100%;
@@ -112,7 +112,7 @@
 
                 <!-- Desktop navigation -->
                 <div class="hidden md:flex md:items-center md:space-x-4">
-                    <a href="{{ url_for('chat.chat_interface') }}" 
+                    <a href="{{ url_for('chat.chat_interface') }}"
                        class="px-3 py-2 rounded-md text-sm font-medium {% if request.endpoint == 'chat.chat_interface' %}text-blue-600 bg-blue-50 dark:bg-gray-700{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
                         Home
                     </a>
@@ -147,14 +147,14 @@
     </nav>
 
     <!-- Dark Mode Toggle -->
-    <button id="dark-mode-toggle" 
+    <button id="dark-mode-toggle"
             class="p-2 bg-gray-200 dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded fixed top-4 right-4 z-50 hover:bg-gray-300 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500">
         <svg class="w-6 h-6 dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
         </svg>
         <svg class="w-6 h-6 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707"/>
         </svg>
     </button>
@@ -162,7 +162,7 @@
     <!-- Mobile Menu -->
     <div id="mobile-menu" class="md:hidden">
         <div class="px-2 pt-2 pb-3 space-y-1">
-            <a href="{{ url_for('chat.chat_interface') }}" 
+            <a href="{{ url_for('chat.chat_interface') }}"
                class="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                 Home
             </a>
@@ -214,10 +214,13 @@
         {% block content %}{% endblock %}
     </main>
 
+    <!-- Feedback Message -->
+    <div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center"></div>
+
     <!-- Required Libraries -->
     <!-- Core dependencies first -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.0/purify.min.js"></script>
-    
+
     <!-- Prism and its components -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
@@ -225,11 +228,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
-    
+
     <!-- Markdown processing -->
     <script src="https://cdn.jsdelivr.net/npm/markdown-it@13.0.1/dist/markdown-it.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/markdown-it-prism@2.2.0/markdown-it-prism.min.js"></script>
-    
+
     <!-- Axios for HTTP requests -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
@@ -242,69 +245,70 @@
         if (typeof DOMPurify === 'undefined') {
             console.error('DOMPurify is not loaded');
         }
-        
+
         // Make libraries available globally
         window.Prism = Prism;
         window.DOMPurify = DOMPurify;
         window.markdownit = markdownit;
     </script>
 
-    <!-- Core JavaScript -->
-    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/base.js') }}"></script>
     {% block scripts %}
-    <script>
-        // Dark mode handling
-        document.addEventListener('DOMContentLoaded', () => {
-            const darkModeToggle = document.getElementById('dark-mode-toggle');
-            const html = document.documentElement;
-            
-            // Check system preference and localStorage
-            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            const storedTheme = localStorage.getItem('theme');
-            
-            if (storedTheme === 'dark' || (!storedTheme && systemPrefersDark)) {
-                html.classList.add('dark');
-            }
-            
-            // Toggle dark mode
-            darkModeToggle?.addEventListener('click', () => {
-                html.classList.toggle('dark');
-                localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
-            });
+        <!-- Core JavaScript -->
+        <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/base.js') }}"></script>
+        {{ super() }}
+        <script>
+            // Dark mode handling
+            document.addEventListener('DOMContentLoaded', () => {
+                const darkModeToggle = document.getElementById('dark-mode-toggle');
+                const html = document.documentElement;
 
-            // Mobile menu toggle
-            const mobileMenuButton = document.getElementById('sidebar-toggle');
-            const mobileMenu = document.getElementById('mobile-menu');
-            
-            mobileMenuButton?.addEventListener('click', () => {
-                mobileMenu?.classList.toggle('hidden');
-            });
-            
-            // Close mobile menu when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!mobileMenu?.contains(e.target) && !mobileMenuButton?.contains(e.target)) {
-                    mobileMenu?.classList.add('hidden');
+                // Check system preference and localStorage
+                const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                const storedTheme = localStorage.getItem('theme');
+
+                if (storedTheme === 'dark' || (!storedTheme && systemPrefersDark)) {
+                    html.classList.add('dark');
                 }
+
+                // Toggle dark mode
+                darkModeToggle?.addEventListener('click', () => {
+                    html.classList.toggle('dark');
+                    localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
+                });
+
+                // Mobile menu toggle
+                const mobileMenuButton = document.getElementById('sidebar-toggle');
+                const mobileMenu = document.getElementById('mobile-menu');
+
+                mobileMenuButton?.addEventListener('click', () => {
+                    mobileMenu?.classList.toggle('hidden');
+                });
+
+                // Close mobile menu when clicking outside
+                document.addEventListener('click', (e) => {
+                    if (!mobileMenu?.contains(e.target) && !mobileMenuButton?.contains(e.target)) {
+                        mobileMenu?.classList.add('hidden');
+                    }
+                });
+
+                // Flash message auto-hide
+                const flashMessages = document.querySelectorAll('[role="alert"]');
+                flashMessages.forEach(message => {
+                    setTimeout(() => {
+                        message.style.opacity = '0';
+                        message.style.transition = 'opacity 0.5s ease-in-out';
+                        setTimeout(() => message.remove(), 500);
+                    }, 5000);
+                });
             });
 
-            // Flash message auto-hide
-            const flashMessages = document.querySelectorAll('[role="alert"]');
-            flashMessages.forEach(message => {
-                setTimeout(() => {
-                    message.style.opacity = '0';
-                    message.style.transition = 'opacity 0.5s ease-in-out';
-                    setTimeout(() => message.remove(), 500);
-                }, 5000);
-            });
-        });
-
-        // CSRF token handling
-        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-        if (csrfToken) {
-            axios.defaults.headers.common['X-CSRFToken'] = csrfToken;
-        }
-    </script>
+            // CSRF token handling
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            if (csrfToken) {
+                axios.defaults.headers.common['X-CSRFToken'] = csrfToken;
+            }
+        </script>
     {% endblock %}
 </body>
 </html>
