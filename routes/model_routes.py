@@ -32,7 +32,10 @@ def validate_csrf_token():
     """
     csrf_token = request.headers.get("X-CSRFToken")
     if not csrf_token or not csrf.validate_csrf(csrf_token):
-        return jsonify({"success": False, "error": "CSRF token invalid or missing"}), 400
+        return (
+            jsonify({"success": False, "error": "CSRF token invalid or missing"}),
+            400,
+        )
     return None
 
 
@@ -120,16 +123,29 @@ def create_model():
 
     try:
         data = extract_model_data(form)
-        logger.debug("Creating model with data: %s", {k: v if k != "api_key" else "****" for k, v in data.items()})
+        logger.debug(
+            "Creating model with data: %s",
+            {k: v if k != "api_key" else "****" for k, v in data.items()},
+        )
         Model.validate_model_config(data)
         model_id = Model.create(data)
-        return jsonify({"id": model_id, "success": True, "message": "Model created successfully"})
+        return jsonify(
+            {"id": model_id, "success": True, "message": "Model created successfully"}
+        )
 
     except ValueError as e:
         return handle_error(e, "Validation error", 400)
     except Exception as e:
         if "UNIQUE constraint failed: models.deployment_name" in str(e):
-            return jsonify({"error": "A model with this deployment name already exists", "success": False}), 400
+            return (
+                jsonify(
+                    {
+                        "error": "A model with this deployment name already exists",
+                        "success": False,
+                    }
+                ),
+                400,
+            )
         return handle_error(e, "Error creating model")
 
 
@@ -213,7 +229,9 @@ def edit_model(model_id):
                     data = extract_model_data(form)
                     validate_immutable_fields(model_id, data)
                     Model.update(model_id, data)
-                    return jsonify({"success": True, "message": "Model updated successfully"})
+                    return jsonify(
+                        {"success": True, "message": "Model updated successfully"}
+                    )
                 except Exception as e:
                     return handle_error(e, "Error updating model", 400)
 
@@ -239,7 +257,9 @@ def set_default_model(model_id: int):
 
     try:
         Model.set_default(model_id)
-        return jsonify({"success": True, "message": "Model set as default successfully"})
+        return jsonify(
+            {"success": True, "message": "Model set as default successfully"}
+        )
     except Exception as e:
         return handle_error(e, "Unexpected error setting default model")
 
@@ -286,7 +306,9 @@ def revert_to_version(model_id: int, version: int):
 
     try:
         Model.revert_to_version(model_id, version)
-        return jsonify({"success": True, "message": "Model reverted to version successfully"})
+        return jsonify(
+            {"success": True, "message": "Model reverted to version successfully"}
+        )
     except ValueError as e:
         return handle_error(e, "Error reverting model", 400)
     except Exception as e:

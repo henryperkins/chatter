@@ -106,7 +106,12 @@ class ConversationManager:
             db.close()
 
     def add_message(
-        self, chat_id: str, role: str, content: str, model_max_tokens: Optional[int] = None, requires_o1_handling: bool = False
+        self,
+        chat_id: str,
+        role: str,
+        content: str,
+        model_max_tokens: Optional[int] = None,
+        requires_o1_handling: bool = False,
     ) -> None:
         """
         Add a message to the conversation context.

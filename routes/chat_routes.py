@@ -37,9 +37,7 @@ MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", 10 * 1024 * 1024))  # 10 MB per f
 MAX_TOTAL_FILE_SIZE = int(os.getenv("MAX_TOTAL_FILE_SIZE", 50 * 1024 * 1024))  # 50 MB
 MAX_FILE_CONTENT_LENGTH = int(os.getenv("MAX_FILE_CONTENT_LENGTH", 8000))  # Characters
 MAX_INPUT_TOKENS = int(os.getenv("MAX_INPUT_TOKENS", 8192))  # Max input tokens
-MAX_CONTEXT_TOKENS = int(
-    os.getenv("MAX_CONTEXT_TOKENS", 128000)
-)  # Max context tokens
+MAX_CONTEXT_TOKENS = int(os.getenv("MAX_CONTEXT_TOKENS", 128000))  # Max context tokens
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")  # Model name for tiktoken encoding
 
 # Initialize tokenizer
@@ -120,7 +118,9 @@ def chat_interface() -> str:
     conversations = [
         {
             **conversation,
-            "timestamp": datetime.strptime(conversation["timestamp"], "%Y-%m-%d %H:%M:%S"),
+            "timestamp": datetime.strptime(
+                conversation["timestamp"], "%Y-%m-%d %H:%M:%S"
+            ),
         }
         for conversation in Chat.get_user_chats(current_user.id)
     ]
@@ -210,7 +210,10 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     data = request.get_json()
     new_title = data.get("title")
     if not new_title or len(new_title) > 100:
-        return jsonify({"error": "Title is required and must be under 100 characters"}), 400
+        return (
+            jsonify({"error": "Title is required and must be under 100 characters"}),
+            400,
+        )
 
     try:
         Chat.update_title(chat_id, new_title)
@@ -226,23 +229,35 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
     """Handle incoming chat messages and return AI responses."""
     try:
-        logger.debug("Received chat message from user %s with data: %s", 
-                    current_user.id, 
-                    {
-                        'form': request.form.to_dict(),
-                        'files': [f.filename for f in request.files.getlist('files[]')] if request.files else [],
-                        'headers': dict(request.headers)
-                    })
+        logger.debug(
+            "Received chat message from user %s with data: %s",
+            current_user.id,
+            {
+                "form": request.form.to_dict(),
+                "files": (
+                    [f.filename for f in request.files.getlist("files[]")]
+                    if request.files
+                    else []
+                ),
+                "headers": dict(request.headers),
+            },
+        )
 
         # Try to get chat_id from headers first, then session
-        chat_id = request.headers.get('X-Chat-ID') or session.get("chat_id")
+        chat_id = request.headers.get("X-Chat-ID") or session.get("chat_id")
         if not chat_id:
-            logger.error("Chat ID not found in headers or session for user %s", current_user.id)
+            logger.error(
+                "Chat ID not found in headers or session for user %s", current_user.id
+            )
             return jsonify({"error": "Chat ID not found."}), 400
 
         # Verify chat access
         if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
-            logger.error("User %s attempted to access unauthorized chat %s", current_user.id, chat_id)
+            logger.error(
+                "User %s attempted to access unauthorized chat %s",
+                current_user.id,
+                chat_id,
+            )
             return jsonify({"error": "Unauthorized access to chat"}), 403
 
         # Fetch the model associated with the chat
@@ -251,9 +266,18 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             logger.error(f"No model associated with chat ID {chat_id}.")
             return jsonify({"error": "No model associated with this chat."}), 400
 
-        if not model_obj.deployment_name or not model_obj.api_key or not model_obj.api_endpoint:
+        if (
+            not model_obj.deployment_name
+            or not model_obj.api_key
+            or not model_obj.api_endpoint
+        ):
             logger.error("Invalid model configuration.")
-            return jsonify({"error": "Invalid model configuration. Please check the settings."}), 400
+            return (
+                jsonify(
+                    {"error": "Invalid model configuration. Please check the settings."}
+                ),
+                400,
+            )
 
         # Sanitize user input before processing
         user_message = bleach.clean(request.form.get("message", "").strip())
@@ -268,7 +292,9 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                 try:
                     filename, content, tokens = process_file(file)
                     if total_tokens + tokens > MAX_INPUT_TOKENS:
-                        excluded_files.append({"filename": filename, "error": "Exceeds token limit"})
+                        excluded_files.append(
+                            {"filename": filename, "error": "Exceeds token limit"}
+                        )
                         continue
                     included_files.append({"filename": filename})
                     file_contents.append(content)
@@ -277,15 +303,28 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                     logger.error(f"Error processing file {file.filename}: {e}")
                     excluded_files.append({"filename": file.filename, "error": str(e)})
             else:
-                excluded_files.append({"filename": file.filename or "Unknown", "error": "Invalid file type"})
+                excluded_files.append(
+                    {
+                        "filename": file.filename or "Unknown",
+                        "error": "Invalid file type",
+                    }
+                )
 
         # Combine user message and file contents
-        combined_message = (user_message + "\n" + "".join(file_contents)) if file_contents else user_message
+        combined_message = (
+            (user_message + "\n" + "".join(file_contents))
+            if file_contents
+            else user_message
+        )
 
         # Update chat title if necessary
-        if Chat.is_title_default(chat_id) and len(conversation_manager.get_context(chat_id)) >= 5:
+        if (
+            Chat.is_title_default(chat_id)
+            and len(conversation_manager.get_context(chat_id)) >= 5
+        ):
             conversation_text = "\n".join(
-                f"{msg['role']}: {msg['content']}" for msg in conversation_manager.get_context(chat_id)[:5]
+                f"{msg['role']}: {msg['content']}"
+                for msg in conversation_manager.get_context(chat_id)[:5]
             )
             Chat.update_title(chat_id, generate_chat_title(conversation_text))
 
@@ -299,7 +338,9 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         )
 
         # Prepare the messages for the API call
-        history = conversation_manager.get_context(chat_id, include_system=not model_obj.requires_o1_handling)
+        history = conversation_manager.get_context(
+            chat_id, include_system=not model_obj.requires_o1_handling
+        )
 
         logger.debug("Sending request to Azure API")
         model_response = get_azure_response(
@@ -322,23 +363,32 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             model_max_tokens=model_obj.max_tokens,
             requires_o1_handling=model_obj.requires_o1_handling,
         )
-        
+
         logger.debug("Returning successful response")
-        return jsonify({
-            "response": model_response, 
-            "included_files": included_files, 
-            "excluded_files": excluded_files
-        })
+        return jsonify(
+            {
+                "response": model_response,
+                "included_files": included_files,
+                "excluded_files": excluded_files,
+            }
+        )
     except Exception as ex:
         logger.error("Error during chat handling: %s", str(ex), exc_info=True)
-        logger.error("Failed request details: %s", {
-            "chat_id": chat_id,
-            "model": model_obj.deployment_name if 'model_obj' in locals() else None,
-            "message_length": len(combined_message) if 'combined_message' in locals() else 0,
-            "file_count": len(included_files) if 'included_files' in locals() else 0,
-            "error": str(ex)
-        })
-        return jsonify({
-            "error": "An unexpected error occurred.", 
-            "details": str(ex)
-        }), 500
+        logger.error(
+            "Failed request details: %s",
+            {
+                "chat_id": chat_id,
+                "model": model_obj.deployment_name if "model_obj" in locals() else None,
+                "message_length": (
+                    len(combined_message) if "combined_message" in locals() else 0
+                ),
+                "file_count": (
+                    len(included_files) if "included_files" in locals() else 0
+                ),
+                "error": str(ex),
+            },
+        )
+        return (
+            jsonify({"error": "An unexpected error occurred.", "details": str(ex)}),
+            500,
+        )

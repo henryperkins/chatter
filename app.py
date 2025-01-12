@@ -72,11 +72,13 @@ login_manager.login_message_category = "info"
 csrf.init_app(app)
 
 # Configure Flask-Limiter with in-memory storage
-app.config.update({
-    "RATELIMIT_STORAGE_URL": "memory://",
-    "RATELIMIT_STRATEGY": "fixed-window",  # Use simpler strategy
-    "RATELIMIT_DEFAULT": "200 per day;50 per hour"  # Set reasonable defaults
-})
+app.config.update(
+    {
+        "RATELIMIT_STORAGE_URL": "memory://",
+        "RATELIMIT_STRATEGY": "fixed-window",  # Use simpler strategy
+        "RATELIMIT_DEFAULT": "200 per day;50 per hour",  # Set reasonable defaults
+    }
+)
 limiter.init_app(app)
 
 # Initialize database
@@ -265,6 +267,4 @@ if __name__ == "__main__":
     port = int(
         os.environ.get("PORT", 5000)
     )  # Get port from environment or use 5000 as default
-    app.run(
-        host="0.0.0.0", port=port, debug=True
-    )  # Set debug=True for development
+    app.run(host="0.0.0.0", port=port, debug=True)  # Set debug=True for development

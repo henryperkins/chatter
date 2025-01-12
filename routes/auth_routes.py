@@ -246,7 +246,9 @@ def register() -> Response:
                     password.encode("utf-8"), bcrypt.gensalt(rounds=12)
                 )
                 # Check if this is the first user
-                user_count = db.execute(text("SELECT COUNT(*) as count FROM users")).scalar()
+                user_count = db.execute(
+                    text("SELECT COUNT(*) as count FROM users")
+                ).scalar()
                 role = "admin" if user_count == 0 else "user"
 
                 result = db.execute(
