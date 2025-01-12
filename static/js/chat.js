@@ -48,9 +48,9 @@
       }
     });
 
-    messageInput.addEventListener('input', debounce(function() {
+    messageInput.addEventListener('input', function() {
       adjustTextareaHeight(this);
-    }, 300));
+    });
 
     messageInput.addEventListener('keydown', function(e) {
       if (e.key === 'Enter' && !e.shiftKey && !sendButton.disabled) {
