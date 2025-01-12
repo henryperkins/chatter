@@ -16,7 +16,7 @@ module.exports = {
   darkMode: 'class',
   plugins: [
     require('@tailwindcss/forms'),
-    require('@tailwindcss/typography'),
+    require('@tailwindcss/typography'), // Ensure this plugin is included
   ],
   corePlugins: {
     // Disable unused core plugins

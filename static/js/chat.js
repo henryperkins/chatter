@@ -3,7 +3,7 @@
     const { getCSRFToken, showFeedback, debounce, fetchWithCSRF } = window.utils;
     
     // Access markdown-it instance from the global window object
-    const md = window.markdownit();
+    const md = window.markdownit().use(window.markdownitPrism);
 
     // DOMPurify and Prism are already available globally (from your script tags)
     // No need to import them or access them differently
