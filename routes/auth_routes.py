@@ -291,16 +291,31 @@ def register() -> Response:
                 )
 
             except Exception as e:
-                log_and_rollback(db, e, "Database error during registration")
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "error": "Registration failed due to database error",
-                        }
-                    ),
-                    500,
-                )
+                db.rollback()
+                if "UNIQUE constraint failed" in str(e):
+                    logger.warning(
+                        f"Registration failed due to duplicate username or email: {username}, {email}"
+                    )
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "error": "Username or email already exists",
+                            }
+                        ),
+                        400,
+                    )
+                else:
+                    logger.error(f"Database error during registration: {e}")
+                    return (
+                        jsonify(
+                            {
+                                "success": False,
+                                "error": "Registration failed due to a server error",
+                            }
+                        ),
+                        500,
+                    )
 
         else:
             logger.debug(f"Form validation errors: {form.errors}")
