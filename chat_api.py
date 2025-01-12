@@ -26,7 +26,7 @@ def get_azure_response(
     api_key: Optional[str] = None,
     api_version: Optional[str] = None,
     requires_o1_handling: bool = False,
-    timeout_seconds: int = 120,  # Increased timeout to 2 minutes
+    timeout_seconds: int = 600,  # Increased timeout to 10 minutes
 ) -> str:
     """
     Sends a chat message to the Azure OpenAI API and returns the response.

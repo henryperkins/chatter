@@ -89,6 +89,12 @@
         
         // Cache DOM elements first
         messageInput = document.getElementById('message-input');
+
+        // Verify that messageInput is not null
+        if (!messageInput) {
+            console.error('Message input element not found');
+            return;
+        }
         sendButton = document.getElementById('send-button');
         chatBox = document.getElementById('chat-box');
         fileInput = document.getElementById('file-input');
@@ -187,6 +193,7 @@
     async function sendMessage() {
         console.log('sendMessage function called'); // Debugging statement
         console.debug('Send button clicked. Preparing to send message:', messageInput.value.trim());
+        console.log('Message input value:', messageInput.value); // Debugging
         console.debug('Uploaded files:', uploadedFiles);
 
         // Validate input
@@ -382,21 +389,31 @@ Prism.highlightAllUnder(contentDiv);
 
     function showTypingIndicator() {
         let indicator = document.getElementById('typing-indicator');
-        if (!indicator) {
-            indicator = document.createElement('div');
-            indicator.id = 'typing-indicator';
-            indicator.className = 'flex items-center space-x-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg mb-2';
-            indicator.innerHTML = `
-                <div class="typing-animation">
-                    <div class="dot"></div>
-                    <div class="dot"></div>
-                    <div class="dot"></div>
-                </div>
-                <span class="text-sm text-gray-500">Assistant is typing...</span>
-            `;
-            chatBox.appendChild(indicator);
+        if (indicator) {
+            indicator.remove();
         }
-        indicator.style.display = 'flex';
+
+        indicator = document.createElement('div');
+        indicator.id = 'typing-indicator';
+        indicator.className = 'flex w-full mt-2 space-x-3 max-w-lg';
+        indicator.innerHTML = `
+            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
+            <div class="relative max-w-lg">
+                <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
+                    <div class="typing-animation">
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                    </div>
+                </div>
+                <span class="text-xs text-gray-500 dark:text-gray-400 leading-none">
+                    ${new Date().toLocaleTimeString()}
+                </span>
+            </div>
+        `;
+
+        // Append the typing indicator to the chat box
+        chatBox.appendChild(indicator);
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
