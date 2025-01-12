@@ -5,7 +5,7 @@
 {% block content %}
 <div class="flex flex-col md:flex-row h-[calc(100vh-4rem)] overflow-hidden bg-white dark:bg-gray-900">
     <!-- Sidebar -->
-    <nav id="sidebar" class="fixed md:relative z-fixed transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-hidden flex flex-col" aria-label="Chat navigation">
+    <nav id="sidebar" class="fixed md:relative z-fixed transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto flex flex-col" aria-label="Chat navigation">
         <div class="flex-none p-4 space-y-4">
             <!-- New Chat Button -->
             <button id="new-chat-btn" class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200" aria-label="Start new chat">
@@ -233,17 +233,17 @@
 
 {% endblock %}
 
+{% block scripts %}
+{{ super() }}
 
-{% block scripts %}
-{{ super() }}
-{% block scripts %}
-{{ super() }}
 <!-- Include Dependency Scripts -->
 <script src="{{ url_for('static', filename='js/dompurify.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/axios.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/markdown-it.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/markdown-it-prism.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/prism.js') }}"></script>
+<!-- Include additional Prism components if necessary -->
+<!-- <script src="{{ url_for('static', filename='js/prism-components.js') }}"></script> -->
 <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
 
 <!-- Initialize required globals -->
@@ -303,5 +303,4 @@
 
 <!-- Load chat.js -->
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
-{% endblock %}
 {% endblock %}

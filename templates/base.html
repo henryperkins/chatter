@@ -259,57 +259,9 @@
     <!-- Core JavaScript -->
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/base.js') }}"></script>
-    <!-- Initialize required globals -->
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            // Verify critical dependencies
-            if (typeof Prism === 'undefined') {
-                console.error('Prism is not loaded');
-                return;
-            }
-            if (typeof DOMPurify === 'undefined') {
-                console.error('DOMPurify is not loaded');
-                return;
-            }
-            if (typeof markdownit === 'undefined') {
-                console.error('markdown-it is not loaded');
-                return;
-            }
-            if (typeof markdownitPrism === 'undefined') {
-                console.error('markdown-it-prism plugin not loaded');
-                return;
-            }
-
-            // Make libraries available globally
-            window.Prism = Prism;
-            window.DOMPurify = DOMPurify;
-            window.markdownit = markdownit;
-            window.markdownitPrism = markdownitPrism;
-
-            // Initialize markdown-it and its plugins
-            try {
-                // Create markdown-it instance
-                const md = window.markdownit();
-
-                // Add Prism plugin
-                md.use(window.markdownitPrism);
-
-                // Make available globally
-                window.md = md;
-            } catch (error) {
-                console.error('Error initializing markdown:', error);
-                // Provide fallback
-                window.md = {
-                    render: text => `<pre>${text}</pre>`
-                };
-            }
-        });
-    </script>
 
     {% block scripts %}
-        <!-- Core JavaScript -->
-        <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
-        <script src="{{ url_for('static', filename='js/base.js') }}"></script>
+        <!-- Initialize required globals -->
         <script>
             document.addEventListener('DOMContentLoaded', () => {
                 // Dark mode handling
@@ -384,12 +336,6 @@
                     });
                 });
             });
-
-            // CSRF token handling
-            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            if (csrfToken) {
-                axios.defaults.headers.common['X-CSRFToken'] = csrfToken;
-            }
         </script>
     {% endblock %}
 </body>
