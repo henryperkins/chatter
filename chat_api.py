@@ -83,7 +83,10 @@ def get_azure_response(
             max_tokens,
             max_completion_tokens,
             requires_o1_handling,
-        ) = initialize_client_from_model(model_config)
+        ) = initialize_client_from_model(
+            model_config,
+            timeout_seconds=timeout_seconds,
+        )
 
         # Update api_params with model/deployment info
         api_params["model"] = deployment_name
