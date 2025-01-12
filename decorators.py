@@ -5,9 +5,13 @@
 import functools
 from typing import Callable, TypeVar, cast
 
-from flask import abort, request
+from flask import abort, request, current_app
+import logging
 from flask_login import current_user
+RT = TypeVar("RT")  # Return type for the decorated function
 
+# Configure logging
+logger = logging.getLogger(__name__)
 RT = TypeVar("RT")  # Return type for the decorated function
 
 def admin_required(func: Callable[..., RT]) -> Callable[..., RT]:

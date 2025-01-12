@@ -1,51 +1,42 @@
-"""
-model_routes.py
-
-This module defines the routes for managing AI models, including
-creating, updating, deleting, and retrieving models.
-"""
-
 import logging
+from typing import Optional, Dict, Any
+
 from flask import (
     Blueprint,
     jsonify,
     request,
     render_template,
-    redirect,
-    url_for,
-    flash,
 )
 from flask_login import login_required
-from models import Model
+from flask_wtf.csrf import validate_csrf_token as flask_validate_csrf
+from werkzeug.exceptions import HTTPException
+
 from decorators import admin_required
-from forms import ModelForm
 from extensions import csrf
+from forms import ModelForm
+from models import Model
 
 bp = Blueprint("model", __name__)
 logger = logging.getLogger(__name__)
 
+def validate_csrf_token() -> Optional[tuple]:
+    """Validate CSRF token for AJAX requests."""
+    try:
+        csrf_token = request.headers.get("X-CSRFToken")
+        flask_validate_csrf(csrf_token)
+        return None
+    except Exception:
+        return jsonify({"success": False, "error": "CSRF token invalid"}), 400
 
-# Utility Functions
-def validate_csrf_token():
-    """
-    Validate the CSRF token for AJAX requests.
-    """
-    csrf_token = request.headers.get("X-CSRFToken")
-    if not csrf_token or not csrf.validate_csrf(csrf_token):
-        return (
-            jsonify({"success": False, "error": "CSRF token invalid or missing"}),
-            400,
-        )
-    return None
+def handle_error(error: Exception, message: str, status_code: int = 500) -> tuple:
+    """Handle errors with proper logging and responses."""
+    if isinstance(error, ValueError):
+        status_code = 400
+    elif isinstance(error, HTTPException):
+        status_code = error.code
 
-
-def handle_error(exception, message="An unexpected error occurred", status_code=500):
-    """
-    Handle errors consistently across routes.
-    """
-    logger.exception(message)
-    return jsonify({"error": str(exception), "success": False}), status_code
-
+    logger.error(f"{message}: {str(error)}")
+    return jsonify({"error": str(error), "success": False}), status_code
 
 def extract_model_data(form):
     """
@@ -276,6 +267,34 @@ def get_immutable_fields(model_id: int):
     except Exception as e:
         return handle_error(e, "Error retrieving immutable fields")
 
+
+@bp.route("/models/<int:model_id>/versions", methods=["GET"])
+@login_required
+@admin_required
+def get_version_history(model_id: int) -> Union[Response, Tuple[Response, int]]:
+    """Get version history for a model."""
+    try:
+        limit = request.args.get('limit', 10, type=int)
+        offset = request.args.get('offset', 0, type=int)
+        versions = Model.get_version_history(model_id, limit, offset)
+        return jsonify({"success": True, "versions": versions})
+    except Exception as e:
+        logger.error(f"Error getting version history: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@bp.route("/models/<int:model_id>/revert/<int:version>", methods=["POST"])
+@login_required
+@admin_required
+def revert_to_version(model_id: int, version: int) -> Union[Response, Tuple[Response, int]]:
+    """Revert model to a previous version."""
+    try:
+        Model.revert_to_version(model_id, version)
+        return jsonify({"success": True, "message": f"Model reverted to version {version}"})
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 404
+    except Exception as e:
+        logger.error(f"Error reverting version: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @bp.route("/models/<int:model_id>/versions", methods=["GET"])
 @login_required

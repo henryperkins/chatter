@@ -61,6 +61,15 @@ CREATE TABLE IF NOT EXISTS model_versions (
     FOREIGN KEY (model_id) REFERENCES models(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS model_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    model_id INTEGER NOT NULL,
+    version INTEGER NOT NULL,
+    data JSON NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (model_id) REFERENCES models(id)
+);
+
 -- =============================
 -- CHATS TABLE
 -- =============================
@@ -110,3 +119,4 @@ CREATE INDEX IF NOT EXISTS idx_uploaded_files_chat_id ON uploaded_files (chat_id
 CREATE INDEX IF NOT EXISTS idx_model_versions_model_id ON model_versions (model_id); -- Speeds up version history lookups
 CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages (timestamp); -- Speeds up fetching messages by timestamp
 CREATE INDEX IF NOT EXISTS idx_chats_created_at ON chats (created_at); -- Speeds up fetching chats by creation time
+CREATE UNIQUE INDEX IF NOT EXISTS idx_model_versions_model_version ON model_versions(model_id, version);

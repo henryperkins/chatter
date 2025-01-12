@@ -33,7 +33,7 @@ class Chat:
             try:
                 query = text(
                     """
-                    SELECT id FROM chats 
+                    SELECT id FROM chats
                     WHERE id = :chat_id AND user_id = :user_id
                     """
                 )
@@ -56,8 +56,8 @@ class Chat:
             try:
                 with db_session() as db:
                     query = text("SELECT COUNT(1) FROM chats WHERE id = :chat_id")
-                    result = db.execute(query, {"chat_id": chat_id}).scalar()
-                    exists = result > 0
+                    result = db.execute(query, {"chat_id": chat_id}).scalar() or 0
+                    exists = bool(result)
                     logger.debug(f"Admin access check for chat_id {chat_id}: {exists}")
                     return exists
             except Exception as e:
@@ -83,26 +83,37 @@ class Chat:
                 raise
 
     @staticmethod
-    def update_title(chat_id: str, new_title: str) -> None:
+    def update_title(chat_id: str, title: str) -> None:
         """
         Update the title of a chat with validation.
+
+        Args:
+            chat_id: The ID of the chat to update
+            title: The new title for the chat
+
+        Raises:
+            ValueError: If the title is empty
         """
-        if not new_title.strip():
+        # Validate and clean the title
+        cleaned_title = title.strip()
+        if not cleaned_title:
             raise ValueError("Chat title cannot be empty.")
-        new_title = new_title.strip()[:50]  # Limit to 50 characters
+
+        # Truncate if necessary
+        cleaned_title = cleaned_title[:50]
 
         with db_session() as db:
             try:
                 query = text(
                     """
-                    UPDATE chats 
-                    SET title = :title 
+                    UPDATE chats
+                    SET title = :title
                     WHERE id = :chat_id
                     """
                 )
-                db.execute(query, {"title": new_title, "chat_id": chat_id})
+                db.execute(query, {"title": cleaned_title, "chat_id": chat_id})
                 db.commit()
-                logger.info(f"Chat title updated for chat_id {chat_id} to '{new_title}'")
+                logger.info(f"Chat title updated for chat_id {chat_id} to '{cleaned_title}'")
             except Exception as e:
                 db.rollback()
                 logger.error(f"Failed to update chat title for chat_id {chat_id}: {e}")
@@ -163,12 +174,19 @@ class Chat:
                 logger.error(f"Error retrieving default model ID: {e}")
                 raise
 
+    @staticmethod
     def create(chat_id: str, user_id: int, title: str = "New Chat", model_id: Optional[int] = None) -> None:
         """
         Create a new chat record.
+
+        Args:
+            chat_id: Unique identifier for the chat
+            user_id: ID of the user creating the chat
+            title: Title of the chat (default: "New Chat")
+            model_id: Optional ID of the model to use
         """
-        if len(title) > 50:
-            title = title[:50]
+        # Validate and clean the title
+        cleaned_title = title.strip()[:50]
 
         # Get default model if no model specified
         if model_id is None:
@@ -178,11 +196,11 @@ class Chat:
             try:
                 query = text(
                     """
-                    INSERT INTO chats (id, user_id, title, model_id) 
+                    INSERT INTO chats (id, user_id, title, model_id)
                     VALUES (:chat_id, :user_id, :title, :model_id)
                     """
                 )
-                db.execute(query, {"chat_id": chat_id, "user_id": user_id, "title": title, "model_id": model_id})
+                db.execute(query, {"chat_id": chat_id, "user_id": user_id, "title": cleaned_title, "model_id": model_id})
                 db.commit()
                 logger.info(f"Chat created: {chat_id} for user {user_id} with model {model_id or 'default'}")
             except Exception as e:
@@ -199,8 +217,8 @@ class Chat:
             try:
                 query = text(
                     """
-                    UPDATE chats 
-                    SET is_deleted = 1 
+                    UPDATE chats
+                    SET is_deleted = 1
                     WHERE id = :chat_id
                     """
                 )

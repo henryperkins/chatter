@@ -24,9 +24,8 @@ class Model:
     api_key: str
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None  # Should be None for o1-preview
-    max_completion_tokens: Optional[int] = None  # Set to the appropriate value
+    max_completion_tokens: Optional[int] = 8300  # o1-preview model can handle up to 8300 tokens
     requires_o1_handling: bool = False  # Set to True for o1-preview models
-    max_completion_tokens: int = 8300  # o1-preview model can handle up to 8300 tokens
     is_default: bool = False
     requires_o1_handling: bool = False
     api_version: str = "2024-10-01-preview"
@@ -52,8 +51,8 @@ class Model:
                     return Model(**model_dict)
                 logger.info("No default model found.")
                 return None
-            except Exception as e:
-                logger.error(f"Error retrieving default model: {e}")
+            except Exception:
+                logger.error("Error retrieving default model")
                 raise
 
     @staticmethod
@@ -71,8 +70,8 @@ class Model:
                     return Model(**model_dict)
                 logger.info(f"No model found with ID: {model_id}")
                 return None
-            except Exception as e:
-                logger.error(f"Error retrieving model by ID {model_id}: {e}")
+            except Exception:
+                logger.error(f"Error retrieving model by ID {model_id}")
                 raise
 
     @staticmethod
@@ -84,9 +83,9 @@ class Model:
             try:
                 query = text(
                     """
-                    SELECT * FROM models 
-                    ORDER BY created_at DESC 
-                    LIMIT :limit OFFSET :offset
+                    SELECT * FROM models
+                    ORDER BY created_at DESC LIMIT :limit
+                    OFFSET :offset
                 """
                 )
                 rows = (
@@ -155,16 +154,16 @@ class Model:
             try:
                 # Check for existing models with same name or deployment_name (case-insensitive)
                 check_query = text("""
-                    SELECT name, deployment_name 
-                    FROM models 
-                    WHERE LOWER(name) = LOWER(:name) 
+                    SELECT name, deployment_name
+                    FROM models
+                    WHERE LOWER(name) = LOWER(:name)
                     OR LOWER(deployment_name) = LOWER(:deployment_name)
                 """)
                 existing = db.execute(check_query, {
                     "name": data["name"],
                     "deployment_name": data["deployment_name"]
                 }).fetchone()
-                
+
                 if existing:
                     if existing[0].lower() == data["name"].lower():
                         raise ValueError(f"A model with name '{data['name']}' already exists")
@@ -207,14 +206,17 @@ class Model:
                 if data.get("is_default", False):
                     unset_default_query = text(
                         """
-                        UPDATE models 
-                        SET is_default = 0 
+                        UPDATE models
+                        SET is_default = 0
                         WHERE id != :model_id AND is_default = :is_default
                     """
                     )
                     db.execute(
                         unset_default_query, {"model_id": model_id, "is_default": True}
                     )
+
+                # Create initial version
+                Model.create_version(model_id, data)
 
                 # Commit all changes in one transaction
                 db.commit()
@@ -278,14 +280,17 @@ class Model:
                 if update_data.get("is_default", False):
                     unset_default_query = text(
                         """
-                        UPDATE models 
-                        SET is_default = 0 
+                        UPDATE models
+                        SET is_default = 0
                         WHERE id != :model_id AND is_default = :is_default
                     """
                     )
                     db.execute(
                         unset_default_query, {"model_id": model_id, "is_default": True}
                     )
+
+                # Create new version after update
+                Model.create_version(model_id, data)
 
                 db.commit()
                 logger.info(f"Model updated (ID {model_id})")
@@ -360,8 +365,8 @@ class Model:
                 # Check if model is in use by any chats
                 check_query = text(
                     """
-                    SELECT COUNT(*) as count 
-                    FROM chats 
+                    SELECT COUNT(*) as count
+                    FROM chats
                     WHERE model_id = :model_id
                 """
                 )
@@ -399,11 +404,11 @@ class Model:
             try:
                 query = text(
                     """
-                    SELECT c.*, m.name as model_name 
-                    FROM chats c 
-                    LEFT JOIN models m ON c.model_id = m.id 
-                    WHERE c.user_id = :user_id 
-                    ORDER BY c.created_at DESC 
+                    SELECT c.*, m.name as model_name
+                    FROM chats c
+                    LEFT JOIN models m ON c.model_id = m.id
+                    WHERE c.user_id = :user_id
+                    ORDER BY c.created_at DESC
                     LIMIT :limit OFFSET :offset
                 """
                 )
@@ -414,4 +419,75 @@ class Model:
                 return [dict(row) for row in result]
             except Exception as e:
                 logger.error(f"Error retrieving chats for user {user_id}: {e}")
+                raise
+
+    @staticmethod
+    def get_immutable_fields(model_id: int) -> List[str]:
+        """Get fields that cannot be modified."""
+        return ['id', 'created_at']
+
+    @staticmethod
+    def get_version_history(model_id: int, limit: int = 10, offset: int = 0) -> List[Dict]:
+        """Get version history for model."""
+        with db_session() as db:
+            query = text("""
+                SELECT * FROM model_versions
+                WHERE model_id = :model_id
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+            """)
+            result = db.execute(query, {
+                "model_id": model_id,
+                "limit": limit,
+                "offset": offset
+            })
+            return [dict(row) for row in result]
+
+    @staticmethod
+    def revert_to_version(model_id: int, version: int) -> None:
+        """Revert model to previous version."""
+        with db_session() as db:
+            try:
+                # Get version data
+                version_query = text("""
+                    SELECT data FROM model_versions
+                    WHERE model_id = :model_id AND version = :version
+                """)
+                version_data = db.execute(version_query, {
+                    "model_id": model_id,
+                    "version": version
+                }).scalar()
+
+                if not version_data:
+                    raise ValueError(f"Version {version} not found")
+
+                # Update model with version data
+                Model.update(model_id, version_data)
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                raise
+
+    @staticmethod
+    def create_version(model_id: int, data: Dict[str, Any]) -> None:
+        """Create new version record."""
+        with db_session() as db:
+            try:
+                # Get current version
+                curr_version = db.execute(text(
+                    "SELECT MAX(version) FROM model_versions WHERE model_id = :id"
+                ), {"id": model_id}).scalar() or 0
+
+                # Insert new version
+                db.execute(text("""
+                    INSERT INTO model_versions (model_id, version, data)
+                    VALUES (:model_id, :version, :data)
+                """), {
+                    "model_id": model_id,
+                    "version": curr_version + 1,
+                    "data": data
+                })
+                db.commit()
+            except Exception as e:
+                db.rollback()
                 raise
