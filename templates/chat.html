@@ -7,7 +7,7 @@
 {% block content %}
 <div class="flex flex-col h-screen overflow-hidden bg-white dark:bg-gray-900">
     <!-- Sidebar -->
-    <nav id="sidebar" class="fixed md:relative z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out w-full md:w-64 lg:w-72 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto flex flex-col backdrop-blur-sm" aria-label="Chat navigation">
+    <nav id="sidebar" class="hidden md:block fixed md:relative z-40 md:z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto flex flex-col" aria-label="Chat navigation">
         <div class="flex-none p-4 space-y-4">
             <!-- New Chat Button -->
             <button id="new-chat-btn" class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200" aria-label="Start new chat">
@@ -89,7 +89,7 @@
     </nav>
 
     <!-- Main Chat Area -->
-    <div class="flex-1 flex flex-col overflow-hidden">
+    <div class="flex-1 flex flex-col overflow-hidden z-0 md:z-auto">
         <!-- Chat Header -->
         <div class="chat-header px-2 sm:px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between backdrop-filter backdrop-blur">
             <div class="flex items-center">
