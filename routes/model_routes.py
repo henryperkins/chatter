@@ -8,7 +8,7 @@ from flask import (
     render_template,
 )
 from flask_login import login_required
-from flask_wtf.csrf import validate_csrf_token as flask_validate_csrf
+from flask_wtf.csrf import validate_csrf as flask_validate_csrf
 from werkzeug.exceptions import HTTPException
 
 from decorators import admin_required
