@@ -113,7 +113,7 @@
         </div>
 
         <!-- Messages Area -->
-        <div id="chat-box" class="flex-1 overflow-y-auto px-2 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4" role="log" aria-live="polite">
+        <div id="chat-box" class="flex-1 overflow-y-auto px-2 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4" role="log" aria-live="polite" style="display: block;">
             {% for message in messages %}
                 {% if message.role == 'user' %}
                     <!-- User message -->
@@ -287,5 +287,6 @@
 </script>
 
 <!-- Load chat.js -->
+<script src="{{ url_for('static', filename='js/markdown-it.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/chat.js') }}" defer></script>
 {% endblock %}
