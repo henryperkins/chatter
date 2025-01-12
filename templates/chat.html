@@ -236,11 +236,47 @@
 
 {% block scripts %}
 {{ super() }}
+{% block scripts %}
+{{ super() }}
 <!-- Include Dependency Scripts -->
+<script src="{{ url_for('static', filename='js/dompurify.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/axios.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/markdown-it.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/purify.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/markdown-it-prism.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/prism.js') }}"></script>
 <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+
+<!-- Initialize required globals -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize markdown-it and its plugins
+        if (typeof markdownit !== 'undefined' && typeof markdownitPrism !== 'undefined') {
+            try {
+                const md = window.markdownit();
+                md.use(window.markdownitPrism);
+                window.md = md;
+            } catch (error) {
+                console.error('Error initializing markdown-it:', error);
+            }
+        } else {
+            console.error('markdown-it or markdown-it-prism is not loaded');
+        }
+
+        // Expose DOMPurify globally
+        if (typeof DOMPurify !== 'undefined') {
+            window.DOMPurify = DOMPurify;
+        } else {
+            console.error('DOMPurify is not loaded');
+        }
+
+        // Expose Prism globally
+        if (typeof Prism !== 'undefined') {
+            window.Prism = Prism;
+        } else {
+            console.error('Prism is not loaded');
+        }
+    });
+</script>
 
 <!-- Define CHAT_CONFIG before loading chat.js -->
 <script>
@@ -265,6 +301,7 @@
     }
 </script>
 
-<!-- Load chat.js directly -->
+<!-- Load chat.js -->
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+{% endblock %}
 {% endblock %}
