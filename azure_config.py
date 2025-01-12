@@ -186,7 +186,8 @@ def initialize_client_from_model(
     else:
         # For other models like gpt-4o
         max_completion_tokens = int(model_config.get("max_completion_tokens") or 500)
-        max_tokens = int(model_config.get("max_tokens") or 16384)
+        # Only set max_tokens if the model supports it
+        max_tokens = None
 
     # Initialize the Azure OpenAI client with the provided timeout
     client = AzureOpenAI(

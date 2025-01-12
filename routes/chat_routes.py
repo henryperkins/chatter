@@ -182,7 +182,13 @@ def chat_interface() -> Response:
     chat_title = chat.title
     model_name = model.name if model else "Default Model"
 
+    # Get messages and process them for display
     messages = conversation_manager.get_context(chat_id)
+    for message in messages:
+        if message['role'] == 'assistant':
+            # Escape any Jinja2 template syntax in stored messages
+            message['content'] = message['content'].replace("{%", "&#123;%").replace("%}", "%&#125;")
+    
     models = Model.get_all()
     conversations = [
         {
@@ -220,6 +226,10 @@ def get_chat_context(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         return jsonify({"error": "Chat not found or access denied"}), 403
 
     messages = conversation_manager.get_context(chat_id)
+    # Process messages to escape Jinja2 template syntax
+    for message in messages:
+        if message['role'] == 'assistant':
+            message['content'] = message['content'].replace("{%", "&#123;%").replace("%}", "%&#125;")
     return cast(Response, jsonify({"messages": messages}))
 
 
@@ -388,8 +398,8 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             chat_id,
             "user",
             combined_message,
-            model_max_tokens=getattr(model_obj, 'max_tokens', None),
-            requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False),
+            getattr(model_obj, 'max_tokens', None),
+            getattr(model_obj, 'requires_o1_handling', False)
         )
 
         history = conversation_manager.get_context(
@@ -409,16 +419,19 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         )
         logger.debug("Received API response: %d chars", len(model_response))
 
+        # Process model response to escape any Jinja2 template syntax
+        processed_response = model_response.replace("{%", "&#123;%").replace("%}", "%&#125;")
+        
         conversation_manager.add_message(
             chat_id,
             "assistant",
-            model_response,
-            model_max_tokens=getattr(model_obj, 'max_tokens', None),
-            requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False),
+            processed_response,
+            getattr(model_obj, 'max_tokens', None),
+            getattr(model_obj, 'requires_o1_handling', False)
         )
 
         return cast(Response, jsonify({
-            "response": model_response,
+            "response": processed_response,
             "included_files": included_files,
             "excluded_files": excluded_files,
         }))
