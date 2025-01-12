@@ -40,7 +40,15 @@
 
     /* Button components */
     .btn {
-        @apply px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+        @apply px-4 py-3 rounded-md text-sm font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+    }
+
+    .icon-button {
+        @apply w-12 h-12 flex items-center justify-center;
+    }
+
+    .icon-button i {
+        @apply text-xl;
     }
 
     .btn-primary {
