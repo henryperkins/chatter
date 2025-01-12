@@ -396,8 +396,8 @@
     }
 
     function handleSendButtonClick(e) {
-      console.debug('Send button clicked');
       e.preventDefault();
+      console.debug('Send button clicked');
       if (!sendButton.disabled) {
         console.debug('Send button not disabled, proceeding with send');
         sendMessage().catch(error => {
@@ -409,7 +409,10 @@
       }
     }
 
-    function handleMessageInput() {
+    function handleMessageInput(e) {
+      if (e.type === 'touchstart') {
+        e.preventDefault();
+      }
       adjustTextareaHeight(this);
     }
 
