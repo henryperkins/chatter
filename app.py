@@ -38,6 +38,12 @@ logger = logging.getLogger(__name__)
 
 # Load configuration from environment variables
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
+
+# Add default configurations if not set
+app.config.setdefault('MAX_FILE_SIZE', 10 * 1024 * 1024)  # 10 MB
+app.config.setdefault('MAX_FILES', 5)
+app.config.setdefault('MAX_MESSAGE_LENGTH', 1000)
+app.config.setdefault('ALLOWED_FILE_TYPES', ["text/plain", "application/pdf", "image/jpeg", "image/png"])
 if (
     app.config["SECRET_KEY"] == "dev-secret-key"
     and os.environ.get("FLASK_ENV") == "production"
@@ -94,6 +100,11 @@ limiter.init_app(app)
 
 # Initialize database
 init_app(app)
+
+# Inject app configuration into templates
+@app.context_processor
+def inject_config():
+    return dict(config=app.config)
 
 # Register blueprints
 app.register_blueprint(auth_bp, url_prefix="/auth")
