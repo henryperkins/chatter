@@ -8,13 +8,13 @@
 <div class="flex h-full w-full overflow-hidden bg-white dark:bg-gray-900">
     <!-- Sidebar -->
     <nav id="mobile-menu" 
-        class="fixed inset-y-0 left-0 z-50 w-[85%] max-w-[320px] bg-gray-50 dark:bg-gray-800 transform transition-transform duration-300 ease-in-out -translate-x-full md:relative md:translate-x-0 overflow-y-auto"
+        class="fixed inset-y-0 left-0 z-50 w-[85%] max-w-[320px] bg-gray-50 dark:bg-gray-800 transform transition-transform duration-300 ease-in-out -translate-x-full md:relative md:translate-x-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700"
         aria-label="Mobile menu">
         <div class="flex flex-col h-full p-4">
             <!-- New Chat Button -->
-            <div class="flex-none mb-4">
+            <div class="flex-none mb-6">
                 <button id="new-chat-btn" 
-                    class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200" 
+                    class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg transition-colors duration-200 text-base font-medium" 
                     aria-label="Start new chat">
                     <i class="fas fa-plus mr-2"></i>
                     <span>New Chat</span>
@@ -102,22 +102,28 @@
     <!-- Main Chat Area -->
     <div class="flex-1 flex flex-col overflow-hidden relative">
         <!-- Chat Header -->
-        <div class="chat-header px-3 sm:px-4 py-3 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between backdrop-filter backdrop-blur sticky top-0 z-10">
-            <div class="flex items-center space-x-3">
+        <div class="chat-header px-4 py-3 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between backdrop-filter backdrop-blur sticky top-0 z-10">
+            <div class="flex items-center space-x-4">
                 <!-- Mobile Menu Button -->
                 <button
                     id="mobile-menu-toggle"
-                    class="md:hidden p-2 -ml-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200"
+                    class="md:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
                     aria-label="Toggle menu"
                     aria-expanded="false"
                 >
-                    <i class="fas fa-bars text-xl"></i>
+                    <i class="fas fa-bars text-2xl"></i>
                 </button>
-                <h2 id="chat-title" class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 truncate max-w-[200px] sm:max-w-none">
+                
+                <!-- Chat Title -->
+                <h2 id="chat-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate max-w-[200px] sm:max-w-none">
                     {{ chat_title }} - {{ model_name }}
                 </h2>
-                <button id="edit-title-btn" class="ml-4 text-sm text-blue-600 hover:underline transition-colors duration-200" aria-label="Edit chat title">
-                    <i class="fas fa-edit"></i>
+                
+                <!-- Edit Title Button -->
+                <button id="edit-title-btn" 
+                    class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200" 
+                    aria-label="Edit chat title">
+                    <i class="fas fa-edit text-lg"></i>
                 </button>
             </div>
         </div>
@@ -244,6 +250,81 @@
 <div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center"></div>
 
 <style>
+/* Standardized text sizes */
+.text-base {
+    font-size: 1rem;
+    line-height: 1.5rem;
+}
+
+.text-lg {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+}
+
+.text-xl {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+}
+
+.text-2xl {
+    font-size: 1.5rem;
+    line-height: 2rem;
+}
+
+/* Consistent spacing */
+.p-4 {
+    padding: 1rem;
+}
+
+.px-4 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.py-3 {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+.space-y-2 > * + * {
+    margin-top: 0.5rem;
+}
+
+.space-y-4 > * + * {
+    margin-top: 1rem;
+}
+
+.space-x-4 > * + * {
+    margin-left: 1rem;
+}
+
+/* Improved mobile menu transitions */
+#mobile-menu {
+    transition: transform 0.3s ease-in-out;
+}
+
+#mobile-menu-backdrop {
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* Consistent button styles */
+button {
+    min-height: 40px;
+    min-width: 40px;
+}
+
+/* Improved touch targets on mobile */
+@media (max-width: 767px) {
+    button, a {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    select {
+        height: 44px;
+    }
+}
+
 .button-loading {
     position: relative;
     color: transparent !important;
