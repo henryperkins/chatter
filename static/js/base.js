@@ -5,43 +5,24 @@
     // const { showFeedback } = window.utils;
 
     document.addEventListener('DOMContentLoaded', function() {
-        /*** Mobile Menu Toggle with Animated Hamburger ***/
-        const menuToggle = document.getElementById('mobile-menu-toggle');
-        const mobileMenu = document.getElementById('mobile-menu');
-        const overlay = document.getElementById('overlay');
-        const hamburger = menuToggle ? menuToggle.querySelector('.hamburger') : null;
-
-        if (menuToggle && mobileMenu && overlay && hamburger) {
-            menuToggle.addEventListener('click', () => {
-                hamburger.classList.toggle('active');
-                mobileMenu.classList.toggle('-translate-x-full');
-                overlay.classList.toggle('hidden');
-                document.body.classList.toggle('overflow-hidden');
-            });
-
-            overlay.addEventListener('click', () => {
-                hamburger.classList.remove('active');
-                mobileMenu.classList.add('-translate-x-full');
-                overlay.classList.add('hidden');
-                document.body.classList.remove('overflow-hidden');
-            });
-        }
-
         /*** Sidebar Toggle for Chat Page ***/
         const chatSidebarToggle = document.getElementById('chat-sidebar-toggle');
         const sidebar = document.getElementById('sidebar');
+        const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
 
         if (chatSidebarToggle && sidebar) {
             chatSidebarToggle.addEventListener('click', () => {
                 sidebar.classList.toggle('-translate-x-full');
+                mobileMenuBackdrop.classList.toggle('hidden');
                 document.body.classList.toggle('overflow-hidden');
             });
 
-            // Close sidebar when clicking outside on mobile
+            // Close sidebar when clicking outside
             document.addEventListener('click', (e) => {
                 if (!sidebar.contains(e.target) && !chatSidebarToggle.contains(e.target)) {
                     if (!sidebar.classList.contains('-translate-x-full')) {
                         sidebar.classList.add('-translate-x-full');
+                        mobileMenuBackdrop.classList.add('hidden');
                         document.body.classList.remove('overflow-hidden');
                     }
                 }
