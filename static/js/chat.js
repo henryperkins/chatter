@@ -245,7 +245,7 @@
             }
 
             // Add Model Button
-            const addModelLink = document.querySelector('a[href="/model/add-model"]');
+            const addModelLink = document.querySelector('a[href*="add-model"]');
             if (addModelLink) {
                 addModelLink.addEventListener('click', (e) => {
                     e.preventDefault();
@@ -253,7 +253,7 @@
                 });
             }
 
-            // New Chat Button - update to use fetch
+            // New Chat Button
             const newChatBtn = document.getElementById('new-chat-btn');
             if (newChatBtn) {
                 newChatBtn.addEventListener('click', async (e) => {
