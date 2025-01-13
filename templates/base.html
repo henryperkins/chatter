@@ -247,31 +247,6 @@
         <!-- Initialize required globals -->
         <script>
             document.addEventListener('DOMContentLoaded', () => {
-                // Mobile menu handling
-                const mobileMenuButton = document.getElementById('sidebar-toggle');
-                const mobileMenuClose = document.getElementById('mobile-menu-close');
-                const mobileMenu = document.getElementById('mobile-menu');
-                const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
-
-                const openMobileMenu = () => {
-                    mobileMenu?.classList.remove('-translate-x-full');
-                    mobileMenuBackdrop?.classList.remove('hidden');
-                    setTimeout(() => {
-                        mobileMenuBackdrop?.classList.remove('opacity-0');
-                    }, 10);
-                };
-
-                const closeMobileMenu = () => {
-                    mobileMenu?.classList.add('-translate-x-full');
-                    mobileMenuBackdrop?.classList.add('opacity-0');
-                    setTimeout(() => {
-                        mobileMenuBackdrop?.classList.add('hidden');
-                    }, 300);
-                };
-
-                mobileMenuButton?.addEventListener('click', openMobileMenu);
-                mobileMenuClose?.addEventListener('click', closeMobileMenu);
-                mobileMenuBackdrop?.addEventListener('click', closeMobileMenu);
 
                 // Flash message handling
                 const flashMessages = document.querySelectorAll('[role="alert"]');

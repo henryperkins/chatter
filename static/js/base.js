@@ -5,29 +5,6 @@
     // const { showFeedback } = window.utils;
 
     document.addEventListener('DOMContentLoaded', function() {
-        /*** Sidebar Toggle for Chat Page ***/
-        const chatSidebarToggle = document.getElementById('chat-sidebar-toggle');
-        const sidebar = document.getElementById('sidebar');
-        const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
-
-        if (chatSidebarToggle && sidebar) {
-            chatSidebarToggle.addEventListener('click', () => {
-                sidebar.classList.toggle('-translate-x-full');
-                mobileMenuBackdrop.classList.toggle('hidden');
-                document.body.classList.toggle('overflow-hidden');
-            });
-
-            // Close sidebar when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!sidebar.contains(e.target) && !chatSidebarToggle.contains(e.target)) {
-                    if (!sidebar.classList.contains('-translate-x-full')) {
-                        sidebar.classList.add('-translate-x-full');
-                        mobileMenuBackdrop.classList.add('hidden');
-                        document.body.classList.remove('overflow-hidden');
-                    }
-                }
-            });
-        }
 
         /*** Flash Message Handling ***/
         const flashMessages = document.querySelectorAll('[role="alert"]');
