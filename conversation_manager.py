@@ -136,20 +136,15 @@ class ConversationManager:
             else:
                 model_max_tokens = MAX_TOKENS  # Default for other models
 
-        """
-        Add a message to the conversation context with metadata and token management.
+        """Add a message to the conversation with metadata and formatting."""
+        try:
+            encoding = tiktoken.encoding_for_model(MODEL_NAME)
+        except KeyError:
+            encoding = tiktoken.get_encoding("cl100k_base")
 
-        Args:
-            chat_id: The unique identifier for the chat session.
-            role: The role of the message sender ("user", "assistant", or "system").
-            content: The message content to add.
-            model_max_tokens: The maximum number of tokens allowed for the model.
-            requires_o1_handling: Whether the message requires o1-preview handling.
-            streaming_stats: Optional statistics from streaming response.
+        if model_max_tokens is None:
+            model_max_tokens = MAX_TOKENS if not requires_o1_handling else MAX_MESSAGE_TOKENS
 
-        Raises:
-            Exception: If there's an error adding the message to the database.
-        """
         # Calculate tokens and prepare metadata
         tokens = len(encoding.encode(content))
         metadata: Dict[str, Any] = {
@@ -163,6 +158,37 @@ class ConversationManager:
         if streaming_stats:
             metadata["streaming"] = True
             metadata["streaming_stats"] = streaming_stats
+
+        # For assistant messages, store both raw and formatted content
+        if role == "assistant":
+            import markdown_it
+            from bs4 import BeautifulSoup
+            import prism
+
+            # Initialize markdown parser with your preferred configuration
+            md = markdown_it.MarkdownIt('commonmark', {'html': True})
+            
+            # Convert markdown to HTML
+            html_content = md.render(content)
+            
+            # Clean and format the HTML
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            # Format code blocks with Prism
+            for pre in soup.find_all('pre'):
+                code = pre.find('code')
+                if code:
+                    lang = code.get('class', [''])[0].replace('language-', '') if code.get('class') else ''
+                    formatted_code = prism.highlight(code.get_text(), lang)
+                    new_code = BeautifulSoup(formatted_code, 'html.parser')
+                    code.replace_with(new_code)
+
+            # Store both raw and formatted content in metadata
+            metadata["raw_content"] = content
+            metadata["formatted_content"] = str(soup)
+            
+            # Use formatted content for storage
+            content = str(soup)
 
         if role == "user" and tokens > MAX_MESSAGE_TOKENS:
             content = self._truncate_content(content, encoding)
