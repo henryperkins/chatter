@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 import logging
 import bleach
 from models.model import Model
+from models.base import db_session
 from conversation_manager import conversation_manager
 from chat_utils import (
     allowed_file,

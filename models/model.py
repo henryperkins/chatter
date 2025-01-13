@@ -3,6 +3,7 @@ Module for handling model operations.
 """
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, TypeVar, List, cast
 
