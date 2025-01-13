@@ -275,7 +275,7 @@ class Chat:
         """
         with db_session() as db:
             try:
-                query = text("SELECT id, user_id, title, model_id FROM chats WHERE id = :chat_id AND (is_deleted = 0 OR is_deleted IS NULL)")
+                query = text("SELECT id, user_id, title, model_id FROM chats WHERE id = :chat_id AND (is_deleted != 1 OR is_deleted IS NULL)")
                 row = db.execute(query, {"chat_id": chat_id}).mappings().first()
                 return Chat(**row) if row else None
             except Exception as e:

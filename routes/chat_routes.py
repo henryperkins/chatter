@@ -201,8 +201,7 @@ def chat_interface() -> Union[Response, Tuple[Response, int]]:
             session["chat_id"] = chat_id
             logger.info(f"Created new chat {chat_id} for user {user_id}")
 
-            if request.args.get("chat_id"):
-                return cast(Response, redirect(url_for("chat.chat_interface")))
+            return cast(Response, redirect(url_for("chat.chat_interface")))
 
         except Exception as e:
             logger.error(f"Error creating chat: {e}")
