@@ -161,8 +161,9 @@
         // Set up drag and drop
         setupDragAndDrop();
 
-        // Cleanup on page unload
-        window.addEventListener('beforeunload', cleanup);
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', cleanup);
+        })();
 
         console.debug('Chat initialization completed successfully');
       } catch (error) {
@@ -261,8 +262,9 @@
       }
     }
 
-    // Initialize chat interface
-    initializeChat();
+    (function() {
+        // Initialize chat interface
+        initializeChat();
 
     async function sendMessage() {
       console.debug('sendMessage called');

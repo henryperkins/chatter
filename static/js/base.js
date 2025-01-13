@@ -2,8 +2,9 @@
     // Use showFeedback utility from utils.js
     const { showFeedback } = window.utils;
 
-    // Initialize mobile menu toggle
-    function initializeMobileMenu() {
+    (function() {
+        // Initialize mobile menu toggle
+        function initializeMobileMenu() {
         const mobileMenu = document.getElementById('mobile-menu');
         const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
         if (!mobileMenuToggle) return; // Exit if the mobile menu toggle doesn't exist
@@ -132,12 +133,13 @@
         }
     }
 
-    // Only initialize once when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeBase);
-    } else {
-        initializeBase();
-    }
+        // Only initialize once when DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeBase);
+        } else {
+            initializeBase();
+        }
+    })();
 
     // No need to expose utilities as they're already available through window.utils
 })();
