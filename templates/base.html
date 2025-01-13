@@ -178,6 +178,12 @@
                       box-shadow 300ms ease-in-out,
                       transform 300ms ease-in-out !important;
         }
+
+        /* Feedback message styles */
+        #feedback-message {
+            top: 20px; /* Adjust this value to position the feedback message below the navbar */
+            z-index: 9999; /* Ensure the feedback message appears above other elements */
+        }
     </style>
 
     {% block extra_head %}{% endblock %}
