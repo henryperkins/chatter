@@ -3,6 +3,9 @@ from typing import List, Dict, Tuple
 from werkzeug.utils import secure_filename as werkzeug_secure_filename
 import tiktoken
 import os
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Constants
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")  # Default model name
@@ -13,6 +16,7 @@ try:
     encoding = tiktoken.encoding_for_model(MODEL_NAME)
 except KeyError:
     encoding = tiktoken.get_encoding("cl100k_base")
+    pass
 
 
 def count_tokens(text: str, model_name: str = MODEL_NAME) -> int:
@@ -209,9 +213,50 @@ def generate_chat_title(conversation_text: str) -> str:
     word_counts = {}
     for word in words:
         word_counts[word] = word_counts.get(word, 0) + 1
-    top_words = sorted(word_counts, key=word_counts.get, reverse=True)[:2]
+        top_words = sorted(word_counts.keys(), key=lambda x: word_counts.get(x, 0), reverse=True)[:2]
 
-    # Create title from top words or fallback to default
-    if top_words:
-        return " ".join([word.capitalize() for word in top_words])
-    return "New Chat"
+        # Create title from top words or fallback to default
+        if top_words:
+            return " ".join([word.capitalize() for word in top_words])
+        return "New Chat"
+
+
+def send_reset_email(recipient_email: str, reset_link: str) -> None:
+    """
+    Send a password reset email to the specified recipient.
+
+    Args:
+        recipient_email (str): The recipient's email address.
+        reset_link (str): The password reset link.
+
+    Raises:
+        Exception: If the email could not be sent.
+    """
+    sender_email = os.getenv("EMAIL_SENDER", "no-reply@example.com")
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.example.com")
+    smtp_port = int(os.getenv("SMTP_PORT", 587))
+    smtp_username = os.getenv("SMTP_USERNAME", "username")
+    smtp_password = os.getenv("SMTP_PASSWORD", "password")
+
+    # Create the email
+    message = MIMEMultipart("alternative")
+    message["Subject"] = "Password Reset Request"
+    message["From"] = sender_email
+    message["To"] = recipient_email
+
+    # Email content
+    text = f"Please click the following link to reset your password: {reset_link}"
+    html = f"<html><body><p>Please click the following link to reset your password:</p><a href='{reset_link}'>{reset_link}</a></body></html>"
+
+    # Attach parts
+    message.attach(MIMEText(text, "plain"))
+    message.attach(MIMEText(html, "html"))
+
+    # Send the email
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.sendmail(sender_email, recipient_email, message.as_string())
+    except Exception as e:
+        raise Exception(f"Failed to send email: {e}")

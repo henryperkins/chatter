@@ -304,7 +304,6 @@ class ConversationManager:
             db.close()
 
     def get_usage_stats(self, chat_id: str) -> Dict[str, Any]:
-    def get_usage_stats(self, chat_id: str) -> Dict[str, Any]:
         """
         Get detailed usage statistics.
 

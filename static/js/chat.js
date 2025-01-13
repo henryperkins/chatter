@@ -80,77 +80,6 @@
     // Initialize mobile menu
     initializeMobileMenu();
 
-    function initializeMobileMenu() {
-        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-        const mobileMenu = document.getElementById('mobile-menu');
-        const backdrop = document.getElementById('mobile-menu-backdrop');
-
-        if (!mobileMenuToggle || !mobileMenu || !backdrop) {
-            console.error('Mobile menu elements not found');
-            return;
-        }
-
-        // Function to close menu
-        const closeMenu = () => {
-            mobileMenu.classList.add('-translate-x-full');
-            backdrop.classList.add('hidden');
-            document.body.classList.remove('overflow-hidden');
-            mobileMenuToggle.setAttribute('aria-expanded', 'false');
-        };
-
-        // Function to open menu
-        const openMenu = () => {
-            mobileMenu.classList.remove('-translate-x-full');
-            backdrop.classList.remove('hidden');
-            document.body.classList.add('overflow-hidden');
-            mobileMenuToggle.setAttribute('aria-expanded', 'true');
-        };
-
-        // Toggle menu
-        mobileMenuToggle.addEventListener('click', () => {
-            const isExpanded = mobileMenuToggle.getAttribute('aria-expanded') === 'true';
-            if (isExpanded) {
-                closeMenu();
-            } else {
-                openMenu();
-            }
-        });
-
-        // Close menu when clicking backdrop
-        backdrop.addEventListener('click', closeMenu);
-
-        // Close menu when clicking a chat link on mobile
-        const chatLinks = mobileMenu.querySelectorAll('a[href*="chat_interface"]');
-        chatLinks.forEach(link => {
-            link.addEventListener('click', () => {
-                if (window.innerWidth < 768) { // Only on mobile
-                    closeMenu();
-                }
-            });
-        });
-
-        // Close menu on window resize if switching to desktop
-        window.addEventListener('resize', () => {
-            if (window.innerWidth >= 768) {
-                mobileMenu.classList.remove('-translate-x-full');
-                backdrop.classList.add('hidden');
-                document.body.classList.remove('overflow-hidden');
-            } else {
-                mobileMenu.classList.add('-translate-x-full');
-            }
-        });
-
-        // Handle escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !mobileMenu.classList.contains('-translate-x-full')) {
-                closeMenu();
-            }
-        });
-    }
-
-    // Initialize mobile menu
-    initializeMobileMenu();
-
     // Access utility functions and dependencies
     const { showFeedback, fetchWithCSRF } = window.utils;
     const DOMPurify = window.DOMPurify;
@@ -271,7 +200,7 @@
           const element = document.getElementById(elementId);
           if (element) {
             Object.entries(handlers).forEach(([event, handler]) => {
-              element.addEventListener(event, handler, { passive: true });
+              element.addEventListener(event, handler, event === 'input' ? { passive: true } : false);
             });
           }
         });
@@ -468,10 +397,6 @@
         formData.append('message', messageText);
         uploadedFiles.forEach(file => formData.append('files[]', file));
 
-        // Add the CSRF token to the FormData
-        const csrfToken = window.utils.getCSRFToken();
-        formData.append('csrf_token', csrfToken);
-
         // Update UI immediately
         appendUserMessage(messageText);
         messageInput.value = '';
@@ -491,14 +416,13 @@
         let responseData;
 
         if (useStreaming) {
-          const response = await fetch('/chat/', {
+          const response = await fetchWithCSRF('/chat/', {
             method: 'POST',
             body: formData,
             headers: {
               'X-Chat-ID': chatId,
               'Accept': 'text/event-stream',
               'X-Requested-With': 'XMLHttpRequest'
-              // Do not include 'X-CSRFToken' header when using FormData
             }
           });
 
@@ -1042,8 +966,6 @@
 
       try {
         if (target.classList.contains('copy-button')) {
-          const rawContent = target.dataset.rawContent;
-          const content = rawContent || target.closest('.max-w-3xl').querySelector('.prose').textContent;
           const rawContent = target.dataset.rawContent;
           const content = rawContent || target.closest('.max-w-3xl').querySelector('.prose').textContent;
           await navigator.clipboard.writeText(content);

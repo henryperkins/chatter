@@ -22,7 +22,7 @@ from flask_wtf.csrf import validate_csrf
 from sqlalchemy import text
 from werkzeug.wrappers import Response as WerkzeugResponse
 from email_validator import validate_email, EmailNotValidError
-from utils.email_utils import send_reset_email
+from chat_utils import send_reset_email
 
 from database import get_db
 from models import User
