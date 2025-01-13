@@ -2,12 +2,12 @@
 
 {% block title %}Chat - Azure OpenAI{% endblock %}
 
-{% block main_classes %}container mx-auto p-0 h-[calc(100vh-4rem)] flex{% endblock %}
+{% block main_classes %}h-[calc(100vh-4rem)] flex{% endblock %}
 
 {% block content %}
-<div class="flex flex-col h-full overflow-hidden bg-white dark:bg-gray-900">
+<div class="flex h-full w-full overflow-hidden bg-white dark:bg-gray-900">
     <!-- Sidebar -->
-    <nav id="sidebar" class="hidden md:block fixed md:relative z-40 md:z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto flex flex-col" aria-label="Chat navigation">
+    <nav id="sidebar" class="hidden md:block w-64 flex-shrink-0 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-50 md:z-auto" aria-label="Chat navigation">
         <div class="flex-none p-4 space-y-4">
             <!-- New Chat Button -->
             <button id="new-chat-btn" class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200" aria-label="Start new chat">
@@ -89,14 +89,14 @@
     </nav>
 
     <!-- Main Chat Area -->
-    <div class="flex-1 flex flex-col overflow-hidden z-0 md:z-auto">
+    <div class="flex-1 flex flex-col overflow-hidden relative">
         <!-- Chat Header -->
-        <div class="chat-header px-2 sm:px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between backdrop-filter backdrop-blur">
+        <div class="chat-header px-2 sm:px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between backdrop-filter backdrop-blur sticky top-0 z-10">
             <div class="flex items-center">
                 <!-- Mobile Menu Button -->
                 <button
                     id="chat-sidebar-toggle"
-                    class="md:hidden mr-2 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200"
+                    class="md:hidden mr-2 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200 relative z-50"
                     aria-label="Open chat sidebar"
                     aria-controls="mobile-menu"
                     aria-expanded="false"
@@ -179,7 +179,7 @@
         </div>
 
         <!-- Input Area -->
-        <div class="sticky bottom-0 border-t border-gray-200 dark:border-gray-700 px-2 sm:px-4 py-2 sm:py-3 bg-white dark:bg-gray-900">
+        <div class="sticky bottom-0 border-t border-gray-200 dark:border-gray-700 px-2 sm:px-4 py-2 sm:py-3 bg-white dark:bg-gray-900 z-10">
             <div class="flex flex-col sm:flex-row items-start sm:items-end space-y-2 sm:space-y-0 sm:space-x-3">
                 <!-- Upload Button -->
                 <button id="upload-button" class="w-full sm:w-auto p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors duration-200" aria-label="Upload files">
@@ -210,6 +210,9 @@
         </div>
     </div>
 </div>
+
+<!-- Mobile Menu Backdrop -->
+<div id="mobile-menu-backdrop" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm hidden z-40 transition-opacity duration-300 opacity-0"></div>
 
 <!-- Drop Zone -->
 <div id="drop-zone" class="hidden sm:flex fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-modal items-center justify-center transition-opacity duration-300" role="dialog" aria-label="File drop zone">
