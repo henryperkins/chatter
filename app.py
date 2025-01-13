@@ -9,12 +9,13 @@ from flask_wtf.csrf import CSRFError
 from werkzeug.exceptions import HTTPException
 from database import close_db, init_db, init_app, get_db
 from sqlalchemy import text
-from models import User
+from models import User, Model
 from extensions import limiter, login_manager, csrf
 from routes.auth_routes import bp as auth_bp
 from routes.chat_routes import chat_routes
 from routes.model_routes import bp as model_bp
 from typing import Dict, Optional
+from database import close_db, init_db, init_app, get_db, db_session
 
 # Load environment variables from .env file
 load_dotenv()
@@ -99,14 +100,53 @@ app.register_blueprint(auth_bp, url_prefix="/auth")
 app.register_blueprint(chat_routes, url_prefix="/chat")
 app.register_blueprint(model_bp, url_prefix="/models")
 
-# Initialize database tables
-with app.app_context():
-    init_db()
+# Initialize database and default model
+def init_app_data():
+    """Initialize database and create default model if needed."""
+    try:
+        init_db()
+        logger.info("Database initialized successfully")
 
+        # Get database connection from pool
+        db = get_db()
+        try:
+            # Check for existing models
+            model_count = db.execute(text("SELECT COUNT(*) FROM models")).scalar()
+            if model_count == 0:
+                logger.info("No models found - creating default model")
+                Model.create_default_model()
+                logger.info("Default model created successfully")
+            else:
+                logger.debug(f"Found {model_count} existing models")
+        finally:
+            db.close()
+
+    except Exception as e:
+        logger.error(f"Error during app data initialization: {e}")
+        raise
+
+# Initialize core application components
+with app.app_context():
+    try:
+        init_app_data()
+    except Exception as e:
+        logger.critical(f"Failed to initialize application: {e}")
+        raise
 
 # User loader for Flask-Login
 @login_manager.user_loader
 def load_user(user_id: str) -> Optional[User]:
+    """
+    load_user _summary_
+
+    _extended_summary_
+
+    Args:
+        user_id (str): _description_
+
+    Returns:
+        Optional[User]: _description_
+    """
     db = get_db()
     try:
         result = db.execute(
@@ -131,13 +171,10 @@ def load_user(user_id: str) -> Optional[User]:
         db.close()
 
 
-# --- CLEANUP HANDLERS ---
-
 # Close the database connection when the app context ends
 app.teardown_appcontext(close_db)
 
 # --- ERROR HANDLERS ---
-
 
 @app.errorhandler(400)
 def bad_request(error: HTTPException) -> tuple[Dict[str, str], int]:

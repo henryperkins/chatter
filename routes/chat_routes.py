@@ -61,7 +61,10 @@ except KeyError:
 
 
 def init_upload_folder() -> None:
-    """Initialize the secure upload folder."""
+    """Initialize the secure upload folder.
+
+    The default value for the UPLOAD_FOLDER environment variable is 'uploads'.
+    """
     upload_folder = os.getenv("UPLOAD_FOLDER", "uploads")
     if not os.path.exists(upload_folder):
         os.makedirs(upload_folder, exist_ok=True)
@@ -77,7 +80,9 @@ def validate_chat_access(chat_id: str) -> bool:
     Args:
         chat_id: The ID of the chat to validate access for
 
-    Returns:
+    if not current_user.is_authenticated or not hasattr(current_user, 'id') or not hasattr(current_user, 'role'):
+        return False
+    return Chat.can_access_chat(chat_id, current_user.id, current_user.role)
         bool: True if user has access, False otherwise
     """
     return Chat.can_access_chat(chat_id, current_user.id, current_user.role)
@@ -105,7 +110,6 @@ def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], Li
                 "error": "Invalid file type"
             })
             continue
-
         try:
             filename, content, tokens = process_file(file)
             if total_tokens + tokens > MAX_INPUT_TOKENS:
@@ -119,6 +123,12 @@ def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], Li
             file_contents.append(content)
             total_tokens += tokens
 
+        except MemoryError as e:
+            logger.error(f"MemoryError processing file {file.filename}: {e}")
+            excluded_files.append({
+                "filename": file.filename,
+                "error": "File too large to process"
+            })
         except Exception as e:
             logger.error(f"Error processing file {file.filename}: {e}")
             excluded_files.append({
@@ -163,20 +173,42 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
 
 @chat_routes.route("/chat_interface")
 @login_required
-def chat_interface() -> Response:
+def chat_interface() -> Union[Response, Tuple[Response, int]]:
     """Render the main chat interface page."""
     logger.debug(f"Current user: id={current_user.id}, role={current_user.role}")
 
     chat_id = request.args.get("chat_id") or session.get("chat_id")
 
+    # If no chat exists, try to create one with a default model
     if not chat_id or not Chat.get_by_id(chat_id):
         chat_id = generate_new_chat_id()
         user_id = int(current_user.id)
-        Chat.create(chat_id=chat_id, user_id=user_id, title="New Chat")
-        session["chat_id"] = chat_id
-        logger.info(f"Created new chat {chat_id} for user {user_id}")
-        if request.args.get("chat_id"):
-            return cast(Response, redirect(url_for("chat.chat_interface")))
+
+        # Check for existing models
+        try:
+            with db_session() as db:
+                model_count = db.execute(text("SELECT COUNT(*) FROM models")).scalar()
+                if model_count == 0:
+                    # No models exist - create default model first
+                    logger.info("No models found - creating default model")
+                    Model.create_default_model()
+                    logger.info("Default model created successfully")
+
+            # Now create the chat
+            Chat.create(chat_id=chat_id, user_id=user_id, title="New Chat")
+            session["chat_id"] = chat_id
+            logger.info(f"Created new chat {chat_id} for user {user_id}")
+
+            if request.args.get("chat_id"):
+                return cast(Response, redirect(url_for("chat.chat_interface")))
+
+        except Exception as e:
+            logger.error(f"Error creating chat: {e}")
+            # Show error page instead of infinite redirect
+            return cast(Response, render_template(
+                "error.html",
+                error="Could not initialize chat. Please contact an administrator."
+            )), 500
 
     chat = Chat.get_by_id(chat_id)
     if not chat:
@@ -309,15 +341,10 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 
 
 def validate_model(model_obj: Optional[Model]) -> Optional[str]:
-    """Validate model configuration.
-
-    Args:
-        model_obj: Model object to validate
-
-    Returns:
-        Optional[str]: Error message if validation fails, None if successful
-    """
-    if model_obj is None:
+    if not all(
+        isinstance(getattr(model_obj, attr, None), str) and getattr(model_obj, attr)
+        for attr in ['deployment_name', 'api_key', 'api_endpoint']
+    ):
         return "No model associated with this chat."
 
     if not all([
@@ -339,7 +366,7 @@ def get_chat_stats(chat_id: str) -> Union[Response, Tuple[Response, int]]:
             return jsonify({"error": "Unauthorized access to chat"}), 403
 
         stats = conversation_manager.get_usage_stats(chat_id)
-        
+
         # Get the model info for this chat
         model_obj = Chat.get_model(chat_id)
         model_info = {
@@ -470,7 +497,7 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
 
         if use_streaming:
             def generate():
-                accumulated_response = []
+                accumulated_response = ""
                 streaming_stats = {
                     "start_time": datetime.now().isoformat(),
                     "chunk_count": 0,
@@ -480,16 +507,15 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                     for chunk in response:
                         if chunk.choices[0].delta.content:
                             content = chunk.choices[0].delta.content
-                            accumulated_response.append(content)
+                            accumulated_response += content
                             streaming_stats["chunk_count"] += 1
                             yield f"data: {content}\n\n"
 
                     # Complete streaming stats
                     streaming_stats["end_time"] = datetime.now().isoformat()
 
-                    # Save complete message
-                    complete_response = "".join(accumulated_response)
-                    processed_response = complete_response.replace("{%", "&#123;%").replace("%}", "%&#125;")
+                    # Process and save complete message
+                    processed_response = accumulated_response.replace("{%", "&#123;%").replace("%}", "%&#125;")
                     conversation_manager.add_message(
                         chat_id=chat_id,
                         role="assistant",
@@ -532,17 +558,17 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
     except Exception as ex:
         logger.error("Error during chat handling: %s", str(ex), exc_info=True)
         return jsonify({"error": "An unexpected error occurred."}), 500
-    
+
 @chat_routes.route("/update_model", methods=["POST"])
 @login_required
 def update_model():
     """Update the model for a chat."""
     data = request.get_json()
     chat_id = request.headers.get("X-Chat-ID")
-    
+
     if not chat_id:
         return jsonify({"error": "Chat ID not provided"}), 400
-        
+
     if not data or "model_id" not in data:
         return jsonify({"error": "Model ID not provided"}), 400
 
@@ -550,9 +576,12 @@ def update_model():
         # Verify chat access
         if not validate_chat_access(chat_id):
             return jsonify({"error": "Unauthorized access to chat"}), 403
-            
-        model_id = int(data["model_id"])
-        
+
+        model_id_str = data.get("model_id")
+        if not model_id_str.isdigit():
+            return jsonify({"error": "Invalid model ID"}), 400
+        model_id = int(model_id_str)
+
         # Verify model exists
         model = Model.get_by_id(model_id)
         if not model:

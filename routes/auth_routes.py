@@ -1,10 +1,12 @@
-# auth_routes.py
+"""
+Authentication routes for the application.
+"""
 
 from datetime import datetime, timedelta
 import logging
 import uuid
 from threading import Timer
-from typing import Union, Dict, List, Tuple
+from typing import Dict, List
 
 import bcrypt
 from flask import (
@@ -15,29 +17,23 @@ from flask import (
     url_for,
     session,
     jsonify,
-    Response as FlaskResponse,
 )
 from flask_login import login_user, logout_user, current_user, login_required
-from flask_wtf.csrf import validate_csrf
 from sqlalchemy import text
-from werkzeug.wrappers import Response as WerkzeugResponse
 from email_validator import validate_email, EmailNotValidError
-from chat_utils import send_reset_email
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
 from database import get_db
-from models import User
+from models import User, Model
 from decorators import admin_required
 from forms import LoginForm, RegistrationForm, ResetPasswordForm
+from chat_utils import send_reset_email
 from extensions import limiter
 
 # Define the blueprint
 bp = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
-
-# Rate limiting for sensitive routes
-limiter = Limiter(key_func=get_remote_address)
 
 # Track failed registration attempts
 failed_registrations: Dict[str, List[datetime]] = {}
@@ -59,16 +55,86 @@ def clean_failed_registrations():
     # Schedule next clean-up
     Timer(900, clean_failed_registrations).start()  # Run every 15 minutes
 
+
 # Start the first clean-up
+clean_failed_registrations()
+
 
 @bp.route("/manage_users", methods=["GET"])
 @login_required
 @admin_required
 def manage_users():
-    """Render the manage users page for admin users."""
+    """Render the manage users page."""
     return render_template("manage_users.html")
-timer = Timer(900, clean_failed_registrations)
-timer.start()
+
+@bp.route("/forgot_password", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
+def forgot_password():
+    """Handle forgot password requests."""
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+
+        if not validate_email(email):
+            logger.warning("Invalid email format provided")
+            return jsonify({
+                "success": False,
+                "error": "Please provide a valid email address."
+            }), 400
+
+        db = get_db()
+        try:
+            # Query for existing user
+            user = db.execute(
+                text("SELECT id, email FROM users WHERE email = :email"),
+                {"email": email}
+            ).mappings().first()
+
+            if not user:
+                logger.info("Password reset attempted for non-existent email: %s", email)
+                return jsonify({
+                    "success": False,
+                    "error": "If an account exists with this email, "
+                            "you will receive password reset instructions."
+                }), 200  # Return 200 to prevent email enumeration
+
+            # Generate and store reset token
+            reset_token = str(uuid.uuid4())
+            db.execute(
+                text("""
+                    UPDATE users
+                    SET reset_token = :token,
+                        reset_token_expiry = datetime('now', '+1 hour')
+                    WHERE email = :email
+                """),
+                {"token": reset_token, "email": email}
+            )
+            db.commit()
+
+            # Send reset email
+            reset_url = url_for(
+                'auth.reset_password',
+                token=reset_token,
+                _external=True
+            )
+            send_reset_email(email, reset_url)
+
+            logger.info("Password reset token generated for user: %s", user["id"])
+            return jsonify({
+                "success": True,
+                "message": "If an account exists with this email, "
+                          "you will receive password reset instructions."
+            }), 200
+
+        except Exception as e:
+            db.rollback()
+            logger.exception("Error during password reset: %s", str(e))
+            return jsonify({
+                "success": False,
+                "error": "An error occurred. Please try again later."
+            }), 500
+
+    # GET request - render template
+    return render_template("forgot_password.html")
 
 def log_and_rollback(db, exception, user_message="An unexpected error occurred"):
     """Helper function to log an error and rollback a database transaction."""
@@ -220,13 +286,24 @@ def register():
                         "error": "Username or email already exists"
                     }), 400
 
-                # Create new user
+                # Check if this is the first user
+                user_count = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
+                is_first_user = user_count == 0
+
+                # Create new user with admin role if first user
+                role = 'admin' if is_first_user else 'user'
                 hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
                 db.execute(
-                    text("INSERT INTO users (username, email, password_hash, role) VALUES (:username, :email, :password_hash, 'user')"),
-                    {"username": username, "email": email, "password_hash": hashed_pw}
+                    text("INSERT INTO users (username, email, password_hash, role) VALUES (:username, :email, :password_hash, :role)"),
+                    {"username": username, "email": email, "password_hash": hashed_pw, "role": role}
                 )
                 db.commit()
+
+                # Create default model if no models exist
+                model_count = db.execute(text("SELECT COUNT(*) FROM models")).scalar()
+                if model_count == 0:
+                    Model.create_default_model()
+
                 logger.info(f"New user registered successfully: {username}")
                 return jsonify({"success": True, "message": "Registration successful"}), 200
 
@@ -250,76 +327,6 @@ def logout():
     logout_user()
     session.clear()
     return redirect(url_for("auth.login"))
-
-@bp.route("/forgot_password", methods=["GET", "POST"])
-@limiter.limit("5 per minute")
-def forgot_password():
-    """Handle forgot password requests. Validates email, generates reset token, and sends password reset email."""
-    if request.method == "POST":
-        email = request.form.get("email", "").strip()
-
-        try:
-            # Validate email address
-            validate_email(email, check_deliverability=False)
-        except EmailNotValidError:
-            logger.warning("Invalid email format provided")
-            return jsonify({
-                "success": False,
-                "error": "Please provide a valid email address."
-            }), 400
-
-        db = get_db()
-        try:
-            # Query for existing user
-            user = db.execute(
-                text("SELECT id, email FROM users WHERE email = :email"),
-                {"email": email}
-            ).mappings().first()
-
-            if not user:
-                logger.info("Password reset attempted for non-existent email: %s", email)
-                return jsonify({
-                    "success": False,
-                    "error": "If an account exists with this email, you will receive password reset instructions."
-                }), 200  # Return 200 to prevent email enumeration
-
-            # Generate and store reset token
-            reset_token = str(uuid.uuid4())
-            db.execute(
-                text("""
-                    UPDATE users
-                    SET reset_token = :token,
-                        reset_token_expiry = datetime('now', '+1 hour')
-                    WHERE email = :email
-                """),
-                {"token": reset_token, "email": email}
-            )
-            db.commit()
-
-            # Send reset email
-            reset_url = url_for(
-                'auth.reset_password',
-                token=reset_token,
-                _external=True
-            )
-            send_reset_email(email, reset_url)
-
-            logger.info("Password reset token generated for user: %s", user["id"])
-            return jsonify({
-                "success": True,
-                "message": "If an account exists with this email, you will receive password reset instructions."
-            }), 200
-
-        except Exception as e:
-            db.rollback()
-            logger.exception("Error during password reset: %s", str(e))
-            return jsonify({
-                "success": False,
-                "error": "An error occurred. Please try again later."
-            }), 500
-
-    # GET request - render template
-    return render_template("forgot_password.html")
 
 @bp.route("/reset_password/<token>", methods=["GET", "POST"])
 @limiter.limit("5 per minute")

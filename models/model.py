@@ -1,10 +1,12 @@
+"""
+Module for handling model operations.
+"""
+
 import logging
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any, TypeVar, cast
+from typing import Optional, Dict, Any, TypeVar, List, cast
 
 from sqlalchemy import text
-from sqlalchemy.engine.result import Row
-
 from .base import db_session
 
 logger = logging.getLogger(__name__)
@@ -13,17 +15,15 @@ logger = logging.getLogger(__name__)
 ModelDict = Dict[str, Any]
 T = TypeVar('T')
 
-
 @dataclass
 class Model:
     """
-    Represents an AI model in the system.
+    Dataclass representing a model.
     """
-
     id: int
     name: str
     deployment_name: str
-    description: Optional[str]
+    description: str
     model_type: str
     api_endpoint: str
     api_key: str
@@ -42,6 +42,33 @@ class Model:
         self.id = int(self.id)
 
     @staticmethod
+    def create_default_model() -> int:
+        """
+        Create a default model if none exists.
+        """
+        default_model_data = {
+            "name": "GPT-4",
+            "deployment_name": "gpt-4",
+            "description": "Default GPT-4 model",
+            "model_type": "azure",
+            "api_endpoint": os.getenv("AZURE_API_ENDPOINT", "https://your-resource.openai.azure.com"),
+            "api_key": os.getenv("AZURE_API_KEY", "your_default_api_key"),
+            "temperature": 1.0,
+            "max_tokens": 4000,
+            "max_completion_tokens": 500,
+            "is_default": True,
+            "requires_o1_handling": False,
+            "supports_streaming": True,
+            "api_version": "2024-12-01-preview",
+            "version": 1,
+        }
+
+        model_id = Model.create(default_model_data)
+        if model_id is None:
+            raise ValueError("Failed to create default model")
+        return model_id
+
+    @staticmethod
     def get_default() -> Optional["Model"]:
         """
         Retrieve the default model (where `is_default=1`).
@@ -52,12 +79,12 @@ class Model:
                 row = db.execute(query, {"is_default": True}).mappings().first()
                 if row:
                     model_dict = dict(row)
-                    logger.debug(f"Default model retrieved: {model_dict}")
+                    logger.debug("Default model retrieved: %s", model_dict)
                     return Model(**model_dict)
                 logger.info("No default model found.")
                 return None
-            except Exception:
-                logger.error("Error retrieving default model")
+            except Exception as e:
+                logger.error("Error retrieving default model: %s", str(e))
                 raise
 
     @staticmethod
@@ -67,16 +94,16 @@ class Model:
         """
         with db_session() as db:
             try:
-                query = text("SELECT * FROM models WHERE id = :model_id")
-                row = db.execute(query, {"model_id": model_id}).mappings().first()
+                query = text("SELECT * FROM models WHERE id = :id")
+                row = db.execute(query, {"id": model_id}).mappings().first()
                 if row:
                     model_dict = dict(row)
-                    logger.debug(f"Model retrieved by ID {model_id}: {model_dict}")
+                    logger.debug("Model retrieved by ID %d: %s", model_id, model_dict)
                     return Model(**model_dict)
-                logger.info(f"No model found with ID: {model_id}")
+                logger.info("No model found with ID %d.", model_id)
                 return None
-            except Exception:
-                logger.error(f"Error retrieving model by ID {model_id}")
+            except Exception as e:
+                logger.error("Error retrieving model by ID %d: %s", model_id, str(e))
                 raise
 
     @staticmethod
