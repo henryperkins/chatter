@@ -125,8 +125,13 @@ def init_app_data():
             model_count = db.execute(text("SELECT COUNT(*) FROM models")).scalar()
             if model_count == 0:
                 logger.info("No models found - creating default model")
-                Model.create_default_model()
-                logger.info("Default model created successfully")
+                try:
+                    Model.create_default_model()
+                    logger.info("Default model created successfully")
+                except ValueError as e:
+                    logger.error(f"Default model configuration is invalid: {e}")
+                    logger.error("Please fix the default model configuration and restart the application.")
+                    raise
             else:
                 logger.debug(f"Found {model_count} existing models")
         finally:

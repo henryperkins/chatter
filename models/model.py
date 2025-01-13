@@ -64,10 +64,14 @@ class Model:
             "version": 1,
         }
 
-        model_id = Model.create(default_model_data)
-        if model_id is None:
-            raise ValueError("Failed to create default model")
-        return model_id
+        try:
+            model_id = Model.create(default_model_data)
+            if model_id is None:
+                raise ValueError("Failed to create default model")
+            return model_id
+        except ValueError as e:
+            logger.error(f"Invalid default model configuration: {e}")
+            raise
 
     @staticmethod
     def get_default() -> Optional["Model"]:
