@@ -6,6 +6,7 @@
     function initializeMobileMenu() {
         const mobileMenu = document.getElementById('mobile-menu');
         const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        if (!mobileMenuToggle) return; // Exit if the mobile menu toggle doesn't exist
         const mobileMenuClose = document.getElementById('mobile-menu-close');
         const sidebar = document.getElementById('sidebar');
 

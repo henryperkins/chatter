@@ -172,7 +172,8 @@
     }
 
     function setupMobileLayout() {
-      const sidebarToggle = document.getElementById('sidebar-toggle');
+      const sidebarToggle = document.getElementById('chat-sidebar-toggle');
+      if (!sidebarToggle) return; // Exit if the chat sidebar toggle doesn't exist
       const sidebar = document.getElementById('sidebar');
 
       if (sidebarToggle && sidebar) {
@@ -687,7 +688,8 @@
 
     function adjustTextareaHeight(textarea) {
       textarea.style.height = 'auto';
-      textarea.style.height = `${textarea.scrollHeight}px`;
+      const maxHeight = window.innerWidth < 640 ? 150 : 300; // 150px on small screens, 300px on larger screens
+      textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
     }
 
     function showTypingIndicator() {
