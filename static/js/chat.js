@@ -10,29 +10,71 @@
     }
 
     function initializeMobileMenu() {
-      const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-      const mobileMenu = document.getElementById('mobile-menu');
-      const backdrop = document.getElementById('mobile-menu-backdrop');
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const mobileMenu = document.getElementById('mobile-menu');
+        const backdrop = document.getElementById('mobile-menu-backdrop');
 
-      if (!mobileMenuToggle || !mobileMenu || !backdrop) {
-          console.error('Mobile menu elements not found');
-          return;
-      }
+        if (!mobileMenuToggle || !mobileMenu || !backdrop) {
+            console.error('Mobile menu elements not found');
+            return;
+        }
 
-      mobileMenuToggle.addEventListener('click', () => {
-          const isExpanded = mobileMenuToggle.getAttribute('aria-expanded') === 'true';
-          mobileMenuToggle.setAttribute('aria-expanded', !isExpanded);
-          mobileMenu.classList.toggle('-translate-x-full');
-          backdrop.classList.toggle('hidden');
-          document.body.classList.toggle('overflow-hidden');
-      });
+        // Function to close menu
+        const closeMenu = () => {
+            mobileMenu.classList.add('-translate-x-full');
+            backdrop.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+            mobileMenuToggle.setAttribute('aria-expanded', 'false');
+        };
 
-      backdrop.addEventListener('click', () => {
-          mobileMenu.classList.add('-translate-x-full');
-          backdrop.classList.add('hidden');
-          document.body.classList.remove('overflow-hidden');
-          mobileMenuToggle.setAttribute('aria-expanded', 'false');
-      });
+        // Function to open menu
+        const openMenu = () => {
+            mobileMenu.classList.remove('-translate-x-full');
+            backdrop.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+            mobileMenuToggle.setAttribute('aria-expanded', 'true');
+        };
+
+        // Toggle menu
+        mobileMenuToggle.addEventListener('click', () => {
+            const isExpanded = mobileMenuToggle.getAttribute('aria-expanded') === 'true';
+            if (isExpanded) {
+                closeMenu();
+            } else {
+                openMenu();
+            }
+        });
+
+        // Close menu when clicking backdrop
+        backdrop.addEventListener('click', closeMenu);
+
+        // Close menu when clicking a chat link on mobile
+        const chatLinks = mobileMenu.querySelectorAll('a[href*="chat_interface"]');
+        chatLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth < 768) { // Only on mobile
+                    closeMenu();
+                }
+            });
+        });
+
+        // Close menu on window resize if switching to desktop
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 768) {
+                mobileMenu.classList.remove('-translate-x-full');
+                backdrop.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            } else {
+                mobileMenu.classList.add('-translate-x-full');
+            }
+        });
+
+        // Handle escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !mobileMenu.classList.contains('-translate-x-full')) {
+                closeMenu();
+            }
+        });
     }
 
     // Initialize mobile menu
