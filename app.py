@@ -15,7 +15,7 @@ from routes.auth_routes import bp as auth_bp
 from routes.chat_routes import chat_routes
 from routes.model_routes import bp as model_bp
 from typing import Dict, Optional
-from database import close_db, init_db, init_app, get_db, db_session
+from database import close_db, init_db, init_app, get_db
 
 # Load environment variables from .env file
 load_dotenv()
