@@ -9,6 +9,77 @@
       return;
     }
 
+    function initializeMobileMenu() {
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const mobileMenu = document.getElementById('mobile-menu');
+        const backdrop = document.getElementById('mobile-menu-backdrop');
+
+        if (!mobileMenuToggle || !mobileMenu || !backdrop) {
+            console.error('Mobile menu elements not found');
+            return;
+        }
+
+        // Function to close menu
+        const closeMenu = () => {
+            mobileMenu.classList.add('-translate-x-full');
+            backdrop.classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
+            mobileMenuToggle.setAttribute('aria-expanded', 'false');
+        };
+
+        // Function to open menu
+        const openMenu = () => {
+            mobileMenu.classList.remove('-translate-x-full');
+            backdrop.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+            mobileMenuToggle.setAttribute('aria-expanded', 'true');
+        };
+
+        // Toggle menu
+        mobileMenuToggle.addEventListener('click', () => {
+            const isExpanded = mobileMenuToggle.getAttribute('aria-expanded') === 'true';
+            if (isExpanded) {
+                closeMenu();
+            } else {
+                openMenu();
+            }
+        });
+
+        // Close menu when clicking backdrop
+        backdrop.addEventListener('click', closeMenu);
+
+        // Close menu when clicking a chat link on mobile
+        const chatLinks = mobileMenu.querySelectorAll('a[href*="chat_interface"]');
+        chatLinks.forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth < 768) { // Only on mobile
+                    closeMenu();
+                }
+            });
+        });
+
+        // Close menu on window resize if switching to desktop
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 768) {
+                mobileMenu.classList.remove('-translate-x-full');
+                backdrop.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            } else {
+                mobileMenu.classList.add('-translate-x-full');
+            }
+        });
+
+        // Handle escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !mobileMenu.classList.contains('-translate-x-full')) {
+                closeMenu();
+            }
+        });
+    }
+
+    // Initialize mobile menu
+    initializeMobileMenu();
+
     // Access utility functions and dependencies
     const { showFeedback, fetchWithCSRF } = window.utils;
     const DOMPurify = window.DOMPurify;
@@ -158,6 +229,63 @@
         // Set up delete chat buttons
         setupDeleteButtons();
 
+        function setupModelButtons() {
+            // Edit Model Button
+            const editModelBtn = document.getElementById('edit-model-btn');
+            if (editModelBtn) {
+                editModelBtn.addEventListener('click', () => {
+                    const modelSelect = document.getElementById('model-select');
+                    const modelId = modelSelect?.value;
+                    if (modelId) {
+                        window.location.href = `/model/edit/${modelId}`;
+                    } else {
+                        showFeedback('No model selected', 'error');
+                    }
+                });
+            }
+
+            // Add Model Button
+            const addModelLink = document.querySelector('a[href*="add-model"]');
+            if (addModelLink) {
+                addModelLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.location.href = '/model/add-model';
+                });
+            }
+
+            // New Chat Button
+            const newChatBtn = document.getElementById('new-chat-btn');
+            if (newChatBtn) {
+                newChatBtn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    try {
+                        newChatBtn.disabled = true;
+                        const response = await fetchWithCSRF('/chat/new_chat', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+
+                        if (response.success && response.chat_id) {
+                            window.location.href = `/chat/chat_interface?chat_id=${response.chat_id}`;
+                        } else {
+                            throw new Error(response.error || 'Failed to create new chat');
+                        }
+                    } catch (error) {
+                        console.error('Error creating new chat:', error);
+                        showFeedback(error.message || 'Failed to create new chat', 'error');
+                    } finally {
+                        newChatBtn.disabled = false;
+                    }
+                });
+            }
+        }
+
+        // Call the setup function
+        setupModelButtons();
+
         // Set up drag and drop
         setupDragAndDrop();
 
@@ -172,26 +300,6 @@
     }
 
     function setupMobileLayout() {
-      const sidebarToggle = document.getElementById('sidebar-toggle');
-      const sidebar = document.getElementById('sidebar');
-
-      if (sidebarToggle && sidebar) {
-        const toggleSidebar = () => {
-          sidebar.classList.toggle('-translate-x-full');
-          document.body.classList.toggle('overflow-hidden');
-        };
-
-        sidebarToggle.addEventListener('click', toggleSidebar);
-
-        // Close sidebar when clicking outside
-        document.addEventListener('click', (e) => {
-          if (!sidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
-            sidebar.classList.add('-translate-x-full');
-            document.body.classList.remove('overflow-hidden');
-          }
-        });
-      }
-
       // Adjust textarea for mobile
       if (messageInput) {
         messageInput.style.fontSize = '16px'; // Prevent zoom on iOS
@@ -750,7 +858,11 @@
         .replace(/'/g, "&#039;");
     }
 
+    let dragAndDropInitialized = false;
+
     function setupDragAndDrop() {
+        if (dragAndDropInitialized) return;
+        dragAndDropInitialized = true;
       if (!dropZone) return;
 
       ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -783,6 +895,8 @@
         } catch (error) {
           console.error('Error handling file drop:', error);
           showFeedback('Failed to process dropped files', 'error');
+        } finally {
+          dropZone.classList.add('hidden'); // Ensure dropZone is hidden after drop
         }
       });
     }
@@ -857,7 +971,8 @@
 
       try {
         if (target.classList.contains('copy-button')) {
-          const content = target.closest('.max-w-3xl').querySelector('.prose').textContent;
+          const rawContent = target.dataset.rawContent;
+          const content = rawContent || target.closest('.max-w-3xl').querySelector('.prose').textContent;
           await navigator.clipboard.writeText(content);
           showFeedback('Copied to clipboard!', 'success');
         } else if (target.classList.contains('regenerate-button')) {

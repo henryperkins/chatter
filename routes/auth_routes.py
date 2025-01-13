@@ -2,9 +2,11 @@
 
 from datetime import datetime, timedelta
 import logging
-import bcrypt
 import uuid
-from typing import Dict, List
+from threading import Timer
+from typing import Union, Dict, List, Tuple
+
+import bcrypt
 from flask import (
     Blueprint,
     render_template,
@@ -13,18 +15,20 @@ from flask import (
     url_for,
     session,
     jsonify,
-    Response,
+    Response as FlaskResponse,
 )
 from flask_login import login_user, logout_user, current_user, login_required
-from database import get_db
+from flask_wtf.csrf import validate_csrf
 from sqlalchemy import text
-from models.user import User
+from werkzeug.wrappers import Response as WerkzeugResponse
+from email_validator import validate_email, EmailNotValidError
+from utils.email_utils import send_reset_email
+
+from database import get_db
+from models import User
 from decorators import admin_required
 from forms import LoginForm, RegistrationForm, ResetPasswordForm
-from extensions import limiter, csrf
-from threading import Timer
-from models.chat import Chat
-from chat_utils import generate_new_chat_id
+from extensions import limiter
 
 # Define the blueprint
 bp = Blueprint("auth", __name__)
@@ -35,6 +39,12 @@ failed_registrations: Dict[str, List[datetime]] = {}
 
 
 def clean_failed_registrations():
+    """
+    Cleans up old failed registration attempts from the tracking dictionary.
+
+    Removes timestamps older than 15 minutes for each IP address and deletes
+    entries for IPs with no recent attempts. Schedules the next cleanup.
+    """
     now = datetime.now()
     to_delete = []
     for ip, timestamps in failed_registrations.items():
@@ -52,7 +62,8 @@ def clean_failed_registrations():
 
 
 # Start the first clean-up
-Timer(900, clean_failed_registrations).start()
+timer = Timer(900, clean_failed_registrations)
+timer.start()
 
 
 def log_and_rollback(db, exception, user_message="An unexpected error occurred"):
@@ -66,6 +77,7 @@ def log_and_rollback(db, exception, user_message="An unexpected error occurred")
     """
     db.rollback()
     logger.error(f"{user_message}: {exception}", exc_info=True)
+    raise exception
 
 
 def check_registration_attempts(ip: str) -> bool:
@@ -87,7 +99,7 @@ def check_registration_attempts(ip: str) -> bool:
             if now - timestamp < timedelta(minutes=15)
         ]
         if len(failed_registrations[ip]) >= 5:
-            logger.warning(f"IP {ip} has exceeded registration attempts.")
+            logger.warning(f"IP {ip} has exceeded registration attempts with {len(failed_registrations[ip])} attempts.")
             return False
     return True
 
@@ -180,150 +192,83 @@ def login():
     return render_template("login.html", form=form)
 
 
+# Type alias for Flask/Werkzeug response
+Response = Union[
+    FlaskResponse,
+    WerkzeugResponse,
+    Tuple[Union[FlaskResponse, WerkzeugResponse], int],
+    str
+]
+
 @bp.route("/register", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
 def register() -> Response:
-    """
-    Handle user registration requests. Validates input, creates an account, and prevents abuse.
-
-    Returns:
-        Response: JSON success or error message, or renders the registration form.
-    """
+    """Handle user registration requests."""
     if current_user.is_authenticated:
         logger.debug("User already authenticated; redirecting to chat interface.")
         return redirect(url_for("chat.chat_interface"))
 
     form = RegistrationForm()
     if request.method == "POST":
-        ip = request.remote_addr
+        # Ensure IP address is not None
+        ip = request.remote_addr or "unknown"
         logger.debug(f"Processing registration form from IP: {ip}")
 
         if not check_registration_attempts(ip):
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Too many registration attempts. Please try again later.",
-                    }
-                ),
-                429,
-            )
+            return jsonify({
+                "success": False,
+                "error": "Too many registration attempts. Please try again later."
+            }), 429
 
         if form.validate_on_submit():
-            username = form.username.data.strip()
-            email = form.email.data.lower().strip()
-            password = form.password.data
-            db = get_db()
+            # Safely handle potentially None values
+            username = form.username.data.strip() if form.username.data else None
+            email = form.email.data.lower().strip() if form.email.data else None
+            password = form.password.data if form.password.data else None
 
+            if not all([username, email, password]):
+                return jsonify({
+                    "success": False,
+                    "error": "All fields are required"
+                }), 400
+
+            db = get_db()
             try:
-                existing_user = (
-                    db.execute(
-                        text(
-                            "SELECT id FROM users WHERE LOWER(username) = LOWER(:username) OR LOWER(email) = LOWER(:email)"
-                        ),
-                        {"username": username, "email": email},
-                    )
-                    .mappings()
-                    .first()
-                )
+                # Check for existing user
+                existing_user = db.execute(
+                    text("SELECT id FROM users WHERE LOWER(username) = LOWER(:username) OR LOWER(email) = LOWER(:email)"),
+                    {"username": username, "email": email}
+                ).mappings().first()
 
                 if existing_user:
-                    logger.warning(
-                        f"Registration attempt failed: username/email exists (IP: {ip})."
-                    )
+                    logger.warning(f"Registration attempt failed: username/email exists (IP: {ip}).")
                     failed_registrations.setdefault(ip, []).append(datetime.now())
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "error": "Username or email already exists",
-                            }
-                        ),
-                        400,
-                    )
+                    return jsonify({
+                        "success": False,
+                        "error": "Username or email already exists"
+                    }), 400
 
-                hashed_password = bcrypt.hashpw(
-                    password.encode("utf-8"), bcrypt.gensalt(rounds=12)
+                # Create new user
+                hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+                db.execute(
+                    text("INSERT INTO users (username, email, password_hash, role) VALUES (:username, :email, :password_hash, 'user')"),
+                    {"username": username, "email": email, "password_hash": hashed_pw}
                 )
-                # Check if this is the first user
-                user_count = db.execute(
-                    text("SELECT COUNT(*) as count FROM users")
-                ).scalar()
-                role = "admin" if user_count == 0 else "user"
-
-                result = db.execute(
-                    text(
-                        """
-                        INSERT INTO users (username, email, password_hash, role)
-                        VALUES (:username, :email, :password_hash, :role)
-                        RETURNING id
-                    """
-                    ),
-                    {
-                        "username": username,
-                        "email": email,
-                        "password_hash": hashed_password,
-                        "role": role,
-                    },
-                )
-                user_id = result.scalar()
                 db.commit()
-                logger.info(f"User {username} registered successfully.")
-
-                # Create user object and log them in
-                user_obj = User(user_id, username, email, role)
-                login_user(user_obj)
-
-                # Create a new chat for the user
-                chat_id = generate_new_chat_id()
-                Chat.create(chat_id, user_id, "New Chat")
-                session["chat_id"] = chat_id
-
-                return (
-                    jsonify(
-                        {
-                            "success": True,
-                            "message": "Registration successful!",
-                            "redirect": url_for("chat.chat_interface", chat_id=chat_id),
-                        }
-                    ),
-                    200,
-                )
+                logger.info(f"New user registered successfully: {username}")
+                return jsonify({"success": True, "message": "Registration successful"}), 200
 
             except Exception as e:
                 db.rollback()
-                if "UNIQUE constraint failed" in str(e):
-                    logger.warning(
-                        f"Registration failed due to duplicate username or email: {username}, {email}"
-                    )
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "error": "Username or email already exists",
-                            }
-                        ),
-                        400,
-                    )
-                else:
-                    logger.error(f"Database error during registration: {e}")
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "error": "Registration failed due to a server error",
-                            }
-                        ),
-                        500,
-                    )
+                logger.error(f"Error during registration: {e}")
+                return jsonify({
+                    "success": False,
+                    "error": "An error occurred during registration"
+                }), 500
 
-        else:
-            logger.debug(f"Form validation errors: {form.errors}")
-            return jsonify({"success": False, "errors": form.errors}), 400
+        return jsonify({"success": False, "errors": form.errors}), 400
 
-    logger.debug("Rendering registration form.")
     return render_template("register.html", form=form)
-
 
 @bp.route("/logout")
 @login_required
@@ -343,167 +288,145 @@ def logout() -> Response:
 @bp.route("/forgot_password", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
 def forgot_password() -> Response:
-    """
-    Handle forgot password requests. Sends a password reset token to the user's email.
+    """Handle forgot password requests.
+
+    Validates email, generates reset token, and sends password reset email.
+    Rate limited to prevent abuse.
 
     Returns:
-        Response: JSON success or error message, or renders the forgot password form.
+        Response: JSON response or rendered template
     """
     if request.method == "POST":
-        email = request.form.get("email").strip()
+        email = request.form.get("email", "").strip()
 
-        if not email:
-            return jsonify({"success": False, "error": "Email is required."}), 400
+        try:
+            # Validate email address
+            validate_email(email, check_deliverability=False)
+        except EmailNotValidError:
+            logger.warning("Invalid email format provided")
+            return jsonify({
+                "success": False,
+                "error": "Please provide a valid email address."
+            }), 400
 
         db = get_db()
         try:
-            user = (
-                db.execute(
-                    text("SELECT * FROM users WHERE email = :email"), {"email": email}
-                )
-                .mappings()
-                .first()
-            )
+            # Query for existing user
+            user = db.execute(
+                text("SELECT id, email FROM users WHERE email = :email"),
+                {"email": email}
+            ).mappings().first()
 
             if not user:
-                logger.warning(
-                    f"Password reset requested for non-existent email: {email}"
-                )
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "error": "No account found with that email address.",
-                        }
-                    ),
-                    404,
-                )
+                logger.info("Password reset attempted for non-existent email: %s", email)
+                return jsonify({
+                    "success": False,
+                    "error": "If an account exists with this email, "
+                            "you will receive password reset instructions."
+                }), 200  # Return 200 to prevent email enumeration
 
+            # Generate and store reset token
             reset_token = str(uuid.uuid4())
             db.execute(
-                text(
-                    "UPDATE users SET reset_token = :token, reset_token_expiry = datetime('now', '+1 hour') WHERE email = :email"
-                ),
-                {"token": reset_token, "email": email},
+                text("""
+                    UPDATE users
+                    SET reset_token = :token,
+                        reset_token_expiry = datetime('now', '+1 hour')
+                    WHERE email = :email
+                """),
+                {"token": reset_token, "email": email}
             )
             db.commit()
-            logger.info(f"Password reset token generated for email: {email}")
 
-            # Placeholder for sending email logic
-            # In a real application, you would send an email here with the reset link
-            # Example: send_reset_email(user.email, reset_token)
-
-            return (
-                jsonify(
-                    {
-                        "success": True,
-                        "message": "A password reset link has been sent to your email.",
-                    }
-                ),
-                200,
+            # Send reset email
+            reset_url = url_for(
+                'auth.reset_password',
+                token=reset_token,
+                _external=True
             )
+            send_reset_email(email, reset_url)
+
+            logger.info("Password reset token generated for user: %s", user["id"])
+            return jsonify({
+                "success": True,
+                "message": "If an account exists with this email, "
+                          "you will receive password reset instructions."
+            }), 200
 
         except Exception as e:
-            log_and_rollback(db, e, "Error during password reset request")
-            return (
-                jsonify(
-                    {"success": False, "error": "Failed to process password reset"}
-                ),
-                500,
-            )
+            db.rollback()
+            logger.exception("Error during password reset: %s", str(e))
+            return jsonify({
+                "success": False,
+                "error": "An error occurred. Please try again later."
+            }), 500
 
+    # GET request - render template
     return render_template("forgot_password.html")
 
 
+# Update the reset_password route to fix syntax error and return types
 @bp.route("/reset_password/<token>", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
-def reset_password(token):
+def reset_password(token: str) -> Union[Response, WerkzeugResponse]:
     """
-    Handle password reset requests using a valid token.
+    reset_password _summary_
+
+    _extended_summary_
 
     Args:
-        token (str): The password reset token.
+        token (str): _description_
 
     Returns:
-        Response: JSON success or error message, or renders the reset password form.
+        Union[Response, WerkzeugResponse]: _description_
     """
     form = ResetPasswordForm()
     db = get_db()
 
-    # Validate the token
     try:
-        user = (
-            db.execute(
-                text(
-                    "SELECT * FROM users WHERE reset_token = :token AND reset_token_expiry > datetime('now')"
-                ),
-                {"token": token},
+        user = db.execute(
+            text("SELECT * FROM users WHERE reset_token = :token AND reset_token_expiry > datetime('now')"),
+            {"token": token}
+        ).mappings().first()
+
+        if not user:
+            logger.warning(f"Invalid or expired reset token used: {token}")
+            return jsonify({"success": False, "error": "Invalid or expired reset token."}), 400
+
+        if request.method == "POST" and form.validate_on_submit():
+            password = form.password.data.strip()
+            hashed_password = bcrypt.hashpw(
+                password.encode("utf-8"), bcrypt.gensalt(rounds=12)
             )
-            .mappings()
-            .first()
-        )
+
+            try:
+                db.execute(
+                    text("UPDATE users SET password_hash = :password_hash, reset_token = NULL, reset_token_expiry = NULL WHERE id = :user_id"),
+                    {"password_hash": hashed_password, "user_id": user["id"]}
+                )
+                db.commit()
+                logger.info(f"Password reset successfully for user ID {user['id']}.")
+                return jsonify({
+                    "success": True,
+                    "message": "Your password has been reset successfully."
+                }), 200
+
+            except Exception as e:
+                return log_and_rollback(db, e, "Error during password reset")
+
+        elif request.method == "POST":
+            logger.debug(f"Form validation errors during password reset: {form.errors}")
+            return jsonify({"success": False, "errors": form.errors}), 400
+
+        logger.debug(f"Rendering reset password form for token: {token}")
+        return render_template("reset_password.html", form=form)
+
     except Exception as e:
-        logger.error(f"Error validating reset token: {e}")
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": "An unexpected error occurred. Please try again later.",
-                }
-            ),
-            500,
-        )
-
-    if not user:
-        logger.warning(f"Invalid or expired reset token used: {token}")
-        return (
-            jsonify({"success": False, "error": "Invalid or expired reset token."}),
-            400,
-        )
-
-    if request.method == "POST" and form.validate_on_submit():
-        password = form.password.data.strip()
-        hashed_password = bcrypt.hashpw(
-            password.encode("utf-8"), bcrypt.gensalt(rounds=12)
-        )
-
-        try:
-            db.execute(
-                text(
-                    "UPDATE users SET password_hash = :password_hash, reset_token = NULL, reset_token_expiry = NULL WHERE id = :user_id"
-                ),
-                {"password_hash": hashed_password, "user_id": user["id"]},
-            )
-            db.commit()
-            logger.info(f"Password reset successfully for user ID {user.id}.")
-            return (
-                jsonify(
-                    {
-                        "success": True,
-                        "message": "Your password has been reset successfully.",
-                    }
-                ),
-                200,
-            )
-        except Exception as e:
-            log_and_rollback(db, e, "Error during password reset")
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Failed to reset password. Please try again later.",
-                    }
-                ),
-                500,
-            )
-
-    elif request.method == "POST":
-        logger.debug(f"Form validation errors during password reset: {form.errors}")
-        return jsonify({"success": False, "errors": form.errors}), 400
-
-    logger.debug(f"Rendering reset password form for token: {token}")
-    return render_template("reset_password.html", form=form)
-
+        logger.error(f"Error during password reset: {e}")
+        return jsonify({
+            "success": False,
+            "error": "An unexpected error occurred"
+        }), 500
 
 @bp.route("/manage-users")
 @login_required
@@ -535,39 +458,46 @@ def manage_users() -> Response:
 @bp.route("/api/users/<int:user_id>/role", methods=["PUT"])
 @login_required
 @admin_required
-def update_user_role(user_id: int) -> tuple[Response, int]:
+def update_user_role(user_id: int) -> Response:
     """
-    API endpoint to update a user's role (admin-only access).
+    update_user_role _summary_
+
+    _extended_summary_
 
     Args:
-        user_id (int): The ID of the user whose role is being updated.
+        user_id (int): _description_
+
+    Raises:
+        ValueError: _description_
 
     Returns:
-        tuple[Response, int]: JSON response with success or error message, and HTTP status code.
+        tuple[Response, int]: _description_
     """
-
-    # CSRF protection for API endpoints
-    csrf_token = request.headers.get("X-CSRFToken")
-    if not csrf_token or not csrf.validate_csrf(csrf_token):
-        return (
-            jsonify({"success": False, "error": "CSRF token invalid or missing"}),
-            400,
-        )
-
-    new_role = request.json.get("role")
-    if new_role not in ["user", "admin"]:
-        logger.warning(f"Invalid role '{new_role}' provided for user ID {user_id}.")
-        return jsonify({"success": False, "error": "Invalid role"}), 400
-
-    db = get_db()
     try:
+        # Validate CSRF token
+        csrf_token = request.headers.get("X-CSRFToken")
+        if not csrf_token:
+            raise ValueError("CSRF token missing")
+
+        validate_csrf(csrf_token)  # Use imported validate_csrf function
+
+        new_role = request.json.get("role")
+        if not new_role or new_role not in ["user", "admin"]:
+            logger.warning(f"Invalid role '{new_role}' provided for user ID {user_id}.")
+            return jsonify({"success": False, "error": "Invalid role specified"}), 400
+
+        db = get_db()
         db.execute(
             text("UPDATE users SET role = :role WHERE id = :user_id"),
-            {"role": new_role, "user_id": user_id},
+            {"role": new_role, "user_id": user_id}
         )
         db.commit()
+
         logger.info(f"User ID {user_id} role updated to '{new_role}'.")
         return jsonify({"success": True}), 200
+
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
     except Exception as e:
-        log_and_rollback(db, e, "Error during user role update")
+        logger.error(f"Error updating user role: {e}")
         return jsonify({"success": False, "error": "Failed to update user role"}), 500

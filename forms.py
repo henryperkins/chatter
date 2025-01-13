@@ -94,11 +94,14 @@ class RegistrationForm(FlaskForm):
         """
         Custom validator for username.
         """
-        username = field.data.lower().strip()
+        # First check for spaces
+        if field.data != field.data.strip():
+            raise ValidationError("Username cannot contain leading or trailing spaces.")
+            
+        # Then check length of cleaned username
+        username = field.data.strip().lower()
         if len(username) < 4:
             raise ValidationError("Username must be at least 4 characters long.")
-        if username != field.data.strip():
-            raise ValidationError("Username cannot contain leading or trailing spaces.")
 
         # Check for existing username using text()
         with get_db() as db:

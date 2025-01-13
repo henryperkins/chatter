@@ -191,8 +191,11 @@ def chat_interface() -> Response:
     messages = conversation_manager.get_context(chat_id)
     for message in messages:
         if message['role'] == 'assistant':
-            # Escape any Jinja2 template syntax in stored messages
-            message['content'] = message['content'].replace("{%", "&#123;%").replace("%}", "%&#125;")
+            # No need to re-format, use the stored formatted content
+            continue
+        elif message['role'] == 'user':
+            # Escape any HTML in user messages
+            message['content'] = bleach.clean(message['content'])
 
     models = Model.get_all()
     conversations = [
@@ -330,16 +333,33 @@ def validate_model(model_obj: Optional[Model]) -> Optional[str]:
 @chat_routes.route("/stats/<chat_id>", methods=["GET"])
 @login_required
 def get_chat_stats(chat_id: str) -> Union[Response, Tuple[Response, int]]:
-    """Get chat usage statistics."""
+    """Get detailed chat usage statistics."""
     try:
         if not validate_chat_access(chat_id):
             return jsonify({"error": "Unauthorized access to chat"}), 403
 
         stats = conversation_manager.get_usage_stats(chat_id)
-        return cast(Response, jsonify({
+        
+        # Get the model info for this chat
+        model_obj = Chat.get_model(chat_id)
+        model_info = {
+            "name": getattr(model_obj, "name", "Unknown"),
+            "max_tokens": getattr(model_obj, "max_tokens", 0),
+            "max_completion_tokens": getattr(model_obj, "max_completion_tokens", 0),
+            "requires_o1_handling": getattr(model_obj, "requires_o1_handling", False)
+        }
+
+        # Add token limit information
+        stats.update({
+            "model_info": model_info,
+            "token_limit": 32000 if model_info["requires_o1_handling"] else 16384,
+            "token_usage_percentage": (stats["total_tokens"] / (32000 if model_info["requires_o1_handling"] else 16384)) * 100
+        })
+
+        return jsonify({
             "success": True,
             "stats": stats
-        }))
+        })
     except Exception as e:
         logger.error(f"Error getting chat stats: {e}")
         return jsonify({"error": "Failed to get chat statistics"}), 500

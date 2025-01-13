@@ -7,25 +7,38 @@
 {% block content %}
 <div class="flex h-full w-full overflow-hidden bg-white dark:bg-gray-900">
     <!-- Sidebar -->
-    <nav id="sidebar" class="hidden md:block w-64 flex-shrink-0 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto flex flex-col transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out z-50 md:z-auto" aria-label="Chat navigation">
-        <div class="flex-none p-4 space-y-4">
+    <nav id="mobile-menu" 
+        class="fixed inset-y-0 left-0 z-50 w-[85%] max-w-[320px] bg-gray-50 dark:bg-gray-800 transform transition-transform duration-300 ease-in-out -translate-x-full md:relative md:translate-x-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700"
+        aria-label="Mobile menu">
+        <div class="flex flex-col h-full p-4">
             <!-- New Chat Button -->
-            <button id="new-chat-btn" class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200" aria-label="Start new chat">
-                <i class="fas fa-plus mr-2"></i>
-                New Chat
-            </button>
+            <div class="flex-none mb-6">
+                <button id="new-chat-btn" 
+                    class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-4 py-4 rounded-lg transition-colors duration-200 text-base font-medium touch-manipulation" 
+                    aria-label="Start new chat">
+                    <i class="fas fa-plus mr-2"></i>
+                    <span>New Chat</span>
+                </button>
+            </div>
 
             <!-- Model Selection -->
             {% if models %}
-            <div>
+            <div class="mb-6">
                 <label for="model-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model:</label>
-                <select id="model-select" data-original-value="{{ model_id }}" class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 placeholder-gray-400">
-                    {% for model in models %}
-                    <option value="{{ model.id }}" {% if model.is_default %}selected{% endif %}>
-                        {{ model.name }}{% if model.is_default %} (Default){% endif %}
-                    </option>
-                    {% endfor %}
-                </select>
+                <div class="relative">
+                    <select id="model-select" 
+                        data-original-value="{{ model_id }}" 
+                        class="w-full h-12 px-4 pr-8 border border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 text-base appearance-none cursor-pointer touch-manipulation">
+                        {% for model in models %}
+                        <option value="{{ model.id }}" {% if model.is_default %}selected{% endif %}>
+                            {{ model.name }}{% if model.is_default %} (Default){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                        <i class="fas fa-chevron-down text-gray-400"></i>
+                    </div>
+                </div>
             </div>
             {% endif %}
 
@@ -33,7 +46,7 @@
             {% if current_user.role == 'admin' %}
             <div class="space-y-2">
                 <a href="{{ url_for('model.add_model_page') }}"
-                   class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center">
+                   class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center transition-colors duration-200">
                     <i class="fas fa-plus-circle mr-2"></i>
                     Add Model
                 </a>
@@ -54,7 +67,7 @@
 
                 {% if chat_date != ns.current_date %}
                 {% set ns.current_date = chat_date %}
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider pt-4 first:pt-0">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider pt-4 first:pt-0 px-2">
                     {% if chat_date == today %}
                         Today
                     {% elif chat_date == yesterday %}
@@ -65,22 +78,27 @@
                 </div>
                 {% endif %}
 
-                <div class="relative group">
+                <div class="relative group touch-manipulation">
                     <a href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
-                       class="block p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500
+                       class="block p-4 rounded-lg hover:bg-gray-200 active:bg-gray-300 dark:hover:bg-gray-700 dark:active:bg-gray-600 focus:ring-2 focus:ring-blue-500 text-base transition-colors duration-150 touch-manipulation
                               {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}">
                         <div class="flex justify-between items-center">
-                            <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                {{ conversation.title }} - {{ conversation.model_name }}
+                            <span class="font-medium text-gray-900 dark:text-gray-100 truncate max-w-[180px]">
+                                {{ conversation.title }}
                             </span>
-                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                            <span class="text-sm text-gray-500 dark:text-gray-400 ml-2 flex-shrink-0">
                                 {{ conversation.timestamp.strftime('%I:%M %p') }}
                             </span>
                         </div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400 truncate mt-1">
+                            {{ conversation.model_name }}
+                        </div>
                     </a>
-                    <button class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center h-8 w-8 rounded-full hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 delete-chat-btn focus:ring-2 focus:ring-red-500"
-                            data-chat-id="{{ conversation.id }}" title="Delete chat">
-                        <i class="fas fa-trash-alt"></i>
+                    <button class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex md:group-hover:flex items-center justify-center w-12 h-12 rounded-full hover:bg-red-100 active:bg-red-200 dark:hover:bg-red-900 dark:active:bg-red-800 text-red-600 dark:text-red-400 delete-chat-btn focus:ring-2 focus:ring-red-500 transition-colors duration-150 touch-manipulation"
+                            data-chat-id="{{ conversation.id }}" 
+                            title="Delete chat"
+                            aria-label="Delete chat">
+                        <i class="fas fa-trash-alt text-lg"></i>
                     </button>
                 </div>
                 {% endfor %}
@@ -88,40 +106,50 @@
         </div>
     </nav>
 
+    <!-- Mobile Menu Backdrop -->
+    <div id="mobile-menu-backdrop" 
+        class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-40 hidden md:hidden transition-opacity duration-300">
+    </div>
+
     <!-- Main Chat Area -->
     <div class="flex-1 flex flex-col overflow-hidden relative">
         <!-- Chat Header -->
-        <div class="chat-header px-2 sm:px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between backdrop-filter backdrop-blur sticky top-0 z-10">
-            <div class="flex items-center">
+        <div class="chat-header px-4 py-3 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between backdrop-filter backdrop-blur sticky top-0 z-10">
+            <div class="flex items-center space-x-4">
                 <!-- Mobile Menu Button -->
                 <button
-                    id="chat-sidebar-toggle"
-                    class="md:hidden mr-2 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200 relative z-50"
-                    aria-label="Open chat sidebar"
-                    aria-controls="mobile-menu"
+                    id="mobile-menu-toggle"
+                    class="md:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
+                    aria-label="Toggle menu"
                     aria-expanded="false"
                 >
-                    <i class="fas fa-bars"></i>
+                    <i class="fas fa-bars text-2xl"></i>
                 </button>
-                <h2 id="chat-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                
+                <!-- Chat Title -->
+                <h2 id="chat-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate max-w-[200px] sm:max-w-none">
                     {{ chat_title }} - {{ model_name }}
                 </h2>
-                <button id="edit-title-btn" class="ml-4 text-sm text-blue-600 hover:underline transition-colors duration-200" aria-label="Edit chat title">
-                    <i class="fas fa-edit"></i>
+                
+                <!-- Edit Title Button -->
+                <button id="edit-title-btn" 
+                    class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200" 
+                    aria-label="Edit chat title">
+                    <i class="fas fa-edit text-lg"></i>
                 </button>
             </div>
         </div>
 
         <!-- Messages Area -->
-        <div id="chat-box" class="flex-1 overflow-y-auto px-2 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 min-h-[200px]" role="log" aria-live="polite">
+        <div id="chat-box" class="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-4 min-h-[200px]" role="log" aria-live="polite">
             {% if messages %}
                 {% for message in messages %}
                     {% if message.role == 'user' %}
                         <!-- User message -->
-                        <div class="flex w-full mt-2 space-x-3 max-w-xs sm:max-w-md md:max-w-2xl ml-auto justify-end">
+                        <div class="flex w-full mt-2 space-x-2 max-w-[85%] sm:max-w-md md:max-w-2xl ml-auto justify-end">
                             <div>
-                                <div class="relative bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
-                                    <p class="text-sm break-words overflow-x-auto">{{ message.content }}</p>
+                                <div class="relative bg-blue-600 text-white p-2.5 rounded-l-lg rounded-br-lg">
+                                    <p class="text-[15px] leading-normal break-words overflow-x-auto">{{ message.content }}</p>
                                     {% if loop.last %}
                                     <button class="edit-message-button absolute top-2 right-2 text-white hover:text-gray-200"
                                             title="Edit message">
@@ -136,17 +164,18 @@
                         </div>
                     {% else %}
                         <!-- Assistant message -->
-                        <div class="flex w-full mt-2 space-x-3 max-w-xs sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
-                            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700 object-cover" role="img" aria-label="Assistant avatar"></div>
-                            <div class="relative max-w-3xl">
-                                <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
+                        <div class="flex w-full mt-2 space-x-2 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
+                            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-700" role="img" aria-label="Assistant avatar"></div>
+                            <div class="relative max-w-full">
+                                <div class="bg-gray-100 dark:bg-gray-800 p-2.5 rounded-r-lg rounded-bl-lg">
                                     <div class="prose dark:prose-invert prose-sm max-w-none overflow-x-auto">
                                         {{ message.content|safe }}
                                     </div>
                                 </div>
                                 <div class="absolute right-0 top-0 flex space-x-2">
                                     <button class="copy-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                                            title="Copy to clipboard">
+                                            title="Copy to clipboard"
+                                            data-raw-content="{{ message.raw_content|default(message.content)|e }}">
                                         <i class="fas fa-copy"></i>
                                     </button>
                                     {% if loop.last %}
@@ -179,12 +208,13 @@
         </div>
 
         <!-- Input Area -->
-        <div class="sticky bottom-0 border-t border-gray-200 dark:border-gray-700 px-2 sm:px-4 py-2 sm:py-3 bg-white dark:bg-gray-900 z-10">
+        <div class="sticky bottom-0 border-t border-gray-200 dark:border-gray-700 px-3 sm:px-4 py-2 bg-white dark:bg-gray-900 z-10">
             <div class="flex flex-col sm:flex-row items-start sm:items-end space-y-2 sm:space-y-0 sm:space-x-3">
                 <!-- Upload Button -->
-                <button id="upload-button" class="w-full sm:w-auto p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors duration-200" aria-label="Upload files">
-                    <i class="fas fa-upload mr-2"></i>
-                    <span class="hidden sm:inline">Upload</span>
+                <button id="upload-button" 
+                    class="p-2.5 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors duration-200" 
+                    aria-label="Upload files">
+                    <i class="fas fa-upload text-lg"></i>
                 </button>
                 <input type="file" id="file-input" class="hidden" multiple>
 
@@ -192,16 +222,16 @@
                 <div class="flex w-full space-x-2">
                     <div id="message-input-container" class="flex-1">
                         <textarea id="message-input"
-                                  class="w-full px-3 py-2 resize-none border border-gray-300 rounded-lg sm:rounded-l-lg sm:rounded-r-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 transition-colors duration-200"
-                                  placeholder="Type your message..."
-                                  rows="1"
-                                  aria-label="Message input"
-                                  maxlength="1000"></textarea>
+                            class="w-full px-3 py-2.5 resize-none border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 transition-colors duration-200 text-[16px]"
+                            placeholder="Type your message..."
+                            rows="1"
+                            aria-label="Message input"
+                            maxlength="1000"></textarea>
                     </div>
 
                     <!-- Send Button -->
                     <button id="send-button"
-                            class="flex items-center justify-center p-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200"
+                            class="flex items-center justify-center p-2.5 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 min-w-[44px]"
                             type="button" aria-label="Send message">
                         <i class="fas fa-paper-plane"></i>
                     </button>
@@ -211,8 +241,6 @@
     </div>
 </div>
 
-<!-- Mobile Menu Backdrop -->
-<div id="mobile-menu-backdrop" class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm hidden z-40 transition-opacity duration-300 opacity-0"></div>
 
 <!-- Drop Zone -->
 <div id="drop-zone" class="hidden sm:flex fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-modal items-center justify-center transition-opacity duration-300" role="dialog" aria-label="File drop zone">
@@ -233,6 +261,237 @@
 <!-- Feedback Message -->
 <div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center"></div>
 
+<style>
+/* Mobile touch optimizations */
+@media (max-width: 767px) {
+    /* Improve touch targets */
+    .touch-manipulation {
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Larger touch targets */
+    button, 
+    a, 
+    select,
+    input[type="button"],
+    input[type="submit"] {
+        min-height: 48px;
+        min-width: 48px;
+        padding: 12px;
+        touch-action: manipulation;
+    }
+
+    /* Prevent double-tap zoom */
+    * {
+        touch-action: manipulation;
+    }
+
+    /* Better tap states */
+    .active\:bg-gray-300:active {
+        background-color: rgba(209, 213, 219, var(--tw-bg-opacity));
+    }
+
+    .dark .dark\:active\:bg-gray-600:active {
+        background-color: rgba(75, 85, 99, var(--tw-bg-opacity));
+    }
+
+    /* Improve button spacing */
+    .group button {
+        margin: 4px;
+    }
+
+    /* Prevent text selection while scrolling */
+    .overflow-y-auto {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-y: contain;
+    }
+
+    /* Add gap between items */
+    .space-y-2 > * + * {
+        margin-top: 0.75rem;
+    }
+}
+
+/* Improved focus states */
+.focus\:ring-2:focus {
+    --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+    --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+}
+
+/* Active states for buttons */
+.active\:scale-95:active {
+    transform: scale(0.95);
+}
+
+/* Transition improvements */
+.transition-all {
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+}
+
+/* Better hover states */
+@media (hover: hover) {
+    .hover\:bg-gray-200:hover {
+        background-color: rgba(229, 231, 235, var(--tw-bg-opacity));
+    }
+
+    .dark .dark\:hover\:bg-gray-700:hover {
+        background-color: rgba(55, 65, 81, var(--tw-bg-opacity));
+    }
+}
+
+/* Improved button visibility */
+.group:hover .group-hover\:flex,
+.group:focus-within .group-hover\:flex {
+    display: flex !important;
+}
+
+/* Better spacing for mobile */
+@media (max-width: 767px) {
+    .p-4 {
+        padding: 1rem 0.75rem;
+    }
+    
+    .space-x-4 > * + * {
+        margin-left: 0.75rem;
+    }
+}
+
+/* Standardized text sizes */
+.text-base {
+    font-size: 1rem;
+    line-height: 1.5rem;
+}
+
+.text-lg {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+}
+
+.text-xl {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+}
+
+.text-2xl {
+    font-size: 1.5rem;
+    line-height: 2rem;
+}
+
+/* Consistent spacing */
+.p-4 {
+    padding: 1rem;
+}
+
+.px-4 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+}
+
+.py-3 {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+.space-y-2 > * + * {
+    margin-top: 0.5rem;
+}
+
+.space-y-4 > * + * {
+    margin-top: 1rem;
+}
+
+.space-x-4 > * + * {
+    margin-left: 1rem;
+}
+
+/* Improved mobile menu transitions */
+#mobile-menu {
+    transition: transform 0.3s ease-in-out;
+}
+
+#mobile-menu-backdrop {
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* Consistent button styles */
+button {
+    min-height: 40px;
+    min-width: 40px;
+}
+
+/* Improved touch targets on mobile */
+@media (max-width: 767px) {
+    button, a {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    
+    select {
+        height: 44px;
+    }
+}
+
+.button-loading {
+    position: relative;
+    color: transparent !important;
+}
+
+.button-loading::after {
+    content: "";
+    position: absolute;
+    width: 1em;
+    height: 1em;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-right-color: transparent;
+    animation: button-loading-spinner 0.75s linear infinite;
+}
+
+@keyframes button-loading-spinner {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Mobile menu styles */
+@media (max-width: 767px) {
+    #mobile-menu {
+        position: fixed;
+        height: 100vh;
+        top: 0;
+        left: 0;
+        bottom: 0;
+    }
+
+    #mobile-menu.hidden {
+        display: none;
+    }
+}
+
+@media (min-width: 768px) {
+    #mobile-menu {
+        position: relative;
+        transform: none !important;
+    }
+
+    #mobile-menu-backdrop {
+        display: none !important;
+    }
+}
+
+/* Ensure new chat button is always visible */
+#new-chat-btn {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
@@ -298,4 +557,21 @@
 
 <!-- Load chat.js -->
 <script src="{{ url_for('static', filename='js/chat.js') }}" defer></script>
+
+<!-- Initialize token usage manager -->
+<script type="module">
+    import TokenUsageManager from "{{ url_for('static', filename='js/token-usage.js') }}";
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize token usage manager
+        const tokenManager = new TokenUsageManager(window.CHAT_CONFIG);
+
+        // Hook into chat response handling
+        const originalHandleResponse = window.handleResponse;
+        window.handleResponse = async function(response) {
+            await originalHandleResponse(response);
+            tokenManager.handleNewMessage();
+        };
+    });
+</script>
 {% endblock %}

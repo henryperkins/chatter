@@ -375,9 +375,11 @@ class Model:
         if max_completion_tokens is not None:
             try:
                 max_completion_tokens = int(max_completion_tokens)
-                if not (1 <= max_completion_tokens <= 16384):
+                # Update the token limit for o1 models
+                max_limit = 32000 if config.get("requires_o1_handling") else 16384
+                if not (1 <= max_completion_tokens <= max_limit):
                     raise ValueError(
-                        "max_completion_tokens must be between 1 and 16384"
+                        f"max_completion_tokens must be between 1 and {max_limit}"
                     )
                 config["max_completion_tokens"] = max_completion_tokens
             except (TypeError, ValueError):

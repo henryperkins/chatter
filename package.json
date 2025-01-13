@@ -132,5 +132,6 @@
     "which": "^2.0.2",
     "wrap-ansi": "^8.1.0",
     "yaml": "^2.7.0"
-  }
+  },
+  "main": "postcss.config.js"
 }
