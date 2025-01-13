@@ -531,10 +531,10 @@ button {
     window.CHAT_CONFIG = {
         chatId: "{{ chat_id }}",
         editModelUrl: "{{ url_for('model.edit_model', model_id=0) }}".replace('0', ''),
-        maxFileSize: parseInt("{{ config.get('MAX_FILE_SIZE', 10 * 1024 * 1024)|string }}"),
-        maxFiles: parseInt("{{ config.get('MAX_FILES', 5)|string }}"),
-        maxMessageLength: parseInt("{{ config.get('MAX_MESSAGE_LENGTH', 1000)|string }}"),
-        allowedFileTypes: JSON.parse('{{ config.get("ALLOWED_FILE_TYPES", ["text/plain", "application/pdf", "text/x-python", "application/javascript", "text/markdown", "image/jpeg", "image/png", "text/csv"])|tojson|safe }}'),
+        maxFileSize: parseInt("{{ config.get('MAX_FILE_SIZE', 10 * 1024 * 1024) }}"),
+        maxFiles: parseInt("{{ config.get('MAX_FILES', 5) }}"),
+        maxMessageLength: parseInt("{{ config.get('MAX_MESSAGE_LENGTH', 1000) }}"),
+        allowedFileTypes: JSON.parse('{{ config.get("ALLOWED_FILE_TYPES", ["text/plain", "application/pdf", "image/jpeg", "image/png"]) | tojson | safe }}'),
         csrfToken: "{{ csrf_token() }}",
         userId: "{{ current_user.id }}",
         userRole: "{{ current_user.role }}"
