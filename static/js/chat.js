@@ -9,6 +9,35 @@
       return;
     }
 
+    function initializeMobileMenu() {
+      const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+      const mobileMenu = document.getElementById('mobile-menu');
+      const backdrop = document.getElementById('mobile-menu-backdrop');
+
+      if (!mobileMenuToggle || !mobileMenu || !backdrop) {
+          console.error('Mobile menu elements not found');
+          return;
+      }
+
+      mobileMenuToggle.addEventListener('click', () => {
+          const isExpanded = mobileMenuToggle.getAttribute('aria-expanded') === 'true';
+          mobileMenuToggle.setAttribute('aria-expanded', !isExpanded);
+          mobileMenu.classList.toggle('-translate-x-full');
+          backdrop.classList.toggle('hidden');
+          document.body.classList.toggle('overflow-hidden');
+      });
+
+      backdrop.addEventListener('click', () => {
+          mobileMenu.classList.add('-translate-x-full');
+          backdrop.classList.add('hidden');
+          document.body.classList.remove('overflow-hidden');
+          mobileMenuToggle.setAttribute('aria-expanded', 'false');
+      });
+    }
+
+    // Initialize mobile menu
+    initializeMobileMenu();
+
     // Access utility functions and dependencies
     const { showFeedback, fetchWithCSRF } = window.utils;
     const DOMPurify = window.DOMPurify;
@@ -172,26 +201,6 @@
     }
 
     function setupMobileLayout() {
-      const sidebarToggle = document.getElementById('sidebar-toggle');
-      const sidebar = document.getElementById('sidebar');
-
-      if (sidebarToggle && sidebar) {
-        const toggleSidebar = () => {
-          sidebar.classList.toggle('-translate-x-full');
-          document.body.classList.toggle('overflow-hidden');
-        };
-
-        sidebarToggle.addEventListener('click', toggleSidebar);
-
-        // Close sidebar when clicking outside
-        document.addEventListener('click', (e) => {
-          if (!sidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
-            sidebar.classList.add('-translate-x-full');
-            document.body.classList.remove('overflow-hidden');
-          }
-        });
-      }
-
       // Adjust textarea for mobile
       if (messageInput) {
         messageInput.style.fontSize = '16px'; // Prevent zoom on iOS
