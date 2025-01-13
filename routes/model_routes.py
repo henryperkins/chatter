@@ -210,9 +210,7 @@ def add_model_page():
 @login_required
 @admin_required
 def edit_model(model_id):
-    """
-    Edit model route handler.
-    """
+    """Edit model route handler."""
     try:
         model = Model.get_by_id(model_id)
         if not model:
@@ -226,9 +224,7 @@ def edit_model(model_id):
                     data = extract_model_data(form)
                     validate_immutable_fields(model_id, data)
                     Model.update(model_id, data)
-                    return jsonify(
-                        {"success": True, "message": "Model updated successfully"}
-                    )
+                    return jsonify({"success": True, "message": "Model updated successfully"})
                 except Exception as e:
                     return handle_error(e, "Error updating model", 400)
 

@@ -163,7 +163,6 @@ class ConversationManager:
         if role == "assistant":
             import markdown_it
             from bs4 import BeautifulSoup
-            import prism
 
             # Initialize markdown parser with your preferred configuration
             md = markdown_it.MarkdownIt('commonmark', {'html': True})
@@ -174,15 +173,6 @@ class ConversationManager:
             # Clean and format the HTML
             soup = BeautifulSoup(html_content, 'html.parser')
             
-            # Format code blocks with Prism
-            for pre in soup.find_all('pre'):
-                code = pre.find('code')
-                if code:
-                    lang = code.get('class', [''])[0].replace('language-', '') if code.get('class') else ''
-                    formatted_code = prism.highlight(code.get_text(), lang)
-                    new_code = BeautifulSoup(formatted_code, 'html.parser')
-                    code.replace_with(new_code)
-
             # Store both raw and formatted content in metadata
             metadata["raw_content"] = content
             metadata["formatted_content"] = str(soup)
