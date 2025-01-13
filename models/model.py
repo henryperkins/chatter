@@ -52,7 +52,7 @@ class Model:
             "deployment_name": os.getenv("DEFAULT_DEPLOYMENT_NAME", "gpt-4"),
             "description": os.getenv("DEFAULT_MODEL_DESCRIPTION", "Default GPT-4 model"),
             "model_type": os.getenv("DEFAULT_MODEL_TYPE", "azure"),
-            "api_endpoint": os.getenv("AZURE_API_ENDPOINT", "https://your-resource.openai.azure.com"),
+            "api_endpoint": os.getenv("DEFAULT_API_ENDPOINT", "https://your-resource.openai.azure.com"),
             "api_key": os.getenv("AZURE_API_KEY", "your_default_api_key"),
             "temperature": float(os.getenv("DEFAULT_TEMPERATURE", "1.0")),
             "max_tokens": int(os.getenv("DEFAULT_MAX_TOKENS", "4000")),
