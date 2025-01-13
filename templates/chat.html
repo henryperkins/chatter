@@ -1,16 +1,28 @@
 {% extends "base.html" %}
 
-{% block title %}Chat - Azure OpenAI{% endblock %}
+{% block title %}
+Chat - Azure OpenAI
+{% endblock %}
 
-{% block main_classes %}container mx-auto p-0 h-[calc(100vh-4rem)] flex{% endblock %}
+{% block main_classes %}
+container mx-auto p-0 h-[calc(100vh-4rem)] flex
+{% endblock %}
 
 {% block content %}
 <div class="flex flex-col h-full overflow-hidden bg-white dark:bg-gray-900">
     <!-- Sidebar -->
-    <nav id="sidebar" class="hidden md:block fixed md:relative z-40 md:z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto flex flex-col" aria-label="Chat navigation">
+    <nav
+      id="sidebar"
+      class="hidden md:block fixed md:relative z-40 md:z-50 transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 h-full overflow-y-auto flex flex-col"
+      aria-label="Chat navigation"
+    >
         <div class="flex-none p-4 space-y-4">
             <!-- New Chat Button -->
-            <button id="new-chat-btn" class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200" aria-label="Start new chat">
+            <button
+              id="new-chat-btn"
+              class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"
+              aria-label="Start new chat"
+            >
                 <i class="fas fa-plus mr-2"></i>
                 New Chat
             </button>
@@ -18,8 +30,17 @@
             <!-- Model Selection -->
             {% if models %}
             <div>
-                <label for="model-select" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model:</label>
-                <select id="model-select" data-original-value="{{ model_id }}" class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 placeholder-gray-400">
+                <label
+                  for="model-select"
+                  class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                >
+                    Model:
+                </label>
+                <select
+                  id="model-select"
+                  data-original-value="{{ model_id }}"
+                  class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 placeholder-gray-400"
+                >
                     {% for model in models %}
                     <option value="{{ model.id }}" {% if model.is_default %}selected{% endif %}>
                         {{ model.name }}{% if model.is_default %} (Default){% endif %}
@@ -32,14 +53,18 @@
             <!-- Admin Buttons -->
             {% if current_user.role == 'admin' %}
             <div class="space-y-2">
-                <a href="{{ url_for('model.add_model_page') }}"
-                   class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center">
+                <a
+                  href="{{ url_for('model.add_model_page') }}"
+                  class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center"
+                >
                     <i class="fas fa-plus-circle mr-2"></i>
                     Add Model
                 </a>
-                <button id="edit-model-btn"
-                        class="block w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-center transition-colors duration-200"
-                        aria-label="Edit current model settings">
+                <button
+                  id="edit-model-btn"
+                  class="block w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-center transition-colors duration-200"
+                  aria-label="Edit current model settings"
+                >
                     <i class="fas fa-edit mr-2"></i>
                     Edit Model
                 </button>
@@ -66,9 +91,11 @@
                 {% endif %}
 
                 <div class="relative group">
-                    <a href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
-                       class="block p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500
-                              {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}">
+                    <a
+                      href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
+                      class="block p-3 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 focus:ring-2 focus:ring-blue-500
+                             {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}"
+                    >
                         <div class="flex justify-between items-center">
                             <span class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                                 {{ conversation.title }} - {{ conversation.model_name }}
@@ -78,8 +105,11 @@
                             </span>
                         </div>
                     </a>
-                    <button class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center h-8 w-8 rounded-full hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 delete-chat-btn focus:ring-2 focus:ring-red-500"
-                            data-chat-id="{{ conversation.id }}" title="Delete chat">
+                    <button
+                      class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center h-8 w-8 rounded-full hover:bg-red-100 dark:hover:bg-red-900 text-red-600 dark:text-red-400 delete-chat-btn focus:ring-2 focus:ring-red-500"
+                      data-chat-id="{{ conversation.id }}"
+                      title="Delete chat"
+                    >
                         <i class="fas fa-trash-alt"></i>
                     </button>
                 </div>
@@ -91,87 +121,116 @@
     <!-- Main Chat Area -->
     <div class="flex-1 flex flex-col overflow-hidden z-0 md:z-auto">
         <!-- Chat Header -->
-        <div class="chat-header px-2 sm:px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between backdrop-filter backdrop-blur">
+        <div
+          class="chat-header px-2 sm:px-4 py-2 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between backdrop-filter backdrop-blur"
+        >
             <div class="flex items-center">
                 <!-- Mobile Menu Button -->
                 <button
-                    id="sidebar-toggle"
-                    class="md:hidden mr-2 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200"
-                    aria-label="Open mobile menu"
-                    aria-controls="mobile-menu"
-                    aria-expanded="false"
+                  id="sidebar-toggle"
+                  class="md:hidden mr-2 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-200"
+                  aria-label="Open mobile menu"
+                  aria-controls="mobile-menu"
+                  aria-expanded="false"
                 >
                     <i class="fas fa-bars"></i>
                 </button>
-                <h2 id="chat-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                <h2
+                  id="chat-title"
+                  class="text-lg font-semibold text-gray-900 dark:text-gray-100"
+                >
                     {{ chat_title }} - {{ model_name }}
                 </h2>
-                <button id="edit-title-btn" class="ml-4 text-sm text-blue-600 hover:underline transition-colors duration-200" aria-label="Edit chat title">
+                <button
+                  id="edit-title-btn"
+                  class="ml-4 text-sm text-blue-600 hover:underline transition-colors duration-200"
+                  aria-label="Edit chat title"
+                >
                     <i class="fas fa-edit"></i>
                 </button>
             </div>
         </div>
 
         <!-- Messages Area -->
-        <div id="chat-box" class="flex-1 overflow-y-auto px-2 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 min-h-[200px]" role="log" aria-live="polite">
+        <div
+          id="chat-box"
+          class="flex-1 overflow-y-auto px-2 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 min-h-[200px]"
+          role="log"
+          aria-live="polite"
+        >
             {% if messages %}
                 {% for message in messages %}
                     {% if message.role == 'user' %}
-                        <!-- User message -->
-                        <div class="flex w-full mt-2 space-x-3 max-w-xs sm:max-w-md md:max-w-2xl ml-auto justify-end">
-                            <div>
-                                <div class="relative bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
-                                    <p class="text-sm break-words overflow-x-auto">{{ message.content }}</p>
-                                    {% if loop.last %}
-                                    <button class="edit-message-button absolute top-2 right-2 text-white hover:text-gray-200"
-                                            title="Edit message">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    {% endif %}
-                                </div>
-                                <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
-                                    {{ message.timestamp.strftime('%I:%M %p') if message.timestamp else now().strftime('%I:%M %p') }}
-                                </span>
+                    <!-- User message -->
+                    <div class="flex w-full mt-2 space-x-3 max-w-xs sm:max-w-md md:max-w-2xl ml-auto justify-end">
+                        <div>
+                            <div class="relative bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
+                                <p class="text-sm break-words overflow-x-auto">
+                                    {{ message.content }}
+                                </p>
+                                {% if loop.last %}
+                                <button
+                                  class="edit-message-button absolute top-2 right-2 text-white hover:text-gray-200"
+                                  title="Edit message"
+                                >
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                {% endif %}
                             </div>
+                            <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                                {{ message.timestamp.strftime('%I:%M %p') if message.timestamp else now().strftime('%I:%M %p') }}
+                            </span>
                         </div>
+                    </div>
                     {% else %}
-                        <!-- Assistant message -->
-                        <div class="flex w-full mt-2 space-x-3 max-w-xs sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
-                            <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700 object-cover" role="img" aria-label="Assistant avatar"></div>
-                            <div class="relative max-w-3xl">
-                                <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
-                                    <div class="prose dark:prose-invert prose-sm max-w-none overflow-x-auto">
-                                        {{ message.content|safe }}
-                                    </div>
+                    <!-- Assistant message -->
+                    <div class="flex w-full mt-2 space-x-3 max-w-xs sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
+                        <div
+                          class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700 object-cover"
+                          role="img"
+                          aria-label="Assistant avatar"
+                        ></div>
+                        <div class="relative max-w-3xl">
+                            <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
+                                <div class="prose dark:prose-invert prose-sm max-w-none overflow-x-auto">
+                                    {{ message.content|safe }}
                                 </div>
-                                <div class="absolute right-0 top-0 flex space-x-2">
-                                    <button class="copy-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                                            title="Copy to clipboard">
-                                        <i class="fas fa-copy"></i>
-                                    </button>
-                                    {% if loop.last %}
-                                    <button class="regenerate-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                                            title="Regenerate response">
-                                        <i class="fas fa-redo-alt"></i>
-                                    </button>
-                                    {% endif %}
-                                </div>
-                                <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
-                                    {{ message.timestamp.strftime('%I:%M %p') if message.timestamp else now().strftime('%I:%M %p') }}
-                                </span>
                             </div>
+                            <div class="absolute right-0 top-0 flex space-x-2">
+                                <button
+                                  class="copy-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                                  title="Copy to clipboard"
+                                >
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                                {% if loop.last %}
+                                <button
+                                  class="regenerate-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                                  title="Regenerate response"
+                                >
+                                    <i class="fas fa-redo-alt"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                            <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                                {{ message.timestamp.strftime('%I:%M %p') if message.timestamp else now().strftime('%I:%M %p') }}
+                            </span>
                         </div>
+                    </div>
                     {% endif %}
                 {% endfor %}
             {% else %}
-                <div class="text-center text-gray-500">
-                    <p>This is a new chat. Start typing to begin!</p>
-                </div>
+            <div class="text-center text-gray-500">
+                <p>This is a new chat. Start typing to begin!</p>
+            </div>
             {% endif %}
         </div>
 
         <!-- File Upload Area -->
-        <div id="uploaded-files" class="hidden px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+        <div
+          id="uploaded-files"
+          class="hidden px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700"
+        >
             <h3 class="text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">
                 Uploaded Files
             </h3>
@@ -179,30 +238,41 @@
         </div>
 
         <!-- Input Area -->
-        <div class="sticky bottom-0 border-t border-gray-200 dark:border-gray-700 px-2 sm:px-4 py-2 sm:py-3 bg-white dark:bg-gray-900">
+        <div
+          class="sticky bottom-0 border-t border-gray-200 dark:border-gray-700 px-2 sm:px-4 py-2 sm:py-3 bg-white dark:bg-gray-900"
+        >
             <div class="flex flex-col sm:flex-row items-start sm:items-end space-y-2 sm:space-y-0 sm:space-x-3">
                 <!-- Upload Button -->
-                <button id="upload-button" class="w-full sm:w-auto p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors duration-200" aria-label="Upload files">
+                <button
+                  id="upload-button"
+                  class="w-full sm:w-auto p-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors duration-200"
+                  aria-label="Upload files"
+                >
                     <i class="fas fa-upload mr-2"></i>
                     <span class="hidden sm:inline">Upload</span>
                 </button>
-                <input type="file" id="file-input" class="hidden" multiple>
+                <input type="file" id="file-input" class="hidden" multiple />
 
                 <!-- Message Input and Send Button -->
                 <div class="flex w-full space-x-2">
                     <div id="message-input-container" class="flex-1">
-                        <textarea id="message-input"
-                                  class="w-full px-3 py-2 resize-none border border-gray-300 rounded-lg sm:rounded-l-lg sm:rounded-r-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 transition-colors duration-200"
-                                  placeholder="Type your message..."
-                                  rows="1"
-                                  aria-label="Message input"
-                                  maxlength="1000"></textarea>
+                        <textarea
+                          id="message-input"
+                          class="w-full px-3 py-2 resize-none border border-gray-300 rounded-lg sm:rounded-l-lg sm:rounded-r-none focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 transition-colors duration-200"
+                          placeholder="Type your message..."
+                          rows="1"
+                          aria-label="Message input"
+                          maxlength="1000"
+                        ></textarea>
                     </div>
 
                     <!-- Send Button -->
-                    <button id="send-button"
-                            class="flex items-center justify-center p-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200"
-                            type="button" aria-label="Send message">
+                    <button
+                      id="send-button"
+                      class="flex items-center justify-center p-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200"
+                      type="button"
+                      aria-label="Send message"
+                    >
                         <i class="fas fa-paper-plane"></i>
                     </button>
                 </div>
@@ -212,7 +282,12 @@
 </div>
 
 <!-- Drop Zone -->
-<div id="drop-zone" class="hidden fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-modal flex items-center justify-center transition-opacity duration-300" role="dialog" aria-label="File drop zone">
+<div
+  id="drop-zone"
+  class="hidden fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-modal flex items-center justify-center transition-opacity duration-300"
+  role="dialog"
+  aria-label="File drop zone"
+>
     <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl text-center">
         <p class="text-xl font-semibold text-gray-800 dark:text-gray-100">Drop files here</p>
         <p class="text-gray-500 dark:text-gray-400 mt-2">Release to upload</p>
@@ -220,79 +295,74 @@
 </div>
 
 <!-- Upload Progress -->
-<div id="upload-progress" class="hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 w-64 transition-all duration-300 transform translate-y-0" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+<div
+  id="upload-progress"
+  class="hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 w-64 transition-all duration-300 transform translate-y-0"
+  role="progressbar"
+  aria-valuemin="0"
+  aria-valuemax="100"
+  aria-valuenow="0"
+>
     <div class="text-sm mb-2 text-gray-800 dark:text-gray-100">Uploading files...</div>
     <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-        <div id="upload-progress-bar" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+        <div
+          id="upload-progress-bar"
+          class="bg-blue-600 h-2 rounded-full"
+          style="width: 0%"
+        ></div>
     </div>
 </div>
 
 <!-- Feedback Message -->
-<div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center"></div>
-
+<div
+  id="feedback-message"
+  class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center"
+></div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
 
-<!-- Include Dependency Scripts -->
-<script src="{{ url_for('static', filename='js/dompurify.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/axios.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/markdown-it.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/prism.js') }}"></script>
-<script src="{{ url_for('static', filename='js/markdown-it-bundle.js') }}"></script>
-<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
-
-<!-- Initialize required globals -->
+<!-- Ensure vendor libs are loaded, then expose them globally if needed -->
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        // Expose DOMPurify globally
-        if (typeof DOMPurify !== 'undefined') {
-            window.DOMPurify = DOMPurify;
-        } else {
-            console.error('DOMPurify is not loaded');
-        }
+  document.addEventListener('DOMContentLoaded', () => {
+    if (typeof DOMPurify !== 'undefined') {
+      window.DOMPurify = DOMPurify;
+    } else {
+      console.error('DOMPurify is not loaded');
+    }
 
-        // Expose Prism globally
-        if (typeof Prism !== 'undefined') {
-            window.Prism = Prism;
-        } else {
-            console.error('Prism is not loaded');
-        }
+    if (typeof Prism !== 'undefined') {
+      window.Prism = Prism;
+    } else {
+      console.error('Prism is not loaded');
+    }
 
-        // markdown-it is initialized in markdown-it-bundle.js
-        if (!window.md) {
-            console.error('markdown-it bundle is not loaded');
-        }
-    });
+    // 'markdown-it' is initialized in 'markdown-it-bundle.js' => window.md
+    if (!window.md) {
+      console.error('markdown-it-bundle is not loaded');
+    }
+  });
 </script>
 
-<!-- Define CHAT_CONFIG before loading chat.js -->
+<!-- Define any needed chat config BEFORE loading chatMain.js -->
 <script>
-    window.CHAT_CONFIG = {
-        chatId: "{{ chat_id }}",
-        editModelUrl: "{{ url_for('model.edit_model', model_id=0) }}",
-        maxFileSize: parseInt("{{ config.get('MAX_FILE_SIZE', 10 * 1024 * 1024)|string }}"),
-        maxFiles: parseInt("{{ config.get('MAX_FILES', 5)|string }}"),
-        maxMessageLength: parseInt("{{ config.get('MAX_MESSAGE_LENGTH', 1000)|string }}"),
-        allowedFileTypes: JSON.parse('{{ config.get("ALLOWED_FILE_TYPES", ["text/plain", "application/pdf", "text/x-python", "application/javascript", "text/markdown", "image/jpeg", "image/png", "text/csv"])|tojson|safe }}'),
-        csrfToken: "{{ csrf_token() }}",
-        userId: "{{ current_user.id }}",
-        userRole: "{{ current_user.role }}"
-    };
+  window.CHAT_CONFIG = {
+    chatId: "{{ chat_id }}",
+    models: JSON.parse('{{ models|tojson|safe }}'),
+    /* Additional config as needed:
+       userId: "{{ current_user.id }}",
+       userRole: "{{ current_user.role }}",
+       etc. */
+  };
 
-    // Initialize models data
-    window.CHAT_CONFIG.models = JSON.parse('{{ models|tojson|safe }}');
-
-    // Validate chat configuration
-    if (!window.CHAT_CONFIG.chatId) {
-        console.warn('Chat ID not initialized');
-    }
-    if (!window.CHAT_CONFIG.csrfToken) {
-        console.error('CSRF token not found');
-    }
+  if (!window.CHAT_CONFIG.chatId) {
+    console.warn('Chat ID not initialized');
+  }
 </script>
 
-<!-- Load chat.js -->
-<script src="{{ url_for('static', filename='js/chat.js') }}" defer></script>
+<!-- Load the Refactored Chat Modules (chatMain.js imports the rest) -->
+<script type="module">
+  import '/static/js/chat/chatMain.js';
+</script>
 {% endblock %}
