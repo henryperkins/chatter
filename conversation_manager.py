@@ -12,14 +12,14 @@ from token_utils import count_tokens
 logger = logging.getLogger(__name__)
 
 # Token-related constants
-TOKENS_PER_MESSAGE: int = 3  # Includes role and message separators
-TOKENS_PER_NAME: int = 1  # Extra token for messages with names
-TOKENS_PER_ASSISTANT_REPLY: int = 3  # Accounts for assistant's reply tokens
+SYSTEM_TOKENS: int = 4  # Base tokens for system messages
+USER_TOKENS: int = 4    # Base tokens for user messages
+ASSISTANT_TOKENS: int = 4  # Base tokens for assistant messages
 
 # Configurable Environment Variables (with defaults)
 MAX_MESSAGES: int = int(os.getenv("MAX_MESSAGES", "20"))
-MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "16384"))  # Adjusted for GPT-4 16K model
-MAX_MESSAGE_TOKENS: int = int(os.getenv("MAX_MESSAGE_TOKENS", "8192"))  # GPT-4 input limit
+MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "32000"))  # Increased from 16384 to 32000
+MAX_MESSAGE_TOKENS: int = int(os.getenv("MAX_MESSAGE_TOKENS", "32000"))  # Increased from 8192
 MODEL_NAME: str = os.getenv("MODEL_NAME", "gpt-4")  # Model for token counting
 
 
@@ -42,7 +42,7 @@ class ConversationManager:
 
     def num_tokens_from_messages(self, messages: List[Dict[str, str]]) -> int:
         """
-        Returns the number of tokens used by a list of messages as per OpenAI's guidelines.
+        Returns the number of tokens used by a list of messages with improved accuracy.
 
         Args:
             messages: List of message dictionaries with 'role' and 'content' keys.
@@ -52,12 +52,22 @@ class ConversationManager:
         """
         num_tokens = 0
         for message in messages:
-            num_tokens += TOKENS_PER_MESSAGE
-            num_tokens += count_tokens(message["content"], MODEL_NAME)
-            if message.get("name"):  # If there's a name field, add an extra token
-                num_tokens += TOKENS_PER_NAME
+            # Add role-specific base tokens
+            if message["role"] == "system":
+                num_tokens += SYSTEM_TOKENS
+            elif message["role"] == "user":
+                num_tokens += USER_TOKENS
+            elif message["role"] == "assistant":
+                num_tokens += ASSISTANT_TOKENS
 
-        num_tokens += TOKENS_PER_ASSISTANT_REPLY
+            # Count content tokens
+            content_tokens = count_tokens(message["content"], MODEL_NAME)
+            num_tokens += content_tokens
+
+            # Add to message metadata if available
+            if isinstance(message.get("metadata"), dict):
+                message["metadata"]["token_count"] = content_tokens
+
         return num_tokens
 
     def get_context(self, chat_id: str, include_system: bool = False) -> List[Dict[str, str]]:
@@ -237,7 +247,7 @@ class ConversationManager:
         finally:
             db.close()
 
-    def get_usage_stats(self, chat_id: str) -> Dict[str, int]:
+    def get_usage_stats(self, chat_id: str) -> Dict[str, Any]:
         """
         Get detailed usage statistics.
 
@@ -245,7 +255,7 @@ class ConversationManager:
             chat_id: The chat ID to get stats for
 
         Returns:
-            Dictionary containing usage statistics
+            Dictionary containing detailed usage statistics
         """
         messages = Chat.get_messages(chat_id, include_system=True)
 
@@ -254,19 +264,44 @@ class ConversationManager:
             "total_tokens": 0,
             "user_messages": 0,
             "assistant_messages": 0,
-            "system_messages": 0
+            "system_messages": 0,
+            "token_breakdown": {
+                "user": 0,
+                "assistant": 0,
+                "system": 0
+            },
+            "average_tokens_per_message": 0,
+            "largest_message": {
+                "role": None,
+                "tokens": 0
+            }
         }
 
         for msg in messages:
+            role = msg.get("role", "")
             metadata = msg.get("metadata", {})
+            
             if isinstance(metadata, dict):
                 tokens = metadata.get("token_count", 0)
                 if isinstance(tokens, (int, float)):
-                    stats["total_tokens"] += int(tokens)
+                    tokens = int(tokens)
+                    stats["total_tokens"] += tokens
+                    if role in stats["token_breakdown"]:
+                        stats["token_breakdown"][role] += tokens
+                    
+                    # Track largest message
+                    if tokens > stats["largest_message"]["tokens"]:
+                        stats["largest_message"] = {
+                            "role": role,
+                            "tokens": tokens
+                        }
 
-            role = msg.get("role", "")
             if isinstance(role, str) and role in ["user", "assistant", "system"]:
                 stats[f"{role}_messages"] += 1
+
+        # Calculate average tokens per message
+        if stats["total_messages"] > 0:
+            stats["average_tokens_per_message"] = stats["total_tokens"] / stats["total_messages"]
 
         return stats
 
