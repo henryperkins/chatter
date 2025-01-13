@@ -3,13 +3,32 @@
     const { showFeedback, fetchWithCSRF } = window.utils;
 
     /**
-     * Merges the old `initializeMobileMenu` with chat's `setupMobileLayout`.
-     * We now handle:
-     * 1) Toggling the mobile sidebar or menu
-     * 2) Toggling body overflow (for mobile)
-     * 3) Handling outside clicks
-     * 4) Checking if screen is below a certain width
-     * 5) Possibly toggling a separate 'mobileMenu' or 'sidebar'
+     * Initializes mobile layout interactions for responsive design.
+     * 
+     * Handles mobile menu and sidebar interactions on screens smaller than 768px, including:
+     * - Toggling mobile menu visibility
+     * - Toggling sidebar visibility
+     * - Managing body overflow for mobile views
+     * - Handling outside clicks to close menus
+     * 
+     * @description
+     * This function is only active on mobile screen sizes (width < 768px). It sets up
+     * event listeners for mobile menu and sidebar toggle buttons, allowing users to
+     * open and close these UI components. Clicking outside the menu or sidebar will
+     * automatically close them.
+     * 
+     * @requires DOM elements with IDs:
+     * - 'mobile-menu-toggle'
+     * - 'mobile-menu'
+     * - 'sidebar-toggle'
+     * - 'sidebar'
+     * - 'mobile-menu-close' (optional)
+     * 
+     * @example
+     * // Automatically called during page initialization
+     * initializeMobileLayout();
+     * 
+     * @throws {Error} If required DOM elements are missing
      */
     function initializeMobileLayout() {
         // If desktop, skip
@@ -27,7 +46,21 @@
             return; // nothing to do
         }
 
-        // Toggle function for the "mobile-menu"
+        /**
+         * Toggles the visibility of the mobile menu.
+         * 
+         * @description Switches the mobile menu's display state between shown and hidden.
+         * Handles the aria-expanded attribute for accessibility and applies a CSS translation
+         * to slide the menu in or out.
+         * 
+         * @returns {void}
+         * 
+         * @throws {Error} If the mobile menu toggle element is not found.
+         * 
+         * @example
+         * // Clicking a menu button will toggle the mobile menu's visibility
+         * mobileMenuToggle.addEventListener('click', toggleMobileMenu);
+         */
         function toggleMobileMenu() {
             if (!mobileMenu) return;
             const expanded = mobileMenuToggle.getAttribute('aria-expanded') === 'true';
@@ -35,7 +68,16 @@
             mobileMenuToggle.setAttribute('aria-expanded', !expanded);
         }
 
-        // Toggle function for the "sidebar"
+        /**
+         * Toggles the visibility of the sidebar by translating its position and managing body overflow.
+         * 
+         * @description
+         * - Checks if the sidebar element exists before performing any actions
+         * - Toggles a CSS translation class to slide the sidebar in/out
+         * - Prevents body scrolling when sidebar is open by adding/removing 'overflow-hidden' class
+         * 
+         * @returns {void}
+         */
         function toggleSidebar() {
             if (!sidebar) return;
             sidebar.classList.toggle('-translate-x-full');
@@ -65,7 +107,22 @@
     }
 
     /**
-     * Tooltips initialization
+     * Initializes tooltips for elements with a 'data-tooltip' attribute.
+     * 
+     * Creates and positions tooltips dynamically when users hover over elements.
+     * Tooltips are positioned relative to the triggering element and include
+     * the text specified in the 'data-tooltip' attribute.
+     * 
+     * @description
+     * - Selects all elements with a 'data-tooltip' attribute
+     * - Creates a tooltip div for each element
+     * - Adds event listeners to show/hide tooltips on mouse enter/leave
+     * - Positions tooltips dynamically based on element's bounding rectangle
+     * 
+     * @example
+     * <div data-tooltip="Helpful information">Hover me</div>
+     * 
+     * @throws {Error} If tooltip creation or event listener attachment fails
      */
     function initializeTooltips() {
         const tooltipElements = document.querySelectorAll('[data-tooltip]');
@@ -90,7 +147,22 @@
     }
 
     /**
-     * Dropdown initialization
+     * Initializes dropdown functionality for elements with the 'data-dropdown' attribute.
+     * 
+     * This function selects all dropdown elements and sets up event listeners to:
+     * - Toggle dropdown menu visibility when the dropdown element is clicked
+     * - Close dropdown menus when clicking outside of them
+     * 
+     * @description
+     * - Finds all elements with the 'data-dropdown' attribute
+     * - Adds click event listeners to toggle dropdown menu visibility
+     * - Prevents event propagation to avoid immediate closing
+     * - Implements a document-wide click listener to close dropdowns when clicking outside
+     * 
+     * @example
+     * // HTML: <div data-dropdown><button>Dropdown</button><div class="dropdown-menu hidden">...</div></div>
+     * 
+     * @throws {Error} Silently handles cases where dropdown menu is not found
      */
     function initializeDropdowns() {
         const dropdownElements = document.querySelectorAll('[data-dropdown]');
@@ -111,7 +183,26 @@
     }
 
     /**
-     * Modals initialization
+     * Initializes modal functionality for all modal triggers on the page.
+     * 
+     * This function sets up event listeners for modal triggers, close buttons, 
+     * and provides methods to open and close modals through user interactions.
+     * 
+     * @description
+     * - Finds all elements with a `data-modal-target` attribute
+     * - Adds click event to trigger buttons to show corresponding modals
+     * - Adds click event to close buttons to hide modals
+     * - Allows closing modal by clicking outside the modal content
+     * - Enables closing modal using the Escape key
+     * 
+     * @example
+     * // HTML structure
+     * <button data-modal-target="myModal">Open Modal</button>
+     * <div id="myModal" class="modal hidden">
+     *   <button data-modal-close>Close</button>
+     * </div>
+     * 
+     * @throws {Error} If modal elements cannot be found or event listeners fail to attach
      */
     function initializeModals() {
         const modalTriggers = document.querySelectorAll('[data-modal-target]');
@@ -146,7 +237,17 @@
     }
 
     /**
-     * Main entry point for base.js
+     * Initializes core UI components and layout for the web application.
+     * 
+     * @description Serves as the main entry point for setting up interactive UI elements,
+     * including mobile layout, tooltips, dropdowns, and modals. Provides comprehensive
+     * error handling to ensure graceful initialization and user feedback.
+     * 
+     * @throws {Error} Logs any initialization errors and displays user-friendly error feedback.
+     * 
+     * @example
+     * // Automatically called when DOM is ready
+     * initializeBase();
      */
     function initializeBase() {
         try {

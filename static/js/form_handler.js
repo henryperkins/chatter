@@ -5,8 +5,11 @@
     const { getCSRFToken, showFeedback, fetchWithCSRF, showLoading, hideLoading, withLoading } = window.utils;
 
     /**
-     * Clears previous error indicators from the form.
-     * @param {HTMLFormElement} form 
+     * Removes all error messages and error styling from form input fields.
+     * @param {HTMLFormElement} form - The HTML form element to clear errors from.
+     * @description Performs two key actions:
+     * 1. Removes all elements with the ".error-text" class, which typically represent error message paragraphs
+     * 2. Removes the "border-red-500" class from input fields, which visually indicates validation errors
      */
     function clearErrors(form) {
         const errorElements = form.querySelectorAll(".error-text");
@@ -18,8 +21,16 @@
 
     /**
      * Displays validation errors on the relevant form fields.
-     * @param {HTMLFormElement} form 
-     * @param {object} errors - A mapping: { fieldName: [errorMessage1, ...], ... }
+     * @param {HTMLFormElement} form - The HTML form element containing the fields to validate.
+     * @param {object} errors - An object mapping field names to arrays of error messages.
+     * @description Iterates through the provided errors, finds corresponding form fields, 
+     * adds a red border to highlight errors, and appends the first error message below each field.
+     * @example
+     * // Example usage
+     * displayErrors(myForm, {
+     *   username: ['Username is required'],
+     *   email: ['Invalid email format']
+     * });
      */
     function displayErrors(form, errors) {
         for (const [fieldName, errorMessages] of Object.entries(errors)) {
@@ -37,8 +48,22 @@
     }
 
     /**
-     * Handles the form submission via AJAX, leveraging fetchWithCSRF.
-     * @param {Event} event
+     * Handles form submission via AJAX with comprehensive error management and data processing.
+     * 
+     * @param {Event} event - The form submission event to be processed.
+     * @async
+     * @description Processes form data, converts numeric and boolean fields, manages loading state,
+     * sends data via CSRF-protected fetch, and handles various response scenarios including
+     * successful submissions, validation errors, and network issues.
+     * 
+     * @throws {Error} Handles and logs various potential errors during form submission.
+     * 
+     * @example
+     * // Automatically attached to forms with 'ajax-form' class
+     * <form class="ajax-form" action="/submit" method="POST">
+     *   <!-- form fields -->
+     *   <button type="submit">Submit</button>
+     * </form>
      */
     async function handleFormSubmit(event) {
         event.preventDefault(); // Prevent the default form submission

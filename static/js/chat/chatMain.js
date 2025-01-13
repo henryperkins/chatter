@@ -13,7 +13,27 @@ import {
 } from './chatMessages.js';
 
 /**
- * Orchestrates chat initialization
+ * Initializes the chat interface with comprehensive setup and event handling.
+ * 
+ * @description
+ * This function sets up the entire chat interface, ensuring proper initialization
+ * only occurs once per instance. It configures DOM elements, event listeners,
+ * file handling, message sending, and various interactive features.
+ * 
+ * @throws {Error} If critical UI elements are missing or initialization fails
+ * 
+ * @remarks
+ * - Prevents multiple initializations using a unique instance key
+ * - Sets up textarea constraints and dynamic height adjustment
+ * - Configures scroll and resize observers
+ * - Handles message sending via Enter key and send button
+ * - Manages file uploads and drag-and-drop functionality
+ * - Sets up event listeners for chat actions like copying and regenerating messages
+ * - Prepares mobile layout and cleanup mechanisms
+ * 
+ * @example
+ * // Typically called when the DOM is fully loaded
+ * document.addEventListener('DOMContentLoaded', initializeChat);
  */
 function initializeChat() {
   console.debug('Initializing chat interface...');
@@ -143,7 +163,17 @@ function initializeChat() {
 }
 
 /**
- * Binds "delete chat" buttons
+ * Sets up event listeners for delete chat buttons across the interface.
+ * 
+ * @description Finds all elements with the '.delete-chat-btn' class and attaches click event listeners
+ * that trigger the deletion of a specific chat by its unique identifier.
+ * 
+ * @remarks
+ * - Iterates through all delete buttons in the document
+ * - Retrieves the unique chat ID from the button's data attribute
+ * - Adds a click event listener that calls the global `deleteChat` function with the specific chat ID
+ * 
+ * @throws {Error} Silently handles cases where a delete button lacks a valid chat ID
  */
 function setupDeleteButtons() {
   const deleteButtons = document.querySelectorAll('.delete-chat-btn');
@@ -156,7 +186,24 @@ function setupDeleteButtons() {
 }
 
 /**
- * Sets up drag & drop for file uploads
+ * Sets up drag and drop functionality for file uploads in the chat interface.
+ * 
+ * @description
+ * Configures a drop zone for file uploads with event listeners to handle:
+ * - Preventing default drag and drop behaviors
+ * - Showing/hiding the drop zone during drag events
+ * - Processing dropped files
+ * 
+ * @throws {Error} If file processing encounters an unexpected issue
+ * 
+ * @example
+ * // Automatically called during chat interface initialization
+ * setupDragAndDrop();
+ * 
+ * @remarks
+ * - Requires a DOM element with id 'drop-zone'
+ * - Uses `showFeedback()` for user notifications
+ * - Supports multiple file drops
  */
 function setupDragAndDrop() {
   const dropZone = document.getElementById('drop-zone');
@@ -197,13 +244,33 @@ function setupDragAndDrop() {
   });
 }
 
+/**
+ * Prevents the default event behavior and stops event propagation.
+ * 
+ * @param {Event} e - The event object to prevent default actions for.
+ * @description Stops the browser's default event handling and prevents the event from bubbling up the DOM tree.
+ * Commonly used in event handlers to prevent unwanted default behaviors like form submissions or link navigation.
+ */
 function preventDefaults(e) {
   e.preventDefault();
   e.stopPropagation();
 }
 
 /**
- * Creates a new chat on server
+ * Creates a new chat by sending a POST request to the server.
+ * 
+ * @async
+ * @throws {Error} Throws an error if the chat creation fails or the server returns an error.
+ * @returns {Promise<void>} Redirects to the new chat interface if successful.
+ * 
+ * @description
+ * This function sends a request to create a new chat. On successful creation, it automatically
+ * redirects the user to the new chat interface. If an error occurs during chat creation,
+ * it displays an error feedback message and re-enables the new chat button.
+ * 
+ * @example
+ * // Typically called when a user clicks a "New Chat" button
+ * document.getElementById('new-chat-btn').addEventListener('click', createNewChat);
  */
 async function createNewChat() {
   try {
@@ -230,7 +297,19 @@ async function createNewChat() {
 }
 
 /**
- * Handles model changes in the dropdown
+ * Handles changing the chat model via dropdown selection.
+ * 
+ * @async
+ * @description Updates the current chat's model on the server and manages UI feedback.
+ * Persists the selected model in local storage and handles potential errors gracefully.
+ * 
+ * @throws {Error} Throws an error if the model update request fails
+ * 
+ * @returns {Promise<void>}
+ * 
+ * @example
+ * // Triggered when user selects a new model from the dropdown
+ * document.getElementById('model-select').addEventListener('change', handleModelChange);
  */
 async function handleModelChange() {
   const modelSelect = document.getElementById('model-select');
@@ -267,7 +346,17 @@ async function handleModelChange() {
 }
 
 /**
- * Cleanup routine on page unload
+ * Removes event listeners from message input and send button to prevent memory leaks.
+ * 
+ * @description Safely removes event listeners attached to the message input and send button
+ * during the chat interface initialization. This helps prevent potential memory leaks and
+ * ensures clean page unloading.
+ * 
+ * @throws {Error} Logs and captures any errors that occur during the cleanup process.
+ * 
+ * @example
+ * // Typically called automatically on page unload
+ * window.addEventListener('unload', cleanup);
  */
 function cleanup() {
   try {

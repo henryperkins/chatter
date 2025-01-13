@@ -2,9 +2,10 @@
     console.log("Utils.js initialized");
 
     /**
-     * Retrieves the CSRF token from a meta tag.
-     * @function getCSRFToken
-     * @returns {string} The CSRF token or an empty string if not found.
+     * Retrieves the CSRF token from a meta tag in the HTML document.
+     * @returns {string} The CSRF token value, or an empty string if no token is found.
+     * @description Searches the document for a meta tag with the name "csrf-token" and extracts its content.
+     * Logs the retrieved token to the console for debugging purposes.
      */
     function getCSRFToken() {
         const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
@@ -20,12 +21,30 @@
 
     /**
      * Fetches data from a URL with CSRF token included in the headers.
-     * Handles non-JSON responses gracefully by checking the content type.
-     * @function fetchWithCSRF
+     * 
      * @param {string} url - The URL to fetch data from.
-     * @param {object} [options={}] - Additional fetch options.
-     * @returns {Promise<object>} The response data as a JSON object.
-     * @throws {Error} If the response is not OK or not JSON.
+     * @param {object} [options={}] - Additional fetch options for the request.
+     * @returns {Promise<object>} The JSON response data from the server.
+     * @throws {Error} If the response is not successful or cannot be parsed as JSON.
+     * @description Performs a fetch request with automatic CSRF token handling. 
+     * Supports both JSON payloads and FormData, dynamically including the CSRF token 
+     * in request headers or form data. Validates response content type and handles 
+     * potential server errors with detailed error logging.
+     * 
+     * @example
+     * // Fetch user data
+     * const userData = await fetchWithCSRF('/api/user', {
+     *   method: 'GET'
+     * });
+     * 
+     * @example
+     * // Post form data with CSRF token
+     * const formData = new FormData();
+     * formData.append('username', 'johndoe');
+     * const result = await fetchWithCSRF('/api/update', {
+     *   method: 'POST',
+     *   body: formData
+     * });
      */
     async function fetchWithCSRF(url, options = {}) {
         const csrfToken = getCSRFToken();
@@ -194,10 +213,11 @@
     }
 
     /**
-     * Shows a loading spinner on an element.
-     * @function showLoading
-     * @param {HTMLElement} element - The element to show the loading spinner on.
-     * @param {object} [options={}] - Additional options for the spinner.
+     * Shows a loading spinner on an element, disabling the element and replacing its content with a spinner.
+     * @param {HTMLElement} element - The DOM element to display the loading spinner on.
+     * @param {object} [options={}] - Optional configuration for the loading spinner.
+     * @param {string} [options.text="Loading..."] - Custom text to display alongside the spinner.
+     * @param {string} [options.size="1.5rem"] - Size of the spinner, specified as a CSS dimension.
      */
     function showLoading(element, options = {}) {
         const { text = "Loading...", size = "1.5rem" } = options;
