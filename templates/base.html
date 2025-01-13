@@ -197,48 +197,6 @@
     <!-- Mobile Menu Backdrop -->
     <div id="mobile-menu-backdrop" class="fixed inset-0 z-modal-backdrop hidden menu-backdrop transition-opacity duration-300 opacity-0"></div>
 
-    <!-- Mobile Menu -->
-    <div id="mobile-menu" class="md:hidden fixed inset-y-0 left-0 z-modal w-64 bg-white dark:bg-gray-800 transform transition-transform duration-300 ease-in-out -translate-x-full overflow-y-auto">
-        <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 class="text-xl font-bold text-gray-800 dark:text-gray-100">Menu</h2>
-            <button id="mobile-menu-close" class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-all duration-300">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
-        </div>
-        <div class="p-4 space-y-2">
-            <a href="{{ url_for('chat.chat_interface') }}"
-               class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
-                Home
-            </a>
-            {% if current_user.is_authenticated %}
-                {% if current_user.role == 'admin' %}
-                <a href="{{ url_for('model.add_model_page') }}"
-                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
-                    Add Model
-                </a>
-                <a href="{{ url_for('auth.manage_users') }}"
-                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
-                    Manage Users
-                </a>
-                {% endif %}
-                <a href="{{ url_for('auth.logout') }}"
-                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
-                    Logout
-                </a>
-            {% else %}
-                <a href="{{ url_for('auth.login') }}"
-                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
-                    Login
-                </a>
-                <a href="{{ url_for('auth.register') }}"
-                   class="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-300">
-                    Register
-                </a>
-            {% endif %}
-        </div>
-    </div>
 
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
