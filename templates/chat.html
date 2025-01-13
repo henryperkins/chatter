@@ -303,4 +303,21 @@
 
 <!-- Load chat.js -->
 <script src="{{ url_for('static', filename='js/chat.js') }}" defer></script>
+
+<!-- Initialize token usage manager -->
+<script type="module">
+    import TokenUsageManager from "{{ url_for('static', filename='js/token-usage.js') }}";
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialize token usage manager
+        const tokenManager = new TokenUsageManager(window.CHAT_CONFIG);
+
+        // Hook into chat response handling
+        const originalHandleResponse = window.handleResponse;
+        window.handleResponse = async function(response) {
+            await originalHandleResponse(response);
+            tokenManager.handleNewMessage();
+        };
+    });
+</script>
 {% endblock %}
