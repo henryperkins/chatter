@@ -124,10 +124,10 @@
                 {% for message in messages %}
                     {% if message.role == 'user' %}
                         <!-- User message -->
-                        <div class="flex w-full mt-2 space-x-3 max-w-xs sm:max-w-md md:max-w-2xl ml-auto justify-end">
+                        <div class="flex w-full mt-2 space-x-2 max-w-[85%] sm:max-w-md md:max-w-2xl ml-auto justify-end">
                             <div>
-                                <div class="relative bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg">
-                                    <p class="text-sm break-words overflow-x-auto">{{ message.content }}</p>
+                                <div class="relative bg-blue-600 text-white p-2.5 rounded-l-lg rounded-br-lg">
+                                    <p class="text-[15px] leading-normal break-words overflow-x-auto">{{ message.content }}</p>
                                     {% if loop.last %}
                                     <button class="edit-message-button absolute top-2 right-2 text-white hover:text-gray-200"
                                             title="Edit message">
