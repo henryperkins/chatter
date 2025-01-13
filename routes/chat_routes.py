@@ -180,6 +180,8 @@ def chat_interface() -> Union[Response, Tuple[Response, int]]:
     logger.debug(f"Current user: id={current_user.id}, role={current_user.role}")
 
     chat_id = request.args.get("chat_id") or session.get("chat_id")
+    if request.args.get("chat_id"):
+        session["chat_id"] = chat_id
 
     # If no chat exists, try to create one with a default model
     if not chat_id or not Chat.get_by_id(chat_id):
@@ -201,7 +203,7 @@ def chat_interface() -> Union[Response, Tuple[Response, int]]:
             session["chat_id"] = chat_id
             logger.info(f"Created new chat {chat_id} for user {user_id}")
 
-            return cast(Response, redirect(url_for("chat.chat_interface")))
+            return cast(Response, redirect(url_for("chat.chat_interface", chat_id=chat_id)))
 
         except Exception as e:
             logger.error(f"Error creating chat: {e}")
