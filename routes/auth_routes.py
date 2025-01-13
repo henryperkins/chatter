@@ -23,6 +23,8 @@ from sqlalchemy import text
 from werkzeug.wrappers import Response as WerkzeugResponse
 from email_validator import validate_email, EmailNotValidError
 from chat_utils import send_reset_email
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from database import get_db
 from models import User
@@ -34,17 +36,14 @@ from extensions import limiter
 bp = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
 
+# Rate limiting for sensitive routes
+limiter = Limiter(key_func=get_remote_address)
+
 # Track failed registration attempts
 failed_registrations: Dict[str, List[datetime]] = {}
 
-
 def clean_failed_registrations():
-    """
-    Cleans up old failed registration attempts from the tracking dictionary.
-
-    Removes timestamps older than 15 minutes for each IP address and deletes
-    entries for IPs with no recent attempts. Schedules the next cleanup.
-    """
+    """Cleans up old failed registration attempts from the tracking dictionary."""
     now = datetime.now()
     to_delete = []
     for ip, timestamps in failed_registrations.items():
@@ -60,36 +59,18 @@ def clean_failed_registrations():
     # Schedule next clean-up
     Timer(900, clean_failed_registrations).start()  # Run every 15 minutes
 
-
 # Start the first clean-up
 timer = Timer(900, clean_failed_registrations)
 timer.start()
 
-
 def log_and_rollback(db, exception, user_message="An unexpected error occurred"):
-    """
-    Helper function to log an error and rollback a database transaction.
-
-    Args:
-        db: Database connection object.
-        exception: Exception instance to log.
-        user_message: Custom error message for the log.
-    """
+    """Helper function to log an error and rollback a database transaction."""
     db.rollback()
     logger.error(f"{user_message}: {exception}", exc_info=True)
     raise exception
 
-
 def check_registration_attempts(ip: str) -> bool:
-    """
-    Checks whether an IP address has exceeded the allowed number of registration attempts.
-
-    Args:
-        ip (str): The client's IP address.
-
-    Returns:
-        bool: True if the IP is allowed to register, False otherwise.
-    """
+    """Checks whether an IP address has exceeded the allowed number of registration attempts."""
     now = datetime.now()
     if ip in failed_registrations:
         # Clean up old attempts
@@ -103,15 +84,10 @@ def check_registration_attempts(ip: str) -> bool:
             return False
     return True
 
-
 @bp.route("/login", methods=["GET", "POST"])
+@limiter.limit("5 per minute")
 def login():
-    """
-    Handle user login requests. Validates credentials and logs the user in.
-
-    Returns:
-        Response: JSON success or error message, or renders the login form.
-    """
+    """Handle user login requests. Validates credentials and logs the user in."""
     if current_user.is_authenticated:
         logger.debug("User already authenticated; redirecting to chat interface.")
         return redirect(url_for("chat.chat_interface"))
@@ -137,9 +113,7 @@ def login():
 
                 # Check if user exists
                 if not user:
-                    logger.warning(
-                        f"Login attempt for non-existent username: {username}"
-                    )
+                    logger.warning(f"Login attempt for non-existent username: {username}")
                     return (
                         jsonify(
                             {
@@ -191,18 +165,9 @@ def login():
     logger.debug("Rendering login form.")
     return render_template("login.html", form=form)
 
-
-# Type alias for Flask/Werkzeug response
-Response = Union[
-    FlaskResponse,
-    WerkzeugResponse,
-    Tuple[Union[FlaskResponse, WerkzeugResponse], int],
-    str
-]
-
 @bp.route("/register", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
-def register() -> Response:
+def register():
     """Handle user registration requests."""
     if current_user.is_authenticated:
         logger.debug("User already authenticated; redirecting to chat interface.")
@@ -272,30 +237,17 @@ def register() -> Response:
 
 @bp.route("/logout")
 @login_required
-def logout() -> Response:
-    """
-    Logs out the current user, clears the session, and redirects to the login page.
-
-    Returns:
-        Response: Redirect to login page.
-    """
+def logout():
+    """Logs out the current user, clears the session, and redirects to the login page."""
     logger.info(f"User {current_user.id} logged out.")
     logout_user()
     session.clear()
     return redirect(url_for("auth.login"))
 
-
 @bp.route("/forgot_password", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
-def forgot_password() -> Response:
-    """Handle forgot password requests.
-
-    Validates email, generates reset token, and sends password reset email.
-    Rate limited to prevent abuse.
-
-    Returns:
-        Response: JSON response or rendered template
-    """
+def forgot_password():
+    """Handle forgot password requests. Validates email, generates reset token, and sends password reset email."""
     if request.method == "POST":
         email = request.form.get("email", "").strip()
 
@@ -321,8 +273,7 @@ def forgot_password() -> Response:
                 logger.info("Password reset attempted for non-existent email: %s", email)
                 return jsonify({
                     "success": False,
-                    "error": "If an account exists with this email, "
-                            "you will receive password reset instructions."
+                    "error": "If an account exists with this email, you will receive password reset instructions."
                 }), 200  # Return 200 to prevent email enumeration
 
             # Generate and store reset token
@@ -349,8 +300,7 @@ def forgot_password() -> Response:
             logger.info("Password reset token generated for user: %s", user["id"])
             return jsonify({
                 "success": True,
-                "message": "If an account exists with this email, "
-                          "you will receive password reset instructions."
+                "message": "If an account exists with this email, you will receive password reset instructions."
             }), 200
 
         except Exception as e:
@@ -364,22 +314,10 @@ def forgot_password() -> Response:
     # GET request - render template
     return render_template("forgot_password.html")
 
-
-# Update the reset_password route to fix syntax error and return types
 @bp.route("/reset_password/<token>", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
-def reset_password(token: str) -> Union[Response, WerkzeugResponse]:
-    """
-    reset_password _summary_
-
-    _extended_summary_
-
-    Args:
-        token (str): _description_
-
-    Returns:
-        Union[Response, WerkzeugResponse]: _description_
-    """
+def reset_password(token: str):
+    """Handle password reset requests."""
     form = ResetPasswordForm()
     db = get_db()
 
@@ -427,77 +365,3 @@ def reset_password(token: str) -> Union[Response, WerkzeugResponse]:
             "success": False,
             "error": "An unexpected error occurred"
         }), 500
-
-@bp.route("/manage-users")
-@login_required
-@admin_required
-def manage_users() -> Response:
-    """
-    Display a list of all users for admin users.
-
-    Returns:
-        Response: Renders the manage users page with user data.
-    """
-    try:
-        db = get_db()
-        users = (
-            db.execute(text("SELECT id, username, email, role FROM users"))
-            .mappings()
-            .all()
-        )
-        logger.debug(f"Fetched {len(users)} users for admin management.")
-        return render_template("manage_users.html", users=users)
-    except Exception as e:
-        logger.error(f"Error fetching user list for admin: {e}")
-        return (
-            jsonify({"success": False, "error": "Failed to retrieve user data."}),
-            500,
-        )
-
-
-@bp.route("/api/users/<int:user_id>/role", methods=["PUT"])
-@login_required
-@admin_required
-def update_user_role(user_id: int) -> Response:
-    """
-    update_user_role _summary_
-
-    _extended_summary_
-
-    Args:
-        user_id (int): _description_
-
-    Raises:
-        ValueError: _description_
-
-    Returns:
-        tuple[Response, int]: _description_
-    """
-    try:
-        # Validate CSRF token
-        csrf_token = request.headers.get("X-CSRFToken")
-        if not csrf_token:
-            raise ValueError("CSRF token missing")
-
-        validate_csrf(csrf_token)  # Use imported validate_csrf function
-
-        new_role = request.json.get("role")
-        if not new_role or new_role not in ["user", "admin"]:
-            logger.warning(f"Invalid role '{new_role}' provided for user ID {user_id}.")
-            return jsonify({"success": False, "error": "Invalid role specified"}), 400
-
-        db = get_db()
-        db.execute(
-            text("UPDATE users SET role = :role WHERE id = :user_id"),
-            {"role": new_role, "user_id": user_id}
-        )
-        db.commit()
-
-        logger.info(f"User ID {user_id} role updated to '{new_role}'.")
-        return jsonify({"success": True}), 200
-
-    except ValueError as e:
-        return jsonify({"success": False, "error": str(e)}), 400
-    except Exception as e:
-        logger.error(f"Error updating user role: {e}")
-        return jsonify({"success": False, "error": "Failed to update user role"}), 500
