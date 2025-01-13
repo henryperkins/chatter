@@ -58,7 +58,6 @@ def extract_model_data(form):
         "version": form.version.data,
     }
 
-
 def validate_immutable_fields(model_id, data):
     """
     Validate that immutable fields are not being updated.
@@ -67,7 +66,6 @@ def validate_immutable_fields(model_id, data):
     for field in immutable_fields:
         if field in data:
             raise ValueError(f"{field} is immutable and cannot be updated")
-
 
 # Routes
 @bp.route("/models", methods=["GET"])
@@ -98,7 +96,6 @@ def get_models():
 
     except Exception as e:
         return handle_error(e, "Error retrieving models")
-
 
 @bp.route("/models", methods=["POST"])
 @login_required
@@ -139,7 +136,6 @@ def create_model():
             )
         return handle_error(e, "Error creating model")
 
-
 @bp.route("/models/<int:model_id>", methods=["PUT"])
 @login_required
 @admin_required
@@ -166,7 +162,6 @@ def update_model(model_id: int):
     except Exception as e:
         return handle_error(e, "Unexpected error during model update")
 
-
 @bp.route("/models/<int:model_id>", methods=["DELETE"])
 @login_required
 @admin_required
@@ -188,7 +183,6 @@ def delete_model(model_id: int):
     except Exception as e:
         return handle_error(e, "Unexpected error during model deletion")
 
-
 @bp.route("/add-model", methods=["GET"])
 @login_required
 @admin_required
@@ -198,7 +192,6 @@ def add_model_page():
     """
     form = ModelForm()
     return render_template("add_model.html", form=form)
-
 
 @bp.route("/edit/<int:model_id>", methods=["GET", "POST"])
 @login_required
@@ -233,7 +226,6 @@ def edit_model(model_id):
     except Exception as e:
         return handle_error(e, "Error in edit_model")
 
-
 @bp.route("/models/default/<int:model_id>", methods=["POST"])
 @login_required
 @admin_required
@@ -254,7 +246,6 @@ def set_default_model(model_id: int):
     except Exception as e:
         return handle_error(e, "Unexpected error setting default model")
 
-
 @bp.route("/models/<int:model_id>/immutable-fields", methods=["GET"])
 @login_required
 def get_immutable_fields(model_id: int):
@@ -267,8 +258,6 @@ def get_immutable_fields(model_id: int):
     except Exception as e:
         return handle_error(e, "Error retrieving immutable fields")
 
-
-
 @bp.route("/models/<int:model_id>/versions", methods=["GET"])
 @login_required
 def get_version_history(model_id: int):
@@ -279,10 +268,11 @@ def get_version_history(model_id: int):
         limit = request.args.get("limit", 10, type=int)
         offset = request.args.get("offset", 0, type=int)
         versions = Model.get_version_history(model_id, limit, offset)
+        if not versions:
+            return jsonify({"message": "No versions found for this model"}), 404
         return jsonify(versions)
     except Exception as e:
         return handle_error(e, "Error retrieving version history")
-
 
 @bp.route("/models/<int:model_id>/revert/<int:version>", methods=["POST"])
 @login_required
@@ -297,6 +287,10 @@ def revert_to_version(model_id: int, version: int):
             return csrf_error
 
     try:
+        version_data = Model.get_version_data(model_id, version)
+        if not version_data:
+            return jsonify({"error": "Version not found", "success": False}), 404
+
         Model.revert_to_version(model_id, version)
         return jsonify(
             {"success": True, "message": "Model reverted to version successfully"}
