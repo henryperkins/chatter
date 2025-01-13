@@ -15,9 +15,14 @@ logger = logging.getLogger(__name__)
 SYSTEM_TOKENS: int = 4  # Base tokens for system messages
 USER_TOKENS: int = 4    # Base tokens for user messages
 ASSISTANT_TOKENS: int = 4  # Base tokens for assistant messages
+SYSTEM_TOKENS: int = 4  # Base tokens for system messages
+USER_TOKENS: int = 4    # Base tokens for user messages
+ASSISTANT_TOKENS: int = 4  # Base tokens for assistant messages
 
 # Configurable Environment Variables (with defaults)
 MAX_MESSAGES: int = int(os.getenv("MAX_MESSAGES", "20"))
+MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "32000"))  # Increased from 16384 to 32000
+MAX_MESSAGE_TOKENS: int = int(os.getenv("MAX_MESSAGE_TOKENS", "32000"))  # Increased from 8192
 MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "32000"))  # Increased from 16384 to 32000
 MAX_MESSAGE_TOKENS: int = int(os.getenv("MAX_MESSAGE_TOKENS", "32000"))  # Increased from 8192
 MODEL_NAME: str = os.getenv("MODEL_NAME", "gpt-4")  # Model for token counting
@@ -52,6 +57,22 @@ class ConversationManager:
         """
         num_tokens = 0
         for message in messages:
+            # Add role-specific base tokens
+            if message["role"] == "system":
+                num_tokens += SYSTEM_TOKENS
+            elif message["role"] == "user":
+                num_tokens += USER_TOKENS
+            elif message["role"] == "assistant":
+                num_tokens += ASSISTANT_TOKENS
+
+            # Count content tokens
+            content_tokens = count_tokens(message["content"], MODEL_NAME)
+            num_tokens += content_tokens
+
+            # Add to message metadata if available
+            if isinstance(message.get("metadata"), dict):
+                message["metadata"]["token_count"] = content_tokens
+
             # Add role-specific base tokens
             if message["role"] == "system":
                 num_tokens += SYSTEM_TOKENS
@@ -135,6 +156,15 @@ class ConversationManager:
                 model_max_tokens = MAX_MESSAGE_TOKENS  # Default for o1-preview
             else:
                 model_max_tokens = MAX_TOKENS  # Default for other models
+
+        """Add a message to the conversation with metadata and formatting."""
+        try:
+            encoding = tiktoken.encoding_for_model(MODEL_NAME)
+        except KeyError:
+            encoding = tiktoken.get_encoding("cl100k_base")
+
+        if model_max_tokens is None:
+            model_max_tokens = MAX_TOKENS if not requires_o1_handling else MAX_MESSAGE_TOKENS
 
         """Add a message to the conversation with metadata and formatting."""
         try:
@@ -274,6 +304,7 @@ class ConversationManager:
             db.close()
 
     def get_usage_stats(self, chat_id: str) -> Dict[str, Any]:
+    def get_usage_stats(self, chat_id: str) -> Dict[str, Any]:
         """
         Get detailed usage statistics.
 
@@ -281,6 +312,7 @@ class ConversationManager:
             chat_id: The chat ID to get stats for
 
         Returns:
+            Dictionary containing detailed usage statistics
             Dictionary containing detailed usage statistics
         """
         messages = Chat.get_messages(chat_id, include_system=True)
@@ -305,6 +337,7 @@ class ConversationManager:
 
         for msg in messages:
             role = msg.get("role", "")
+            role = msg.get("role", "")
             metadata = msg.get("metadata", {})
 
             if isinstance(metadata, dict):
@@ -324,6 +357,10 @@ class ConversationManager:
 
             if isinstance(role, str) and role in ["user", "assistant", "system"]:
                 stats[f"{role}_messages"] += 1
+
+        # Calculate average tokens per message
+        if stats["total_messages"] > 0:
+            stats["average_tokens_per_message"] = stats["total_tokens"] / stats["total_messages"]
 
         # Calculate average tokens per message
         if stats["total_messages"] > 0:
