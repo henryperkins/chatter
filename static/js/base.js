@@ -1,6 +1,6 @@
 (function() {
     // We can still use showFeedback from utils if needed
-    const { showFeedback } = window.utils;
+    const { showFeedback, fetchWithCSRF } = window.utils;
 
     /**
      * Merges the old `initializeMobileMenu` with chat's `setupMobileLayout`.
