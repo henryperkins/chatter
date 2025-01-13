@@ -138,26 +138,11 @@
             });
         }
 
-    // Combine all initialization logic
-    function initializeBase() {
-        try {
-            initializeMobileMenu();
-            initializeTooltips();
-            initializeDropdowns();
-            initializeModals();
-            // Other initialization functions can be added here
-        } catch (error) {
-            console.error('Error during base initialization:', error);
-            showFeedback('An error occurred during initialization. Please reload the page.', 'error');
-        }
-    }
+        /*** Initialize Other Components as Needed ***/
+        // You can add additional initialization functions here
 
-    // Only initialize once when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeBase);
-    } else {
-        initializeBase();
-    }
-
-    // No need to expose utilities as they're already available through window.utils
+        // Call initialization functions
+        initializeTooltips();
+        initializeModals();
+    });
 })();
