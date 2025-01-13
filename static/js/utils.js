@@ -9,7 +9,7 @@
     function getCSRFToken() {
         const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
         const csrfToken = csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") || "" : "";
-        console.debug("Retrieved CSRF token from meta tag:", csrfToken);  // Add this line for debugging
+        console.debug("Retrieved CSRF token from meta tag:", csrfToken);
         return csrfToken;
     }
 
@@ -44,7 +44,6 @@
 
         try {
             const response = await fetch(url, { ...options, headers });
-
             const contentType = response.headers.get('content-type');
             let data;
 
@@ -205,7 +204,8 @@
         element.disabled = true;
         element.innerHTML = `
             <div class="flex items-center justify-center">
-                <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white" style="width: ${size}; height: ${size}"></div>
+                <div class="animate-spin rounded-full border-b-2 border-white"
+                     style="width: ${size}; height: ${size}"></div>
                 ${text ? `<span class="ml-2">${text}</span>` : ''}
             </div>
         `;
@@ -237,7 +237,7 @@
             .finally(() => hideLoading(element, originalContent));
     }
 
-    // Export functions that need to be globally accessible
+    // Export everything that might be needed by the rest of the app
     window.utils = {
         getCSRFToken,
         fetchWithCSRF,
