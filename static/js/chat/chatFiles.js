@@ -13,10 +13,25 @@ import {
 } from './chatState.js';
 
 /**
- * Processes newly selected or dropped files:
- * 1) Checks allowed types/sizes
- * 2) Updates the global `uploadedFiles` state
- * 3) Renders the file list in the UI
+ * Processes and validates newly selected or dropped files for upload.
+ * 
+ * @param {File[]} files - Array of files to be processed and validated.
+ * @description Performs comprehensive validation checks on uploaded files including:
+ * - Verifying file types against allowed types
+ * - Checking individual file sizes
+ * - Ensuring total uploaded file size does not exceed limit
+ * - Preventing upload of more than maximum allowed files
+ * - Rejecting empty files
+ * 
+ * @throws {Error} Displays error feedback for invalid files
+ * 
+ * @example
+ * // User selects files in file input
+ * processFiles(event.target.files);
+ * 
+ * @example
+ * // User drops files into drop zone
+ * processFiles(droppedFiles);
  */
 export function processFiles(files) {
   const errors = [];
@@ -75,7 +90,18 @@ export function processFiles(files) {
 }
 
 /**
- * Re-renders the list of uploaded files in the DOM.
+ * Renders the list of uploaded files in the user interface.
+ * 
+ * @description Updates the DOM to display all currently uploaded files with individual remove buttons.
+ * Manages the visibility of the uploaded files container based on the number of files.
+ * Attaches event listeners to allow interactive file removal.
+ * 
+ * @throws {Error} If required DOM elements are not found.
+ * 
+ * @example
+ * // Typical usage after adding files
+ * processFiles(selectedFiles);
+ * renderFileList(); // Updates the UI with the new files
  */
 export function renderFileList() {
   const uploadedFilesDiv = document.getElementById('uploaded-files');
@@ -109,7 +135,10 @@ export function renderFileList() {
 }
 
 /**
- * Removes a file from the global uploadedFiles by index.
+ * Removes a file from the list of uploaded files.
+ * 
+ * @param {number} index - The index of the file to remove from the uploadedFiles array.
+ * @description Deletes the specified file from the global uploadedFiles collection and updates the file list display.
  */
 export function removeFile(index) {
   uploadedFiles.splice(index, 1);

@@ -4,7 +4,11 @@
 import { showFeedback } from '../utils.js'; // Adjust path if needed
 
 /**
- * Automatically resizes a <textarea> to fit its content.
+ * Automatically adjusts the height of a textarea to match its content.
+ * 
+ * @param {HTMLTextAreaElement} textarea - The textarea element to resize dynamically.
+ * @description This function sets the textarea's height to 'auto' and then sets it to the scroll height,
+ * effectively expanding the textarea vertically to accommodate all of its content without scrollbars.
  */
 export function adjustTextareaHeight(textarea) {
   textarea.style.height = 'auto';
@@ -12,7 +16,17 @@ export function adjustTextareaHeight(textarea) {
 }
 
 /**
- * Sets up an IntersectionObserver on chat messages for lazy loading/fade-ins.
+ * Sets up an IntersectionObserver to dynamically add visibility effects to chat messages.
+ * 
+ * @param {HTMLElement} chatBox - The container element holding chat messages.
+ * @description Observes each message within the chat box and adds a 'visible' class when the message becomes partially visible, enabling lazy loading and fade-in animations.
+ * 
+ * @example
+ * const chatContainer = document.getElementById('chat-messages');
+ * setupScrollObserver(chatContainer);
+ * 
+ * @performance Lightweight observer with low performance overhead
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/Intersection_Observer_API
  */
 export function setupScrollObserver(chatBox) {
   const observer = new IntersectionObserver(
@@ -32,7 +46,12 @@ export function setupScrollObserver(chatBox) {
 }
 
 /**
- * Simple HTML escape function.
+ * Escapes special HTML characters in a string to prevent XSS attacks.
+ * @param {string} unsafe - The input string containing potentially unsafe HTML characters.
+ * @returns {string} A sanitized string with HTML special characters replaced by their corresponding HTML entities.
+ * @example
+ * // returns "&lt;script&gt;alert('XSS')&lt;/script&gt;"
+ * escapeHtml('<script>alert('XSS')</script>')
  */
 export function escapeHtml(unsafe) {
   return unsafe
@@ -44,7 +63,18 @@ export function escapeHtml(unsafe) {
 }
 
 /**
- * Shows a "typing..." indicator in the chat.
+ * Displays a "typing..." indicator in the chat box to signal that the assistant is composing a response.
+ * 
+ * @param {HTMLElement} chatBox - The container element where the typing indicator will be added.
+ * @description Removes any existing typing indicator and creates a new animated indicator with an avatar, 
+ * typing dots animation, and current timestamp. The indicator is automatically scrolled into view.
+ * 
+ * @example
+ * const chatContainer = document.getElementById('chat-messages');
+ * showTypingIndicator(chatContainer);
+ * 
+ * @accessibility Adds ARIA attributes to improve screen reader experience
+ * @performance O(1) time complexity for DOM manipulation
  */
 export function showTypingIndicator(chatBox) {
   let indicator = document.getElementById('typing-indicator');
@@ -78,7 +108,16 @@ export function showTypingIndicator(chatBox) {
 }
 
 /**
- * Removes the "typing..." indicator from the chat.
+ * Removes the "typing..." indicator from the chat box.
+ * 
+ * @description Finds and removes the typing indicator element from the DOM. 
+ * If the indicator is not found, it logs a warning to the console.
+ * 
+ * @throws {Error} Implicitly handles cases where the indicator cannot be removed.
+ * 
+ * @example
+ * // Remove the typing indicator when a message is sent or typing stops
+ * removeTypingIndicator();
  */
 export function removeTypingIndicator() {
   const indicator = document.getElementById('typing-indicator');
@@ -90,7 +129,11 @@ export function removeTypingIndicator() {
 }
 
 /**
- * Appends a user (blue) message to the chat box.
+ * Appends a user message to the chat box with a blue message bubble.
+ * @param {HTMLElement} chatBox - The container element where messages are displayed.
+ * @param {string} message - The text content of the user's message.
+ * @description Creates a styled message div with the user's message, applies blue styling, 
+ * escapes HTML to prevent XSS, and automatically scrolls the chat box to the bottom.
  */
 export function appendUserMessage(chatBox, message) {
   const messageDiv = document.createElement('div');
@@ -111,8 +154,30 @@ export function appendUserMessage(chatBox, message) {
 }
 
 /**
- * Appends an assistant (gray) message to the chat box.
- * Supports "streaming" updates if isStreaming=true.
+ * Appends an assistant message to the chat box with markdown rendering and syntax highlighting.
+ * 
+ * @param {HTMLElement} chatBox - The container element for chat messages.
+ * @param {string} message - The markdown-formatted message content.
+ * @param {boolean} [isStreaming=false] - Indicates whether the message is being streamed/updated incrementally.
+ * 
+ * @description
+ * This function handles rendering assistant messages with the following features:
+ * - Markdown rendering using global markdown library
+ * - HTML sanitization to prevent XSS attacks
+ * - Syntax highlighting for code blocks
+ * - Accessibility improvements for code regions
+ * - Copy and regenerate message buttons
+ * - Timestamp display
+ * 
+ * @throws {Error} Logs an error if message rendering fails.
+ * 
+ * @example
+ * // Append a new assistant message
+ * appendAssistantMessage(chatBoxElement, '# Hello, world!');
+ * 
+ * @example
+ * // Stream an incremental message update
+ * appendAssistantMessage(chatBoxElement, 'Additional content', true);
  */
 export function appendAssistantMessage(chatBox, message, isStreaming = false) {
   if (!message || typeof message !== 'string') {

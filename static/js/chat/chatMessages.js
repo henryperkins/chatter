@@ -16,8 +16,24 @@ import {
 } from './chatUI.js';
 
 /**
- * Send a user message plus any uploaded files to the server.
- * Handles streaming or normal response.
+ * Sends a user message to the server with optional file uploads.
+ * 
+ * @param {HTMLInputElement} messageInput - The input element containing the user's message.
+ * @param {HTMLButtonElement} sendButton - The button used to send the message.
+ * @param {HTMLElement} chatBox - The container element for chat messages.
+ * 
+ * @description
+ * Handles sending messages with the following features:
+ * - Validates message length and presence of content
+ * - Supports both streaming and non-streaming responses
+ * - Manages file uploads
+ * - Provides real-time UI feedback during message sending
+ * - Handles errors and displays appropriate messages
+ * 
+ * @throws {Error} Throws an error if message sending fails due to network or server issues.
+ * 
+ * @example
+ * sendMessage(messageInputElement, sendButtonElement, chatBoxElement);
  */
 export async function sendMessage(messageInput, sendButton, chatBox) {
   console.debug('sendMessage called');
@@ -138,7 +154,10 @@ export async function sendMessage(messageInput, sendButton, chatBox) {
 }
 
 /**
- * Edits the chat title.
+ * Updates the title of a specific chat.
+ * @param {string} chatId - The unique identifier of the chat to be updated.
+ * @throws {Error} Throws an error if the title update fails or exceeds 100 characters.
+ * @description Prompts the user to enter a new chat title, validates its length, and sends a request to update the title on the server. Updates the UI with the new title if successful.
  */
 export async function editChatTitle(chatId) {
   try {
@@ -173,7 +192,10 @@ export async function editChatTitle(chatId) {
 }
 
 /**
- * Deletes the current chat.
+ * Deletes the specified chat after user confirmation.
+ * @param {string} chatId - The unique identifier of the chat to be deleted.
+ * @throws {Error} Throws an error if the chat deletion fails or is not confirmed by the user.
+ * @description Prompts the user for confirmation, sends a DELETE request to the server, and reloads the page on successful deletion.
  */
 export async function deleteChat(chatId) {
   try {
@@ -200,7 +222,23 @@ export async function deleteChat(chatId) {
 }
 
 /**
- * Regenerates the assistant’s last response by re-sending the last user message.
+ * Regenerates the last assistant response by re-sending the most recent user message.
+ * 
+ * @param {HTMLButtonElement} button - The regenerate response button that triggered the action.
+ * @param {HTMLElement} chatBox - The container element for chat messages.
+ * @throws {Error} Throws an error if chat ID is missing, no message is found, or server request fails.
+ * 
+ * @description
+ * This function handles regenerating an AI response by:
+ * - Finding the last user message in the chat
+ * - Removing existing assistant messages
+ * - Sending the last message back to the server
+ * - Supporting both streaming and non-streaming response modes
+ * - Appending the regenerated response to the chat box
+ * 
+ * @example
+ * // Typical usage in an event listener
+ * regenerateButton.addEventListener('click', () => regenerateResponse(regenerateButton, chatContainer));
  */
 export async function regenerateResponse(button, chatBox) {
   button.disabled = true;
