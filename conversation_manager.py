@@ -215,15 +215,20 @@ class ConversationManager:
 
         db = get_db()
         try:
-            query = text("""
+            # Create placeholders for the IN clause
+            placeholders = ','.join(f':id{i}' for i in range(len(keep_ids)))
+            
+            query = text(f"""
                 DELETE FROM messages
                 WHERE chat_id = :chat_id
-                AND id NOT IN :keep_ids
+                AND id NOT IN ({placeholders})
             """)
-            db.execute(query, {
-                "chat_id": chat_id,
-                "keep_ids": tuple(keep_ids)
-            })
+            
+            # Create parameters dict with individual id bindings
+            params = {"chat_id": chat_id}
+            params.update({f"id{i}": id_val for i, id_val in enumerate(keep_ids)})
+            
+            db.execute(query, params)
             db.commit()
         except Exception as e:
             db.rollback()
