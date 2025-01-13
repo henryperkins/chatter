@@ -187,6 +187,63 @@
         // Set up delete chat buttons
         setupDeleteButtons();
 
+        function setupModelButtons() {
+            // Edit Model Button
+            const editModelBtn = document.getElementById('edit-model-btn');
+            if (editModelBtn) {
+                editModelBtn.addEventListener('click', () => {
+                    const modelSelect = document.getElementById('model-select');
+                    const modelId = modelSelect?.value;
+                    if (modelId) {
+                        window.location.href = `/model/edit/${modelId}`;
+                    } else {
+                        showFeedback('No model selected', 'error');
+                    }
+                });
+            }
+
+            // Add Model Button
+            const addModelLink = document.querySelector('a[href="/model/add-model"]');
+            if (addModelLink) {
+                addModelLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.location.href = '/model/add-model';
+                });
+            }
+
+            // New Chat Button - update to use fetch
+            const newChatBtn = document.getElementById('new-chat-btn');
+            if (newChatBtn) {
+                newChatBtn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    try {
+                        newChatBtn.disabled = true;
+                        const response = await fetchWithCSRF('/chat/new_chat', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+                    
+                        if (response.success && response.chat_id) {
+                            window.location.href = `/chat/chat_interface?chat_id=${response.chat_id}`;
+                        } else {
+                            throw new Error(response.error || 'Failed to create new chat');
+                        }
+                    } catch (error) {
+                        console.error('Error creating new chat:', error);
+                        showFeedback(error.message || 'Failed to create new chat', 'error');
+                    } finally {
+                        newChatBtn.disabled = false;
+                    }
+                });
+            }
+        }
+
+        // Call the setup function
+        setupModelButtons();
+
         // Set up drag and drop
         setupDragAndDrop();
 

@@ -12,9 +12,11 @@
         aria-label="Mobile menu">
         <div class="flex-none p-4 space-y-4">
             <!-- New Chat Button -->
-            <button id="new-chat-btn" class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200" aria-label="Start new chat">
+            <button id="new-chat-btn" 
+                class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200" 
+                aria-label="Start new chat">
                 <i class="fas fa-plus mr-2"></i>
-                New Chat
+                <span>New Chat</span>
             </button>
 
             <!-- Model Selection -->
@@ -35,7 +37,7 @@
             {% if current_user.role == 'admin' %}
             <div class="space-y-2">
                 <a href="{{ url_for('model.add_model_page') }}"
-                   class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center">
+                   class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center transition-colors duration-200">
                     <i class="fas fa-plus-circle mr-2"></i>
                     Add Model
                 </a>
@@ -238,6 +240,29 @@
 <!-- Feedback Message -->
 <div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center"></div>
 
+<style>
+.button-loading {
+    position: relative;
+    color: transparent !important;
+}
+
+.button-loading::after {
+    content: "";
+    position: absolute;
+    width: 1em;
+    height: 1em;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    border-right-color: transparent;
+    animation: button-loading-spinner 0.75s linear infinite;
+}
+
+@keyframes button-loading-spinner {
+    to {
+        transform: rotate(360deg);
+    }
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
