@@ -86,6 +86,27 @@ class Chat:
                 raise
 
     @staticmethod
+    def update_model(chat_id: str, model_id: int) -> None:
+        """Update the model associated with a chat."""
+        with db_session() as db:
+            try:
+                query = text("""
+                    UPDATE chats 
+                    SET model_id = :model_id
+                    WHERE id = :chat_id
+                """)
+                db.execute(query, {
+                    "chat_id": chat_id,
+                    "model_id": model_id
+                })
+                db.commit()
+                logger.info(f"Updated model to {model_id} for chat {chat_id}")
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Failed to update chat model: {e}")
+                raise
+            
+    @staticmethod
     def update_title(chat_id: str, title: str) -> None:
         """
         Update the title of a chat with validation.

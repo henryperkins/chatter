@@ -19,12 +19,14 @@ bp = Blueprint("model", __name__)
 logger = logging.getLogger(__name__)
 
 def validate_csrf_token() -> Optional[tuple]:
-    """Validate CSRF token for AJAX requests."""
+    """Validate CSRF token for all POST, PUT, and DELETE requests."""
     try:
         csrf_token = request.headers.get("X-CSRFToken")
+        if not csrf_token:
+            raise ValueError("CSRF token missing.")
         flask_validate_csrf(csrf_token)
         return None
-    except Exception:
+    except Exception as e:
         return jsonify({"success": False, "error": "CSRF token invalid"}), 400
 
 def handle_error(error: Exception, message: str, status_code: int = 500) -> tuple:
@@ -37,7 +39,7 @@ def handle_error(error: Exception, message: str, status_code: int = 500) -> tupl
     logger.error(f"{message}: {str(error)}")
     return jsonify({"error": str(error), "success": False}), status_code
 
-def extract_model_data(form: ModelForm) -> dict[str, any]:
+def extract_model_data(form: ModelForm) -> dict:
     """
     Extract model data from a form.
 
@@ -98,13 +100,12 @@ def get_models():
                 "api_version": m.api_version,
                 "version": m.version,
             }
-            for m in models
+        for m in models
         ]
         return jsonify(model_list)
 
     except Exception as e:
         return handle_error(e, "Error retrieving models")
-
 
 @bp.route("/models", methods=["POST"])
 @login_required
@@ -113,6 +114,10 @@ def create_model():
     """
     Create a new model (admin-only).
     """
+    csrf_error = validate_csrf_token()
+    if csrf_error:
+        return csrf_error
+
     form = ModelForm()
     if not form.validate_on_submit():
         logger.error("Form validation failed: %s", form.errors)
@@ -120,30 +125,34 @@ def create_model():
 
     try:
         data = extract_model_data(form)
-        logger.debug(
+        
+        # Validate required fields
+        required_fields = ["name", "deployment_name", "api_endpoint", "api_key"]
+        for field in required_fields:
+            if not data.get(field):
+                raise ValueError(f"Missing required field: {field}")
+
+        # Validate API endpoint
+        if not data["api_endpoint"].startswith("https://"):
+            raise ValueError("API endpoint must be a valid HTTPS URL.")
+
+        logger.info(
             "Creating model with data: %s",
             {k: v if k != "api_key" else "****" for k, v in data.items()},
         )
         Model.validate_model_config(data)
         model_id = Model.create(data)
+        logger.info(f"Model created successfully with ID: {model_id}")
         return jsonify(
             {"id": model_id, "success": True, "message": "Model created successfully"}
-        )
+        ), 201
 
     except ValueError as e:
-        return handle_error(e, "Validation error", 400)
+        return handle_error(e, "Validation error during model creation", 400)
     except Exception as e:
         if "UNIQUE constraint failed: models.deployment_name" in str(e):
-            return (
-                jsonify(
-                    {
-                        "error": "A model with this deployment name already exists",
-                        "success": False,
-                    }
-                ),
-                400,
-            )
-        return handle_error(e, "Error creating model")
+            return handle_error(e, "A model with this deployment name already exists", 400)
+        return handle_error(e, "Unexpected error during model creation")
 
 
 @bp.route("/models/<int:model_id>", methods=["PUT"])
@@ -153,18 +162,19 @@ def update_model(model_id: int):
     """
     Update an existing model (admin-only).
     """
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        csrf_error = validate_csrf_token()
-        if csrf_error:
-            return csrf_error
+    csrf_error = validate_csrf_token()
+    if csrf_error:
+        return csrf_error
 
     data = request.get_json()
     if not data:
         return jsonify({"error": "No data provided", "success": False}), 400
 
     try:
+        logger.info(f"Updating model with ID: {model_id}")
         validate_immutable_fields(model_id, data)
         Model.update(model_id, data)
+        logger.info(f"Model updated successfully: {model_id}")
         return jsonify({"success": True, "message": "Model updated successfully"})
 
     except ValueError as e:
@@ -180,20 +190,20 @@ def delete_model(model_id: int):
     """
     Delete a model (admin-only).
     """
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        csrf_error = validate_csrf_token()
-        if csrf_error:
-            return csrf_error
+    csrf_error = validate_csrf_token()
+    if csrf_error:
+        return csrf_error
 
     try:
+        logger.info(f"Deleting model with ID: {model_id}")
         Model.delete(model_id)
+        logger.info(f"Model deleted successfully: {model_id}")
         return jsonify({"success": True, "message": "Model deleted successfully"})
 
     except ValueError as e:
-        return handle_error(e, "Error deleting model", 400)
+        return handle_error(e, f"Error deleting model {model_id}", 400)
     except Exception as e:
-        return handle_error(e, "Unexpected error during model deletion")
-
+        return handle_error(e, f"Unexpected error during model deletion {model_id}")
 
 @bp.route("/add-model", methods=["GET"])
 @login_required
@@ -219,11 +229,16 @@ def edit_model(model_id):
         form = ModelForm(obj=model)
 
         if request.method == "POST":
+            csrf_error = validate_csrf_token()
+            if csrf_error:
+                return csrf_error
+
             if form.validate_on_submit():
                 try:
                     data = extract_model_data(form)
                     validate_immutable_fields(model_id, data)
                     Model.update(model_id, data)
+                    logger.info(f"Model updated successfully: {model_id}")
                     return jsonify({"success": True, "message": "Model updated successfully"})
                 except Exception as e:
                     return handle_error(e, "Error updating model", 400)
@@ -235,7 +250,6 @@ def edit_model(model_id):
     except Exception as e:
         return handle_error(e, "Error in edit_model")
 
-
 @bp.route("/models/default/<int:model_id>", methods=["POST"])
 @login_required
 @admin_required
@@ -243,19 +257,19 @@ def set_default_model(model_id: int):
     """
     Set a model as the default (admin-only).
     """
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        csrf_error = validate_csrf_token()
-        if csrf_error:
-            return csrf_error
+    csrf_error = validate_csrf_token()
+    if csrf_error:
+        return csrf_error
 
     try:
+        logger.info(f"Setting model {model_id} as default")
         Model.set_default(model_id)
+        logger.info(f"Model {model_id} set as default successfully")
         return jsonify(
             {"success": True, "message": "Model set as default successfully"}
         )
     except Exception as e:
         return handle_error(e, "Unexpected error setting default model")
-
 
 @bp.route("/models/<int:model_id>/immutable-fields", methods=["GET"])
 @login_required
@@ -291,13 +305,23 @@ def revert_to_version(model_id: int, version: int):
     """
     Revert a model to a previous version (admin-only).
     """
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        csrf_error = validate_csrf_token()
-        if csrf_error:
-            return csrf_error
+    csrf_error = validate_csrf_token()
+    if csrf_error:
+        return csrf_error
 
     try:
+        # Validate version number
+        if version < 1:
+            raise ValueError("Version must be a positive integer.")
+
+        # Check if the version exists in the model's history
+        versions = Model.get_version_history(model_id)
+        if version not in [v["version"] for v in versions]:
+            raise ValueError(f"Version {version} not found in model history.")
+
+        logger.info(f"Reverting model {model_id} to version {version}")
         Model.revert_to_version(model_id, version)
+        logger.info(f"Model {model_id} reverted to version {version} successfully")
         return jsonify(
             {"success": True, "message": "Model reverted to version successfully"}
         )

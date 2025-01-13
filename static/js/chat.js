@@ -237,7 +237,7 @@
                     const modelSelect = document.getElementById('model-select');
                     const modelId = modelSelect?.value;
                     if (modelId) {
-                        window.location.href = `/model/edit/${modelId}`;
+                        window.location.href = `${window.CHAT_CONFIG.editModelUrl}${modelId}`;
                     } else {
                         showFeedback('No model selected', 'error');
                     }
@@ -565,26 +565,52 @@
 
     async function deleteChat(chatId) {
       try {
-        if (!confirm('Are you sure you want to delete this chat?')) {
+        // Enhanced confirmation dialog
+        if (!confirm('Are you sure you want to delete this chat? This action cannot be undone.')) {
           return;
         }
-
+    
+        // Show loading state on the delete button
+        const deleteBtn = document.querySelector(`button[data-chat-id="${chatId}"]`);
+        if (deleteBtn) {
+          deleteBtn.disabled = true;
+          deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+    
         const response = await fetchWithCSRF(`/chat/delete_chat/${chatId}`, {
           method: 'DELETE',
           headers: {
-            'X-Chat-ID': window.CHAT_CONFIG.chatId,
+            'Content-Type': 'application/json',
+            'X-Chat-ID': chatId,
             'X-Requested-With': 'XMLHttpRequest'
           }
         });
-
+    
         if (response.success) {
-          location.reload();
+          // If deleting current chat, redirect to new chat
+          if (chatId === window.CHAT_CONFIG.chatId) {
+            window.location.href = '/chat/chat_interface';
+            return;
+          }
+          
+          // Otherwise just remove the chat from sidebar
+          const chatElement = document.querySelector(`[data-chat-id="${chatId}"]`).closest('.group');
+          chatElement.remove();
+          
+          showFeedback('Chat deleted successfully', 'success');
         } else {
-          throw new Error(response.error || 'Unknown error');
+          throw new Error(response.error || 'Failed to delete chat');
         }
       } catch (error) {
         console.error('Error deleting chat:', error);
-        showFeedback('Failed to delete chat', 'error');
+        showFeedback(error.message || 'Failed to delete chat', 'error');
+      } finally {
+        // Reset delete button state if it exists
+        const deleteBtn = document.querySelector(`button[data-chat-id="${chatId}"]`);
+        if (deleteBtn) {
+          deleteBtn.disabled = false;
+          deleteBtn.innerHTML = '<i class="fas fa-trash-alt text-lg"></i>';
+        }
       }
     }
 
@@ -928,37 +954,51 @@
 
     async function handleModelChange() {
       if (!modelSelect) return;
-
+  
       const modelId = modelSelect.value;
       const originalValue = modelSelect.dataset.originalValue;
-
+  
+      // Disable select while processing
+      modelSelect.disabled = true;
+  
       try {
-        const response = await fetchWithCSRF('/chat/update_model', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Chat-ID': window.CHAT_CONFIG.chatId,
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          body: JSON.stringify({ model_id: modelId })
-        });
-
-        if (response.success) {
-          localStorage.setItem('selectedModel', modelId);
-          modelSelect.dataset.originalValue = modelId;
-          showFeedback('Model updated successfully', 'success');
-        } else {
-          throw new Error(response.error || 'Failed to update model');
-        }
+          const response = await fetchWithCSRF('/chat/update_model', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                  'X-Requested-With': 'XMLHttpRequest'
+              },
+              body: JSON.stringify({ model_id: modelId })
+          });
+  
+          if (response.success) {
+              // Update model name in title
+              const selectedOption = modelSelect.options[modelSelect.selectedIndex];
+              const modelName = selectedOption.textContent;
+              const chatTitle = document.getElementById('chat-title');
+              if (chatTitle) {
+                  const currentTitle = chatTitle.textContent.split('-')[0].trim();
+                  chatTitle.textContent = `${currentTitle} - ${modelName}`;
+              }
+              
+              localStorage.setItem('selectedModel', modelId);
+              modelSelect.dataset.originalValue = modelId;
+              showFeedback('Model updated successfully', 'success');
+          } else {
+              throw new Error(response.error || 'Failed to update model');
+          }
       } catch (error) {
-        console.error('Error updating model:', error);
-        showFeedback(error.message || 'Failed to update model', 'error');
-        // Restore original value on error
-        if (originalValue && modelSelect) {
-          modelSelect.value = originalValue;
-        }
+          console.error('Error updating model:', error);
+          showFeedback(error.message || 'Failed to update model', 'error');
+          // Restore original value on error
+          if (originalValue && modelSelect) {
+              modelSelect.value = originalValue;
+          }
+      } finally {
+          modelSelect.disabled = false;
       }
-    }
+  }
 
     async function handleMessageActions(event) {
       const target = event.target.closest('button');

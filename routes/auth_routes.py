@@ -60,6 +60,13 @@ def clean_failed_registrations():
     Timer(900, clean_failed_registrations).start()  # Run every 15 minutes
 
 # Start the first clean-up
+
+@bp.route("/manage_users", methods=["GET"])
+@login_required
+@admin_required
+def manage_users():
+    """Render the manage users page for admin users."""
+    return render_template("manage_users.html")
 timer = Timer(900, clean_failed_registrations)
 timer.start()
 
