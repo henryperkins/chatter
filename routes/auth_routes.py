@@ -302,7 +302,14 @@ def register():
                 # Create default model if no models exist
                 model_count = db.execute(text("SELECT COUNT(*) FROM models")).scalar()
                 if model_count == 0:
-                    Model.create_default_model()
+                    try:
+                        Model.create_default_model()
+                    except ValueError as e:
+                        logger.error(f"Failed to create default model: {e}")
+                        return jsonify({
+                            "success": False,
+                            "error": f"Default model configuration is invalid: {e}"
+                        }), 400
 
                 logger.info(f"New user registered successfully: {username}")
                 return jsonify({"success": True, "message": "Registration successful"}), 200
