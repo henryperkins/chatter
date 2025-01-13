@@ -72,25 +72,35 @@ class ConversationManager:
 
     def get_context(self, chat_id: str, include_system: bool = False) -> List[Dict[str, str]]:
         """
-        Retrieve the conversation context for a specific chat ID.
+        Retrieve the conversation context with proper formatting.
 
         Args:
-            chat_id (str): The unique identifier for the chat session.
-            include_system (bool): Whether to include system messages. Defaults to False.
+            chat_id: The unique identifier for the chat session.
+            include_system: Whether to include system messages. Defaults to False.
 
         Returns:
             A list of message dictionaries with 'role' and 'content'.
         """
         messages = Chat.get_messages(chat_id=chat_id, include_system=include_system)
         context: List[Dict[str, str]] = []
+        
         for msg in messages:
             role = msg.get("role")
             content = msg.get("content")
+            metadata = msg.get("metadata", {})
+            
             if isinstance(role, str) and isinstance(content, str):
-                context.append({
-                    "role": role,
-                    "content": content
-                })
+                message_dict = {"role": role}
+                
+                # For assistant messages, use formatted content if available
+                if role == "assistant" and metadata and "formatted_content" in metadata:
+                    message_dict["content"] = metadata["formatted_content"]
+                    message_dict["raw_content"] = metadata["raw_content"]
+                else:
+                    message_dict["content"] = content
+                
+                context.append(message_dict)
+        
         return context
 
     def add_message(

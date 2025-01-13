@@ -923,7 +923,8 @@
 
       try {
         if (target.classList.contains('copy-button')) {
-          const content = target.closest('.max-w-3xl').querySelector('.prose').textContent;
+          const rawContent = target.dataset.rawContent;
+          const content = rawContent || target.closest('.max-w-3xl').querySelector('.prose').textContent;
           await navigator.clipboard.writeText(content);
           showFeedback('Copied to clipboard!', 'success');
         } else if (target.classList.contains('regenerate-button')) {

@@ -191,8 +191,11 @@ def chat_interface() -> Response:
     messages = conversation_manager.get_context(chat_id)
     for message in messages:
         if message['role'] == 'assistant':
-            # Escape any Jinja2 template syntax in stored messages
-            message['content'] = message['content'].replace("{%", "&#123;%").replace("%}", "%&#125;")
+            # No need to re-format, use the stored formatted content
+            continue
+        elif message['role'] == 'user':
+            # Escape any HTML in user messages
+            message['content'] = bleach.clean(message['content'])
 
     models = Model.get_all()
     conversations = [
