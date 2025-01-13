@@ -1,25 +1,25 @@
-import os
 import logging
+import os
 from datetime import timedelta
+from typing import Optional, Union
+
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, url_for, request, session
-from werkzeug.wrappers import Response
+from flask import Flask, Response as FlaskResponse, jsonify, redirect, request, session, url_for
 from flask_login import current_user, logout_user
 from flask_wtf.csrf import CSRFError
-from werkzeug.exceptions import HTTPException
-from database import close_db, init_db, init_app, get_db
 from sqlalchemy import text
+from werkzeug.exceptions import HTTPException
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+from database import close_db, get_db, init_app, init_db
+from extensions import csrf, limiter, login_manager
 from models import User
-from extensions import limiter, login_manager, csrf
 from routes.auth_routes import bp as auth_bp
 from routes.chat_routes import chat_routes
 from routes.model_routes import bp as model_bp
-from typing import Dict, Optional
 
 # Load environment variables from .env file
 load_dotenv()
-
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -85,10 +85,14 @@ csrf.init_app(app)
 app.config.update(
     {
         "RATELIMIT_STORAGE_URL": "memory://",
-        "RATELIMIT_STRATEGY": "fixed-window",  # Use simpler strategy
-        "RATELIMIT_DEFAULT": "200 per day;50 per hour",  # Set reasonable defaults
+        "RATELIMIT_STRATEGY": "fixed-window",
+        "RATELIMIT_DEFAULT": "1000 per day;200 per hour",  # More lenient default
     }
 )
+
+# More permissive rate limits for static files
+limiter.limit("1000 per hour")(app.route("/static/<path:filename>"))
+limiter.limit("1000 per hour")(app.route("/favicon.ico"))
 limiter.init_app(app)
 
 # Initialize database
@@ -140,7 +144,7 @@ app.teardown_appcontext(close_db)
 
 
 @app.errorhandler(400)
-def bad_request(error: HTTPException) -> tuple[Dict[str, str], int]:
+def bad_request(error: HTTPException) -> tuple[Union[FlaskResponse, dict], int]:
     """Handle HTTP 400 Bad Request errors."""
     return (
         jsonify(
@@ -153,7 +157,7 @@ def bad_request(error: HTTPException) -> tuple[Dict[str, str], int]:
 
 
 @app.errorhandler(403)
-def forbidden(error: HTTPException) -> tuple[Dict[str, str], int]:
+def forbidden(error: HTTPException) -> tuple[Union[FlaskResponse, dict], int]:
     """Handle HTTP 403 Forbidden errors."""
     logger.warning(
         f"Forbidden access attempt by user {current_user.username if current_user.is_authenticated else 'anonymous'} to {request.path}"
@@ -168,7 +172,7 @@ def forbidden(error: HTTPException) -> tuple[Dict[str, str], int]:
 
 
 @app.errorhandler(404)
-def not_found(error: HTTPException) -> tuple[Dict[str, str], int]:
+def not_found(error: HTTPException) -> tuple[Union[FlaskResponse, dict], int]:
     """Handle HTTP 404 Not Found errors."""
     return (
         jsonify(error="Not found", message="The requested resource was not found."),
@@ -177,7 +181,7 @@ def not_found(error: HTTPException) -> tuple[Dict[str, str], int]:
 
 
 @app.errorhandler(429)
-def rate_limit_exceeded(error: HTTPException) -> tuple[Dict[str, str], int]:
+def rate_limit_exceeded(error: HTTPException) -> tuple[Union[FlaskResponse, dict], int]:
     """Handle HTTP 429 Too Many Requests errors."""
     logger.warning("Rate limit exceeded: %s", error)
     return (
@@ -190,7 +194,7 @@ def rate_limit_exceeded(error: HTTPException) -> tuple[Dict[str, str], int]:
 
 
 @app.errorhandler(500)
-def internal_server_error(error: HTTPException) -> tuple[Dict[str, str], int]:
+def internal_server_error(error: HTTPException) -> tuple[Union[FlaskResponse, dict], int]:
     """Handle HTTP 500 Internal Server Error."""
     logger.error("Internal server error: %s", error)
     return (
@@ -203,7 +207,7 @@ def internal_server_error(error: HTTPException) -> tuple[Dict[str, str], int]:
 
 
 @app.errorhandler(CSRFError)
-def handle_csrf_error(e: CSRFError) -> tuple[Dict[str, str], int]:
+def handle_csrf_error(e: CSRFError) -> tuple[Union[FlaskResponse, dict], int]:
     """Handle CSRF token errors raised by Flask-WTF."""
     logger.warning("CSRF error: %s", e.description)
     return (
@@ -216,10 +220,16 @@ def handle_csrf_error(e: CSRFError) -> tuple[Dict[str, str], int]:
 
 
 @app.errorhandler(Exception)
-def handle_exception(e: Exception) -> tuple[Dict[str, str], int]:
+def handle_exception(e: Exception) -> tuple[Union[FlaskResponse, dict], int]:
     """Handle unhandled exceptions globally."""
     if isinstance(e, HTTPException):
-        return e
+        return (
+            jsonify(
+                error=e.name,
+                message=e.description,
+            ),
+            e.code,
+        )
     logger.exception("Unhandled exception: %s", e)
     if "database" in str(e).lower():
         return (
@@ -248,14 +258,16 @@ def handle_exception(e: Exception) -> tuple[Dict[str, str], int]:
 
 # Handle favicon.ico requests
 @app.route("/favicon.ico")
-def favicon() -> Response:
-    """Redirect favicon.ico requests to the static file."""
-    return redirect(url_for("static", filename="favicon.ico"))
+def favicon() -> FlaskResponse:
+    """Redirect favicon.ico requests to the static file with caching headers."""
+    response = redirect(url_for("static", filename="favicon.ico"))
+    response.headers["Cache-Control"] = "public, max-age=86400"  # Cache for 1 day
+    return response
 
 
 # Redirect root URL to chat interface
 @app.route("/")
-def index() -> Response:
+def index() -> FlaskResponse:
     """Redirect to login if not authenticated, otherwise to chat interface."""
     if not current_user.is_authenticated:
         return redirect(url_for("auth.login"), code=307)
@@ -264,7 +276,7 @@ def index() -> Response:
 
 # Clear session route
 @app.route("/clear-session")
-def clear_session() -> Response:
+def clear_session() -> FlaskResponse:
     """Clear the session and log out the user."""
     logout_user()
     session.clear()

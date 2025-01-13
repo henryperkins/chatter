@@ -1,142 +1,148 @@
-(function() {
-    // Use showFeedback utility from utils.js
-    const { showFeedback } = window.utils;
+// static/js/base.js
 
-    // Initialize mobile menu toggle
-    function initializeMobileMenu() {
+(function() {
+    // Use utility functions from utils.js if needed
+    // const { showFeedback } = window.utils;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        /*** Mobile Menu Toggle with Animated Hamburger ***/
+        const menuToggle = document.getElementById('mobile-menu-toggle');
         const mobileMenu = document.getElementById('mobile-menu');
-        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-        const mobileMenuClose = document.getElementById('mobile-menu-close');
+        const overlay = document.getElementById('overlay');
+        const hamburger = menuToggle ? menuToggle.querySelector('.hamburger') : null;
+
+        if (menuToggle && mobileMenu && overlay && hamburger) {
+            menuToggle.addEventListener('click', () => {
+                hamburger.classList.toggle('active');
+                mobileMenu.classList.toggle('-translate-x-full');
+                overlay.classList.toggle('hidden');
+                document.body.classList.toggle('overflow-hidden');
+            });
+
+            overlay.addEventListener('click', () => {
+                hamburger.classList.remove('active');
+                mobileMenu.classList.add('-translate-x-full');
+                overlay.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            });
+        }
+
+        /*** Sidebar Toggle for Chat Page ***/
+        const chatSidebarToggle = document.getElementById('chat-sidebar-toggle');
         const sidebar = document.getElementById('sidebar');
 
-        // Only proceed if required elements exist
-        if (!mobileMenu || !mobileMenuToggle) return;
-
-        function toggleMobileMenu() {
-            const expanded = mobileMenuToggle.getAttribute('aria-expanded') === 'true';
-            mobileMenu.classList.toggle('-translate-x-full');
-            mobileMenuToggle.setAttribute('aria-expanded', !expanded);
-        }
-
-        function toggleSidebar() {
-            if (sidebar) {
+        if (chatSidebarToggle && sidebar) {
+            chatSidebarToggle.addEventListener('click', () => {
                 sidebar.classList.toggle('-translate-x-full');
-            }
-        }
-
-        mobileMenuToggle.addEventListener('click', toggleSidebar);
-
-        if (mobileMenuClose) {
-            mobileMenuClose.addEventListener('click', toggleMobileMenu);
-        }
-
-        // Close menu when clicking outside
-        document.addEventListener('click', (e) => {
-            if (mobileMenu && !mobileMenu.contains(e.target) && !mobileMenuToggle.contains(e.target)) {
-                mobileMenu.classList.add('-translate-x-full');
-            }
-            if (sidebar && !sidebar.contains(e.target) && !mobileMenuToggle.contains(e.target)) {
-                sidebar.classList.add('-translate-x-full');
-            }
-        });
-    }
-
-    // Initialize tooltips
-    function initializeTooltips() {
-        const tooltipElements = document.querySelectorAll('[data-tooltip]');
-        tooltipElements.forEach(element => {
-            const tooltipText = element.getAttribute('data-tooltip');
-            const tooltip = document.createElement('div');
-            tooltip.className = 'tooltip hidden bg-black text-white text-sm px-2 py-1 rounded absolute z-50';
-            tooltip.textContent = tooltipText;
-            element.appendChild(tooltip);
-
-            element.addEventListener('mouseenter', () => {
-                tooltip.classList.remove('hidden');
-                const rect = element.getBoundingClientRect();
-                tooltip.style.top = `${rect.bottom + window.scrollY}px`;
-                tooltip.style.left = `${rect.left + window.scrollX}px`;
+                document.body.classList.toggle('overflow-hidden');
             });
 
-            element.addEventListener('mouseleave', () => {
-                tooltip.classList.add('hidden');
-            });
-        });
-    }
-
-    // Initialize dropdowns
-    function initializeDropdowns() {
-        const dropdownElements = document.querySelectorAll('[data-dropdown]');
-        dropdownElements.forEach(element => {
-            const dropdownMenu = element.querySelector('.dropdown-menu');
-            if (dropdownMenu) {
-                element.addEventListener('click', event => {
-                    event.stopPropagation();
-                    dropdownMenu.classList.toggle('hidden');
-                });
-
-                document.addEventListener('click', event => {
-                    if (!event.target.closest('[data-dropdown]')) {
-                        dropdownMenu.classList.add('hidden');
+            // Close sidebar when clicking outside on mobile
+            document.addEventListener('click', (e) => {
+                if (!sidebar.contains(e.target) && !chatSidebarToggle.contains(e.target)) {
+                    if (!sidebar.classList.contains('-translate-x-full')) {
+                        sidebar.classList.add('-translate-x-full');
+                        document.body.classList.remove('overflow-hidden');
                     }
+                }
+            });
+        }
+
+        /*** Flash Message Handling ***/
+        const flashMessages = document.querySelectorAll('[role="alert"]');
+        flashMessages.forEach(message => {
+            const dismissButton = message.querySelector('button');
+            let timeoutId;
+
+            const removeMessage = () => {
+                message.style.opacity = '0';
+                message.style.transform = 'translateY(-10px)';
+                setTimeout(() => message.remove(), 300);
+            };
+
+            // Auto-dismiss after 5 seconds
+            timeoutId = setTimeout(removeMessage, 5000);
+
+            // Cancel auto-dismiss when hovering
+            message.addEventListener('mouseenter', () => clearTimeout(timeoutId));
+            message.addEventListener('mouseleave', () => {
+                timeoutId = setTimeout(removeMessage, 5000);
+            });
+
+            // Manual dismiss
+            if (dismissButton) {
+                dismissButton.addEventListener('click', () => {
+                    clearTimeout(timeoutId);
+                    removeMessage();
                 });
             }
         });
-    }
 
-    // Initialize modals
-    function initializeModals() {
-        const modalTriggers = document.querySelectorAll('[data-modal-target]');
-        modalTriggers.forEach(trigger => {
-            const modalId = trigger.getAttribute('data-modal-target');
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                trigger.addEventListener('click', () => {
-                    modal.classList.remove('hidden');
+        /*** Initialize Tooltips ***/
+        function initializeTooltips() {
+            const tooltipElements = document.querySelectorAll('[data-tooltip]');
+            tooltipElements.forEach(element => {
+                const tooltipText = element.getAttribute('data-tooltip');
+                const tooltip = document.createElement('div');
+                tooltip.className = 'tooltip hidden bg-black text-white text-sm px-2 py-1 rounded absolute z-50';
+                tooltip.textContent = tooltipText;
+                element.appendChild(tooltip);
+
+                element.addEventListener('mouseenter', () => {
+                    tooltip.classList.remove('hidden');
+                    const rect = element.getBoundingClientRect();
+                    tooltip.style.top = `${rect.bottom + window.scrollY}px`;
+                    tooltip.style.left = `${rect.left + window.scrollX}px`;
                 });
 
-                const closeButtons = modal.querySelectorAll('[data-modal-close]');
-                closeButtons.forEach(button => {
-                    button.addEventListener('click', () => {
-                        modal.classList.add('hidden');
+                element.addEventListener('mouseleave', () => {
+                    tooltip.classList.add('hidden');
+                });
+            });
+        }
+
+        /*** Initialize Modals ***/
+        function initializeModals() {
+            const modalTriggers = document.querySelectorAll('[data-modal-target]');
+            modalTriggers.forEach(trigger => {
+                const modalId = trigger.getAttribute('data-modal-target');
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    trigger.addEventListener('click', () => {
+                        modal.classList.remove('hidden');
+                        document.body.classList.add('overflow-hidden');
                     });
-                });
 
-                modal.addEventListener('click', event => {
-                    if (event.target === modal) {
-                        modal.classList.add('hidden');
-                    }
-                });
+                    const closeButtons = modal.querySelectorAll('[data-modal-close]');
+                    closeButtons.forEach(button => {
+                        button.addEventListener('click', () => {
+                            modal.classList.add('hidden');
+                            document.body.classList.remove('overflow-hidden');
+                        });
+                    });
 
-                document.addEventListener('keydown', event => {
-                    if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
-                        modal.classList.add('hidden');
-                    }
-                });
-            }
-        });
-    }
+                    modal.addEventListener('click', event => {
+                        if (event.target === modal) {
+                            modal.classList.add('hidden');
+                            document.body.classList.remove('overflow-hidden');
+                        }
+                    });
 
-    // Combine all initialization logic
-    function initializeBase() {
-        try {
-            initializeMobileMenu();
-            initializeTooltips();
-            initializeDropdowns();
-            initializeModals();
-            // Other initialization functions can be added here
-        } catch (error) {
-            console.error('Error during base initialization:', error);
-            showFeedback('An error occurred during initialization. Please reload the page.', 'error');
+                    document.addEventListener('keydown', event => {
+                        if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                            modal.classList.add('hidden');
+                            document.body.classList.remove('overflow-hidden');
+                        }
+                    });
+                }
+            });
         }
-    }
 
-    // Only initialize once when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializeBase);
-    } else {
-        initializeBase();
-    }
+        /*** Initialize Other Components as Needed ***/
+        // You can add additional initialization functions here
 
-    // No need to expose utilities as they're already available through window.utils
+        // Call initialization functions
+        initializeTooltips();
+        initializeModals();
+    });
 })();
