@@ -161,9 +161,8 @@
         // Set up drag and drop
         setupDragAndDrop();
 
-            // Cleanup on page unload
-            window.addEventListener('beforeunload', cleanup);
-        })();
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', cleanup);
 
         console.debug('Chat initialization completed successfully');
       } catch (error) {
@@ -173,8 +172,7 @@
     }
 
     function setupMobileLayout() {
-      const sidebarToggle = document.getElementById('chat-sidebar-toggle');
-      if (!sidebarToggle) return; // Exit if the chat sidebar toggle doesn't exist
+      const sidebarToggle = document.getElementById('sidebar-toggle');
       const sidebar = document.getElementById('sidebar');
 
       if (sidebarToggle && sidebar) {
@@ -262,9 +260,8 @@
       }
     }
 
-    (function() {
-        // Initialize chat interface
-        initializeChat();
+    // Initialize chat interface
+    initializeChat();
 
     async function sendMessage() {
       console.debug('sendMessage called');
@@ -505,6 +502,12 @@
       chatBox.scrollTop = chatBox.scrollHeight;
     }
 
+    /**
+     * Appends a message from the assistant to the chat box.
+     * If the message is streaming, it updates the last message instead of creating a new one.
+     * @param {string} message - The message content to append.
+     * @param {boolean} [isStreaming=false] - Whether the message is part of a streaming response.
+     */
     function appendAssistantMessage(message, isStreaming = false) {
       if (!message || typeof message !== 'string') {
         console.error('Invalid message content.');
@@ -690,10 +693,14 @@
 
     function adjustTextareaHeight(textarea) {
       textarea.style.height = 'auto';
-      const maxHeight = window.innerWidth < 640 ? 150 : 300; // 150px on small screens, 300px on larger screens
-      textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+      textarea.style.height = `${textarea.scrollHeight}px`;
     }
 
+    /**
+     * Displays a typing indicator in the chat box to show that the assistant is typing.
+     * This function creates a new div element with a typing animation and appends it to the chat box.
+     * The typing indicator is removed when the assistant's response is complete.
+     */
     function showTypingIndicator() {
       let indicator = document.getElementById('typing-indicator');
       if (indicator && indicator.parentNode) {
@@ -962,7 +969,7 @@
           } else {
             throw new Error(responseData.error || 'Failed to regenerate response');
           }
-        }
+        } // <-- This was the missing closing brace
       } catch (error) {
         console.error('Error regenerating response:', error);
         showFeedback(error.message, 'error');
@@ -972,16 +979,16 @@
       }
     }
 
-    // Expose necessary functions to global scope
-    window.editChatTitle = editChatTitle;
-    window.deleteChat = deleteChat;
-    window.removeFile = removeFile;
-  }
+// Expose necessary functions to global scope
+window.editChatTitle = editChatTitle;
+window.deleteChat = deleteChat;
+window.removeFile = removeFile;
+}
 
-  // Initialize either when DOM is ready or immediately if already loaded
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+// Initialize either when DOM is ready or immediately if already loaded
+if (document.readyState === 'loading') {
+document.addEventListener('DOMContentLoaded', init);
+} else {
+init();
+}
 })();
