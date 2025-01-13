@@ -45,22 +45,22 @@ class Model:
     @staticmethod
     def create_default_model() -> int:
         """
-        Create a default model if none exists.
+        Create a default model using values from environment variables.
         """
         default_model_data = {
-            "name": "GPT-4",
-            "deployment_name": "gpt-4",
-            "description": "Default GPT-4 model",
-            "model_type": "azure",
+            "name": os.getenv("DEFAULT_MODEL_NAME", "GPT-4"),
+            "deployment_name": os.getenv("DEFAULT_DEPLOYMENT_NAME", "gpt-4"),
+            "description": os.getenv("DEFAULT_MODEL_DESCRIPTION", "Default GPT-4 model"),
+            "model_type": os.getenv("DEFAULT_MODEL_TYPE", "azure"),
             "api_endpoint": os.getenv("AZURE_API_ENDPOINT", "https://your-resource.openai.azure.com"),
             "api_key": os.getenv("AZURE_API_KEY", "your_default_api_key"),
-            "temperature": 1.0,
-            "max_tokens": 4000,
-            "max_completion_tokens": 500,
+            "temperature": float(os.getenv("DEFAULT_TEMPERATURE", "1.0")),
+            "max_tokens": int(os.getenv("DEFAULT_MAX_TOKENS", "4000")),
+            "max_completion_tokens": int(os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "500")),
             "is_default": True,
-            "requires_o1_handling": False,
-            "supports_streaming": True,
-            "api_version": "2024-12-01-preview",
+            "requires_o1_handling": os.getenv("DEFAULT_REQUIRES_O1_HANDLING", "False").lower() == "true",
+            "supports_streaming": os.getenv("DEFAULT_SUPPORTS_STREAMING", "True").lower() == "true",
+            "api_version": os.getenv("AZURE_API_VERSION", "2024-12-01-preview"),
             "version": 1,
         }
 
