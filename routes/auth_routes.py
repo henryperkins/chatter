@@ -354,10 +354,12 @@ def verify_email(token: str):
                 cost_factor = int(os.environ.get("BCRYPT_COST_FACTOR", 12))
                 hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=cost_factor))
                 verification_token = secrets.token_urlsafe(32)
+                verification_token = secrets.token_urlsafe(32)
                 db.execute(
-                    text("INSERT INTO users (username, email, password_hash, role, email_verification_token) VALUES (:username, :email, :password_hash, :role, :verification_token)"),
+                    text("INSERT INTO users (username, email, password_hash, role, email_verification_token, is_verified) VALUES (:username, :email, :password_hash, :role, :verification_token, 0)"),
                     {"username": username, "email": email, "password_hash": hashed_pw, "role": role, "verification_token": verification_token}
                 )
+                send_verification_email(email, verification_token)
                 send_verification_email(email, verification_token)
                 db.commit()
 
