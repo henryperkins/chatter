@@ -87,20 +87,7 @@
     const md = window.md;
 
     // Global variables and state
-    let uploadedFiles = [];
-    const MAX_FILES = 5;
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     const MAX_MESSAGE_LENGTH = 1000;
-    const ALLOWED_FILE_TYPES = [
-      'text/plain',
-      'application/pdf',
-      'text/x-python',
-      'application/javascript',
-      'text/markdown',
-      'image/jpeg',
-      'image/png',
-      'text/csv'
-    ];
 
     // DOM Elements Cache
     let messageInput, sendButton, chatBox, fileInput, uploadButton,
@@ -210,9 +197,22 @@
           setupMobileLayout();
         }
 
-        // Set up file handling
+        // Set up file handling using FileUploadManager
         if (fileInput && uploadButton) {
-          setupFileHandling();
+          uploadButton.addEventListener('click', () => fileInput.click());
+          fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            const { validFiles, errors } = fileUploadManager.processFiles(files);
+
+            if (errors.length > 0) {
+              errors.forEach(error => showFeedback(error.errors.join(', '), 'error'));
+            }
+
+            if (validFiles.length > 0) {
+              fileUploadManager.uploadedFiles.push(...validFiles);
+              fileUploadManager.renderFileList();
+            }
+          });
         }
 
         // Set up additional handlers
@@ -385,7 +385,7 @@
 
     async function sendMessage() {
       console.debug('sendMessage called');
-      if (messageInput.value.trim() === '' && uploadedFiles.length === 0) {
+      if (messageInput.value.trim() === '' && fileUploadManager.uploadedFiles.length === 0) {
         showFeedback('Please enter a message or upload files.', 'error');
         return;
       }
@@ -407,7 +407,7 @@
         // Prepare form data
         const formData = new FormData();
         formData.append('message', messageText);
-        uploadedFiles.forEach(file => formData.append('files[]', file));
+        fileUploadManager.uploadedFiles.forEach(file => formData.append('files[]', file));
 
         // Update UI immediately
         appendUserMessage(messageText);
@@ -487,8 +487,8 @@
         }
 
         // Clean up after successful response
-        uploadedFiles = [];
-        renderFileList();
+        fileUploadManager.uploadedFiles = [];
+        fileUploadManager.renderFileList();
 
         // Handle any excluded files
         if (Array.isArray(responseData?.excluded_files)) {
@@ -748,89 +748,6 @@
       }
     }
 
-    function processFiles(files) {
-      const validFiles = [];
-      const errors = [];
-      const totalSize = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
-
-      for (const file of files) {
-        // Check file type
-        if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-          errors.push(`${file.name}: Unsupported file type. Allowed types: ${ALLOWED_FILE_TYPES.join(', ')}`);
-          continue;
-        }
-
-        // Check individual file size
-        if (file.size > MAX_FILE_SIZE) {
-          errors.push(`${file.name}: File too large (max ${MAX_FILE_SIZE / 1024 / 1024}MB)`);
-          continue;
-        }
-
-        // Check total size limit
-        if (totalSize + file.size > MAX_FILE_SIZE * MAX_FILES) {
-          errors.push(`${file.name}: Would exceed total size limit of ${MAX_FILES * MAX_FILE_SIZE / 1024 / 1024}MB`);
-          continue;
-        }
-
-        // Check file count limit
-        if (uploadedFiles.length + validFiles.length >= MAX_FILES) {
-          errors.push(`${file.name}: Maximum number of files (${MAX_FILES}) reached`);
-          continue;
-        }
-
-        // Validate file is not empty
-        if (file.size === 0) {
-          errors.push(`${file.name}: File is empty`);
-          continue;
-        }
-
-        validFiles.push(file);
-      }
-
-      if (errors.length > 0) {
-        showFeedback(errors.join('\n'), 'error', { duration: 10000 }); // Show errors longer
-      }
-
-      if (validFiles.length > 0) {
-        uploadedFiles = uploadedFiles.concat(validFiles);
-        renderFileList();
-        showFeedback(
-          `${validFiles.length} file(s) ready to upload. Total size: ${
-            (uploadedFiles.reduce((sum, file) => sum + file.size, 0) / 1024 / 1024).toFixed(1)
-          }MB`,
-          'success'
-        );
-      }
-    }
-
-    function renderFileList() {
-      if (!uploadedFilesDiv) return;
-
-      const fileList = document.getElementById('file-list');
-      if (!fileList) return;
-
-      fileList.innerHTML = '';
-      uploadedFiles.forEach((file, index) => {
-        const fileDiv = document.createElement('div');
-        fileDiv.className = 'flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-2 rounded mb-2';
-        fileDiv.innerHTML = `
-          <span class="text-sm truncate">${escapeHtml(file.name)}</span>
-          <button class="text-red-500 hover:text-red-700 transition-colors duration-200"
-                  data-index="${index}"
-                  aria-label="Remove ${escapeHtml(file.name)}">
-            Remove
-          </button>
-        `;
-        fileList.appendChild(fileDiv);
-      });
-
-      uploadedFilesDiv.classList.toggle('hidden', uploadedFiles.length === 0);
-    }
-
-    function removeFile(index) {
-      uploadedFiles.splice(index, 1);
-      renderFileList();
-    }
 
     function adjustTextareaHeight(textarea) {
       textarea.style.height = 'auto';
@@ -1144,7 +1061,6 @@
 // Expose necessary functions to global scope
 window.editChatTitle = editChatTitle;
 window.deleteChat = deleteChat;
-window.removeFile = removeFile;
 }
 
 // Initialize either when DOM is ready or immediately if already loaded

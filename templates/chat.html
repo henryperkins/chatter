@@ -552,6 +552,13 @@ button {
     }
 </script>
 
+<!-- Initialize file upload manager -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        window.fileUploadManager = new FileUploadManager();
+    });
+</script>
+
 <!-- Load chat.js -->
 <script src="{{ url_for('static', filename='js/chat.js') }}" defer></script>
 
