@@ -17,6 +17,9 @@ from sqlalchemy import text
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from database import close_db, init_db, init_app, get_db
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 from models import User, Model
 from extensions import limiter, login_manager, csrf
 from routes.auth_routes import bp as auth_bp
