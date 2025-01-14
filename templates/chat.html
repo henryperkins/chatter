@@ -560,31 +560,7 @@ button {
 {% block scripts %}
 {{ super() }}
 
-<!-- Initialize required globals -->
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        // Expose DOMPurify globally
-        if (typeof DOMPurify !== 'undefined') {
-            window.DOMPurify = DOMPurify;
-        } else {
-            console.error('DOMPurify is not loaded');
-        }
-
-        // Expose Prism globally
-        if (typeof Prism !== 'undefined') {
-            window.Prism = Prism;
-        } else {
-            console.error('Prism is not loaded');
-        }
-
-        // markdown-it is initialized in markdown-it-bundle.js
-        if (!window.md) {
-            console.error('markdown-it bundle is not loaded');
-        }
-    });
-</script>
-
-<!-- Define CHAT_CONFIG before loading chat.js -->
+<!-- Configuration -->
 <script>
     window.CHAT_CONFIG = {
         chatId: "{{ chat_id }}",
@@ -597,37 +573,19 @@ button {
         userId: "{{ current_user.id }}",
         userRole: "{{ current_user.role }}"
     };
-
-    // Initialize models data
     window.CHAT_CONFIG.models = JSON.parse('{{ models|tojson|safe }}');
-
-    // Validate chat configuration
-    if (!window.CHAT_CONFIG.chatId) {
-        console.warn('Chat ID not initialized');
-    }
-    if (!window.CHAT_CONFIG.csrfToken) {
-        console.error('CSRF token not found');
-    }
 </script>
 
-<!-- Initialize file upload manager -->
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        window.fileUploadManager = new FileUploadManager();
-    });
-</script>
-
-<!-- Load chat.js -->
+<!-- Chat Functionality -->
 <script src="{{ url_for('static', filename='js/chat.js') }}" defer></script>
 
-<!-- Initialize token usage manager -->
+<!-- Token Usage Manager -->
 <script type="module">
     import TokenUsageManager from "{{ url_for('static', filename='js/token-usage.js') }}";
     
     document.addEventListener('DOMContentLoaded', () => {
-        // Initialize token usage manager
         const tokenManager = new TokenUsageManager(window.CHAT_CONFIG);
-
+        
         // Hook into chat response handling
         const originalHandleResponse = window.handleResponse;
         window.handleResponse = async function(response) {
