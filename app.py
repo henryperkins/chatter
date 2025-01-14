@@ -213,11 +213,27 @@ def log_request_info():
         # Generate correlation ID
         g.correlation_id = str(uuid.uuid4())
         
-        # Log basic request info without sensitive data
-        logger.info("Request received - Method: %s, Path: %s, Remote IP: %s, Correlation ID: %s",
-                   request.method, request.path, request.remote_addr, g.correlation_id)
+        # Add user ID if authenticated
+        if current_user.is_authenticated:
+            g.user_id = current_user.id
+            
+        # Log request info with additional context
+        logger.info("Request received", extra={
+            'method': request.method,
+            'path': request.path,
+            'remote_addr': request.remote_addr,
+            'correlation_id': g.correlation_id,
+            'user_id': getattr(g, 'user_id', None),
+            'content_length': request.content_length,
+            'content_type': request.content_type,
+            'referrer': request.referrer,
+            'user_agent': request.headers.get('User-Agent')
+        })
     except Exception as e:
-        logger.error("Error logging request: %s", str(e))
+        logger.error("Error logging request", extra={
+            'error': str(e),
+            'correlation_id': getattr(g, 'correlation_id', None)
+        })
         
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e: CSRFError) -> Tuple[Dict[str, str], int]:

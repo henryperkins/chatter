@@ -38,6 +38,8 @@ class JsonFormatter(logging.Formatter):
             'message': record.getMessage(),
             'thread': record.threadName,
             'process': record.processName,
+            'environment': os.getenv('FLASK_ENV', 'development'),
+            'application': 'chat_app',
         }
         
         if record.exc_info:
@@ -57,6 +59,8 @@ class JsonFormatter(logging.Formatter):
                     'user_agent': request.headers.get('User-Agent'),
                     'referrer': request.referrer,
                     'user_id': getattr(request, 'user_id', None),
+                    'content_length': request.content_length,
+                    'content_type': request.content_type,
                 })
         except Exception:
             pass
@@ -66,8 +70,17 @@ class JsonFormatter(logging.Formatter):
             from flask import g
             if hasattr(g, 'correlation_id'):
                 log_record['correlation_id'] = g.correlation_id
+            if hasattr(g, 'user_id'):
+                log_record['user_id'] = g.user_id
         except Exception:
             pass
+            
+        # Redact sensitive information
+        if 'api_key' in log_record.get('message', ''):
+            log_record['message'] = log_record['message'].replace(
+                log_record['message'].split('api_key=')[1].split('&')[0],
+                '***REDACTED***'
+            )
             
         return json.dumps(log_record)
 
@@ -85,6 +98,14 @@ if os.getenv('FLASK_ENV') != 'production':
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(logging.Formatter(DETAILED_FORMAT))
     root_logger.addHandler(console_handler)
+
+# Ensure all loggers have handlers
+def ensure_logger_handlers(logger_name, handler, formatter):
+    logger = logging.getLogger(logger_name)
+    if not logger.handlers:
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.propagate = False
 
 app_log_handler = ConcurrentRotatingFileHandler(
     os.path.join(LOG_DIR, f"app_{datetime.now().strftime('%Y-%m-%d')}.log"),

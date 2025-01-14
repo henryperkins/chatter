@@ -47,6 +47,21 @@ logconfig_dict = {
             'handlers': ['console'],
             'propagate': False,
         },
+        'app': {
+            'level': log_level,
+            'handlers': ['console'],
+            'propagate': False,
+        },
+        'models': {
+            'level': log_level,
+            'handlers': ['console'],
+            'propagate': False,
+        },
+        'database': {
+            'level': log_level,
+            'handlers': ['console'],
+            'propagate': False,
+        },
     },
 }
 

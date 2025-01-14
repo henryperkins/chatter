@@ -168,21 +168,21 @@ def get_azure_response(
         return model_response
 
     except OpenAIError as e:
-        logger.error(
-            "OpenAI API error with %s model: %s",
-            "o1-preview" if requires_o1_handling else "standard",
-            str(e),
+        logger.exception(
+            "OpenAI API error with %s model",
+            "o1-preview" if requires_o1_handling else "standard"
         )
-        logger.debug("API parameters at the time of error: %s", api_params)
-        return {"error": str(e)}
+        safe_api_params = {k: v for k, v in api_params.items() if k != 'api_key'}
+        logger.debug("API parameters at the time of error: %s", safe_api_params)
+        return {"error": "OpenAI API error occurred"}
     except Exception as e:
-        logger.error(
-            "Error in get_azure_response (%s model): %s",
-            "o1-preview" if requires_o1_handling else "standard",
-            str(e),
+        logger.exception(
+            "Error in get_azure_response (%s model)",
+            "o1-preview" if requires_o1_handling else "standard"
         )
-        logger.debug("API parameters at the time of error: %s", api_params)
-        return {"error": str(e)}
+        safe_api_params = {k: v for k, v in api_params.items() if k != 'api_key'}
+        logger.debug("API parameters at the time of error: %s", safe_api_params)
+        return {"error": "An unexpected error occurred"}
 
 
 def scrape_data(query: str) -> str:
