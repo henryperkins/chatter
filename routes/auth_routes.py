@@ -306,10 +306,14 @@ def register():
                         Model.create_default_model()
                     except ValueError as e:
                         logger.error(f"Failed to create default model: {e}")
-                        return jsonify({
-                            "success": False,
-                            "error": f"Default model configuration is invalid: {e}"
-                        }), 400
+                        # Render the default model configuration form
+                        default_model_form = DefaultModelForm()
+                        return render_template(
+                            "edit_default_model.html",
+                            form=default_model_form,
+                            registration_form=form,
+                            model_error=str(e)
+                        )
 
                 logger.info(f"New user registered successfully: {username}")
                 return jsonify({"success": True, "message": "Registration successful"}), 200
@@ -325,15 +329,54 @@ def register():
         return jsonify({"success": False, "errors": form.errors}), 400
 
     return render_template("register.html", form=form)
+from forms import DefaultModelForm  # Add this import
 
-@bp.route("/logout")
-@login_required
-def logout():
-    """Logs out the current user, clears the session, and redirects to the login page."""
-    logger.info(f"User {current_user.id} logged out.")
-    logout_user()
-    session.clear()
-    return redirect(url_for("auth.login"))
+@bp.route("/edit_default_model", methods=["GET", "POST"])
+def edit_default_model():
+    """Handle editing of the default model configuration during registration."""
+    form = DefaultModelForm()
+    registration_form = RegistrationForm()
+
+    if request.method == "POST" and form.validate_on_submit():
+        # Extract data from form
+        default_model_data = {
+            "name": form.name.data,
+            "deployment_name": form.deployment_name.data,
+            "description": form.description.data,
+            "model_type": "azure",
+            "api_endpoint": form.api_endpoint.data,
+            "api_key": form.api_key.data,
+            "temperature": form.temperature.data,
+            "max_tokens": form.max_tokens.data,
+            "max_completion_tokens": form.max_completion_tokens.data,
+            "is_default": True,
+            "requires_o1_handling": form.requires_o1_handling.data,
+            "supports_streaming": form.supports_streaming.data,
+            "api_version": form.api_version.data,
+            "version": 1,
+        }
+        try:
+            model_id = Model.create(default_model_data)
+            logger.info(f"Default model created successfully with ID {model_id}")
+            # After creating the default model, attempt to register the user again
+            return redirect(url_for("auth.register"))
+        except Exception as e:
+            logger.error(f"Error creating default model: {e}")
+            model_error = f"Error creating default model: {e}"
+            return render_template(
+                "edit_default_model.html",
+                form=form,
+                registration_form=registration_form,
+                model_error=model_error
+            )
+    else:
+        model_error = "Please correct the errors in the form."
+        return render_template(
+            "edit_default_model.html",
+            form=form,
+            registration_form=registration_form,
+            model_error=model_error
+        )
 
 @bp.route("/reset_password/<token>", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
