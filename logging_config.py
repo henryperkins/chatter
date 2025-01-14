@@ -2,7 +2,7 @@ import logging
 import os
 import json
 from logging.handlers import RotatingFileHandler
-from cloghandler import ConcurrentRotatingFileHandler
+from concurrent_log_handler import ConcurrentRotatingFileHandler
 from datetime import datetime
 
 # Log directory and file setup
