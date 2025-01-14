@@ -197,7 +197,7 @@ def internal_server_error(error: HTTPException) -> Tuple[Dict[str, str], int]:
 @app.errorhandler(Exception)
 def handle_exception(e):
     """Handle all uncaught exceptions"""
-    logger.exception("Unhandled exception occurred")
+    logger.exception(f"Unhandled exception occurred: {str(e)} - URL: {request.url} - Method: {request.method}")
     return jsonify(
         error="An internal error occurred",
         message="Please try again later"

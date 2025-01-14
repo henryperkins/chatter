@@ -23,6 +23,27 @@ DETAILED_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(line
 SIMPLE_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 USER_FORMAT = "%(asctime)s - %(message)s"
 
+# JSON logging configuration
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_record = {
+            'timestamp': self.formatTime(record),
+            'logger': record.name,
+            'level': record.levelname,
+            'file': record.filename,
+            'line': record.lineno,
+            'function': record.funcName,
+            'message': record.getMessage(),
+            'stack_info': record.stack_info,
+            'exc_info': record.exc_info
+        }
+        return json.dumps(log_record)
+
+# Configure JSON logging for production
+if os.getenv('FLASK_ENV') == 'production':
+    json_formatter = JsonFormatter()
+    app_log_handler.setFormatter(json_formatter)
+
 # Filter class for HTTP client logs
 class HttpClientFilter(logging.Filter):
     def filter(self, record):
@@ -30,22 +51,18 @@ class HttpClientFilter(logging.Filter):
 
 # Configure root logger
 root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
+root_logger.setLevel(logging.WARNING)  # Only warnings and above for root
 
 # Create handlers
-app_log_handler = RotatingFileHandler(
+app_log_handler = ConcurrentRotatingFileHandler(
     os.path.join(LOG_DIR, f"app_{datetime.now().strftime('%Y-%m-%d')}.log"),
     maxBytes=20 * 1024 * 1024,  # 20 MB
     backupCount=10
 )
 app_log_handler.setFormatter(logging.Formatter(DETAILED_FORMAT))
 
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(logging.Formatter(DETAILED_FORMAT))
-
-# Add handlers to root logger
+# Add only file handler to root logger
 root_logger.addHandler(app_log_handler)
-root_logger.addHandler(console_handler)
 
 # Configure third-party library logging
 logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
@@ -54,7 +71,7 @@ logging.getLogger('werkzeug').setLevel(logging.WARNING)
 # API logger configuration
 api_logger = logging.getLogger("chat_api")
 api_logger.setLevel(logging.INFO)
-api_logger.propagate = False
+api_logger.propagate = False  # Prevent duplicate logs
 api_handler = RotatingFileHandler(
     os.path.join(API_LOG_DIR, f"api_{datetime.now().strftime('%Y-%m-%d')}.log"),
     maxBytes=10 * 1024 * 1024,

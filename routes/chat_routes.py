@@ -169,7 +169,7 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
             return cast(Response, jsonify({"success": True, "chat_id": chat_id}))
         return cast(Response, render_template("new_chat.html"))
     except Exception as e:
-        logger.error(f"Error creating new chat: {e}")
+        logger.exception("Error creating new chat")  # Logs full stack trace
         return jsonify({"error": "Failed to create new chat"}), 500
 
 
@@ -339,7 +339,7 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         Chat.update_title(chat_id, title)
         return cast(Response, jsonify({"success": True}))
     except Exception as e:
-        logger.error(f"Error updating chat title: {e}")
+        logger.exception("Error updating chat title")  # Logs full stack trace
         return jsonify({"error": "Failed to update chat title"}), 500
 
 
