@@ -23,6 +23,7 @@ from sqlalchemy import text
 from email_validator import validate_email, EmailNotValidError
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_limiter.util import get_remote_address
 import secrets
 from chat_utils import send_verification_email
 from flask_wtf.csrf import validate_csrf, CSRFError

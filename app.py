@@ -32,6 +32,9 @@ load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 
+# Configure Flask-Limiter to use Redis
+limiter.init_app(app, key_func=get_remote_address, storage_uri="redis://localhost:6379")
+
 # --- Configuration Functions ---
 def configure_ssl() -> ssl.SSLContext:
     """Configure SSL context with secure defaults"""
@@ -50,7 +53,7 @@ def configure_security() -> None:
         Talisman(app, content_security_policy={
             'default-src': "'self'",
             'script-src': "'self' 'unsafe-inline'",
-            'style-src': "'self' 'unsafe-inline'",
+            'style-src': "'self' 'unsafe-inline' 'self' 'unsafe-inline' 'style-src-elem'",
             'img-src': "'self' data:",
             'connect-src': "'self'",
             'font-src': "'self'",
