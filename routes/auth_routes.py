@@ -359,7 +359,16 @@ def register():
                         )
 
                 db.commit()
-                send_verification_email(email, verification_token)
+                # Placeholder: Skip email verification
+                logger.warning("Email verification is currently disabled. All users are automatically verified.")
+                db.execute(
+                    text("""
+                        UPDATE users
+                        SET is_verified = 1, email_verification_token = NULL
+                        WHERE email = :email
+                    """),
+                    {"email": email}
+                )
                 logger.info(f"New user registered: {username}")
                 return jsonify({"success": True, "message": "Registration successful"}), 200
 
