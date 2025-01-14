@@ -161,7 +161,8 @@ def init_app_data():
         logger.error(f"Error during app data initialization: {e}")
         raise
 
-# Remove this duplicate init_db_command and use the one from database.py
+from database import init_db_command
+app.cli.add_command(init_db_command)
 
 # Initialize core application components
 with app.app_context():
