@@ -1,22 +1,26 @@
-# models/base.py
-
 import logging
 from contextlib import contextmanager
+from typing import Optional
 from sqlalchemy.orm import Session
-from database import get_db_session
+from sqlalchemy.pool import QueuePool
+from database import get_db_session, get_db_pool
+from sqlalchemy.ext.declarative import declarative_base
+
 
 logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def db_session_scope():
-    """
-    Provide a transactional scope around a series of operations.
-    """
+def db_session(pool: Optional[QueuePool] = None) -> Session:
+    """Provide a transactional scope around a series of operations."""
+    if pool is None:
+        pool = get_db_pool()
+    
     session_gen = get_db_session()
-    session: Session = next(session_gen)
+    session = next(session_gen)
     try:
         yield session
+        session.commit()
     except Exception as e:
         session.rollback()
         logger.error(f"Session rollback due to exception: {e}")
@@ -25,7 +29,9 @@ def db_session_scope():
         session.close()
 
 
-# Base is imported from database.py
-from database import Base
+# Import Base from SQLAlchemy
+Base = declarative_base()
 
-# Now, all ORM models should inherit from Base
+def row_to_dict(row):
+    """Convert a SQLAlchemy row object to a dictionary."""
+    return {column.name: getattr(row, column.name) for column in row.__table__.columns}

@@ -12,3 +12,4 @@ tiktoken==0.8.0
 email-validator==1.3.0
 bleach==6.1.0
 SQLAlchemy==2.0.25
+cryptography==42.0.5

@@ -22,17 +22,6 @@ from wtforms.validators import (
     Optional,
     Regexp,
 )
-from wtforms.validators import (
-    DataRequired,
-    Email,
-    Length,
-    EqualTo,
-    NumberRange,
-    URL,
-    Optional,
-    Regexp,
-)
-import os
 from typing import Any
 from database import get_db
 from sqlalchemy import text
@@ -318,22 +307,38 @@ def validate_requires_o1_handling(self, field: Any) -> None:
 class DefaultModelForm(FlaskForm):
     """
     Form for editing the default model configuration during registration if it is invalid.
+    Specifically designed for o1-preview model configuration.
     """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Check for encryption key before form validation
+        from config import Config
+        if not Config.ENCRYPTION_KEY:
+            raise ValueError("ENCRYPTION_KEY environment variable must be set")
+
     name = StringField(
         "Model Name",
         validators=[
             DataRequired(message="Model name is required."),
             Length(max=50, message="Model name cannot exceed 50 characters."),
+            Regexp(
+                r"^[a-zA-Z0-9_\-\s]+$",
+                message="Model name can only contain letters, numbers, spaces, underscores, and hyphens.",
+            ),
         ],
-        default=os.getenv("DEFAULT_MODEL_NAME", "GPT-4")
+        default="o1-preview"
     )
     deployment_name = StringField(
         "Deployment Name",
         validators=[
             DataRequired(message="Deployment name is required."),
             Length(max=50, message="Deployment name cannot exceed 50 characters."),
+            Regexp(
+                r"^[a-zA-Z0-9_\-]+$",
+                message="Deployment name can only contain letters, numbers, underscores, and hyphens.",
+            ),
         ],
-        default=os.getenv("DEFAULT_DEPLOYMENT_NAME", "gpt-4")
+        default="o1-preview"
     )
     description = TextAreaField(
         "Description",
@@ -341,15 +346,19 @@ class DefaultModelForm(FlaskForm):
             Optional(),
             Length(max=500, message="Description cannot exceed 500 characters."),
         ],
-        default=os.getenv("DEFAULT_MODEL_DESCRIPTION", "Default GPT-4 model")
+        default="Azure OpenAI o1-preview model"
     )
     api_endpoint = URLField(
         "API Endpoint",
         validators=[
             DataRequired(message="API endpoint is required."),
             URL(message="Must be a valid URL."),
+            Regexp(
+                r"^https://[^/]+\.openai\.azure\.com/?$",
+                message="Must be a valid Azure OpenAI endpoint URL.",
+            ),
         ],
-        default=os.getenv("DEFAULT_API_ENDPOINT", "https://your-resource.openai.azure.com")
+        default="https://openai-hp.openai.azure.com/"
     )
     api_key = StringField(
         "API Key",
@@ -357,55 +366,87 @@ class DefaultModelForm(FlaskForm):
             DataRequired(message="API key is required."),
             Length(min=32, message="API key must be at least 32 characters long."),
         ],
-        default=os.getenv("AZURE_API_KEY", "your_default_api_key")
+        default="9SPmgaBZ0tlnQrdRU0IxLsanKHZiEUMD2RASDEUhOchf6gyqRLWCJQQJ99BAACHYHv6XJ3w3AAABACOGKt5l"
     )
     temperature = FloatField(
         "Temperature",
         validators=[
-            Optional(),
-            NumberRange(min=0, max=2, message="Temperature must be between 0 and 2."),
+            DataRequired(message="Temperature is required for o1-preview."),
+            NumberRange(min=1.0, max=1.0, message="Temperature must be exactly 1.0 for o1-preview."),
         ],
-        default=os.getenv("DEFAULT_TEMPERATURE", "1.0")
+        default=1.0,
+        render_kw={"readonly": True}
     )
     max_tokens = IntegerField(
         "Max Tokens",
-        validators=[
-            Optional(),
-            NumberRange(min=1, max=4000, message="Max tokens must be between 1 and 4000."),
-        ],
-        default=os.getenv("DEFAULT_MAX_TOKENS", "4000")
+        validators=[Optional()],
+        default=None,
+        render_kw={"readonly": True, "disabled": True}
     )
     max_completion_tokens = IntegerField(
         "Max Completion Tokens",
         validators=[
             DataRequired(message="Max completion tokens is required."),
-            NumberRange(min=1, max=16384, message="Max completion tokens must be between 1 and 16384."),
+            NumberRange(min=1, max=8300, message="Max completion tokens must be between 1 and 8300 for o1-preview."),
         ],
-        default=os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "500")
+        default=8300
     )
     requires_o1_handling = BooleanField(
         "Requires o1-preview Handling",
-        default=os.getenv("DEFAULT_REQUIRES_O1_HANDLING", "False").lower() == "true"
+        default=True,
+        render_kw={"readonly": True, "checked": True, "disabled": True}
     )
     supports_streaming = BooleanField(
         "Supports Streaming",
-        default=os.getenv("DEFAULT_SUPPORTS_STREAMING", "True").lower() == "true"
+        default=False,
+        render_kw={"readonly": True, "disabled": True}
     )
     api_version = StringField(
         "API Version",
         validators=[
             DataRequired(message="API version is required."),
             Length(max=20, message="API version cannot exceed 20 characters."),
+            Regexp(
+                r"^\d{4}-\d{2}-\d{2}-preview$",
+                message="API version must be in format YYYY-MM-DD-preview",
+            ),
         ],
-        default=os.getenv("AZURE_API_VERSION", "2024-12-01-preview")
+        default="2024-12-01-preview",
+        render_kw={"readonly": True}
+    )
+    model_type = StringField(
+        "Model Type",
+        validators=[DataRequired(message="Model type is required.")],
+        default="o1-preview",
+        render_kw={"type": "hidden"}
     )
     submit = SubmitField("Save Configuration")
 
-    def validate_password(self, field: Any) -> None:
+    def validate_api_endpoint(self, field: Any) -> None:
         """
-        Validate password strength and security requirements.
+        Custom validator for API endpoint.
         """
-        validate_password_strength(field.data)
+        # Remove any trailing slashes
+        field.data = field.data.rstrip("/")
+
+    def validate_temperature(self, field: Any) -> None:
+        """
+        Ensure temperature is exactly 1.0 for o1-preview.
+        """
+        if field.data != 1.0:
+            raise ValidationError("Temperature must be exactly 1.0 for o1-preview.")
+
+    def validate_max_completion_tokens(self, field: Any) -> None:
+        """
+        Ensure max_completion_tokens is within o1-preview limits.
+        """
+        try:
+            value = int(field.data)
+            if not (1 <= value <= 8300):
+                raise ValidationError("Max completion tokens must be between 1 and 8300 for o1-preview.")
+            field.data = value
+        except (TypeError, ValueError) as e:
+            raise ValidationError("Max completion tokens must be a valid integer.") from e
 
 
 def validate_password_strength(password: str) -> None:
@@ -416,11 +457,25 @@ def validate_password_strength(password: str) -> None:
         raise ValidationError("Password is required.")
 
     password = password.strip()
-    errors = validate_password_strength(password)
+    errors = []
+    
+    # Check minimum length
+    if len(password) < 8:
+        errors.append("Password must be at least 8 characters long.")
+    
+    # Check for required character types
+    if not re.search(r"[A-Z]", password):
+        errors.append("Password must contain at least one uppercase letter.")
+    if not re.search(r"[a-z]", password):
+        errors.append("Password must contain at least one lowercase letter.")
+    if not re.search(r"\d", password):
+        errors.append("Password must contain at least one number.")
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        errors.append("Password must contain at least one special character.")
     
     if errors:
         raise ValidationError(" ".join(errors))
-
+    
     # Additional validations
     common_passwords = {
         "password", "password123", "123456", "qwerty", "abc123", "12345678", "letmein"

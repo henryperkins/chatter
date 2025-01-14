@@ -1,32 +1,29 @@
-import os
-import ssl
 import logging
-import redis
+import os
+import uuid
 from datetime import timedelta
 from typing import Dict, Optional, Tuple
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, redirect, url_for, request, session, g
-import uuid
 from flask_login import current_user, logout_user
 from flask_talisman import Talisman
 from flask_sslify import SSLify
 from flask_wtf.csrf import CSRFError
 from werkzeug.wrappers import Response
 from werkzeug.exceptions import HTTPException
-from sqlalchemy import text
-from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
+from sqlalchemy import text
 
-from database import close_db, init_db, init_app, get_db
-
-# Initialize logger
-logger = logging.getLogger(__name__)
-from models import User, Model
+from database import init_app, get_db
 from extensions import limiter, login_manager, csrf
+from models import User
 from routes.auth_routes import bp as auth_bp
 from routes.chat_routes import chat_routes
 from routes.model_routes import bp as model_bp
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -48,6 +45,7 @@ class RemoveConnectionUpgradeMiddleware:
             logger.debug(f"Modified Connection header from '{connection_header}' to 'close'")
         return self.app(environ, start_response)
 
+
 # Wrap the Flask app with the middleware
 app.wsgi_app = RemoveConnectionUpgradeMiddleware(app.wsgi_app)
 
@@ -55,40 +53,24 @@ app.wsgi_app = RemoveConnectionUpgradeMiddleware(app.wsgi_app)
 limiter.init_app(app)
 
 # --- Configuration Functions ---
-def configure_ssl() -> ssl.SSLContext:
-    """Configure SSL context with secure defaults"""
-    context = ssl.create_default_context()
-    context.minimum_version = ssl.TLSVersion.TLSv1_2
-    context.set_ciphers('ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256')
-    return context
-
 def configure_security() -> None:
     """Configure security settings"""
-    if not app.testing:
-        # Enable HTTPS
+    if app.config.get('ENV') == "production":
+        # Enable HTTPS only in production
         SSLify(app)
-        
-        # Security headers with Talisman
-        Talisman(app, content_security_policy={
-            'default-src': "'self'",
-            'script-src': "'self' 'unsafe-inline'",
-            'style-src': "'self' 'unsafe-inline' 'self' 'unsafe-inline' 'style-src-elem'",
-            'img-src': "'self' data:",
-            'connect-src': "'self'",
-            'font-src': "'self'",
-            'object-src': "'none'",
-            'frame-src': "'none'"
-        })
-        
-        # Secure cookie settings
+        Talisman(app)
         app.config.update(
             SESSION_COOKIE_SECURE=True,
             REMEMBER_COOKIE_SECURE=True,
-            SESSION_COOKIE_HTTPONLY=True,
-            REMEMBER_COOKIE_HTTPONLY=True,
-            SESSION_COOKIE_SAMESITE='Lax',
             PREFERRED_URL_SCHEME='https'
         )
+    
+    # Basic security settings for all environments
+    app.config.update(
+        SESSION_COOKIE_HTTPONLY=True,
+        REMEMBER_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE='Lax'
+    )
 
 def configure_app() -> None:
     """Configure Flask application settings"""
@@ -122,11 +104,10 @@ def configure_app() -> None:
 
 def configure_logging() -> None:
     """Configure application logging"""
-    # Set log level based on environment variable or default to INFO
-    log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler()]
+        handlers=[logging.StreamHandler()],
+        level=os.getenv("LOG_LEVEL", "WARNING").upper()
     )
 
 def init_app_components() -> None:
@@ -203,10 +184,13 @@ def internal_server_error(error: HTTPException) -> Tuple[Dict[str, str], int]:
 @app.errorhandler(Exception)
 def handle_exception(e):
     """Handle all uncaught exceptions"""
-    logger.exception("Unhandled exception occurred - URL: %s, Method: %s, User: %s, Error: %s",
-                    request.url, request.method,
-                    current_user.id if current_user.is_authenticated else 'anonymous',
-                    str(e))
+    logger.exception(
+        "Unhandled exception occurred - URL: %s, Method: %s, User: %s, Error: %s",
+        request.url,
+        request.method,
+        current_user.id if current_user.is_authenticated else 'anonymous',
+        str(e)
+    )
     return jsonify(
         error="An internal error occurred",
         message="Please try again later"
@@ -285,6 +269,7 @@ def load_user(user_id: str) -> Optional[User]:
     finally:
         db.close()
 
+
 # --- Application Initialization ---
 configure_logging()
 configure_app()
@@ -293,11 +278,9 @@ init_app_components()
 
 # --- Application Entry Point ---
 if __name__ == "__main__":
-    ssl_context = configure_ssl()
     port = int(os.environ.get("PORT", 5000))
     app.run(
         host="0.0.0.0",
         port=port,
-        ssl_context=ssl_context,
-        debug=False
+        debug=os.environ.get("FLASK_ENV") == "development"
     )

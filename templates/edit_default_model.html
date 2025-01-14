@@ -15,6 +15,7 @@
 
     <form method="POST" action="{{ url_for('auth.edit_default_model') }}" class="space-y-6">
         {{ form.hidden_tag() }}
+        {{ form.model_type() }}
 
         <!-- Model Name -->
         <div class="space-y-1">
@@ -34,7 +35,86 @@
             {% endif %}
         </div>
 
-        <!-- Include similar blocks for each field in the form -->
+        <!-- Description -->
+        <div class="space-y-1">
+            {{ form.description.label(class="block font-medium text-gray-700 dark:text-gray-300") }}
+            {{ form.description(class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200") }}
+            {% if form.description.errors %}
+            <p class="text-red-600 dark:text-red-400 text-sm">{{ form.description.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- API Endpoint -->
+        <div class="space-y-1">
+            {{ form.api_endpoint.label(class="block font-medium text-gray-700 dark:text-gray-300") }}
+            {{ form.api_endpoint(class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200") }}
+            {% if form.api_endpoint.errors %}
+            <p class="text-red-600 dark:text-red-400 text-sm">{{ form.api_endpoint.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- API Key -->
+        <div class="space-y-1">
+            {{ form.api_key.label(class="block font-medium text-gray-700 dark:text-gray-300") }}
+            {{ form.api_key(class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200") }}
+            {% if form.api_key.errors %}
+            <p class="text-red-600 dark:text-red-400 text-sm">{{ form.api_key.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Temperature -->
+        <div class="space-y-1">
+            {{ form.temperature.label(class="block font-medium text-gray-700 dark:text-gray-300") }}
+            {{ form.temperature(class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200") }}
+            {% if form.temperature.errors %}
+            <p class="text-red-600 dark:text-red-400 text-sm">{{ form.temperature.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Max Tokens -->
+        <div class="space-y-1">
+            {{ form.max_tokens.label(class="block font-medium text-gray-700 dark:text-gray-300") }}
+            {{ form.max_tokens(class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200") }}
+            {% if form.max_tokens.errors %}
+            <p class="text-red-600 dark:text-red-400 text-sm">{{ form.max_tokens.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Max Completion Tokens -->
+        <div class="space-y-1">
+            {{ form.max_completion_tokens.label(class="block font-medium text-gray-700 dark:text-gray-300") }}
+            {{ form.max_completion_tokens(class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200") }}
+            {% if form.max_completion_tokens.errors %}
+            <p class="text-red-600 dark:text-red-400 text-sm">{{ form.max_completion_tokens.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- API Version -->
+        <div class="space-y-1">
+            {{ form.api_version.label(class="block font-medium text-gray-700 dark:text-gray-300") }}
+            {{ form.api_version(class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-200") }}
+            {% if form.api_version.errors %}
+            <p class="text-red-600 dark:text-red-400 text-sm">{{ form.api_version.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Requires o1 Handling -->
+        <div class="space-y-1">
+            {{ form.requires_o1_handling.label(class="block font-medium text-gray-700 dark:text-gray-300") }}
+            {{ form.requires_o1_handling(class="ml-2") }}
+            {% if form.requires_o1_handling.errors %}
+            <p class="text-red-600 dark:text-red-400 text-sm">{{ form.requires_o1_handling.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Supports Streaming -->
+        <div class="space-y-1">
+            {{ form.supports_streaming.label(class="block font-medium text-gray-700 dark:text-gray-300") }}
+            {{ form.supports_streaming(class="ml-2") }}
+            {% if form.supports_streaming.errors %}
+            <p class="text-red-600 dark:text-red-400 text-sm">{{ form.supports_streaming.errors[0] }}</p>
+            {% endif %}
+        </div>
 
         <!-- Submit Button -->
         <button type="submit"
@@ -43,6 +123,7 @@
         </button>
     </form>
 </div>
+{% endblock %}
 
 {% block scripts %}
 {{ super() }}
@@ -50,13 +131,17 @@
     document.addEventListener('DOMContentLoaded', () => {
         const requiresO1HandlingCheckbox = document.getElementById('requires_o1_handling');
         const temperatureField = document.getElementById('temperature');
+        const streamingCheckbox = document.getElementById('supports_streaming');
 
         function toggleTemperatureField() {
             if (requiresO1HandlingCheckbox.checked) {
                 temperatureField.value = '1.0';
                 temperatureField.disabled = true;
+                streamingCheckbox.checked = false;
+                streamingCheckbox.disabled = true;
             } else {
                 temperatureField.disabled = false;
+                streamingCheckbox.disabled = false;
             }
         }
 

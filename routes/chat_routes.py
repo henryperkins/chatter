@@ -219,9 +219,37 @@ def chat_interface() -> Union[Response, Tuple[Response, int]]:
         logger.error(f"Chat {chat_id} not found")
         return cast(Response, redirect(url_for("chat.chat_interface")))
 
-    model = Model.get_by_id(chat.model_id) if chat.model_id else None
-    chat_title = chat.title
-    model_name = model.name if model else "Default Model"
+    try:
+        model = Model.get_by_id(chat.model_id) if chat.model_id else None
+        if not model and chat.model_id:
+            # Model retrieval failed, likely due to encryption issues
+            logger.error(f"Failed to retrieve model for chat {chat_id}. Model may need to be reconfigured.")
+            if current_user.role == 'admin':
+                # Save registration data in session if it exists
+                if 'registration_data' in session:
+                    return redirect(url_for('auth.edit_default_model'))
+                else:
+                    # Create registration data for existing admin
+                    session['registration_data'] = {
+                        'username': current_user.username,
+                        'email': current_user.email,
+                        'password': None  # Not needed for existing admin
+                    }
+                    return redirect(url_for('auth.edit_default_model'))
+            else:
+                return render_template(
+                    "error.html",
+                    error="The model configuration is invalid. Please contact an administrator to reconfigure the model."
+                ), 500
+            
+        chat_title = chat.title
+        model_name = model.name if model else "Default Model"
+    except Exception as e:
+        logger.error(f"Error retrieving model for chat {chat_id}: {str(e)}")
+        return render_template(
+            "error.html",
+            error="An error occurred while retrieving the model configuration. Please contact an administrator."
+        ), 500
 
     # Get messages and process them for display
     messages = conversation_manager.get_context(chat_id)
@@ -340,23 +368,22 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         Chat.update_title(chat_id, title)
         return cast(Response, jsonify({"success": True}))
     except Exception as e:
-        logger.exception("Error updating chat title")  # Logs full stack trace
+        logger.exception(f"Error updating chat title: {str(e)}")  # Logs full stack trace with specific error
         return jsonify({"error": "Failed to update chat title"}), 500
 
 
 def validate_model(model_obj: Optional[Model]) -> Optional[str]:
-    if not all(
-        isinstance(getattr(model_obj, attr, None), str) and getattr(model_obj, attr)
-        for attr in ['deployment_name', 'api_key', 'api_endpoint']
-    ):
+    """Validate model configuration."""
+    if not model_obj:
         return "No model associated with this chat."
 
-    if not all([
-        getattr(model_obj, 'deployment_name', None),
-        getattr(model_obj, 'api_key', None),
-        getattr(model_obj, 'api_endpoint', None)
-    ]):
-        return "Invalid model configuration. Please check the settings."
+    required_attrs = ['deployment_name', 'api_key', 'api_endpoint']
+    
+    # Check if all required attributes exist and are strings
+    for attr in required_attrs:
+        value = getattr(model_obj, attr, None)
+        if not isinstance(value, str) or not value:
+            return "Invalid model configuration. Please check the settings."
 
     return None
 
