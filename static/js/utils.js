@@ -2,13 +2,25 @@
     console.log("Utils.js initialized");
 
     /**
-     * Retrieves the CSRF token from a meta tag.
+     * Retrieves the CSRF token from a meta tag or from a hidden input in the form.
      * @function getCSRFToken
      * @returns {string} The CSRF token or an empty string if not found.
      */
     function getCSRFToken() {
+        // First, try to get the CSRF token from the meta tag
         const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
-        return csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") || "" : "";
+        if (csrfTokenMetaTag) {
+            return csrfTokenMetaTag.getAttribute("content") || "";
+        }
+
+        // If not found, try to get it from a hidden input in a form
+        const csrfTokenInput = document.querySelector('input[name="csrf_token"]');
+        if (csrfTokenInput) {
+            return csrfTokenInput.value || "";
+        }
+
+        console.warn("CSRF token not found in meta tags or form inputs.");
+        return "";
     }
 
     // Set default CSRF token for axios if available
@@ -28,9 +40,9 @@
     async function fetchWithCSRF(url, options = {}) {
         const csrfToken = getCSRFToken();
         const headers = {
+            ...options.headers,
             'X-CSRFToken': csrfToken,
             'X-Requested-With': 'XMLHttpRequest',
-            ...options.headers
         };
 
         try {

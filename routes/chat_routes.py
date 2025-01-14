@@ -7,7 +7,6 @@ from flask import (
     render_template,
     session,
 )
-from flask.wrappers import Response
 from flask_login import login_required, current_user
 from typing import Union, Tuple, List, Dict, Any, Optional, cast
 import os
@@ -15,6 +14,7 @@ from datetime import datetime, timedelta
 import logging
 import bleach
 from models.model import Model
+from models.base import db_session
 from conversation_manager import conversation_manager
 from chat_utils import (
     allowed_file,
@@ -27,6 +27,8 @@ from models.chat import Chat
 import tiktoken
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from sqlalchemy import text
+from extensions import csrf  # Import csrf extension
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -71,26 +73,12 @@ init_upload_folder()
 
 
 def validate_chat_access(chat_id: str) -> bool:
-    """Validate user's access to a chat.
-
-    Args:
-        chat_id: The ID of the chat to validate access for
-
-    Returns:
-        bool: True if user has access, False otherwise
-    """
+    """Validate user's access to a chat."""
     return Chat.can_access_chat(chat_id, current_user.id, current_user.role)
 
 
 def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], List[str], int]:
-    """Process uploaded files and return processed data.
-
-    Args:
-        files: List of uploaded files
-
-    Returns:
-        Tuple containing included files, excluded files, file contents, and total tokens
-    """
+    """Process uploaded files and return processed data."""
     included_files, excluded_files, file_contents = [], [], []
     total_tokens = 0
 
@@ -104,7 +92,6 @@ def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], Li
                 "error": "Invalid file type"
             })
             continue
-
         try:
             filename, content, tokens = process_file(file)
             if total_tokens + tokens > MAX_INPUT_TOKENS:
@@ -118,6 +105,12 @@ def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], Li
             file_contents.append(content)
             total_tokens += tokens
 
+        except MemoryError as e:
+            logger.error(f"MemoryError processing file {file.filename}: {e}")
+            excluded_files.append({
+                "filename": file.filename,
+                "error": "File too large to process"
+            })
         except Exception as e:
             logger.error(f"Error processing file {file.filename}: {e}")
             excluded_files.append({
@@ -130,9 +123,9 @@ def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], Li
 
 @chat_routes.route("/")
 @login_required
-def index() -> Response:
+def index() -> Union[Response, Tuple[Response, int]]:
     """Redirect to the chat interface."""
-    return cast(Response, redirect(url_for("chat.chat_interface")))
+    return redirect(url_for("chat.chat_interface"))
 
 
 @chat_routes.route("/new_chat", methods=["GET", "POST"])
@@ -144,13 +137,17 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
         chat_id = generate_new_chat_id()
         user_id = int(current_user.id)
 
-        Chat.create(chat_id=chat_id, user_id=user_id, title="New Chat")
-        session["chat_id"] = chat_id
-        logger.info("New chat created with ID: %s", chat_id)
+        try:
+            Chat.create(chat_id=chat_id, user_id=user_id, title="New Chat")
+            session["chat_id"] = chat_id
+            logger.info("New chat created with ID: %s", chat_id)
+        except ValueError as e:
+            logger.error(f"No model available to create chat: {e}")
+            return jsonify({"error": "No AI models are configured. Please contact your administrator."}), 500
 
         if request.method == "POST":
-            return cast(Response, jsonify({"success": True, "chat_id": chat_id}))
-        return cast(Response, render_template("new_chat.html"))
+            return jsonify({"success": True, "chat_id": chat_id})
+        return render_template("new_chat.html")
     except Exception as e:
         logger.error(f"Error creating new chat: {e}")
         return jsonify({"error": "Failed to create new chat"}), 500
@@ -158,31 +155,63 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
 
 @chat_routes.route("/chat_interface")
 @login_required
-def chat_interface() -> Response:
+def chat_interface() -> Union[Response, Tuple[Response, int]]:
     """Render the main chat interface page."""
     logger.debug(f"Current user: id={current_user.id}, role={current_user.role}")
 
     chat_id = request.args.get("chat_id") or session.get("chat_id")
+    if request.args.get("chat_id"):
+        session["chat_id"] = chat_id
 
+    # If no chat exists, try to create one with a default model
     if not chat_id or not Chat.get_by_id(chat_id):
         chat_id = generate_new_chat_id()
         user_id = int(current_user.id)
-        Chat.create(chat_id=chat_id, user_id=user_id, title="New Chat")
-        session["chat_id"] = chat_id
-        logger.info(f"Created new chat {chat_id} for user {user_id}")
-        if request.args.get("chat_id"):
-            return cast(Response, redirect(url_for("chat.chat_interface")))
+
+        # Check for existing models
+        try:
+            with db_session() as db:
+                model_count = db.execute(text("SELECT COUNT(*) FROM models")).scalar()
+                if model_count == 0:
+                    # No models exist - create default model first
+                    logger.info("No models found - creating default model")
+                    Model.create_default_model()
+                    logger.info("Default model created successfully")
+
+            # Now create the chat
+            Chat.create(chat_id=chat_id, user_id=user_id, title="New Chat")
+            session["chat_id"] = chat_id
+            logger.info(f"Created new chat {chat_id} for user {user_id}")
+
+            return redirect(url_for("chat.chat_interface", chat_id=chat_id))
+
+        except Exception as e:
+            logger.error(f"Error creating chat: {e}")
+            # Show error page instead of infinite redirect
+            return render_template(
+                "error.html",
+                error="Could not initialize chat. Please contact an administrator."
+            ), 500
 
     chat = Chat.get_by_id(chat_id)
     if not chat:
         logger.error(f"Chat {chat_id} not found")
-        return cast(Response, redirect(url_for("chat.chat_interface")))
+        return redirect(url_for("chat.chat_interface"))
 
     model = Model.get_by_id(chat.model_id) if chat.model_id else None
     chat_title = chat.title
     model_name = model.name if model else "Default Model"
 
+    # Get messages and process them for display
     messages = conversation_manager.get_context(chat_id)
+    for message in messages:
+        if message['role'] == 'assistant':
+            # No need to re-format, use the stored formatted content
+            continue
+        elif message['role'] == 'user':
+            # Escape any HTML in user messages
+            message['content'] = bleach.clean(message['content'])
+
     models = Model.get_all()
     conversations = [
         {
@@ -197,7 +226,7 @@ def chat_interface() -> Response:
     today = datetime.now().strftime("%Y-%m-%d")
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    return cast(Response, render_template(
+    return render_template(
         "chat.html",
         chat_id=chat_id,
         chat_title=chat_title,
@@ -208,7 +237,7 @@ def chat_interface() -> Response:
         now=datetime.now,
         today=today,
         yesterday=yesterday,
-    ))
+    )
 
 
 @chat_routes.route("/get_chat_context/<chat_id>")
@@ -220,7 +249,11 @@ def get_chat_context(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         return jsonify({"error": "Chat not found or access denied"}), 403
 
     messages = conversation_manager.get_context(chat_id)
-    return cast(Response, jsonify({"messages": messages}))
+    # Process messages to escape Jinja2 template syntax
+    for message in messages:
+        if message['role'] == 'assistant':
+            message['content'] = message['content'].replace("{%", "&#123;%").replace("%}", "%&#125;")
+    return jsonify({"messages": messages})
 
 
 @chat_routes.route("/delete_chat/<chat_id>", methods=["DELETE"])
@@ -239,7 +272,7 @@ def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
     try:
         Chat.soft_delete(chat_id)
         logger.info("Chat %s deleted successfully", chat_id)
-        return cast(Response, jsonify({"success": True}))
+        return jsonify({"success": True})
     except Exception as e:
         logger.error(f"Error deleting chat {chat_id}: {e}")
         return jsonify({"error": "Failed to delete chat"}), 500
@@ -257,7 +290,7 @@ def scrape() -> Union[Response, Tuple[Response, int]]:
 
     try:
         response = scrape_data(query)
-        return cast(Response, jsonify({"response": response}))
+        return jsonify({"response": response})
     except ValueError as ex:
         logger.error("ValueError during scraping: %s", ex)
         return jsonify({"error": str(ex)}), 400
@@ -284,22 +317,17 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 
     try:
         Chat.update_title(chat_id, title)
-        return cast(Response, jsonify({"success": True}))
+        return jsonify({"success": True})
     except Exception as e:
         logger.error(f"Error updating chat title: {e}")
         return jsonify({"error": "Failed to update chat title"}), 500
 
 
 def validate_model(model_obj: Optional[Model]) -> Optional[str]:
-    """Validate model configuration.
-
-    Args:
-        model_obj: Model object to validate
-
-    Returns:
-        Optional[str]: Error message if validation fails, None if successful
-    """
-    if model_obj is None:
+    if not all(
+        isinstance(getattr(model_obj, attr, None), str) and getattr(model_obj, attr)
+        for attr in ['deployment_name', 'api_key', 'api_endpoint']
+    ):
         return "No model associated with this chat."
 
     if not all([
@@ -312,59 +340,67 @@ def validate_model(model_obj: Optional[Model]) -> Optional[str]:
     return None
 
 
+@chat_routes.route("/stats/<chat_id>", methods=["GET"])
+@login_required
+def get_chat_stats(chat_id: str) -> Union[Response, Tuple[Response, int]]:
+    """Get detailed chat usage statistics."""
+    try:
+        if not validate_chat_access(chat_id):
+            return jsonify({"error": "Unauthorized access to chat"}), 403
+
+        stats = conversation_manager.get_usage_stats(chat_id)
+
+        # Get the model info for this chat
+        model_obj = Chat.get_model(chat_id)
+        model_info = {
+            "name": getattr(model_obj, "name", "Unknown"),
+            "max_tokens": getattr(model_obj, "max_tokens", 0),
+            "max_completion_tokens": getattr(model_obj, "max_completion_tokens", 0),
+            "requires_o1_handling": getattr(model_obj, "requires_o1_handling", False)
+        }
+
+        # Add token limit information
+        stats.update({
+            "model_info": model_info,
+            "token_limit": 32000 if model_info["requires_o1_handling"] else 16384,
+            "token_usage_percentage": (stats["total_tokens"] / (32000 if model_info["requires_o1_handling"] else 16384)) * 100
+        })
+
+        return jsonify({
+            "success": True,
+            "stats": stats
+        })
+    except Exception as e:
+        logger.error(f"Error getting chat stats: {e}")
+        return jsonify({"error": "Failed to get chat statistics"}), 500
+
+
 @chat_routes.route("/", methods=["POST"])
 @login_required
 @limiter.limit(CHAT_RATE_LIMIT)
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
     """Handle incoming chat messages and return AI responses."""
-    # Initialize all variables that might be used in error handling
-    chat_id = None
-    model_obj = None
-    user_message = ""
-    combined_message = ""
-    included_files = []
-    excluded_files = []
-    file_contents = []
-    total_tokens = 0
-    model_response = ""
-
     try:
-        logger.debug(
-            "Received chat message from user %s with data: %s",
-            current_user.id,
-            {
-                "form": request.form.to_dict(),
-                "files": (
-                    [f.filename for f in request.files.getlist("files[]")]
-                    if request.files
-                    else []
-                ),
-                "headers": dict(request.headers),
-            },
-        )
-
         chat_id = request.headers.get("X-Chat-ID") or session.get("chat_id")
         if not chat_id:
-            logger.error(
-                "Chat ID not found in headers or session for user %s", current_user.id
-            )
             return jsonify({"error": "Chat ID not found."}), 400
 
         if not validate_chat_access(chat_id):
-            logger.error(
-                "User %s attempted to access unauthorized chat %s",
-                current_user.id,
-                chat_id,
-            )
             return jsonify({"error": "Unauthorized access to chat"}), 403
 
         model_obj = Chat.get_model(chat_id)
         model_error = validate_model(model_obj)
         if model_error:
-            logger.error(model_error)
             return jsonify({"error": model_error}), 400
 
+        # Validate message is present in form data
+        if "message" not in request.form:
+            return jsonify({"error": "Message is required."}), 400
+
         user_message = bleach.clean(request.form.get("message", "").strip())
+        if not user_message and not request.files:
+            return jsonify({"error": "Message or files are required."}), 400
+
         logger.debug(f"User message: {user_message}")
 
         included_files, excluded_files, file_contents, total_tokens = process_uploaded_files(
@@ -384,20 +420,31 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             )
             Chat.update_title(chat_id, generate_chat_title(conversation_text))
 
+        # Add user message with metadata
         conversation_manager.add_message(
-            chat_id,
-            "user",
-            combined_message,
+            chat_id=chat_id,
+            role="user",
+            content=combined_message,
             model_max_tokens=getattr(model_obj, 'max_tokens', None),
-            requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False),
+            requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False)
         )
 
+        # Get optimized context
         history = conversation_manager.get_context(
-            chat_id, include_system=not getattr(model_obj, 'requires_o1_handling', False)
+            chat_id,
+            include_system=not getattr(model_obj, 'requires_o1_handling', False)
+        )
+
+        # Get Azure response
+        # Check if streaming is requested and supported
+        use_streaming = (
+            request.headers.get("Accept") == "text/event-stream"
+            and getattr(model_obj, "supports_streaming", False)
+            and not getattr(model_obj, "requires_o1_handling", False)
         )
 
         logger.debug("Sending request to Azure API")
-        model_response = get_azure_response(
+        response = get_azure_response(
             messages=history,
             deployment_name=getattr(model_obj, 'deployment_name', ''),
             max_completion_tokens=getattr(model_obj, 'max_completion_tokens', 0),
@@ -405,36 +452,107 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             api_key=getattr(model_obj, 'api_key', ''),
             api_version=getattr(model_obj, 'api_version', ''),
             requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False),
+            stream=use_streaming,
             timeout_seconds=120,
         )
-        logger.debug("Received API response: %d chars", len(model_response))
 
-        conversation_manager.add_message(
-            chat_id,
-            "assistant",
-            model_response,
-            model_max_tokens=getattr(model_obj, 'max_tokens', None),
-            requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False),
-        )
+        if use_streaming:
+            def generate():
+                accumulated_response = ""
+                streaming_stats = {
+                    "start_time": datetime.now().isoformat(),
+                    "chunk_count": 0,
+                }
 
-        return cast(Response, jsonify({
-            "response": model_response,
-            "included_files": included_files,
-            "excluded_files": excluded_files,
-        }))
+                try:
+                    for chunk in response:
+                        if chunk.choices[0].delta.content:
+                            content = chunk.choices[0].delta.content
+                            accumulated_response += content
+                            streaming_stats["chunk_count"] += 1
+                            yield f"data: {content}\n\n"
 
+                    # Complete streaming stats
+                    streaming_stats["end_time"] = datetime.now().isoformat()
+
+                    # Process and save complete message
+                    processed_response = accumulated_response.replace("{%", "&#123;%").replace("%}", "%&#125;")
+                    conversation_manager.add_message(
+                        chat_id=chat_id,
+                        role="assistant",
+                        content=processed_response,
+                        model_max_tokens=getattr(model_obj, 'max_tokens', None),
+                        requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False),
+                        streaming_stats=streaming_stats
+                    )
+                except Exception as e:
+                    logger.error(f"Streaming error: {e}")
+                    yield f"data: Error: {str(e)}\n\n"
+                finally:
+                    yield "data: [DONE]\n\n"
+
+            return Response(
+                generate(),
+                mimetype='text/event-stream',
+                headers={
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'X-Accel-Buffering': 'no'
+                }
+            )
+        else:
+            # Handle non-streaming response
+            logger.debug("Received API response: %d chars", len(response))
+            processed_response = response.replace("{%", "&#123;%").replace("%}", "%&#125;")
+            conversation_manager.add_message(
+                chat_id=chat_id,
+                role="assistant",
+                content=processed_response,
+                model_max_tokens=getattr(model_obj, 'max_tokens', None),
+                requires_o1_handling=getattr(model_obj, 'requires_o1_handling', False)
+            )
+            return jsonify({
+                "response": processed_response,
+                "included_files": included_files,
+                "excluded_files": excluded_files,
+            })
     except Exception as ex:
         logger.error("Error during chat handling: %s", str(ex), exc_info=True)
-        logger.error(
-            "Failed request details: %s",
-            {
-                "chat_id": chat_id,
-                "model": getattr(model_obj, 'deployment_name', None) if model_obj else None,
-                "message_length": len(combined_message),
-                "file_count": len(included_files),
-                "error": str(ex),
-            },
-        )
-        return jsonify({
-            "error": "An unexpected error occurred."
-        }), 500
+        return jsonify({"error": "An unexpected error occurred."}), 500
+
+
+@chat_routes.route("/update_model", methods=["POST"])
+@login_required
+def update_model():
+    """Update the model for a chat."""
+    data = request.get_json()
+    chat_id = request.headers.get("X-Chat-ID")
+
+    if not chat_id:
+        return jsonify({"error": "Chat ID not provided"}), 400
+
+    if not data or "model_id" not in data:
+        return jsonify({"error": "Model ID not provided"}), 400
+
+    try:
+        # Verify chat access
+        if not validate_chat_access(chat_id):
+            return jsonify({"error": "Unauthorized access to chat"}), 403
+
+        model_id_str = data.get("model_id")
+        if not str(model_id_str).isdigit():
+            return jsonify({"error": "Invalid model ID"}), 400
+        model_id = int(model_id_str)
+
+        # Verify model exists
+        model = Model.get_by_id(model_id)
+        if not model:
+            return jsonify({"error": "Model not found"}), 404
+
+        # Update chat's model
+        Chat.update_model(chat_id, model_id)
+        return jsonify({"success": True})
+
+    except Exception as e:
+        logger.error(f"Error updating chat model: {e}")
+        return jsonify({"error": str(e)}), 500
