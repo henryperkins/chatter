@@ -92,8 +92,7 @@ def configure_app() -> None:
     app.config.update(
         PERMANENT_SESSION_LIFETIME=timedelta(minutes=60),
         WTF_CSRF_HEADERS=['X-CSRFToken'],
-        WTF_CSRF_CHECK_DEFAULT=False,
-        WTF_CSRF_METHODS=[]
+        WTF_CSRF_ENABLED=True
     )
     
     # Rate limiting
@@ -113,7 +112,7 @@ def configure_logging() -> None:
 def init_app_components() -> None:
     """Initialize Flask extensions and components"""
     # Apply proxy fix
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     
     # Initialize extensions
     login_manager.init_app(app)

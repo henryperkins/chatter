@@ -287,21 +287,6 @@ def register():
                 "error": "Too many registration attempts. Please try again later."
             }), 429
 
-        try:
-            csrf_token = request.form.get('csrf_token') or request.headers.get('X-CSRFToken')
-            if not csrf_token:
-                logger.error("Missing CSRF token in request")
-                return jsonify({
-                    "success": False,
-                    "error": "Missing CSRF token. Please refresh the page and try again."
-                }), 400
-            validate_csrf(csrf_token)
-        except CSRFError as e:
-            logger.error(f"CSRF validation failed: {str(e)}")
-            return jsonify({
-                "success": False,
-                "error": "Invalid CSRF token. Please refresh the page and try again."
-            }), 400
 
         if form.validate_on_submit():
             username = form.username.data.strip()
