@@ -21,6 +21,16 @@ from wtforms.validators import (
     Optional,
     Regexp,
 )
+from wtforms.validators import (
+    DataRequired,
+    Email,
+    Length,
+    EqualTo,
+    NumberRange,
+    URL,
+    Optional,
+    Regexp,
+)
 import os
 from typing import Any
 from database import get_db
@@ -444,3 +454,26 @@ def validate_password_strength(password: str) -> None:
             raise ValidationError(
                 "Password must not contain three or more repeated characters in a row."
             )
+class ResetPasswordForm(FlaskForm):
+    """
+    Form for resetting a user's password.
+    """
+    password = PasswordField(
+        "New Password",
+        validators=[
+            DataRequired(message="Password is required."),
+            Length(min=8, message="Password must be at least 8 characters long."),
+            Regexp(
+                r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?\":{}|<>]).+$",
+                message="Password must include at least one uppercase letter, one lowercase letter, one number, and one special character.",
+            ),
+        ],
+    )
+    confirm_password = PasswordField(
+        "Confirm New Password",
+        validators=[
+            DataRequired(message="Please confirm your password."),
+            EqualTo("password", message="Passwords must match."),
+        ],
+    )
+    submit = SubmitField("Reset Password")
