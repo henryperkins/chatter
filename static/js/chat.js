@@ -87,7 +87,7 @@
     const md = window.md;
 
     // Global variables and state
-    const MAX_MESSAGE_LENGTH = 1000;
+    const MAX_MESSAGE_LENGTH = window.CHAT_CONFIG.maxMessageLength || 1000;
 
     // DOM Elements Cache
     let messageInput, sendButton, chatBox, fileInput, uploadButton,

@@ -260,6 +260,30 @@ def send_reset_email(recipient_email: str, reset_link: str) -> None:
             server.sendmail(sender_email, recipient_email, message.as_string())
     except Exception as e:
         raise Exception(f"Failed to send email: {e}")
+def validate_password_strength(password: str) -> List[str]:
+    """
+    Validate password strength and return a list of errors.
+    """
+    errors = []
+    if len(password) < 8:
+        errors.append("Password must be at least 8 characters long.")
+    if not any(c.isupper() for c in password):
+        errors.append("Password must contain at least one uppercase letter.")
+    if not any(c.islower() for c in password):
+        errors.append("Password must contain at least one lowercase letter.")
+    if not any(c.isdigit() for c in password):
+        errors.append("Password must contain at least one number.")
+    if not any(c in '!@#$%^&*(),.?":{}|<>' for c in password):
+        errors.append("Password must contain at least one special character.")
+    return errors
+
+def handle_error(error, message="An error occurred"):
+    """
+    Centralized error handling utility.
+    """
+    logger.error(f"{message}: {error}")
+    return jsonify({"success": False, "error": str(error)}), 500
+
 def send_verification_email(recipient_email: str, verification_token: str) -> None:
     """
     Send an email to the user with a verification link.

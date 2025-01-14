@@ -416,22 +416,12 @@ def validate_password_strength(password: str) -> None:
         raise ValidationError("Password is required.")
 
     password = password.strip()
-    if len(password) < 8:
-        raise ValidationError("Password must be at least 8 characters long.")
+    errors = validate_password_strength(password)
+    
+    if errors:
+        raise ValidationError(" ".join(errors))
 
-    # Check for required character types
-    if not any(c.isupper() for c in password):
-        raise ValidationError("Password must contain at least one uppercase letter.")
-    if not any(c.islower() for c in password):
-        raise ValidationError("Password must contain at least one lowercase letter.")
-    if not any(c.isdigit() for c in password):
-        raise ValidationError("Password must contain at least one number.")
-    if all(c not in '!@#$%^&*(),.?":{}|<>' for c in password):
-        raise ValidationError(
-            'Password must contain at least one special character (!@#$%^&*(),.?":{}|<>).'
-        )
-
-    # Check for common passwords
+    # Additional validations
     common_passwords = {
         "password", "password123", "123456", "qwerty", "abc123", "12345678", "letmein"
     }

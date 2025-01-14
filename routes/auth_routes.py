@@ -16,7 +16,21 @@ from flask import (
     url_for,
     session,
     jsonify,
+    current_app,
 )
+from contextlib import contextmanager
+
+@contextmanager
+def db_session():
+    db = get_db()
+    try:
+        yield db
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise e
+    finally:
+        db.close()
 from flask_login import login_user, logout_user, current_user, login_required
 from sqlalchemy import text
 from email_validator import validate_email, EmailNotValidError
@@ -205,7 +219,7 @@ def login():
             password = form.password.data.strip()
             db = get_db()
 
-            try:
+            with db_session() as db:
                 user = (
                     db.execute(
                         text("SELECT * FROM users WHERE username = :username"),
@@ -240,16 +254,7 @@ def login():
                 return jsonify({"success": True, "message": "Login successful"}), 200
 
             except Exception as e:
-                log_and_rollback(db, e, "Error during login process")
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "error": "An unexpected error occurred. Please try again later.",
-                        }
-                    ),
-                    500,
-                )
+                return handle_error(e, "Error during login process")
 
         else:
             logger.debug(f"Form validation errors: {form.errors}")

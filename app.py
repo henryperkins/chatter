@@ -102,8 +102,13 @@ def configure_app() -> None:
         MAX_CONTENT_LENGTH=50 * 1024 * 1024,  # 50 MB
         MAX_FILE_SIZE=10 * 1024 * 1024,  # 10 MB
         MAX_FILES=5,
-        MAX_MESSAGE_LENGTH=1000,
-        ALLOWED_FILE_TYPES=["text/plain", "application/pdf", "image/jpeg", "image/png"]
+        MAX_MESSAGE_LENGTH=int(os.getenv("MAX_MESSAGE_LENGTH", 1000)),
+        ALLOWED_FILE_TYPES=os.getenv("ALLOWED_FILE_TYPES", "text/plain,application/pdf,image/jpeg,image/png").split(","),
+        PASSWORD_MIN_LENGTH=8,
+        PASSWORD_REQUIRE_UPPERCASE=True,
+        PASSWORD_REQUIRE_LOWERCASE=True,
+        PASSWORD_REQUIRE_NUMBER=True,
+        PASSWORD_REQUIRE_SPECIAL_CHAR=True
     )
     
     # Session settings
