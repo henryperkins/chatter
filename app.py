@@ -123,10 +123,10 @@ def init_app_components() -> None:
     app.register_blueprint(chat_routes, url_prefix="/chat")
     app.register_blueprint(model_bp, url_prefix="/models")
     
-    # Ensure auth routes are properly registered
+    # Check if auth routes are properly registered
     if 'auth.register' not in app.view_functions:
-        logger.warning("Auth routes not properly registered - re-registering")
-        app.register_blueprint(auth_bp, url_prefix="/auth")
+        logger.error("Auth routes failed to register properly")
+        raise RuntimeError("Auth routes failed to register properly")
     
     # Initialize database
     init_app(app)
