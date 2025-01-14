@@ -197,23 +197,8 @@
           setupMobileLayout();
         }
 
-        // Set up file handling using FileUploadManager
-        if (fileInput && uploadButton) {
-          uploadButton.addEventListener('click', () => fileInput.click());
-          fileInput.addEventListener('change', (e) => {
-            const files = Array.from(e.target.files);
-            const { validFiles, errors } = fileUploadManager.processFiles(files);
-
-            if (errors.length > 0) {
-              errors.forEach(error => showFeedback(error.errors.join(', '), 'error'));
-            }
-
-            if (validFiles.length > 0) {
-              fileUploadManager.uploadedFiles.push(...validFiles);
-              fileUploadManager.renderFileList();
-            }
-          });
-        }
+        // Initialize file upload manager
+        window.fileUploadManager = new FileUploadManager();
 
         // Set up additional handlers
         if (newChatBtn) {
@@ -324,22 +309,6 @@
       });
     }
 
-    function setupFileHandling() {
-      uploadButton.addEventListener('click', () => fileInput.click());
-      fileInput.addEventListener('change', (e) => {
-        const files = Array.from(e.target.files);
-        const { validFiles, errors } = fileUploadManager.processFiles(files);
-
-        if (errors.length > 0) {
-          errors.forEach(error => showFeedback(error.errors.join(', '), 'error'));
-        }
-
-        if (validFiles.length > 0) {
-          fileUploadManager.uploadedFiles.push(...validFiles);
-          fileUploadManager.renderFileList();
-        }
-      });
-    }
 
     function setupDeleteButtons() {
       const deleteButtons = document.querySelectorAll('.delete-chat-btn');
@@ -808,53 +777,6 @@
         .replace(/'/g, "&#039;");
     }
 
-    let dragAndDropInitialized = false;
-
-    function setupDragAndDrop() {
-        if (dragAndDropInitialized) return;
-        dragAndDropInitialized = true;
-      if (!dropZone) return;
-
-      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropZone.addEventListener(eventName, preventDefaults, false);
-      });
-
-      dropZone.addEventListener('dragenter', () => {
-        dropZone.classList.remove('hidden');
-      });
-
-      dropZone.addEventListener('dragleave', (e) => {
-        if (!e.relatedTarget || !dropZone.contains(e.relatedTarget)) {
-          dropZone.classList.add('hidden');
-        }
-      });
-
-      dropZone.addEventListener('drop', (e) => {
-        try {
-          dropZone.classList.add('hidden');
-          if (!e.dataTransfer?.files) {
-            showFeedback('No files dropped', 'error');
-            return;
-          }
-          const files = Array.from(e.dataTransfer.files);
-          if (files.length === 0) {
-            showFeedback('No files dropped', 'error');
-            return;
-          }
-          processFiles(files);
-        } catch (error) {
-          console.error('Error handling file drop:', error);
-          showFeedback('Failed to process dropped files', 'error');
-        } finally {
-          dropZone.classList.add('hidden'); // Ensure dropZone is hidden after drop
-        }
-      });
-    }
-
-    function preventDefaults(e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
 
     async function createNewChat() {
       try {

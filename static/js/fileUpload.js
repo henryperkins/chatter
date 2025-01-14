@@ -15,6 +15,12 @@ class FileUploadManager {
       'image/png',
       'text/csv'
     ];
+    this.dropZone = document.getElementById('drop-zone');
+    this.fileInput = document.getElementById('file-input');
+    this.uploadButton = document.getElementById('upload-button');
+    this.uploadedFilesDiv = document.getElementById('uploaded-files');
+    this.setupDragAndDrop();
+    this.setupEventListeners();
   }
 
   // Validate a single file
@@ -76,9 +82,8 @@ class FileUploadManager {
     });
 
     // Show/hide the upload area
-    const uploadArea = document.getElementById('uploaded-files');
-    if (uploadArea) {
-      uploadArea.classList.toggle('hidden', this.uploadedFiles.length === 0);
+    if (this.uploadedFilesDiv) {
+      this.uploadedFilesDiv.classList.toggle('hidden', this.uploadedFiles.length === 0);
     }
   }
 
@@ -111,6 +116,84 @@ class FileUploadManager {
     } catch (error) {
       console.error('Upload error:', error);
       showFeedback(error.message, 'error');
+    }
+  }
+
+  // Setup drag-and-drop functionality
+  setupDragAndDrop() {
+    if (!this.dropZone) return;
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      this.dropZone.addEventListener(eventName, this.preventDefaults, false);
+    });
+
+    this.dropZone.addEventListener('dragenter', () => {
+      this.dropZone.classList.remove('hidden');
+    });
+
+    this.dropZone.addEventListener('dragleave', (e) => {
+      if (!e.relatedTarget || !this.dropZone.contains(e.relatedTarget)) {
+        this.dropZone.classList.add('hidden');
+      }
+    });
+
+    this.dropZone.addEventListener('drop', (e) => {
+      try {
+        this.dropZone.classList.add('hidden');
+        if (!e.dataTransfer?.files) {
+          showFeedback('No files dropped', 'error');
+          return;
+        }
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length === 0) {
+          showFeedback('No files dropped', 'error');
+          return;
+        }
+        const { validFiles, errors } = this.processFiles(files);
+        if (errors.length > 0) {
+          errors.forEach(error => showFeedback(error.errors.join(', '), 'error'));
+        }
+        if (validFiles.length > 0) {
+          this.uploadedFiles.push(...validFiles);
+          this.renderFileList();
+        }
+      } catch (error) {
+        console.error('Error handling file drop:', error);
+        showFeedback('Failed to process dropped files', 'error');
+      } finally {
+        this.dropZone.classList.add('hidden');
+      }
+    });
+  }
+
+  // Prevent default drag-and-drop behavior
+  preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  // Setup event listeners
+  setupEventListeners() {
+    if (this.fileInput) {
+      this.fileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        const { validFiles, errors } = this.processFiles(files);
+
+        if (errors.length > 0) {
+          errors.forEach(error => showFeedback(error.errors.join(', '), 'error'));
+        }
+
+        if (validFiles.length > 0) {
+          this.uploadedFiles.push(...validFiles);
+          this.renderFileList();
+        }
+      });
+    }
+
+    if (this.uploadButton) {
+      this.uploadButton.addEventListener('click', () => {
+        this.fileInput.click();
+      });
     }
   }
 }
