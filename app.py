@@ -161,14 +161,7 @@ def init_app_data():
         logger.error(f"Error during app data initialization: {e}")
         raise
 
-@cli.with_appcontext
-def init_db_command():
-    """Initialize the database."""
-    init_app_data()
-    print("Database initialized successfully.")
-
-# Add the command to Flask CLI
-app.cli.add_command(init_db_command)
+# Remove this duplicate init_db_command and use the one from database.py
 
 # Initialize core application components
 with app.app_context():

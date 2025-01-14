@@ -78,7 +78,7 @@ def init_db() -> None:
 
 @click.command("init-db")
 @with_appcontext
-def init_db_command() -> None:
+def init_db_command():
     """Flask CLI command to initialize database."""
     init_db()
     click.echo("Initialized the database.")
