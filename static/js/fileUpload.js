@@ -81,7 +81,7 @@ class FileUploadManager {
     return 'file';
   }
 
-  // Render the file list
+  // Render the file list with enhanced UI
   renderFileList() {
     const fileList = document.getElementById('file-list');
     const totalSize = document.getElementById('total-size');
@@ -93,23 +93,56 @@ class FileUploadManager {
     this.uploadedFiles.forEach((file, index) => {
       totalBytes += file.size;
       const fileDiv = document.createElement('div');
-      fileDiv.className = 'file-item flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-800 rounded mb-2';
+      fileDiv.className = 'file-item group flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg mb-2 shadow-sm hover:shadow-md transition-all duration-200';
       fileDiv.innerHTML = `
-        <div class="flex items-center space-x-2">
-          <i class="fas fa-${this.getFileIcon(file.type)} text-blue-500"></i>
-          <div>
-            <span class="block text-sm font-medium text-gray-700 dark:text-gray-200 truncate">${file.name}</span>
-            <span class="block text-xs text-gray-500 dark:text-gray-400">${(file.size / 1024).toFixed(2)} KB</span>
+        <div class="flex items-center space-x-3 w-full">
+          <div class="flex-shrink-0">
+            <i class="fas fa-${this.getFileIcon(file.type)} text-2xl text-blue-500"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <span class="block text-sm font-medium text-gray-900 dark:text-gray-100 truncate" title="${file.name}">
+                ${file.name}
+              </span>
+              <span class="text-xs text-gray-500 dark:text-gray-400 ml-2 whitespace-nowrap">
+                ${(file.size / 1024).toFixed(2)} KB
+              </span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-1">
+              <div class="bg-blue-500 h-1.5 rounded-full" style="width: 100%"></div>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <button onclick="fileUploadManager.showPreview(${index})"
+                    class="text-gray-500 hover:text-blue-500 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    aria-label="Preview file">
+              <i class="fas fa-eye text-sm"></i>
+            </button>
+            <button onclick="fileUploadManager.removeFile(${index})"
+                    class="text-gray-500 hover:text-red-500 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    aria-label="Remove file">
+              <i class="fas fa-times text-sm"></i>
+            </button>
           </div>
         </div>
-        <button onclick="fileUploadManager.removeFile(${index})" 
-                class="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
-                aria-label="Remove file">
-          <i class="fas fa-times"></i>
-        </button>
       `;
       fileList.appendChild(fileDiv);
     });
+
+    // Add progress bar and quota information
+    const totalMB = (totalBytes / 1024 / 1024).toFixed(2);
+    const maxMB = (this.MAX_TOTAL_SIZE / 1024 / 1024).toFixed(2);
+    const percentage = Math.min((totalBytes / this.MAX_TOTAL_SIZE) * 100, 100);
+    
+    totalSize.innerHTML = `
+      <div class="flex items-center justify-between text-sm">
+        <span class="text-gray-700 dark:text-gray-300">Storage Used</span>
+        <span class="font-medium">${totalMB} MB / ${maxMB} MB</span>
+      </div>
+      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-1">
+        <div class="bg-blue-500 h-2 rounded-full" style="width: ${percentage}%"></div>
+      </div>
+    `;
 
     // Update total size display
     const totalMB = (totalBytes / 1024 / 1024).toFixed(2);
@@ -150,14 +183,46 @@ class FileUploadManager {
   async uploadFiles(chatId) {
     if (this.uploadedFiles.length === 0) return;
 
-    const formData = new FormData();
-    this.uploadedFiles.forEach(file => formData.append('files[]', file));
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+    const UPLOAD_CONCURRENCY = 3; // Number of parallel uploads
 
     try {
-      const response = await fetchWithCSRF(`/chat/${chatId}/upload`, {
-        method: 'POST',
-        body: formData
-      });
+      const uploadPromises = [];
+      
+      for (const file of this.uploadedFiles) {
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+        
+        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+          const start = chunkIndex * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, file.size);
+          const chunk = file.slice(start, end);
+          
+          const formData = new FormData();
+          formData.append('file', chunk);
+          formData.append('fileName', file.name);
+          formData.append('chunkIndex', chunkIndex);
+          formData.append('totalChunks', totalChunks);
+          formData.append('fileSize', file.size);
+          
+          uploadPromises.push(
+            fetchWithCSRF(`/chat/${chatId}/upload`, {
+              method: 'POST',
+              body: formData
+            })
+          );
+          
+          // Limit concurrent uploads
+          if (uploadPromises.length >= UPLOAD_CONCURRENCY) {
+            await Promise.all(uploadPromises);
+            uploadPromises.length = 0;
+          }
+        }
+      }
+      
+      // Wait for remaining uploads
+      if (uploadPromises.length > 0) {
+        await Promise.all(uploadPromises);
+      }
 
       if (response.success) {
         showFeedback('Files uploaded successfully', 'success');
