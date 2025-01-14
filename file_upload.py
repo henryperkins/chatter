@@ -41,6 +41,7 @@ class FileUploadHandler:
     def save_files(self, files: List, chat_id: str) -> List[Dict]:
         """Save validated files to the upload folder and database."""
         saved_files = []
+        errors = []
         upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], chat_id)
 
         if not os.path.exists(upload_folder):
@@ -61,6 +62,9 @@ class FileUploadHandler:
             except Exception as e:
                 current_app.logger.error(f"Error saving file {filename}: {str(e)}")
                 errors.append(f"Failed to save file: {filename}")
+
+        if errors:
+            current_app.logger.warning(f"Encountered errors while saving files: {errors}")
 
         return saved_files
 
