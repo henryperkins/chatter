@@ -10,7 +10,7 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
         <div id="error-message" class="space-y-2 mb-4 hidden">
             <div class="bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded-lg relative transition-all duration-200" role="alert">
-                <span class="block sm:inline" id="error-text"></span>
+                <span class="block sm:inline" id="error-text">{{ error_message | e }}</span>
                 <button type="button" class="absolute top-1 right-1 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors duration-200" onclick="this.parentElement.classList.add('hidden')" aria-label="Dismiss error">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
