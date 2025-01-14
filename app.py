@@ -119,11 +119,9 @@ def configure_logging() -> None:
     # Set log level based on environment variable or default to INFO
     log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
     logging.basicConfig(
-        level=getattr(logging, log_level, logging.INFO),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[logging.StreamHandler()]
     )
-    logging.getLogger().setLevel(getattr(logging, log_level, logging.WARNING))
 
 def init_app_components() -> None:
     """Initialize Flask extensions and components"""
