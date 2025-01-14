@@ -213,52 +213,52 @@ def login():
             logger.error(f"CSRF validation failed during login: {e.description if hasattr(e, 'description') else str(e)}")
             return jsonify({"success": False, "error": "Invalid CSRF token."}), 400
 
-        logger.debug("Processing login form submission.")
-        if form.validate_on_submit():
-            username = form.username.data.strip()
-            password = form.password.data.strip()
-            db = get_db()
+        try:
+            logger.debug("Processing login form submission.")
+            if form.validate_on_submit():
+                username = form.username.data.strip()
+                password = form.password.data.strip()
+                db = get_db()
 
-            with db_session() as db:
-                user = (
-                    db.execute(
-                        text("SELECT * FROM users WHERE username = :username"),
-                        {"username": username},
+                with db_session() as db:
+                    user = (
+                        db.execute(
+                            text("SELECT * FROM users WHERE username = :username"),
+                            {"username": username},
+                        )
+                        .mappings()
+                        .first()
                     )
-                    .mappings()
-                    .first()
-                )
-                logger.debug(f"Database query result for username '{username}': {user}")
+                    logger.debug(f"Database query result for username '{username}': {user}")
 
-                # Check if user exists and password matches
-                if not user or not bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]):
-                    failed_logins.setdefault(username, []).append(datetime.now())
-                    logger.warning(f"Failed login attempt for username: {username}")
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "error": "Invalid username or password",
-                            }
-                        ),
-                        401,
+                    # Check if user exists and password matches
+                    if not user or not bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]):
+                        failed_logins.setdefault(username, []).append(datetime.now())
+                        logger.warning(f"Failed login attempt for username: {username}")
+                        return (
+                            jsonify(
+                                {
+                                    "success": False,
+                                    "error": "Invalid username or password",
+                                }
+                            ),
+                            401,
+                        )
+
+                    # Successful login
+                    user_obj = User(
+                        user["id"], user["username"], user["email"], user["role"]
                     )
+                    session.clear()
+                    login_user(user_obj)
+                    logger.info(f"User {user.id} logged in successfully.")
+                    return jsonify({"success": True, "message": "Login successful"}), 200
 
-                # Successful login
-                user_obj = User(
-                    user["id"], user["username"], user["email"], user["role"]
-                )
-                session.clear()
-                login_user(user_obj)
-                logger.info(f"User {user.id} logged in successfully.")
-                return jsonify({"success": True, "message": "Login successful"}), 200
+            logger.debug(f"Form validation errors: {form.errors}")
+            return jsonify({"success": False, "errors": form.errors}), 400
 
         except Exception as e:
             return handle_error(e, "Error during login process")
-
-        else:
-            logger.debug(f"Form validation errors: {form.errors}")
-            return jsonify({"success": False, "errors": form.errors}), 400
 
     logger.debug("Rendering login form.")
     return render_template("login.html", form=form)
