@@ -1,6 +1,8 @@
 import logging
 import os
+import json
 from logging.handlers import RotatingFileHandler
+from cloghandler import ConcurrentRotatingFileHandler
 from datetime import datetime
 
 # Log directory and file setup
@@ -39,11 +41,6 @@ class JsonFormatter(logging.Formatter):
         }
         return json.dumps(log_record)
 
-# Configure JSON logging for production
-if os.getenv('FLASK_ENV') == 'production':
-    json_formatter = JsonFormatter()
-    app_log_handler.setFormatter(json_formatter)
-
 # Filter class for HTTP client logs
 class HttpClientFilter(logging.Filter):
     def filter(self, record):
@@ -63,6 +60,11 @@ app_log_handler.setFormatter(logging.Formatter(DETAILED_FORMAT))
 
 # Add only file handler to root logger
 root_logger.addHandler(app_log_handler)
+
+# Configure JSON logging for production after handler is created
+if os.getenv('FLASK_ENV') == 'production':
+    json_formatter = JsonFormatter()
+    app_log_handler.setFormatter(json_formatter)
 
 # Configure third-party library logging
 logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
