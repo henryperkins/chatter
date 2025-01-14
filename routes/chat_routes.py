@@ -7,6 +7,7 @@ from flask import (
     render_template,
     session,
 )
+from file_upload import FileUploadHandler
 from flask.wrappers import Response
 from flask_login import login_required, current_user
 from typing import Union, Tuple, List, Dict, Any, Optional, cast
@@ -561,6 +562,15 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
     except Exception as ex:
         logger.error("Error during chat handling: %s", str(ex), exc_info=True)
         return jsonify({"error": "An unexpected error occurred."}), 500
+
+@chat_routes.route('/<chat_id>/upload', methods=['POST'])
+@login_required
+def upload_files(chat_id: str):
+    if not validate_chat_access(chat_id):
+        return jsonify({'error': 'Unauthorized access to chat'}), 403
+
+    upload_handler = FileUploadHandler()
+    return upload_handler.handle_upload(chat_id)
 
 @chat_routes.route("/update_model", methods=["POST"])
 @login_required

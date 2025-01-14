@@ -326,7 +326,19 @@
 
     function setupFileHandling() {
       uploadButton.addEventListener('click', () => fileInput.click());
-      fileInput.addEventListener('change', handleFileSelect);
+      fileInput.addEventListener('change', (e) => {
+        const files = Array.from(e.target.files);
+        const { validFiles, errors } = fileUploadManager.processFiles(files);
+
+        if (errors.length > 0) {
+          errors.forEach(error => showFeedback(error.errors.join(', '), 'error'));
+        }
+
+        if (validFiles.length > 0) {
+          fileUploadManager.uploadedFiles.push(...validFiles);
+          fileUploadManager.renderFileList();
+        }
+      });
     }
 
     function setupDeleteButtons() {
