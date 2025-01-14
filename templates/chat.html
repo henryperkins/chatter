@@ -84,7 +84,7 @@
                               {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}">
                         <div class="flex justify-between items-center">
                             <span class="font-medium text-gray-900 dark:text-gray-100 truncate max-w-[180px]">
-                                {{ conversation.title }}
+                                {{ conversation.title | e }}
                             </span>
                             <span class="text-sm text-gray-500 dark:text-gray-400 ml-2 flex-shrink-0">
                                 {{ conversation.timestamp.strftime('%I:%M %p') }}

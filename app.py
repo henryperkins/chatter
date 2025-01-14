@@ -22,8 +22,19 @@ load_dotenv()
 
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from flask_sslify import SSLify
+
 # Initialize Flask app
 app = Flask(__name__)
+
+# Enforce HTTPS in production
+if not app.debug and not app.testing:
+    sslify = SSLify(app)
+    app.config.update(
+        SESSION_COOKIE_SECURE=True,
+        REMEMBER_COOKIE_SECURE=True,
+        PREFERRED_URL_SCHEME="https"
+    )
 
 # Apply ProxyFix middleware
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)

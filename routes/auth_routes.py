@@ -37,7 +37,8 @@ from extensions import limiter
 bp = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
 
-# Track failed registration attempts
+# Track failed login and registration attempts
+failed_logins: Dict[str, List[datetime]] = {}
 failed_registrations: Dict[str, List[datetime]] = {}
 
 def clean_failed_registrations():
@@ -100,15 +101,16 @@ def forgot_password():
                 }), 200  # Return 200 to prevent email enumeration
 
             # Generate and store reset token
-            reset_token = str(uuid.uuid4())
+            reset_token = secrets.token_urlsafe(32)
+            reset_token_hash = bcrypt.hashpw(reset_token.encode("utf-8"), bcrypt.gensalt(rounds=12))
             db.execute(
                 text("""
                     UPDATE users
-                    SET reset_token = :token,
+                    SET reset_token_hash = :token_hash,
                         reset_token_expiry = datetime('now', '+1 hour')
                     WHERE email = :email
                 """),
-                {"token": reset_token, "email": email}
+                {"token_hash": reset_token_hash, "email": email}
             )
             db.commit()
 
@@ -159,9 +161,32 @@ def check_registration_attempts(ip: str) -> bool:
             return False
     return True
 
+def check_login_attempts(identifier: str) -> bool:
+    """Check if the identifier (username or IP) has exceeded allowed login attempts."""
+    now = datetime.now()
+    attempts = failed_logins.get(identifier, [])
+    # Remove attempts older than 15 minutes
+    attempts = [t for t in attempts if now - t < timedelta(minutes=15)]
+    failed_logins[identifier] = attempts
+    if len(attempts) >= 5:
+        return False
+    return True
+
+def limiter_key():
+    """Rate limit key based on IP and username."""
+    username = request.form.get("username", "")
+    return f"{get_remote_address()}:{username}"
+
 @bp.route("/login", methods=["GET", "POST"])
-@limiter.limit("5 per minute")
+@limiter.limit("5 per minute", key_func=limiter_key)
 def login():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        if not check_login_attempts(username):
+            return jsonify({
+                "success": False,
+                "error": "Too many login attempts. Please try again later."
+            }), 429
     """Handle user login requests. Validates credentials and logs the user in."""
     if current_user.is_authenticated:
         logger.debug("User already authenticated; redirecting to chat interface.")
@@ -197,6 +222,7 @@ def login():
 
                 # Check if user exists
                 if not user or not bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]):
+                    failed_logins.setdefault(username, []).append(datetime.now())
                     logger.warning(f"Failed login attempt for username: {username}")
                     return (
                         jsonify(
@@ -236,9 +262,29 @@ def login():
     logger.debug("Rendering login form.")
     return render_template("login.html", form=form)
 
-@bp.route("/register", methods=["GET", "POST"])
-@limiter.limit("5 per minute")
-def register():
+@bp.route("/verify_email/<token>", methods=["GET"])
+def verify_email(token: str):
+    """Verify the user's email address."""
+    db = get_db()
+    try:
+        user = db.execute(
+            text("SELECT id FROM users WHERE email_verification_token = :token"),
+            {"token": token}
+        ).mappings().first()
+
+        if not user:
+            return jsonify({"success": False, "error": "Invalid or expired verification token."}), 400
+
+        db.execute(
+            text("UPDATE users SET is_verified = 1, email_verification_token = NULL WHERE id = :user_id"),
+            {"user_id": user["id"]}
+        )
+        db.commit()
+        return jsonify({"success": True, "message": "Email verified successfully."}), 200
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error verifying email: {e}")
+        return jsonify({"success": False, "error": "An error occurred during email verification."}), 500
     """Handle user registration requests."""
     if current_user.is_authenticated:
         logger.debug("User already authenticated; redirecting to chat interface.")
@@ -301,10 +347,12 @@ def register():
                 role = 'admin' if is_first_user else 'user'
                 cost_factor = int(os.environ.get("BCRYPT_COST_FACTOR", 12))
                 hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=cost_factor))
+                verification_token = secrets.token_urlsafe(32)
                 db.execute(
-                    text("INSERT INTO users (username, email, password_hash, role) VALUES (:username, :email, :password_hash, :role)"),
-                    {"username": username, "email": email, "password_hash": hashed_pw, "role": role}
+                    text("INSERT INTO users (username, email, password_hash, role, email_verification_token) VALUES (:username, :email, :password_hash, :role, :verification_token)"),
+                    {"username": username, "email": email, "password_hash": hashed_pw, "role": role, "verification_token": verification_token}
                 )
+                send_verification_email(email, verification_token)
                 db.commit()
 
                 # Create default model if no models exist
@@ -395,9 +443,12 @@ def reset_password(token: str):
 
     try:
         user = db.execute(
-            text("SELECT * FROM users WHERE reset_token = :token AND reset_token_expiry > datetime('now')"),
-            {"token": token}
+            text("SELECT * FROM users WHERE reset_token_expiry > datetime('now')"),
         ).mappings().first()
+
+        if not user or not bcrypt.checkpw(token.encode("utf-8"), user["reset_token_hash"]):
+            logger.warning("Invalid or expired reset token used.")
+            return jsonify({"success": False, "error": "Invalid or expired reset token."}), 400
 
         if not user:
             logger.warning(f"Invalid or expired reset token used: {token}")
