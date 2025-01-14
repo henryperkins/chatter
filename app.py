@@ -107,7 +107,7 @@ app.config.update(
         "RATELIMIT_DEFAULT": "200 per day;50 per hour",  # Set reasonable defaults
     }
 )
-limiter.init_app(app)
+limiter.init_app(app, storage_uri="redis://localhost:6379")
 
 # Initialize database
 init_app(app)

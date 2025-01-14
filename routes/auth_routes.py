@@ -270,29 +270,6 @@ def login():
     logger.debug("Rendering login form.")
     return render_template("login.html", form=form)
 
-@bp.route("/verify_email/<token>", methods=["GET"])
-def verify_email(token: str):
-    """Verify the user's email address."""
-    db = get_db()
-    try:
-        user = db.execute(
-            text("SELECT id FROM users WHERE email_verification_token = :token"),
-            {"token": token}
-        ).mappings().first()
-
-        if not user:
-            return jsonify({"success": False, "error": "Invalid or expired verification token."}), 400
-
-        db.execute(
-            text("UPDATE users SET is_verified = 1, email_verification_token = NULL WHERE id = :user_id"),
-            {"user_id": user["id"]}
-        )
-        db.commit()
-        return jsonify({"success": True, "message": "Email verified successfully."}), 200
-    except Exception as e:
-        db.rollback()
-        logger.error(f"Error verifying email: {e}")
-        return jsonify({"success": False, "error": "An error occurred during email verification."}), 500
     """Handle user registration requests."""
     if current_user.is_authenticated:
         logger.debug("User already authenticated; redirecting to chat interface.")
