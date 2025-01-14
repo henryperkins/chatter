@@ -293,26 +293,10 @@ def login():
             logger.error(f"CSRF validation failed: {e}")
             return jsonify({"success": False, "error": "Invalid CSRF token."}), 400
 
-        try:
-            csrf_token = request.form.get('csrf_token')
-            if not csrf_token:
-                raise CSRFError('Missing CSRF token.')
-            validate_csrf(csrf_token)
-        except CSRFError as e:
-            logger.error(f"CSRF validation failed during registration: {e.description if hasattr(e, 'description') else str(e)}")
-            return jsonify({"success": False, "error": "Invalid CSRF token."}), 400
-
         if form.validate_on_submit():
-            # Safely handle potentially None values
-            username = form.username.data.strip() if form.username.data else None
-            email = form.email.data.lower().strip() if form.email.data else None
-            password = form.password.data if form.password.data else None
-
-            if not all([username, email, password]):
-                return jsonify({
-                    "success": False,
-                    "error": "All fields are required"
-                }), 400
+            username = form.username.data.strip()
+            email = form.email.data.lower().strip()
+            password = form.password.data
 
             db = get_db()
             try:
@@ -323,51 +307,55 @@ def login():
                 ).mappings().first()
 
                 if existing_user:
-                    logger.warning(f"Registration attempt failed: username/email exists (IP: {ip}).")
                     failed_registrations.setdefault(ip, []).append(datetime.now())
                     return jsonify({
                         "success": False,
                         "error": "Username or email already exists"
                     }), 400
 
-                # Check if this is the first user
+                # Create new user
                 user_count = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
-                is_first_user = user_count == 0
-
-                # Create new user with admin role if first user
-                role = 'admin' if is_first_user else 'user'
+                role = 'admin' if user_count == 0 else 'user'
+                
                 cost_factor = int(os.environ.get("BCRYPT_COST_FACTOR", 12))
                 hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=cost_factor))
                 verification_token = secrets.token_urlsafe(32)
+                
                 db.execute(
-                    text("INSERT INTO users (username, email, password_hash, role, email_verification_token, is_verified) VALUES (:username, :email, :password_hash, :role, :verification_token, 0)"),
-                    {"username": username, "email": email, "password_hash": hashed_pw, "role": role, "verification_token": verification_token}
+                    text("""
+                        INSERT INTO users (username, email, password_hash, role, email_verification_token, is_verified)
+                        VALUES (:username, :email, :password_hash, :role, :verification_token, 0)
+                    """),
+                    {
+                        "username": username,
+                        "email": email,
+                        "password_hash": hashed_pw,
+                        "role": role,
+                        "verification_token": verification_token
+                    }
                 )
-                send_verification_email(email, verification_token)
-                db.commit()
-
-                # Create default model if no models exist
+                
+                # Create default model if none exists
                 model_count = db.execute(text("SELECT COUNT(*) FROM models")).scalar()
                 if model_count == 0:
                     try:
                         Model.create_default_model()
                     except ValueError as e:
                         logger.error(f"Failed to create default model: {e}")
-                        # Render the default model configuration form
-                        default_model_form = DefaultModelForm()
                         return render_template(
-                            "edit_default_model.html",
-                            form=default_model_form,
-                            registration_form=form,
+                            "register.html",
+                            form=form,
                             model_error=str(e)
                         )
 
-                logger.info(f"New user registered successfully: {username}")
+                db.commit()
+                send_verification_email(email, verification_token)
+                logger.info(f"New user registered: {username}")
                 return jsonify({"success": True, "message": "Registration successful"}), 200
 
             except Exception as e:
                 db.rollback()
-                logger.error(f"Error during registration: {e}")
+                logger.error(f"Registration error: {e}")
                 return jsonify({
                     "success": False,
                     "error": "An error occurred during registration"
