@@ -270,6 +270,8 @@ def login():
     logger.debug("Rendering login form.")
     return render_template("login.html", form=form)
 
+@bp.route("/register", methods=["GET", "POST"])
+def register():
     """Handle user registration requests."""
     if current_user.is_authenticated:
         return redirect(url_for("chat.chat_interface"))
@@ -364,8 +366,6 @@ def login():
         return jsonify({"success": False, "errors": form.errors}), 400
 
     return render_template("register.html", form=form)
-from forms import DefaultModelForm  # Add this import
-
 @bp.route("/edit_default_model", methods=["GET", "POST"])
 def edit_default_model():
     """Handle editing of the default model configuration during registration."""
