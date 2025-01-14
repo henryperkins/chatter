@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from typing import Optional, Dict, Any, TypeVar, List, cast
 
 from sqlalchemy import text
-from .base import db_session
+from .base import db_session, get_db_pool
+from sqlalchemy.pool import QueuePool
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,8 @@ class Model:
         """
         Retrieve the default model (where `is_default=1`).
         """
-        with db_session() as db:
+        pool = get_db_pool()
+        with db_session(pool) as db:
             try:
                 query = text("SELECT * FROM models WHERE is_default = :is_default")
                 row = db.execute(query, {"is_default": True}).mappings().first()
@@ -389,7 +391,7 @@ class Model:
     @staticmethod
     def validate_model_config(config: ModelDict) -> None:
         """
-        Validate model configuration parameters.
+        Validate model configuration parameters with enhanced security checks.
         """
         required_fields = [
             "name",
@@ -399,20 +401,36 @@ class Model:
             "api_version",
             "model_type",
             "max_completion_tokens",
-            "version"  # Add version to required fields
+            "version"
         ]
 
+        # Validate required fields
         for field_name in required_fields:
             val = config.get(field_name)
             if not val:
                 raise ValueError(f"Missing required field: {field_name}")
 
+        # Validate API endpoint format
         api_endpoint = config["api_endpoint"]
         if (
             not api_endpoint.startswith("https://")
             or "openai.azure.com" not in api_endpoint
         ):
             raise ValueError("Invalid Azure OpenAI API endpoint.")
+
+        # Validate API key format (basic format check)
+        api_key = config["api_key"]
+        if not isinstance(api_key, str) or len(api_key) != 32:
+            raise ValueError("API key must be a 32-character string")
+
+        # Encrypt sensitive fields before storage
+        from cryptography.fernet import Fernet
+        key = os.getenv('ENCRYPTION_KEY')
+        if not key:
+            raise ValueError("Encryption key not configured")
+            
+        cipher_suite = Fernet(key)
+        config["api_key"] = cipher_suite.encrypt(api_key.encode()).decode()
 
         # Validate temperature based on requires_o1_handling
         if config.get("requires_o1_handling", False):
