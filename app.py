@@ -10,6 +10,7 @@ from werkzeug.exceptions import HTTPException
 from database import close_db, init_db, init_app, get_db
 from sqlalchemy import text
 from models import User, Model
+import redis  # Add this import
 from extensions import limiter, login_manager, csrf
 from routes.auth_routes import bp as auth_bp
 from routes.chat_routes import chat_routes
@@ -107,7 +108,24 @@ app.config.update(
         "RATELIMIT_DEFAULT": "200 per day;50 per hour",  # Set reasonable defaults
     }
 )
-limiter.init_app(app, storage_uri="redis://localhost:6379")
+# Check Redis availability
+def is_redis_available():
+    try:
+        redis_client = redis.StrictRedis.from_url("redis://localhost:6379")
+        redis_client.ping()  # Test connection
+        return True
+    except redis.ConnectionError:
+        return False
+
+# Configure Flask-Limiter with fallback
+if is_redis_available():
+    app.config["RATELIMIT_STORAGE_URL"] = "redis://localhost:6379"
+    logger.info("Using Redis for rate limiting storage.")
+else:
+    app.config["RATELIMIT_STORAGE_URL"] = "memory://"
+    logger.warning("Redis unavailable. Falling back to in-memory storage for rate limiting.")
+
+limiter.init_app(app, storage_uri=app.config["RATELIMIT_STORAGE_URL"])
 
 # Initialize database
 init_app(app)
