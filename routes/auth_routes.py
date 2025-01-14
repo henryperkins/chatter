@@ -481,6 +481,13 @@ def reset_password(token: str):
             "success": False,
             "error": "An unexpected error occurred"
         }), 500
+@bp.route("/logout", methods=["GET"])
+@login_required
+def logout():
+    """Handle user logout."""
+    logout_user()
+    return redirect(url_for('auth.login'))
+
 @bp.route("/verify_email/<token>", methods=["GET"])
 def verify_email(token: str):
     """Verify the user's email address."""

@@ -116,8 +116,10 @@ def configure_app() -> None:
 
 def configure_logging() -> None:
     """Configure application logging"""
+    # Set log level based on environment variable or default to INFO
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=getattr(logging, log_level, logging.INFO),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[logging.StreamHandler()]
     )

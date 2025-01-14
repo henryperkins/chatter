@@ -84,7 +84,9 @@ class Model:
                 row = db.execute(query, {"is_default": True}).mappings().first()
                 if row:
                     model_dict = dict(row)
-                    logger.debug("Default model retrieved: %s", model_dict)
+                    # Exclude sensitive fields from logs
+                    safe_model_dict = {k: v for k, v in model_dict.items() if k != 'api_key'}
+                    logger.debug("Default model retrieved: %s", safe_model_dict)
                     return Model(**model_dict)
                 logger.info("No default model found.")
                 return None
@@ -103,7 +105,9 @@ class Model:
                 row = db.execute(query, {"id": model_id}).mappings().first()
                 if row:
                     model_dict = dict(row)
-                    logger.debug("Model retrieved by ID %d: %s", model_id, model_dict)
+                    # Exclude sensitive fields from logs
+                    safe_model_dict = {k: v for k, v in model_dict.items() if k != 'api_key'}
+                    logger.debug("Model retrieved by ID %d: %s", model_id, safe_model_dict)
                     return Model(**model_dict)
                 logger.info("No model found with ID %d.", model_id)
                 return None
