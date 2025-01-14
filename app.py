@@ -14,6 +14,7 @@ from flask_wtf.csrf import CSRFError
 from werkzeug.wrappers import Response
 from werkzeug.exceptions import HTTPException
 from sqlalchemy import text
+from flask_limiter.util import get_remote_address
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from database import close_db, init_db, init_app, get_db
