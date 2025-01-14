@@ -169,33 +169,6 @@ def init_db_command():
 
 # Add the command to Flask CLI
 app.cli.add_command(init_db_command)
-    """Initialize database and create default model if needed."""
-    try:
-        init_db()
-        logger.info("Database initialized successfully")
-
-        # Get database connection from pool
-        db = get_db()
-        try:
-            # Check for existing models
-            model_count = db.execute(text("SELECT COUNT(*) FROM models")).scalar()
-            if model_count == 0:
-                logger.info("No models found - creating default model")
-                try:
-                    Model.create_default_model()
-                    logger.info("Default model created successfully")
-                except ValueError as e:
-                    logger.error(f"Default model configuration is invalid: {e}")
-                    logger.error("Please fix the default model configuration and restart the application.")
-                    raise
-            else:
-                logger.debug(f"Found {model_count} existing models")
-        finally:
-            db.close()
-
-    except Exception as e:
-        logger.error(f"Error during app data initialization: {e}")
-        raise
 
 # Initialize core application components
 with app.app_context():
