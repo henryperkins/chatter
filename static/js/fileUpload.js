@@ -15,6 +15,9 @@ class FileUploadManager {
       'image/png',
       'text/csv'
     ];
+    this.uploadQueue = [];
+    this.currentUploads = 0;
+    this.MAX_CONCURRENT_UPLOADS = 3;
     this.dropZone = document.getElementById('drop-zone');
     this.fileInput = document.getElementById('file-input');
     this.uploadButton = document.getElementById('upload-button');
@@ -23,19 +26,57 @@ class FileUploadManager {
     this.setupEventListeners();
   }
 
-  // Validate a single file
+  // Validate a single file with enhanced checks
   validateFile(file) {
     const errors = [];
+    
+    // File type validation
     if (!this.ALLOWED_FILE_TYPES.includes(file.type)) {
       errors.push(`Unsupported file type: ${file.type}`);
     }
+    
+    // File size validation
     if (file.size > this.MAX_FILE_SIZE) {
       errors.push(`File too large: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
     }
-    if (this.uploadedFiles.some(f => f.name === file.name)) {
+    
+    // Duplicate check
+    if (this.uploadedFiles.some(f => f.name === file.name && f.size === file.size)) {
       errors.push(`Duplicate file: ${file.name}`);
     }
+    
     return errors;
+  }
+
+  // Show upload progress for a file
+  showUploadProgress(file, progress) {
+    const progressElement = document.getElementById(`progress-${file.name}`);
+    if (progressElement) {
+      progressElement.style.width = `${progress}%`;
+      progressElement.textContent = `${Math.round(progress)}%`;
+    }
+  }
+
+  // Show error message with file context
+  showError(message, file = null) {
+    const errorDiv = document.getElementById('file-errors');
+    if (!errorDiv) return;
+
+    const errorElement = document.createElement('div');
+    errorElement.className = 'text-sm text-red-500 flex items-center space-x-1';
+    errorElement.innerHTML = `
+      <i class="fas fa-exclamation-circle"></i>
+      <span>${file ? `${file.name}: ` : ''}${message}</span>
+      ${file ? `<button onclick="this.parentElement.remove()" class="ml-2 text-red-600 hover:text-red-700">
+        <i class="fas fa-times"></i>
+      </button>` : ''}
+    `;
+    errorDiv.appendChild(errorElement);
+
+    // Auto-remove error after 5 seconds
+    setTimeout(() => {
+      errorElement.remove();
+    }, 5000);
   }
 
   // Process multiple files
@@ -81,20 +122,14 @@ class FileUploadManager {
     return 'file';
   }
 
-  // Render the file list with enhanced UI
+  // Render the file list with enhanced UI and progress indicators
   renderFileList() {
     const fileList = document.getElementById('file-list');
     const totalSize = document.getElementById('total-size');
     if (!fileList || !totalSize) return;
 
-    fileList.innerHTML = '';
-    let totalBytes = 0;
-
-    this.uploadedFiles.forEach((file, index) => {
-      totalBytes += file.size;
-      const fileDiv = document.createElement('div');
-      fileDiv.className = 'file-item group flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg mb-2 shadow-sm hover:shadow-md transition-all duration-200';
-      fileDiv.innerHTML = `
+    fileList.innerHTML = this.uploadedFiles.map((file, index) => `
+      <div class="file-item group flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg mb-2 shadow-sm hover:shadow-md transition-all duration-200">
         <div class="flex items-center space-x-3 w-full">
           <div class="flex-shrink-0">
             <i class="fas fa-${this.getFileIcon(file.type)} text-2xl text-blue-500"></i>
@@ -109,7 +144,9 @@ class FileUploadManager {
               </span>
             </div>
             <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-1">
-              <div class="bg-blue-500 h-1.5 rounded-full" style="width: 100%"></div>
+              <div id="progress-${file.name}" 
+                   class="bg-blue-500 h-1.5 rounded-full text-[10px] text-center text-white" 
+                   style="width: 0%">0%</div>
             </div>
           </div>
           <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -125,9 +162,29 @@ class FileUploadManager {
             </button>
           </div>
         </div>
-      `;
-      fileList.appendChild(fileDiv);
-    });
+      </div>
+    `).join('');
+
+    // Update total size display
+    const totalBytes = this.uploadedFiles.reduce((sum, file) => sum + file.size, 0);
+    const totalMB = (totalBytes / 1024 / 1024).toFixed(2);
+    const maxMB = (this.MAX_TOTAL_SIZE / 1024 / 1024).toFixed(2);
+    const percentage = Math.min((totalBytes / this.MAX_TOTAL_SIZE) * 100, 100);
+    
+    totalSize.innerHTML = `
+      <div class="flex items-center justify-between text-sm">
+        <span class="text-gray-700 dark:text-gray-300">Storage Used</span>
+        <span class="font-medium">${totalMB} MB / ${maxMB} MB</span>
+      </div>
+      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-1">
+        <div class="bg-blue-500 h-2 rounded-full" style="width: ${percentage}%"></div>
+      </div>
+    `;
+
+    // Show/hide the upload area
+    if (this.uploadedFilesDiv) {
+      this.uploadedFilesDiv.classList.toggle('hidden', this.uploadedFiles.length === 0);
+    }
 
     // Add progress bar and quota information
     const totalMB = (totalBytes / 1024 / 1024).toFixed(2);
