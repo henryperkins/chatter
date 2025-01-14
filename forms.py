@@ -416,23 +416,10 @@ def validate_password_strength(password: str) -> None:
 
     # Check for common passwords
     common_passwords = {
-        "password",
-        "password123",
-        "123456",
-        "qwerty",
-        "letmein",
-        "admin123",
-        "welcome",
-        "monkey",
-        "dragon",
-        "baseball",
-        "football",
-        "master",
+        "password", "password123", "123456", "qwerty", "abc123", "12345678", "letmein"
     }
     if password.lower() in common_passwords:
-        raise ValidationError(
-            "This password is too common. Please choose a stronger password."
-        )
+        raise ValidationError("This password is too common. Please choose a stronger password.")
 
     # Check for sequential characters
     sequences = (

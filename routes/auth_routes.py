@@ -167,6 +167,15 @@ def login():
 
     form = LoginForm()
     if request.method == "POST":
+        try:
+            csrf_token = request.form.get('csrf_token')
+            if not csrf_token:
+                raise CSRFError('Missing CSRF token.')
+            validate_csrf(csrf_token)
+        except CSRFError as e:
+            logger.error(f"CSRF validation failed during login: {e.description}")
+            return jsonify({"success": False, "error": "Invalid CSRF token."}), 400
+
         logger.debug("Processing login form submission.")
         if form.validate_on_submit():
             username = form.username.data.strip()
@@ -185,26 +194,13 @@ def login():
                 logger.debug(f"Database query result for username '{username}': {user}")
 
                 # Check if user exists
-                if not user:
-                    logger.warning(f"Login attempt for non-existent username: {username}")
+                if not user or not bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]):
+                    logger.warning(f"Failed login attempt for username: {username}")
                     return (
                         jsonify(
                             {
                                 "success": False,
-                                "error": "Username not found",
-                            }
-                        ),
-                        401,
-                    )
-
-                # Check password
-                if not bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]):
-                    logger.warning(f"Invalid password for username: {username}")
-                    return (
-                        jsonify(
-                            {
-                                "success": False,
-                                "error": "Incorrect password",
+                                "error": "Invalid username or password",
                             }
                         ),
                         401,
@@ -258,6 +254,15 @@ def register():
                 "error": "Too many registration attempts. Please try again later."
             }), 429
 
+        try:
+            csrf_token = request.form.get('csrf_token')
+            if not csrf_token:
+                raise CSRFError('Missing CSRF token.')
+            validate_csrf(csrf_token)
+        except CSRFError as e:
+            logger.error(f"CSRF validation failed during registration: {e.description}")
+            return jsonify({"success": False, "error": "Invalid CSRF token."}), 400
+
         if form.validate_on_submit():
             # Safely handle potentially None values
             username = form.username.data.strip() if form.username.data else None
@@ -292,7 +297,8 @@ def register():
 
                 # Create new user with admin role if first user
                 role = 'admin' if is_first_user else 'user'
-                hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+                cost_factor = int(os.environ.get("BCRYPT_COST_FACTOR", 12))
+                hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(rounds=cost_factor))
                 db.execute(
                     text("INSERT INTO users (username, email, password_hash, role) VALUES (:username, :email, :password_hash, :role)"),
                     {"username": username, "email": email, "password_hash": hashed_pw, "role": role}
