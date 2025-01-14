@@ -263,14 +263,10 @@
                 const formData = new FormData(registrationForm);
 
                 try {
-                    const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-                    formData.append('csrf_token', csrfToken);
-
                     const response = await fetch(registrationForm.action, {
                         method: 'POST',
                         body: formData,
                         headers: {
-                            'X-CSRFToken': csrfToken,
                             'Accept': 'application/json'
                         },
                         credentials: 'same-origin'

@@ -272,6 +272,15 @@ def register():
 
     form = RegistrationForm()
     if request.method == "POST":
+        try:
+            csrf_token = request.form.get('csrf_token')
+            if not csrf_token:
+                raise CSRFError('Missing CSRF token.')
+            validate_csrf(csrf_token)
+        except CSRFError as e:
+            logger.error(f"CSRF validation failed during registration: {e.description if hasattr(e, 'description') else str(e)}")
+            return jsonify({"success": False, "error": "Invalid CSRF token."}), 400
+
         clean_failed_registrations()
         ip = request.remote_addr or "unknown"
         
@@ -281,13 +290,17 @@ def register():
                 "error": "Too many registration attempts. Please try again later."
             }), 429
 
+        logger.debug(f"Registration form data: {request.form}")
+
 
         if form.validate_on_submit():
+            logger.debug("Registration form validated successfully")
             username = form.username.data.strip()
             email = form.email.data.lower().strip()
             password = form.password.data
 
             db = get_db()
+            logger.debug(f"Creating new user: {username}, {email}")
             try:
                 # Check for existing user
                 existing_user = db.execute(
@@ -353,13 +366,19 @@ def register():
 
             except Exception as e:
                 db.rollback()
-                logger.error(f"Registration error: {e}")
+                logger.error(f"Registration error: {e}", exc_info=True)
+                logger.debug(f"Failed registration data - Username: {username}, Email: {email}")
                 return jsonify({
                     "success": False,
-                    "error": "An error occurred during registration"
+                    "error": "An error occurred during registration. Please try again."
                 }), 500
 
-        return jsonify({"success": False, "errors": form.errors}), 400
+        logger.debug(f"Form validation failed: {form.errors}")
+        return jsonify({
+            "success": False,
+            "errors": form.errors,
+            "error": "Please correct the errors in the form."
+        }), 400
 
     return render_template("register.html", form=form)
 @bp.route("/edit_default_model", methods=["GET", "POST"])
