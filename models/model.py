@@ -449,7 +449,7 @@ class Model:
         if max_completion_tokens is not None:
             try:
                 max_completion_tokens = int(max_completion_tokens)
-                max_limit = 32000 if config.get("requires_o1_handling") else 16384
+                max_limit = 8300 if config.get("requires_o1_handling") else 16384
                 if not (1 <= max_completion_tokens <= max_limit):
                     raise ValueError(
                         f"max_completion_tokens must be between 1 and {max_limit}"
@@ -457,6 +457,13 @@ class Model:
                 config["max_completion_tokens"] = max_completion_tokens
             except (TypeError, ValueError):
                 raise ValueError("max_completion_tokens must be a valid integer")
+
+        # Additional validation for o1-preview models
+        if config.get("requires_o1_handling", False):
+            if config.get("temperature") not in (None, 1.0):
+                raise ValueError("For o1 models, temperature must be exactly 1.0.")
+            if config.get("supports_streaming", False):
+                raise ValueError("o1 models do not support streaming.")
 
     @staticmethod
     def delete(model_id: int) -> None:
