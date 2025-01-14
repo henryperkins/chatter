@@ -115,13 +115,9 @@ def is_redis_available():
     except redis.ConnectionError:
         return False
 
-# Initialize limiter with appropriate storage
-if is_redis_available():
-    logger.info("Using Redis for rate limiting storage.")
-    limiter.init_app(app, storage_uri="redis://localhost:6379")
-else:
-    logger.warning("Redis unavailable. Falling back to in-memory storage for rate limiting.")
-    limiter.init_app(app)
+# Initialize limiter with SQLite storage
+limiter.init_app(app, storage_uri="sqlite:///rate_limits.db")
+logger.info("Using SQLite for rate limiting storage.")
 
 # Initialize database
 init_app(app)

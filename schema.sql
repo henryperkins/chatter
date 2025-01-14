@@ -16,7 +16,6 @@ CREATE TABLE IF NOT EXISTS users (
     reset_token TEXT DEFAULT NULL, -- Token for password reset
     email_verification_token TEXT DEFAULT NULL, -- Token for email verification
     is_verified BOOLEAN DEFAULT FALSE, -- Whether the email is verified
-    is_verified BOOLEAN DEFAULT FALSE -- Whether the email is verified
     reset_token_expiry TIMESTAMP DEFAULT NULL -- Expiry for the reset token
 );
 
