@@ -182,6 +182,7 @@ def limiter_key():
 @bp.route("/login", methods=["GET", "POST"])
 @limiter.limit("5 per minute", key_func=limiter_key)
 def login():
+    """Handle user login requests. Validates credentials and logs the user in."""
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         if not check_login_attempts(username):
@@ -189,7 +190,6 @@ def login():
                 "success": False,
                 "error": "Too many login attempts. Please try again later."
             }), 429
-    """Handle user login requests. Validates credentials and logs the user in."""
     if current_user.is_authenticated:
         logger.debug("User already authenticated; redirecting to chat interface.")
         return redirect(url_for("chat.chat_interface"))
@@ -272,20 +272,26 @@ def login():
 
     """Handle user registration requests."""
     if current_user.is_authenticated:
-        logger.debug("User already authenticated; redirecting to chat interface.")
         return redirect(url_for("chat.chat_interface"))
 
     form = RegistrationForm()
     if request.method == "POST":
-        # Ensure IP address is not None
         ip = request.remote_addr or "unknown"
-        logger.debug(f"Processing registration form from IP: {ip}")
-
+        
         if not check_registration_attempts(ip):
             return jsonify({
                 "success": False,
                 "error": "Too many registration attempts. Please try again later."
             }), 429
+
+        try:
+            csrf_token = request.form.get('csrf_token')
+            if not csrf_token:
+                raise CSRFError('Missing CSRF token.')
+            validate_csrf(csrf_token)
+        except CSRFError as e:
+            logger.error(f"CSRF validation failed: {e}")
+            return jsonify({"success": False, "error": "Invalid CSRF token."}), 400
 
         try:
             csrf_token = request.form.get('csrf_token')

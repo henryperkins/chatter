@@ -19,7 +19,7 @@
         </div>
         {% endif %}
 
-        <form id="registration-form" method="POST" action="{{ url_for('auth.register') }}" class="space-y-6 ajax-form" novalidate>
+        <form id="registration-form" method="POST" action="{{ url_for('auth.register') }}" class="space-y-6" novalidate>
             {{ form.hidden_tag() }}
 
             <!-- Username -->
