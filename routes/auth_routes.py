@@ -19,6 +19,7 @@ from flask import (
     current_app,
 )
 from contextlib import contextmanager
+from chat_utils import handle_error
 
 @contextmanager
 def db_session():
