@@ -33,6 +33,23 @@ load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 
+# Middleware to handle Connection: Upgrade header
+class RemoveConnectionUpgradeMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    def __call__(self, environ, start_response):
+        # Check if 'Connection' header exists and contains 'Upgrade'
+        connection_header = environ.get('HTTP_CONNECTION', '')
+        if 'upgrade' in connection_header.lower():
+            # Remove 'Upgrade' from the 'Connection' header
+            environ['HTTP_CONNECTION'] = 'close'
+            logger.debug(f"Modified Connection header from '{connection_header}' to 'close'")
+        return self.app(environ, start_response)
+
+# Wrap the Flask app with the middleware
+app.wsgi_app = RemoveConnectionUpgradeMiddleware(app.wsgi_app)
+
 # Configure Flask-Limiter to use Redis
 limiter.init_app(app)
 
