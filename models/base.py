@@ -1,27 +1,31 @@
+# models/base.py
+
 import logging
 from contextlib import contextmanager
-from typing import Dict, List, Any
-
-from database import get_db
 from sqlalchemy.orm import Session
+from database import get_db_session
 
 logger = logging.getLogger(__name__)
 
 
 @contextmanager
-def db_session():
-    """Context manager for handling database sessions."""
-    db: Session = get_db()
+def db_session_scope():
+    """
+    Provide a transactional scope around a series of operations.
+    """
+    session_gen = get_db_session()
+    session: Session = next(session_gen)
     try:
-        yield db
+        yield session
     except Exception as e:
-        db.rollback()
-        logger.error(f"Database operation failed: {e}")
+        session.rollback()
+        logger.error(f"Session rollback due to exception: {e}")
         raise
     finally:
-        db.close()
+        session.close()
 
 
-def row_to_dict(row, fields: List[str]) -> Dict[str, Any]:
-    """Convert a SQLAlchemy row to a dictionary."""
-    return {field: row._mapping[field] for field in fields}
+# Base is imported from database.py
+from database import Base
+
+# Now, all ORM models should inherit from Base
