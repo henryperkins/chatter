@@ -23,6 +23,8 @@ from sqlalchemy import text
 from email_validator import validate_email, EmailNotValidError
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import validate_csrf, CSRFError
+import os
 
 from database import get_db
 from models import User, Model
@@ -173,7 +175,7 @@ def login():
                 raise CSRFError('Missing CSRF token.')
             validate_csrf(csrf_token)
         except CSRFError as e:
-            logger.error(f"CSRF validation failed during login: {e.description}")
+            logger.error(f"CSRF validation failed during login: {e.description if hasattr(e, 'description') else str(e)}")
             return jsonify({"success": False, "error": "Invalid CSRF token."}), 400
 
         logger.debug("Processing login form submission.")
@@ -260,7 +262,7 @@ def register():
                 raise CSRFError('Missing CSRF token.')
             validate_csrf(csrf_token)
         except CSRFError as e:
-            logger.error(f"CSRF validation failed during registration: {e.description}")
+            logger.error(f"CSRF validation failed during registration: {e.description if hasattr(e, 'description') else str(e)}")
             return jsonify({"success": False, "error": "Invalid CSRF token."}), 400
 
         if form.validate_on_submit():
