@@ -248,6 +248,86 @@ class FileUploadManager {
         this.fileInput.click();
       });
     }
+
+    // Close preview modal when clicking outside
+    document.addEventListener('click', (e) => {
+      const previewModal = document.getElementById('file-preview-modal');
+      if (previewModal && !previewModal.contains(e.target) && !e.target.closest('.file-item')) {
+        previewModal.classList.add('hidden');
+      }
+    });
+  }
+
+  // Show file preview
+  showPreview(index) {
+    const file = this.uploadedFiles[index];
+    if (!file) return;
+
+    // Create or update preview modal
+    let previewModal = document.getElementById('file-preview-modal');
+    if (!previewModal) {
+      previewModal = document.createElement('div');
+      previewModal.id = 'file-preview-modal';
+      previewModal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-modal flex items-center justify-center p-4 hidden';
+      previewModal.innerHTML = `
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">${file.name}</h3>
+            <button onclick="this.closest('#file-preview-modal').classList.add('hidden')"
+                    class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                    aria-label="Close preview">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="flex-1 overflow-auto p-4" id="file-preview-content"></div>
+        </div>
+      `;
+      document.body.appendChild(previewModal);
+    }
+
+    const previewContent = document.getElementById('file-preview-content');
+    previewContent.innerHTML = this.getPreviewContent(file);
+
+    previewModal.classList.remove('hidden');
+  }
+
+  // Get preview content based on file type
+  getPreviewContent(file) {
+    if (file.type.startsWith('image/')) {
+      return `<img src="${URL.createObjectURL(file)}" alt="Preview of ${file.name}" class="max-w-full h-auto rounded-lg">`;
+    } else if (file.type === 'application/pdf') {
+      return `
+        <div class="h-[70vh]">
+          <iframe src="${URL.createObjectURL(file)}" class="w-full h-full rounded-lg" title="PDF Preview"></iframe>
+        </div>
+      `;
+    } else if (file.type === 'text/plain' || file.type === 'text/markdown') {
+      return `
+        <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
+          <pre class="whitespace-pre-wrap break-words text-sm">Loading...</pre>
+        </div>
+      `;
+    } else {
+      return `
+        <div class="text-center py-8">
+          <i class="fas fa-file text-4xl text-gray-400 mb-4"></i>
+          <p class="text-gray-500 dark:text-gray-400">Preview not available for this file type</p>
+        </div>
+      `;
+    }
+  }
+
+  // Load text file content
+  async loadTextFileContent(file) {
+    const previewContent = document.getElementById('file-preview-content');
+    if (!previewContent) return;
+
+    try {
+      const text = await file.text();
+      previewContent.querySelector('pre').textContent = text;
+    } catch (error) {
+      previewContent.querySelector('pre').textContent = 'Failed to load file content';
+    }
   }
 }
 

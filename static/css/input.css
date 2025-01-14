@@ -180,6 +180,25 @@ body {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+/* File Preview Modal */
+#file-preview-modal {
+    transition: opacity 0.3s ease;
+}
+
+#file-preview-modal iframe {
+    border: none;
+}
+
+#file-preview-modal img {
+    max-height: 70vh;
+    object-fit: contain;
+}
+
+#file-preview-modal pre {
+    max-height: 70vh;
+    overflow: auto;
+}
+
 #drop-zone {
     animation: drop-zone-fade 0.3s ease;
 }
