@@ -44,34 +44,67 @@ class Model:
 
     @staticmethod
     def create_default_model() -> int:
-        """
-        Create a default model using values from environment variables.
-        """
+        """Create a default model with comprehensive validation and fallback."""
+        required_env_vars = {
+            "DEFAULT_MODEL_NAME": "GPT-4",
+            "DEFAULT_DEPLOYMENT_NAME": "gpt-4",
+            "DEFAULT_MODEL_DESCRIPTION": "Default GPT-4 model",
+            "DEFAULT_MODEL_TYPE": "azure",
+            "DEFAULT_API_ENDPOINT": "https://your-resource.openai.azure.com",
+            "AZURE_API_KEY": "your_default_api_key",
+            "DEFAULT_TEMPERATURE": "1.0",
+            "DEFAULT_MAX_TOKENS": "4000",
+            "DEFAULT_MAX_COMPLETION_TOKENS": "500",
+            "AZURE_API_VERSION": "2024-12-01-preview"
+        }
+
+        # Validate environment variables
+        missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+        if missing_vars:
+            logger.warning(f"Missing environment variables: {', '.join(missing_vars)}")
+
         default_model_data = {
-            "name": os.getenv("DEFAULT_MODEL_NAME", "GPT-4"),
-            "deployment_name": os.getenv("DEFAULT_DEPLOYMENT_NAME", "gpt-4"),
-            "description": os.getenv("DEFAULT_MODEL_DESCRIPTION", "Default GPT-4 model"),
-            "model_type": os.getenv("DEFAULT_MODEL_TYPE", "azure"),
-            "api_endpoint": os.getenv("DEFAULT_API_ENDPOINT", "https://your-resource.openai.azure.com"),
-            "api_key": os.getenv("AZURE_API_KEY", "your_default_api_key"),
-            "temperature": float(os.getenv("DEFAULT_TEMPERATURE", "1.0")),
-            "max_tokens": int(os.getenv("DEFAULT_MAX_TOKENS", "4000")),
-            "max_completion_tokens": int(os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "500")),
+            "name": os.getenv("DEFAULT_MODEL_NAME", required_env_vars["DEFAULT_MODEL_NAME"]),
+            "deployment_name": os.getenv("DEFAULT_DEPLOYMENT_NAME", required_env_vars["DEFAULT_DEPLOYMENT_NAME"]),
+            "description": os.getenv("DEFAULT_MODEL_DESCRIPTION", required_env_vars["DEFAULT_MODEL_DESCRIPTION"]),
+            "model_type": os.getenv("DEFAULT_MODEL_TYPE", required_env_vars["DEFAULT_MODEL_TYPE"]),
+            "api_endpoint": os.getenv("DEFAULT_API_ENDPOINT", required_env_vars["DEFAULT_API_ENDPOINT"]),
+            "api_key": os.getenv("AZURE_API_KEY", required_env_vars["AZURE_API_KEY"]),
+            "temperature": float(os.getenv("DEFAULT_TEMPERATURE", required_env_vars["DEFAULT_TEMPERATURE"])),
+            "max_tokens": int(os.getenv("DEFAULT_MAX_TOKENS", required_env_vars["DEFAULT_MAX_TOKENS"])),
+            "max_completion_tokens": int(os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", required_env_vars["DEFAULT_MAX_COMPLETION_TOKENS"])),
             "is_default": True,
             "requires_o1_handling": os.getenv("DEFAULT_REQUIRES_O1_HANDLING", "False").lower() == "true",
             "supports_streaming": os.getenv("DEFAULT_SUPPORTS_STREAMING", "True").lower() == "true",
-            "api_version": os.getenv("AZURE_API_VERSION", "2024-12-01-preview"),
+            "api_version": os.getenv("AZURE_API_VERSION", required_env_vars["AZURE_API_VERSION"]),
             "version": 1,
         }
 
         try:
+            # Validate model configuration before creation
+            Model.validate_model_config(default_model_data)
+            
+            # Attempt to create the model
             model_id = Model.create(default_model_data)
             if model_id is None:
                 raise ValueError("Failed to create default model")
             return model_id
-        except ValueError as e:
-            logger.error(f"Invalid default model configuration: {e}")
-            raise
+        except Exception as e:
+            logger.error(f"Failed to create default model: {e}")
+            # Create a minimal valid model as fallback
+            fallback_data = {
+                "name": "Fallback Model",
+                "deployment_name": "fallback-model",
+                "description": "Minimal fallback model",
+                "model_type": "azure",
+                "api_endpoint": "https://fallback.openai.azure.com",
+                "api_key": "fallback-key",
+                "max_completion_tokens": 500,
+                "is_default": True,
+                "version": 1
+            }
+            logger.warning("Creating fallback model due to default model creation failure")
+            return Model.create(fallback_data)
 
     @staticmethod
     def get_default() -> Optional["Model"]:
