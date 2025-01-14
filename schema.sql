@@ -97,14 +97,21 @@ CREATE TABLE IF NOT EXISTS uploaded_files (
 -- =============================
 -- INDEXES FOR PERFORMANCE
 -- =============================
-CREATE INDEX IF NOT EXISTS idx_users_username ON users (username); -- Speeds up username lookups
-CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats (user_id); -- Speeds up fetching chats by user
-CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id); -- Speeds up fetching messages by chat
-CREATE INDEX IF NOT EXISTS idx_models_is_default ON models (is_default); -- Ensures fast lookup of default model
-CREATE INDEX IF NOT EXISTS idx_uploaded_files_chat_id ON uploaded_files (chat_id); -- Speeds up file lookups by chat
-CREATE INDEX IF NOT EXISTS idx_model_versions_model_id ON model_versions (model_id); -- Speeds up version history lookups
-CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages (timestamp); -- Speeds up fetching messages by timestamp
-CREATE INDEX IF NOT EXISTS idx_messages_metadata ON messages((json_extract(metadata, '$.summarized'))); -- Speeds up metadata queries
-CREATE INDEX IF NOT EXISTS idx_messages_role ON messages(role); -- Speeds up role-based filtering
-CREATE INDEX IF NOT EXISTS idx_chats_created_at ON chats (created_at); -- Speeds up fetching chats by creation time
-CREATE INDEX IF NOT EXISTS idx_messages_streaming ON messages((json_extract(metadata, '$.streamed'))); -- Speeds up streaming metadata queries
+CREATE INDEX IF NOT EXISTS idx_users_username ON users (username);
+CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats (user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages (chat_id);
+CREATE INDEX IF NOT EXISTS idx_models_is_default ON models (is_default);
+CREATE INDEX IF NOT EXISTS idx_uploaded_files_chat_id ON uploaded_files (chat_id);
+CREATE INDEX IF NOT EXISTS idx_model_versions_model_id ON model_versions (model_id);
+CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages (timestamp);
+CREATE INDEX IF NOT EXISTS idx_messages_metadata ON messages((json_extract(metadata, '$.summarized')));
+CREATE INDEX IF NOT EXISTS idx_messages_role ON messages(role);
+CREATE INDEX IF NOT EXISTS idx_chats_created_at ON chats (created_at);
+CREATE INDEX IF NOT EXISTS idx_messages_streaming ON messages((json_extract(metadata, '$.streamed')));
+
+-- Additional indexes for improved performance
+CREATE INDEX IF NOT EXISTS idx_models_deployment_name ON models (deployment_name);
+CREATE INDEX IF NOT EXISTS idx_models_created_at ON models (created_at);
+CREATE INDEX IF NOT EXISTS idx_model_versions_created_at ON model_versions (created_at);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users (email);
+CREATE INDEX IF NOT EXISTS idx_users_created_at ON users (created_at);

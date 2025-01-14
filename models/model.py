@@ -134,21 +134,30 @@ class Model:
         """
         Retrieve a model by its ID.
         """
-        with db_session() as db:
-            try:
+        try:
+            with db_session() as db:
                 query = text("SELECT * FROM models WHERE id = :id")
                 row = db.execute(query, {"id": model_id}).mappings().first()
                 if row:
                     model_dict = dict(row)
+                    
+                    # Decrypt API key
+                    from cryptography.fernet import Fernet
+                    key = os.getenv('ENCRYPTION_KEY')
+                    if not key:
+                        raise ValueError("Encryption key not configured")
+                    cipher_suite = Fernet(key)
+                    model_dict["api_key"] = cipher_suite.decrypt(model_dict["api_key"].encode()).decode()
+                    
                     # Exclude sensitive fields from logs
                     safe_model_dict = {k: v for k, v in model_dict.items() if k != 'api_key'}
                     logger.debug("Model retrieved by ID %d: %s", model_id, safe_model_dict)
                     return Model(**model_dict)
                 logger.info("No model found with ID %d.", model_id)
                 return None
-            except Exception as e:
-                logger.error("Error retrieving model by ID %d: %s", model_id, str(e))
-                raise
+        except Exception as e:
+            logger.error("Error retrieving model by ID %d: %s", model_id, str(e))
+            raise
 
     @staticmethod
     def get_all(limit: int = 10, offset: int = 0) -> List["Model"]:
@@ -226,8 +235,10 @@ class Model:
         """
         Create a new model record in the database.
         """
-        with db_session() as db:
-            try:
+        try:
+            with db_session() as db:
+                logger.debug(f"Creating model with data: {data}")
+
                 # Check for existing models with same name or deployment_name (case-insensitive)
                 check_query = text("""
                     SELECT name, deployment_name
@@ -246,23 +257,16 @@ class Model:
                     else:
                         raise ValueError(f"A model with deployment name '{data['deployment_name']}' already exists")
 
-                # Ensure all required fields are present
+                # Validate model configuration
                 Model.validate_model_config(data)
 
-                # Check if any models exist
-                model_count_query = text("SELECT COUNT(*) as count FROM models")
-                model_count = db.execute(model_count_query).scalar()
-                if model_count == 0:
-                    # Set is_default to True for the first model
-                    data['is_default'] = True
+                # If setting as default, unset previous default
+                if data.get("is_default", False):
+                    db.execute(
+                        text("UPDATE models SET is_default = 0 WHERE is_default = 1")
+                    )
 
-                if data.get("requires_o1_handling", False):
-                    data["temperature"] = None
-                    data["supports_streaming"] = False  # Disable streaming for o1-preview models
-
-                # Log the full data being inserted
-                logger.debug(f"Inserting model with data: {data}")
-
+                # Insert new model
                 query = text(
                     """
                     INSERT INTO models (
@@ -277,9 +281,7 @@ class Model:
                         CURRENT_TIMESTAMP
                     )
                     RETURNING id
-                """
-                )
-                # Execute all operations and commit in a single transaction
+                """)
                 result = db.execute(query, data)
                 model_id = result.scalar()
 
@@ -287,30 +289,16 @@ class Model:
                     logger.error("Failed to create model - no ID returned")
                     return None
 
-                if data.get("is_default", False):
-                    unset_default_query = text(
-                        """
-                        UPDATE models
-                        SET is_default = 0
-                        WHERE id != :model_id
-                    """
-                    )
-                    db.execute(
-                        unset_default_query, {"model_id": model_id, "is_default": True}
-                    )
-
                 # Create initial version
                 Model.create_version(model_id, data)
 
-                # Commit all changes in one transaction
                 db.commit()
-
                 logger.info(f"Model created with ID: {model_id}")
                 return model_id
-            except Exception as e:
-                db.rollback()
-                logger.error(f"Failed to create model: {e}")
-                raise
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Failed to create model: {e}")
+            raise
 
     @staticmethod
     def update(model_id: int, data: ModelDict) -> None:
