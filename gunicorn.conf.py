@@ -2,7 +2,7 @@ import logging
 from logging.config import dictConfig
 import os
 
-log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
+log_level = os.getenv('LOG_LEVEL', 'WARNING').upper()
 
 logconfig_dict = {
     'version': 1,
