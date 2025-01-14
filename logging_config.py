@@ -93,11 +93,8 @@ class HttpClientFilter(logging.Filter):
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)  # Capture INFO and above logs
 
-# Create handlers
-if os.getenv('FLASK_ENV') != 'production':
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(logging.Formatter(DETAILED_FORMAT))
-    root_logger.addHandler(console_handler)
+# Remove console handler to prevent duplicate logs
+# All logging is now handled through gunicorn.conf.py
 
 # Ensure all loggers have handlers
 def ensure_logger_handlers(logger_name, handler, formatter):

@@ -1,8 +1,11 @@
 import logging
 from logging.config import dictConfig
 import os
+from logging.handlers import RotatingFileHandler
 
-log_level = os.getenv('LOG_LEVEL', 'WARNING').upper()
+# Create logs directory if it doesn't exist
+LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
+os.makedirs(LOG_DIR, exist_ok=True)
 
 logconfig_dict = {
     'version': 1,
@@ -19,47 +22,55 @@ logconfig_dict = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'json' if os.getenv('FLASK_ENV') == 'production' else 'standard',
-            'level': log_level,
+            'level': 'ERROR',
+        },
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'formatter': 'standard',
+            'filename': os.path.join(LOG_DIR, 'gunicorn.log'),
+            'maxBytes': 20 * 1024 * 1024,  # 20 MB
+            'backupCount': 5,
+            'level': 'DEBUG',
         },
     },
     'root': {
-        'level': log_level,
-        'handlers': ['console'],
+        'level': 'DEBUG',
+        'handlers': ['console', 'file'],
     },
     'loggers': {
         'gunicorn.error': {
-            'level': log_level,
-            'handlers': ['console'],
+            'level': 'DEBUG',
+            'handlers': ['file'],
             'propagate': False,
         },
         'gunicorn.access': {
-            'level': log_level,
-            'handlers': ['console'],
+            'level': 'DEBUG',
+            'handlers': ['file'],
             'propagate': False,
         },
         'chat_api': {
-            'level': log_level,
-            'handlers': ['console'],
+            'level': 'DEBUG',
+            'handlers': ['file'],
             'propagate': False,
         },
         'user_actions': {
-            'level': log_level,
-            'handlers': ['console'],
+            'level': 'DEBUG',
+            'handlers': ['file'],
             'propagate': False,
         },
         'app': {
-            'level': log_level,
-            'handlers': ['console'],
+            'level': 'DEBUG',
+            'handlers': ['file'],
             'propagate': False,
         },
         'models': {
-            'level': log_level,
-            'handlers': ['console'],
+            'level': 'DEBUG',
+            'handlers': ['file'],
             'propagate': False,
         },
         'database': {
-            'level': log_level,
-            'handlers': ['console'],
+            'level': 'DEBUG',
+            'handlers': ['file'],
             'propagate': False,
         },
     },
