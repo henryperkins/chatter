@@ -260,3 +260,43 @@ def send_reset_email(recipient_email: str, reset_link: str) -> None:
             server.sendmail(sender_email, recipient_email, message.as_string())
     except Exception as e:
         raise Exception(f"Failed to send email: {e}")
+def send_verification_email(recipient_email: str, verification_token: str) -> None:
+    """
+    Send an email to the user with a verification link.
+
+    Args:
+        recipient_email (str): The recipient's email address.
+        verification_token (str): The unique token for email verification.
+
+    Raises:
+        Exception: If the email could not be sent.
+    """
+    sender_email = os.getenv("EMAIL_SENDER", "no-reply@example.com")
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.example.com")
+    smtp_port = int(os.getenv("SMTP_PORT", 587))
+    smtp_username = os.getenv("SMTP_USERNAME", "username")
+    smtp_password = os.getenv("SMTP_PASSWORD", "password")
+
+    # Create the email
+    message = MIMEMultipart("alternative")
+    message["Subject"] = "Email Verification"
+    message["From"] = sender_email
+    message["To"] = recipient_email
+
+    # Email content
+    verification_url = f"{os.getenv('APP_URL', 'http://localhost:5000')}/auth/verify_email/{verification_token}"
+    text = f"Please click the following link to verify your email: {verification_url}"
+    html = f"<html><body><p>Please click the following link to verify your email:</p><a href='{verification_url}'>{verification_url}</a></body></html>"
+
+    # Attach parts
+    message.attach(MIMEText(text, "plain"))
+    message.attach(MIMEText(html, "html"))
+
+    # Send the email
+    try:
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_username, smtp_password)
+            server.sendmail(sender_email, recipient_email, message.as_string())
+    except Exception as e:
+        raise Exception(f"Failed to send verification email: {e}")
