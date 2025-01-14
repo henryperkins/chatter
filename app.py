@@ -155,6 +155,7 @@ def init_app_components() -> None:
 @app.errorhandler(400)
 def bad_request(error: HTTPException) -> Tuple[Dict[str, str], int]:
     """Handle HTTP 400 Bad Request errors"""
+    logger.warning(f"400 Bad Request: {error} - URL: {request.url}")
     return jsonify(
         error="Bad request",
         message=error.description or "Invalid request"
@@ -187,18 +188,27 @@ def rate_limit_exceeded(error: HTTPException) -> Tuple[Dict[str, str], int]:
 @app.errorhandler(500)
 def internal_server_error(error: HTTPException) -> Tuple[Dict[str, str], int]:
     """Handle HTTP 500 Internal Server Error"""
+    logger.error(f"500 Internal Server Error: {error} - URL: {request.url}")
     return jsonify(
         error="Internal server error",
         message="An unexpected error occurred"
     ), 500
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """Handle all uncaught exceptions"""
+    logger.exception("Unhandled exception occurred")
+    return jsonify(
+        error="An internal error occurred",
+        message="Please try again later"
+    ), 500
+
 @app.before_request
 def log_request_info():
     try:
-        app.logger.debug(f"Request Headers: {request.headers}")
-        # Removed request.data logging to prevent consuming the request stream
+        logger.info(f"{request.remote_addr} - {request.method} {request.url}")
     except Exception as e:
-        app.logger.error(f"Error logging request: {e}")
+        logger.error(f"Error logging request: {e}")
         
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e: CSRFError) -> Tuple[Dict[str, str], int]:

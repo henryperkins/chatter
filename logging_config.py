@@ -19,7 +19,7 @@ for directory in [API_LOG_DIR, HTTP_LOG_DIR, USER_LOG_DIR, ERROR_LOG_DIR]:
         os.makedirs(directory)
 
 # Logging format configurations
-DETAILED_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s"
+DETAILED_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d:%(funcName)s] - %(message)s"
 SIMPLE_FORMAT = "%(asctime)s - %(levelname)s - %(message)s"
 USER_FORMAT = "%(asctime)s - %(message)s"
 
@@ -28,23 +28,33 @@ class HttpClientFilter(logging.Filter):
     def filter(self, record):
         return record.levelno >= logging.WARNING
 
-# Base configuration
-logging.basicConfig(
-    level=logging.INFO,
-    format=DETAILED_FORMAT,
-    handlers=[
-        RotatingFileHandler(
-            os.path.join(LOG_DIR, f"app_{datetime.now().strftime('%Y-%m-%d')}.log"),
-            maxBytes=10 * 1024 * 1024,
-            backupCount=5
-        ),
-        logging.StreamHandler()
-    ]
+# Configure root logger
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+
+# Create handlers
+app_log_handler = RotatingFileHandler(
+    os.path.join(LOG_DIR, f"app_{datetime.now().strftime('%Y-%m-%d')}.log"),
+    maxBytes=20 * 1024 * 1024,  # 20 MB
+    backupCount=10
 )
+app_log_handler.setFormatter(logging.Formatter(DETAILED_FORMAT))
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(logging.Formatter(DETAILED_FORMAT))
+
+# Add handlers to root logger
+root_logger.addHandler(app_log_handler)
+root_logger.addHandler(console_handler)
+
+# Configure third-party library logging
+logging.getLogger('sqlalchemy.engine').setLevel(logging.WARNING)
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
 # API logger configuration
 api_logger = logging.getLogger("chat_api")
 api_logger.setLevel(logging.INFO)
+api_logger.propagate = False
 api_handler = RotatingFileHandler(
     os.path.join(API_LOG_DIR, f"api_{datetime.now().strftime('%Y-%m-%d')}.log"),
     maxBytes=10 * 1024 * 1024,
@@ -56,6 +66,7 @@ api_logger.addHandler(api_handler)
 # HTTP client logger configuration
 http_logger = logging.getLogger("httpx")
 http_logger.setLevel(logging.WARNING)  # Only log warnings and errors
+http_logger.propagate = False
 http_handler = RotatingFileHandler(
     os.path.join(HTTP_LOG_DIR, f"http_{datetime.now().strftime('%Y-%m-%d')}.log"),
     maxBytes=10 * 1024 * 1024,
