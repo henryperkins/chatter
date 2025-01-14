@@ -62,18 +62,12 @@ class RegistrationForm(FlaskForm):
     """
     Form for user registration.
     """
-
     username = StringField(
         "Username",
         validators=[
             DataRequired(message="Username is required."),
-            Length(
-                min=4, max=20, message="Username must be between 4 and 20 characters."
-            ),
-            Regexp(
-                r"^[a-zA-Z0-9_]+$",
-                message="Username can only contain letters, numbers, and underscores.",
-            ),
+            Length(min=4, max=20, message="Username must be between 4 and 20 characters."),
+            Regexp(r"^[a-zA-Z0-9_]+$", message="Username can only contain letters, numbers, and underscores."),
         ],
     )
     email = StringField(
@@ -91,6 +85,11 @@ class RegistrationForm(FlaskForm):
         "Password",
         validators=[
             DataRequired(message="Password is required."),
+            Length(min=8, message="Password must be at least 8 characters long."),
+            Regexp(
+                r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?\":{}|<>]).+$",
+                message="Password must include at least one uppercase letter, one lowercase letter, one number, and one special character.",
+            ),
         ],
     )
     confirm_password = PasswordField(
