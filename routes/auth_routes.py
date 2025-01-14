@@ -253,8 +253,8 @@ def login():
                 logger.info(f"User {user.id} logged in successfully.")
                 return jsonify({"success": True, "message": "Login successful"}), 200
 
-            except Exception as e:
-                return handle_error(e, "Error during login process")
+        except Exception as e:
+            return handle_error(e, "Error during login process")
 
         else:
             logger.debug(f"Form validation errors: {form.errors}")

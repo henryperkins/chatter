@@ -277,6 +277,11 @@ def validate_password_strength(password: str) -> List[str]:
         errors.append("Password must contain at least one special character.")
     return errors
 
+import logging
+from flask import jsonify
+
+logger = logging.getLogger(__name__)
+
 def handle_error(error, message="An error occurred"):
     """
     Centralized error handling utility.
