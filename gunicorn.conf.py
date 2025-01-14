@@ -26,6 +26,28 @@ logconfig_dict = {
         'level': log_level,
         'handlers': ['console'],
     },
+    'loggers': {
+        'gunicorn.error': {
+            'level': log_level,
+            'handlers': ['console'],
+            'propagate': False,
+        },
+        'gunicorn.access': {
+            'level': log_level,
+            'handlers': ['console'],
+            'propagate': False,
+        },
+        'chat_api': {
+            'level': log_level,
+            'handlers': ['console'],
+            'propagate': False,
+        },
+        'user_actions': {
+            'level': log_level,
+            'handlers': ['console'],
+            'propagate': False,
+        },
+    },
 }
 
 dictConfig(logconfig_dict)

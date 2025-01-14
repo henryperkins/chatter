@@ -6,7 +6,8 @@ from datetime import timedelta
 from typing import Dict, Optional, Tuple
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, url_for, request, session
+from flask import Flask, jsonify, redirect, url_for, request, session, g
+import uuid
 from flask_login import current_user, logout_user
 from flask_talisman import Talisman
 from flask_sslify import SSLify
@@ -155,7 +156,7 @@ def init_app_components() -> None:
 @app.errorhandler(400)
 def bad_request(error: HTTPException) -> Tuple[Dict[str, str], int]:
     """Handle HTTP 400 Bad Request errors"""
-    logger.warning(f"400 Bad Request: {error} - URL: {request.url}")
+    logger.exception("400 Bad Request - URL: %s", request.url)
     return jsonify(
         error="Bad request",
         message=error.description or "Invalid request"
@@ -209,9 +210,12 @@ def handle_exception(e):
 @app.before_request
 def log_request_info():
     try:
+        # Generate correlation ID
+        g.correlation_id = str(uuid.uuid4())
+        
         # Log basic request info without sensitive data
-        logger.info("Request received - Method: %s, Path: %s, Remote IP: %s",
-                   request.method, request.path, request.remote_addr)
+        logger.info("Request received - Method: %s, Path: %s, Remote IP: %s, Correlation ID: %s",
+                   request.method, request.path, request.remote_addr, g.correlation_id)
     except Exception as e:
         logger.error("Error logging request: %s", str(e))
         

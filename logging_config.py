@@ -36,12 +36,14 @@ class JsonFormatter(logging.Formatter):
             'line': record.lineno,
             'function': record.funcName,
             'message': record.getMessage(),
+            'thread': record.threadName,
+            'process': record.processName,
         }
         
         if record.exc_info:
-            log_record['exc_info'] = self.formatException(record.exc_info)
+            log_record['exception'] = self.formatException(record.exc_info)
         if record.stack_info:
-            log_record['stack_info'] = self.formatStack(record.stack_info)
+            log_record['stack_trace'] = self.formatStack(record.stack_info)
             
         # Add request context if available
         try:
@@ -51,9 +53,20 @@ class JsonFormatter(logging.Formatter):
                     'request_id': request.headers.get('X-Request-ID'),
                     'url': request.url,
                     'method': request.method,
-                    'remote_addr': request.remote_addr
+                    'remote_addr': request.remote_addr,
+                    'user_agent': request.headers.get('User-Agent'),
+                    'referrer': request.referrer,
+                    'user_id': getattr(request, 'user_id', None),
                 })
-        except:
+        except Exception:
+            pass
+            
+        # Add correlation ID if available
+        try:
+            from flask import g
+            if hasattr(g, 'correlation_id'):
+                log_record['correlation_id'] = g.correlation_id
+        except Exception:
             pass
             
         return json.dumps(log_record)
@@ -68,6 +81,11 @@ root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)  # Capture INFO and above logs
 
 # Create handlers
+if os.getenv('FLASK_ENV') != 'production':
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(logging.Formatter(DETAILED_FORMAT))
+    root_logger.addHandler(console_handler)
+
 app_log_handler = ConcurrentRotatingFileHandler(
     os.path.join(LOG_DIR, f"app_{datetime.now().strftime('%Y-%m-%d')}.log"),
     maxBytes=20 * 1024 * 1024,  # 20 MB
