@@ -220,8 +220,14 @@ def login():
                 )
                 logger.debug(f"Database query result for username '{username}': {user}")
 
-                # Check if user exists
-                if not user or not bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]):
+                # Check if user exists and email is verified
+                if not user or not bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]) or not user["is_verified"]:
+                    if user and not user["is_verified"]:
+                        logger.warning(f"Unverified email login attempt for username: {username}")
+                        return jsonify({
+                            "success": False,
+                            "error": "Email not verified. Please check your email for verification instructions."
+                        }), 401
                     failed_logins.setdefault(username, []).append(datetime.now())
                     logger.warning(f"Failed login attempt for username: {username}")
                     return (
@@ -443,8 +449,12 @@ def reset_password(token: str):
 
     try:
         user = db.execute(
-            text("SELECT * FROM users WHERE reset_token_expiry > datetime('now')"),
+            text("SELECT * FROM users WHERE reset_token_expiry > datetime('now') AND reset_token_hash IS NOT NULL"),
         ).mappings().first()
+
+        if not user or not bcrypt.checkpw(token.encode("utf-8"), user["reset_token_hash"]):
+            logger.warning("Invalid or expired reset token used.")
+            return jsonify({"success": False, "error": "Invalid or expired reset token."}), 400
 
         if not user or not bcrypt.checkpw(token.encode("utf-8"), user["reset_token_hash"]):
             logger.warning("Invalid or expired reset token used.")
@@ -488,3 +498,26 @@ def reset_password(token: str):
             "success": False,
             "error": "An unexpected error occurred"
         }), 500
+@bp.route("/verify_email/<token>", methods=["GET"])
+def verify_email(token: str):
+    """Verify the user's email address."""
+    db = get_db()
+    try:
+        user = db.execute(
+            text("SELECT id FROM users WHERE email_verification_token = :token"),
+            {"token": token}
+        ).mappings().first()
+
+        if not user:
+            return jsonify({"success": False, "error": "Invalid or expired verification token."}), 400
+
+        db.execute(
+            text("UPDATE users SET is_verified = 1, email_verification_token = NULL WHERE id = :user_id"),
+            {"user_id": user["id"]}
+        )
+        db.commit()
+        return jsonify({"success": True, "message": "Email verified successfully."}), 200
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error verifying email: {e}")
+        return jsonify({"success": False, "error": "An error occurred during email verification."}), 500

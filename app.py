@@ -28,7 +28,7 @@ from flask_sslify import SSLify
 app = Flask(__name__)
 
 # Enforce HTTPS in production
-if not app.debug and not app.testing:
+if not app.testing:
     sslify = SSLify(app)
     app.config.update(
         SESSION_COOKIE_SECURE=True,
@@ -342,3 +342,16 @@ if __name__ == "__main__":
         os.environ.get("PORT", 5000)
     )  # Get port from environment or use 5000 as default
     app.run(host="0.0.0.0", port=port, debug=True)  # Set debug=True for development
+from flask_talisman import Talisman
+
+# Apply security headers
+Talisman(app, content_security_policy={
+    'default-src': "'self'",
+    'script-src': "'self' 'unsafe-inline'",
+    'style-src': "'self' 'unsafe-inline'",
+    'img-src': "'self' data:",
+    'connect-src': "'self'",
+    'font-src': "'self'",
+    'object-src': "'none'",
+    'frame-src': "'none'"
+})
