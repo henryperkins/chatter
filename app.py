@@ -100,15 +100,13 @@ app.config['WTF_CSRF_CHECK_DEFAULT'] = False  # Disable default CSRF checks
 app.config['WTF_CSRF_METHODS'] = []  # Disable CSRF for all methods by default
 csrf.init_app(app)
 
-# Configure Flask-Limiter with in-memory storage
-app.config.update(
-    {
-        "RATELIMIT_STORAGE_URL": "memory://",
-        "RATELIMIT_STRATEGY": "fixed-window",  # Use simpler strategy
-        "RATELIMIT_DEFAULT": "200 per day;50 per hour",  # Set reasonable defaults
-    }
-)
-# Check Redis availability
+# Configure Flask-Limiter
+app.config.update({
+    "RATELIMIT_STRATEGY": "fixed-window",  # Use simpler strategy
+    "RATELIMIT_DEFAULT": "200 per day;50 per hour",  # Set reasonable defaults
+})
+
+# Check Redis availability and configure storage
 def is_redis_available():
     try:
         redis_client = redis.StrictRedis.from_url("redis://localhost:6379")
@@ -117,15 +115,13 @@ def is_redis_available():
     except redis.ConnectionError:
         return False
 
-# Configure Flask-Limiter with fallback
+# Initialize limiter with appropriate storage
 if is_redis_available():
-    app.config["RATELIMIT_STORAGE_URL"] = "redis://localhost:6379"
     logger.info("Using Redis for rate limiting storage.")
+    limiter.init_app(app, storage_uri="redis://localhost:6379")
 else:
-    app.config["RATELIMIT_STORAGE_URL"] = "memory://"
     logger.warning("Redis unavailable. Falling back to in-memory storage for rate limiting.")
-
-limiter.init_app(app, storage_uri=app.config["RATELIMIT_STORAGE_URL"])
+    limiter.init_app(app)
 
 # Initialize database
 init_app(app)
