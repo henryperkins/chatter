@@ -31,7 +31,7 @@ import os
 from database import get_db
 from models import User, Model
 from decorators import admin_required
-from forms import LoginForm, RegistrationForm, ResetPasswordForm
+from forms import LoginForm, RegistrationForm, ResetPasswordForm, DefaultModelForm
 from chat_utils import send_reset_email
 from extensions import limiter
 
