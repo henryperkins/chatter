@@ -216,14 +216,8 @@ def login():
                 )
                 logger.debug(f"Database query result for username '{username}': {user}")
 
-                # Check if user exists and email is verified
-                if not user or not bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]) or not user["is_verified"]:
-                    if user and not user["is_verified"]:
-                        logger.warning(f"Unverified email login attempt for username: {username}")
-                        return jsonify({
-                            "success": False,
-                            "error": "Email not verified. Please check your email for verification instructions."
-                        }), 401
+                # Check if user exists and password matches
+                if not user or not bcrypt.checkpw(password.encode("utf-8"), user["password_hash"]):
                     failed_logins.setdefault(username, []).append(datetime.now())
                     logger.warning(f"Failed login attempt for username: {username}")
                     return (
@@ -361,6 +355,7 @@ def register():
                     """),
                     {"email": email}
                 )
+                db.commit()  # Commit the verification status update
                 logger.info(f"New user registered: {username}")
                 return jsonify({"success": True, "message": "Registration successful"}), 200
 

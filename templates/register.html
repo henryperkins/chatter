@@ -289,7 +289,12 @@
                     if (response.ok && data.success) {
                         window.location.href = "{{ url_for('chat.chat_interface') }}";
                     } else {
-                        showError(data.error || 'Registration failed');
+                        // Check if there are field-specific errors
+                        if (data.errors) {
+                            displayFieldErrors(data.errors);
+                        } else {
+                            showError(data.error || 'Registration failed');
+                        }
                     }
                 } catch (error) {
                     console.error('Registration error:', error);
@@ -349,5 +354,29 @@
             });
         }
     });
+
+    // Add these new functions to handle field errors
+    function clearFieldErrors() {
+        const errorElements = document.querySelectorAll('.field-error');
+        errorElements.forEach(el => el.remove());
+    }
+
+    function displayFieldErrors(errors) {
+        for (const fieldName in errors) {
+            const field = registrationForm.querySelector(`[name="${fieldName}"]`);
+            if (field) {
+                const errorText = errors[fieldName][0]; // Get the first error message
+                const errorElement = document.createElement('p');
+                errorElement.className = 'text-red-600 dark:text-red-400 text-sm mt-1 field-error';
+                errorElement.textContent = errorText;
+                field.parentElement.appendChild(errorElement);
+            }
+        }
+        // Optionally, focus the first field with an error
+        const firstErrorField = registrationForm.querySelector(`.field-error`);
+        if (firstErrorField) {
+            firstErrorField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
 </script>
 {% endblock %}
