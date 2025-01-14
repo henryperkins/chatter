@@ -195,7 +195,7 @@ def internal_server_error(error: HTTPException) -> Tuple[Dict[str, str], int]:
 def log_request_info():
     try:
         app.logger.debug(f"Request Headers: {request.headers}")
-        app.logger.debug(f"Request Data: {request.data}")
+        # Removed request.data logging to prevent consuming the request stream
     except Exception as e:
         app.logger.error(f"Error logging request: {e}")
         
