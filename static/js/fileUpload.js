@@ -1,7 +1,24 @@
 
+// Configure structured logging
+const logStructured = (level, message, metadata = {}) => {
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    level: level,
+    message: message,
+    ...metadata
+  };
+  console.log(JSON.stringify(logEntry));
+};
+
 class FileUploadManager {
-  constructor() {
+  constructor(chatId, userId) {
     this.uploadedFiles = [];
+    this.chatId = chatId;
+    this.userId = userId;
+    logStructured('INFO', 'FileUploadManager initialized', {
+      chatId: this.chatId,
+      userId: this.userId
+    });
     this.MAX_FILES = 5;
     this.MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
     this.MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB
@@ -28,6 +45,12 @@ class FileUploadManager {
 
   // Validate a single file with enhanced checks
   validateFile(file) {
+    logStructured('DEBUG', 'Validating file', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type
+    });
+    
     const errors = [];
     
     // File type validation
@@ -81,6 +104,12 @@ class FileUploadManager {
 
   // Process multiple files
   processFiles(files) {
+    logStructured('INFO', 'Processing files', {
+      fileCount: files.length,
+      chatId: this.chatId,
+      userId: this.userId
+    });
+    
     const validFiles = [];
     const errors = [];
     const totalSize = this.uploadedFiles.reduce((sum, file) => sum + file.size, 0);
@@ -238,7 +267,17 @@ class FileUploadManager {
 
   // Upload files to the server
   async uploadFiles(chatId) {
-    if (this.uploadedFiles.length === 0) return;
+    if (this.uploadedFiles.length === 0) {
+      logStructured('WARN', 'No files to upload');
+      return;
+    }
+    
+    logStructured('INFO', 'Starting file upload', {
+      fileCount: this.uploadedFiles.length,
+      totalSize: this.uploadedFiles.reduce((sum, file) => sum + file.size, 0),
+      chatId: this.chatId,
+      userId: this.userId
+    });
 
     const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
     const UPLOAD_CONCURRENCY = 3; // Number of parallel uploads
@@ -261,12 +300,21 @@ class FileUploadManager {
           formData.append('totalChunks', totalChunks);
           formData.append('fileSize', file.size);
           
-          uploadPromises.push(
-            fetchWithCSRF(`/chat/${chatId}/upload`, {
-              method: 'POST',
-              body: formData
-            })
-          );
+          const uploadStart = Date.now();
+          const uploadPromise = fetchWithCSRF(`/chat/${chatId}/upload`, {
+            method: 'POST',
+            body: formData
+          }).then(() => {
+            const chunkDuration = Date.now() - uploadStart;
+            logStructured('DEBUG', 'Chunk upload completed', {
+              fileName: file.name,
+              chunkIndex: chunkIndex,
+              totalChunks: totalChunks,
+              duration: chunkDuration
+            });
+          });
+          
+          uploadPromises.push(uploadPromise);
           
           // Limit concurrent uploads
           if (uploadPromises.length >= UPLOAD_CONCURRENCY) {
@@ -282,6 +330,13 @@ class FileUploadManager {
       }
 
       if (response.success) {
+        const uploadDuration = Date.now() - startTime;
+        logStructured('INFO', 'Files uploaded successfully', {
+          fileCount: this.uploadedFiles.length,
+          duration: uploadDuration,
+          chatId: this.chatId,
+          userId: this.userId
+        });
         showFeedback('Files uploaded successfully', 'success');
         this.uploadedFiles = []; // Clear the list after successful upload
         this.renderFileList();
@@ -289,7 +344,12 @@ class FileUploadManager {
         throw new Error(response.error || 'Failed to upload files');
       }
     } catch (error) {
-      console.error('Upload error:', error);
+      logStructured('ERROR', 'File upload failed', {
+        error: error.message,
+        stack: error.stack,
+        chatId: this.chatId,
+        userId: this.userId
+      });
       showFeedback(error.message, 'error');
     }
   }
