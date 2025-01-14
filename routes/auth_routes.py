@@ -5,7 +5,6 @@ Authentication routes for the application.
 from datetime import datetime, timedelta
 import logging
 import uuid
-from threading import Timer
 from typing import Dict, List
 
 import bcrypt
@@ -58,12 +57,6 @@ def clean_failed_registrations():
     # Delete IPs with no recent attempts
     for ip in to_delete:
         del failed_registrations[ip]
-    # Schedule next clean-up
-    Timer(900, clean_failed_registrations).start()  # Run every 15 minutes
-
-
-# Start the first clean-up
-clean_failed_registrations()
 
 
 @bp.route("/manage_users", methods=["GET"])
@@ -279,6 +272,7 @@ def register():
 
     form = RegistrationForm()
     if request.method == "POST":
+        clean_failed_registrations()
         ip = request.remote_addr or "unknown"
         
         if not check_registration_attempts(ip):

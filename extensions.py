@@ -19,15 +19,15 @@ csrf = CSRFProtect()
 csrf_protect = csrf.protect
 
 # Initialize Limiter
-redis_url = os.getenv("REDIS_URL")
+redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
 
-if redis_url:
-    try:
-        limiter = Limiter(key_func=get_remote_address, storage_uri=redis_url)
-        logger.info("Flask-Limiter is configured to use Redis.")
-    except Exception as e:
-        logger.error(f"Failed to configure Redis for Flask-Limiter: {e}")
-        raise RuntimeError("Redis configuration for Flask-Limiter failed.")
-else:
-    limiter = Limiter(key_func=get_remote_address)
-    logger.warning("Using in-memory storage for Flask-Limiter. This is not recommended for production.")
+try:
+    limiter = Limiter(
+        key_func=get_remote_address,
+        storage_uri=redis_url,
+        default_limits=["200 per day", "50 per hour"]
+    )
+    logger.info("Flask-Limiter is configured to use Redis.")
+except Exception as e:
+    logger.error(f"Failed to configure Redis for Flask-Limiter: {e}")
+    raise RuntimeError("Redis configuration for Flask-Limiter failed.")

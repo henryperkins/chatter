@@ -95,11 +95,7 @@ def configure_app() -> None:
         WTF_CSRF_ENABLED=True
     )
     
-    # Rate limiting
-    app.config.update(
-        RATELIMIT_STRATEGY="fixed-window",
-        RATELIMIT_DEFAULT="200 per day;50 per hour"
-    )
+    # Rate limiting is now configured in extensions.py with Redis
 
 def configure_logging() -> None:
     """Configure application logging"""
