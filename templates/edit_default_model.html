@@ -43,4 +43,25 @@
         </button>
     </form>
 </div>
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const requiresO1HandlingCheckbox = document.getElementById('requires_o1_handling');
+        const temperatureField = document.getElementById('temperature');
+
+        function toggleTemperatureField() {
+            if (requiresO1HandlingCheckbox.checked) {
+                temperatureField.value = '1.0';
+                temperatureField.disabled = true;
+            } else {
+                temperatureField.disabled = false;
+            }
+        }
+
+        requiresO1HandlingCheckbox.addEventListener('change', toggleTemperatureField);
+        toggleTemperatureField();  // Initialize on page load
+    });
+</script>
 {% endblock %}

@@ -381,16 +381,15 @@ class Model:
         ):
             raise ValueError("Invalid Azure OpenAI API endpoint.")
 
-        # Validate version field
-        version = config.get("version")
-        if version is not None and not isinstance(version, int):
-            raise ValueError("Version must be an integer")
-
-        # Validate streaming support
-        if config.get("requires_o1_handling") and config.get("supports_streaming"):
-            raise ValueError("o1-preview models do not support streaming")
-
-        if not config.get("requires_o1_handling", False):
+        # Validate temperature based on requires_o1_handling
+        if config.get("requires_o1_handling", False):
+            # For o1 models, temperature must be exactly 1.0
+            temperature = config.get("temperature")
+            if temperature is not None and float(temperature) != 1.0:
+                raise ValueError("For o1 models, temperature must be exactly 1.0.")
+            config["temperature"] = 1.0  # Ensure it is set to 1.0
+            config["supports_streaming"] = False  # Disable streaming for o1-preview models
+        else:
             temperature = config.get("temperature")
             if temperature is not None:
                 try:
@@ -411,7 +410,6 @@ class Model:
         if max_completion_tokens is not None:
             try:
                 max_completion_tokens = int(max_completion_tokens)
-                # Update the token limit for o1 models
                 max_limit = 32000 if config.get("requires_o1_handling") else 16384
                 if not (1 <= max_completion_tokens <= max_limit):
                     raise ValueError(

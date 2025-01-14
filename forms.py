@@ -287,8 +287,10 @@ class ModelForm(FlaskForm):
         Validate temperature based on whether special handling is required.
         """
         if self.requires_o1_handling.data:
-            # When requires_o1_handling is True, set temperature to 1 as required by o1-preview models
-            field.data = 1.0
+            # For o1 models, temperature must be exactly 1.0
+            if field.data is not None and float(field.data) != 1.0:
+                raise ValidationError("For o1 models, temperature must be exactly 1.0.")
+            field.data = 1.0  # Ensure temperature is set to 1.0
         elif field.data is not None and not (0 <= field.data <= 2):
             raise ValidationError("Temperature must be between 0 and 2.")
 
