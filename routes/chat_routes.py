@@ -169,7 +169,7 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
             return cast(Response, jsonify({"success": True, "chat_id": chat_id}))
         return cast(Response, render_template("new_chat.html"))
     except Exception as e:
-        logger.exception("Error creating new chat")  # Logs full stack trace
+        logger.exception("Error creating new chat for user %s: %s", current_user.id, str(e))
         return jsonify({"error": "Failed to create new chat"}), 500
 
 

@@ -36,9 +36,26 @@ class JsonFormatter(logging.Formatter):
             'line': record.lineno,
             'function': record.funcName,
             'message': record.getMessage(),
-            'stack_info': record.stack_info,
-            'exc_info': record.exc_info
         }
+        
+        if record.exc_info:
+            log_record['exc_info'] = self.formatException(record.exc_info)
+        if record.stack_info:
+            log_record['stack_info'] = self.formatStack(record.stack_info)
+            
+        # Add request context if available
+        try:
+            from flask import request
+            if request:
+                log_record.update({
+                    'request_id': request.headers.get('X-Request-ID'),
+                    'url': request.url,
+                    'method': request.method,
+                    'remote_addr': request.remote_addr
+                })
+        except:
+            pass
+            
         return json.dumps(log_record)
 
 # Filter class for HTTP client logs
@@ -48,7 +65,7 @@ class HttpClientFilter(logging.Filter):
 
 # Configure root logger
 root_logger = logging.getLogger()
-root_logger.setLevel(logging.WARNING)  # Only warnings and above for root
+root_logger.setLevel(logging.INFO)  # Capture INFO and above logs
 
 # Create handlers
 app_log_handler = ConcurrentRotatingFileHandler(

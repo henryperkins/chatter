@@ -15,9 +15,6 @@ logger = logging.getLogger(__name__)
 SYSTEM_TOKENS: int = 4  # Base tokens for system messages
 USER_TOKENS: int = 4    # Base tokens for user messages
 ASSISTANT_TOKENS: int = 4  # Base tokens for assistant messages
-SYSTEM_TOKENS: int = 4  # Base tokens for system messages
-USER_TOKENS: int = 4    # Base tokens for user messages
-ASSISTANT_TOKENS: int = 4  # Base tokens for assistant messages
 
 # Configurable Environment Variables (with defaults)
 MAX_MESSAGES: int = int(os.getenv("MAX_MESSAGES", "20"))

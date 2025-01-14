@@ -309,6 +309,8 @@ class Chat:
             content: The content of the message
             metadata: Optional metadata dictionary for the message
         """
+        logger.debug("Adding message to chat %s - Role: %s, Content length: %d",
+                    chat_id, role, len(content))
         with db_session() as db:
             try:
                 query = text("""

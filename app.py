@@ -197,7 +197,10 @@ def internal_server_error(error: HTTPException) -> Tuple[Dict[str, str], int]:
 @app.errorhandler(Exception)
 def handle_exception(e):
     """Handle all uncaught exceptions"""
-    logger.exception(f"Unhandled exception occurred: {str(e)} - URL: {request.url} - Method: {request.method}")
+    logger.exception("Unhandled exception occurred - URL: %s, Method: %s, User: %s, Error: %s",
+                    request.url, request.method,
+                    current_user.id if current_user.is_authenticated else 'anonymous',
+                    str(e))
     return jsonify(
         error="An internal error occurred",
         message="Please try again later"
@@ -206,9 +209,11 @@ def handle_exception(e):
 @app.before_request
 def log_request_info():
     try:
-        logger.info(f"{request.remote_addr} - {request.method} {request.url}")
+        # Log basic request info without sensitive data
+        logger.info("Request received - Method: %s, Path: %s, Remote IP: %s",
+                   request.method, request.path, request.remote_addr)
     except Exception as e:
-        logger.error(f"Error logging request: {e}")
+        logger.error("Error logging request: %s", str(e))
         
 @app.errorhandler(CSRFError)
 def handle_csrf_error(e: CSRFError) -> Tuple[Dict[str, str], int]:
