@@ -7,17 +7,17 @@
     <div class="w-full max-w-md px-8 py-6 mx-4 mt-4 text-left bg-white dark:bg-gray-800 shadow-xl rounded-lg transition-all duration-200">
         <h1 class="text-2xl font-bold text-center text-gray-900 dark:text-gray-100 mb-6">Register</h1>
 
-        <!-- Error Message Container -->
-        <div id="error-message" class="space-y-2 mb-4 hidden">
-            <div class="bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded-lg relative transition-all duration-200" role="alert">
-                <span class="block sm:inline" id="error-text"></span>
-                <button type="button" class="absolute top-1 right-1 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors duration-200" onclick="this.parentElement.classList.add('hidden')" aria-label="Dismiss error">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-            </div>
+        {% if model_error %}
+        <div class="mt-8">
+            <h2 class="text-xl font-semibold mt-8 text-red-600 dark:text-red-400">Default Model Configuration Error</h2>
+            <p class="text-gray-700 dark:text-gray-300 mb-4">{{ model_error }}</p>
+            <p class="text-gray-700 dark:text-gray-300 mb-4">Please configure the default model before proceeding.</p>
+            <a href="{{ url_for('auth.edit_default_model') }}"
+               class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                Edit Default Model Configuration
+            </a>
         </div>
+        {% endif %}
 
         <form id="registration-form" method="POST" action="{{ url_for('auth.register') }}" class="space-y-6 ajax-form" novalidate>
             {{ form.hidden_tag() }}

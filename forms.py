@@ -297,25 +297,91 @@ def validate_requires_o1_handling(self, field: Any) -> None:
         self.supports_streaming.data = False
 
 
-class ResetPasswordForm(FlaskForm):
+class DefaultModelForm(FlaskForm):
     """
-    Form for resetting user password.
+    Form for editing the default model configuration during registration if it is invalid.
     """
-
-    password = PasswordField(
-        "New Password",
+    name = StringField(
+        "Model Name",
         validators=[
-            DataRequired(message="New password is required."),
+            DataRequired(message="Model name is required."),
+            Length(max=50, message="Model name cannot exceed 50 characters."),
         ],
+        default=os.getenv("DEFAULT_MODEL_NAME", "GPT-4")
     )
-    confirm_password = PasswordField(
-        "Confirm New Password",
+    deployment_name = StringField(
+        "Deployment Name",
         validators=[
-            DataRequired(message="Please confirm your new password."),
-            EqualTo("password", message="Passwords must match."),
+            DataRequired(message="Deployment name is required."),
+            Length(max=50, message="Deployment name cannot exceed 50 characters."),
         ],
+        default=os.getenv("DEFAULT_DEPLOYMENT_NAME", "gpt-4")
     )
-    submit = SubmitField("Reset Password")
+    description = TextAreaField(
+        "Description",
+        validators=[
+            Optional(),
+            Length(max=500, message="Description cannot exceed 500 characters."),
+        ],
+        default=os.getenv("DEFAULT_MODEL_DESCRIPTION", "Default GPT-4 model")
+    )
+    api_endpoint = URLField(
+        "API Endpoint",
+        validators=[
+            DataRequired(message="API endpoint is required."),
+            URL(message="Must be a valid URL."),
+        ],
+        default=os.getenv("DEFAULT_API_ENDPOINT", "https://your-resource.openai.azure.com")
+    )
+    api_key = StringField(
+        "API Key",
+        validators=[
+            DataRequired(message="API key is required."),
+            Length(min=32, message="API key must be at least 32 characters long."),
+        ],
+        default=os.getenv("AZURE_API_KEY", "your_default_api_key")
+    )
+    temperature = FloatField(
+        "Temperature",
+        validators=[
+            Optional(),
+            NumberRange(min=0, max=2, message="Temperature must be between 0 and 2."),
+        ],
+        default=os.getenv("DEFAULT_TEMPERATURE", "1.0")
+    )
+    max_tokens = IntegerField(
+        "Max Tokens",
+        validators=[
+            Optional(),
+            NumberRange(min=1, max=4000, message="Max tokens must be between 1 and 4000."),
+        ],
+        default=os.getenv("DEFAULT_MAX_TOKENS", "4000")
+    )
+    max_completion_tokens = IntegerField(
+        "Max Completion Tokens",
+        validators=[
+            DataRequired(message="Max completion tokens is required."),
+            NumberRange(min=1, max=16384, message="Max completion tokens must be between 1 and 16384."),
+        ],
+        default=os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "500")
+    )
+    requires_o1_handling = BooleanField(
+        "Requires o1-preview Handling",
+        default=os.getenv("DEFAULT_REQUIRES_O1_HANDLING", "False").lower() == "true"
+    )
+    supports_streaming = BooleanField(
+        "Supports Streaming",
+        default=os.getenv("DEFAULT_SUPPORTS_STREAMING", "True").lower() == "true"
+    )
+    api_version = StringField(
+        "API Version",
+        validators=[
+            DataRequired(message="API version is required."),
+            Length(max=20, message="API version cannot exceed 20 characters."),
+        ],
+        default=os.getenv("AZURE_API_VERSION", "2024-12-01-preview")
+    )
+    submit = SubmitField("Save Configuration")
 
     def validate_password(self, field: Any) -> None:
         """
