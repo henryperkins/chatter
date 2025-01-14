@@ -2,7 +2,7 @@ import os
 import logging
 from datetime import timedelta
 from dotenv import load_dotenv
-from flask import Flask, jsonify, redirect, url_for, request, session
+from flask import Flask, jsonify, redirect, url_for, request, session, cli
 from werkzeug.wrappers import Response
 from flask_login import current_user, logout_user
 from flask_wtf.csrf import CSRFError
@@ -132,8 +132,43 @@ app.register_blueprint(auth_bp, url_prefix="/auth")
 app.register_blueprint(chat_routes, url_prefix="/chat")
 app.register_blueprint(model_bp, url_prefix="/models")
 
-# Initialize database and default model
 def init_app_data():
+    """Initialize database and create default model if needed."""
+    try:
+        init_db()
+        logger.info("Database initialized successfully")
+
+        # Get database connection from pool
+        db = get_db()
+        try:
+            # Check for existing models
+            model_count = db.execute(text("SELECT COUNT(*) FROM models")).scalar()
+            if model_count == 0:
+                logger.info("No models found - creating default model")
+                try:
+                    Model.create_default_model()
+                    logger.info("Default model created successfully")
+                except ValueError as e:
+                    logger.error(f"Default model configuration is invalid: {e}")
+                    logger.error("Please fix the default model configuration and restart the application.")
+                    raise
+            else:
+                logger.debug(f"Found {model_count} existing models")
+        finally:
+            db.close()
+
+    except Exception as e:
+        logger.error(f"Error during app data initialization: {e}")
+        raise
+
+@cli.with_appcontext
+def init_db_command():
+    """Initialize the database."""
+    init_app_data()
+    print("Database initialized successfully.")
+
+# Add the command to Flask CLI
+app.cli.add_command(init_db_command)
     """Initialize database and create default model if needed."""
     try:
         init_db()
