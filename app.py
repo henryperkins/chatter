@@ -34,7 +34,7 @@ load_dotenv()
 app = Flask(__name__)
 
 # Configure Flask-Limiter to use Redis
-limiter.init_app(app, key_func=get_remote_address, storage_uri="redis://localhost:6379")
+limiter.init_app(app)
 
 # --- Configuration Functions ---
 def configure_ssl() -> ssl.SSLContext:
