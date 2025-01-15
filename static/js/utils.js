@@ -1,4 +1,4 @@
-export function getCSRFToken() {
+function getCSRFToken() {
     const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
     const csrfToken = csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") || "" : "";
     console.debug("Retrieved CSRF token from meta tag:", csrfToken);
@@ -14,7 +14,7 @@ export function getCSRFToken() {
      * @returns {Promise<object>} The response data as a JSON object.
      * @throws {Error} If the response is not OK or not JSON.
      */
-    async function fetchWithCSRF(url, options = {}) {
+function fetchWithCSRF(url, options = {}) {
         const csrfToken = getCSRFToken();
         const headers = {
             'X-Requested-With': 'XMLHttpRequest',
@@ -60,7 +60,7 @@ export function getCSRFToken() {
      * @param {('success'|'error'|'warning'|'info')} [type='success'] - The type of message.
      * @param {object} [options={}] - Additional options for the feedback.
      */
-    function showFeedback(message, type = "success", options = {}) {
+function showFeedback(message, type = "success", options = {}) {
         const { duration = 5000, position = "top" } = options;
         let feedbackMessage = document.getElementById("feedback-message");
 
@@ -125,7 +125,7 @@ export function getCSRFToken() {
      * @param {FormData} formData - The FormData object to convert.
      * @returns {object} A plain JavaScript object with key-value pairs.
      */
-    function formDataToObject(formData) {
+function formDataToObject(formData) {
         const object = {};
         for (const [key, value] of formData.entries()) {
             object[key] = value;
@@ -139,7 +139,7 @@ export function getCSRFToken() {
      * @param {string} dateString - The date string to format.
      * @returns {string} The formatted date (e.g., "January 1, 2023").
      */
-    function formatDate(dateString) {
+function formatDate(dateString) {
         const date = new Date(dateString);
         return date.toLocaleDateString("en-US", {
             year: "numeric",
@@ -155,7 +155,7 @@ export function getCSRFToken() {
      * @param {number} wait - The wait time in milliseconds.
      * @returns {function} The debounced function.
      */
-    function debounce(func, wait) {
+function debounce(func, wait) {
         let timeout;
         return function (...args) {
             clearTimeout(timeout);
@@ -170,7 +170,7 @@ export function getCSRFToken() {
      * @param {number} limit - The time limit in milliseconds.
      * @returns {function} The throttled function.
      */
-    function throttle(func, limit) {
+function throttle(func, limit) {
         let inThrottle;
         return function (...args) {
             if (!inThrottle) {
@@ -187,7 +187,7 @@ export function getCSRFToken() {
      * @param {HTMLButtonElement} element - The button element to show the loading spinner on.
      * @param {object} [options={}] - Additional options for the spinner.
      */
-    function showLoading(element, options = {}) {
+function showLoading(element, options = {}) {
         const { text = "Loading...", size = "1.5rem" } = options;
         element.disabled = true;
         element.innerHTML = `
@@ -204,7 +204,7 @@ export function getCSRFToken() {
      * @param {HTMLButtonElement} element - The button element to hide the loading spinner on.
      * @param {string} originalContent - The original content of the element.
      */
-    function hideLoading(element, originalContent) {
+function hideLoading(element, originalContent) {
         element.disabled = false;
         element.innerHTML = originalContent;
     }
@@ -217,14 +217,13 @@ export function getCSRFToken() {
      * @param {object} [options={}] - Additional options for the spinner.
      * @returns {Promise} The result of the callback function.
      */
-    function withLoading(element, callback, options = {}) {
+function withLoading(element, callback, options = {}) {
         const originalContent = element.innerHTML;
         showLoading(element, options);
         return Promise.resolve(callback())
             .finally(() => hideLoading(element, originalContent));
     }
 
-/* static/js/utils.js */
 
 // Attach utility functions to window.utils
 window.utils = {

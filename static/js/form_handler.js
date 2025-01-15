@@ -1,8 +1,10 @@
+
 (function() {
     console.log("Form handler initialized");
 
     // Access utility functions from window.utils
-    const { getCSRFToken, showFeedback, fetchWithCSRF } = window.utils;
+    const utils = window.utils || {};
+    const { getCSRFToken, showFeedback, fetchWithCSRF } = utils;
 
     // Function to clear previous errors
     function clearErrors(form) {
