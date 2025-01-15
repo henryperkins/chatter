@@ -1,6 +1,25 @@
 (function() {
     const { fetchWithCSRF, showFeedback, debounce, throttle } = window.utils;
 
+    // *** CHANGED ***: Name these functions so we can properly add/remove them.
+    // Debounced handler for input
+    const handleMessageInput = (e) => {
+        adjustTextareaHeight(e.target);
+    };
+
+    // Throttled handler for send
+    const throttledSendMessage = throttle(() => {
+        sendMessage();
+    }, 1000);
+
+    // Keydown handler
+    const handleMessageKeydown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    };
+
     function init() {
         // Verify dependencies
         if (!window.utils || !window.md || !window.DOMPurify || !window.Prism || !window.FileUploadManager) {
@@ -70,21 +89,10 @@
             document.head.appendChild(styleSheet);
         }
 
-        // Set up event listeners
-        messageInput.addEventListener('input', debounce((e) => {
-            adjustTextareaHeight(e.target);
-        }, 100));
-
-        messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        sendButton.addEventListener('click', throttle(() => {
-            sendMessage();
-        }, 1000));
+        // *** CHANGED ***: Use named functions for addEventListener.
+        messageInput.addEventListener('input', debounce(handleMessageInput, 100));
+        messageInput.addEventListener('keydown', handleMessageKeydown);
+        sendButton.addEventListener('click', throttledSendMessage);
 
         if (newChatBtn) {
             newChatBtn.addEventListener('click', createNewChat);
@@ -311,12 +319,14 @@
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
             if (messageInput) {
+                // *** CHANGED ***: Remove the matching references, not anonymous.
                 messageInput.removeEventListener('input', handleMessageInput);
                 messageInput.removeEventListener('keydown', handleMessageKeydown);
             }
             if (sendButton) {
-                sendButton.removeEventListener('click', () => sendMessage());
-                sendButton.removeEventListener('touchend', () => sendMessage());
+                // *** CHANGED ***: Remove the throttled function reference.
+                sendButton.removeEventListener('click', throttledSendMessage);
+                // Removed removeEventListener for 'touchend' because it was never added.
             }
             console.debug('Chat cleanup completed successfully');
         } catch (error) {
@@ -371,8 +381,11 @@
         // Add message text if present
         if (messageText) {
             formData.append('message', messageText);
+            // Append user's message to chat immediately
             appendUserMessage(messageText);
         }
+
+        // *** CHANGED ***: Removed second appendUserMessage() call here — it was duplicated.
 
         // Add files if present
         window.fileUploadManager.uploadedFiles.forEach(file => {
@@ -472,17 +485,6 @@
         }
     }
 
-    function handleMessageInput(e) {
-        adjustTextareaHeight(e.target);
-    }
-
-    function handleMessageKeydown(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    }
-
     function adjustTextareaHeight(textarea) {
         textarea.style.height = 'auto';
         textarea.style.height = `${textarea.scrollHeight}px`;
@@ -510,11 +512,15 @@
 
                 if (response.success) {
                     const selectedOption = modelSelect.options[modelSelect.selectedIndex];
-                    const modelName = selectedOption.textContent;
-                    const chatTitle = document.getElementById('chat-title');
-                    if (chatTitle) {
-                        const currentTitle = chatTitle.textContent.split('-')[0].trim();
-                        chatTitle.textContent = `${currentTitle} - ${modelName}`;
+                    if (selectedOption) {
+                        const modelName = selectedOption.textContent;
+                        const chatTitle = document.getElementById('chat-title');
+                        if (chatTitle) {
+                            const currentTitle = chatTitle.textContent.split('-')[0].trim();
+                            chatTitle.textContent = `${currentTitle} - ${modelName}`;
+                        }
+                    } else {
+                        console.error('Selected option is undefined');
                     }
                     modelSelect.dataset.originalValue = modelId;
                     showFeedback('Model updated successfully', 'success');
