@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
 
 import tiktoken
+from context_manager import ContextManager
 from sqlalchemy import text
 from database import get_db
 from models.chat import Chat

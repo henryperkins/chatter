@@ -573,10 +573,6 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             include_system=not getattr(model_obj, "requires_o1_handling", False),
         )
         
-        # Track response quality (basic implementation)
-        response_quality = min(1.0, len(response) / 1000)  # Could be enhanced
-        conversation_manager.context_manager.update_strategy(response_quality)
-
         logger.debug("Sending request to Azure API")
         response = get_azure_response(
             messages=history,
@@ -587,6 +583,10 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             requires_o1_handling=getattr(model_obj, "requires_o1_handling", False),
             timeout_seconds=120,
         )
+
+        # Track response quality (basic implementation)
+        response_quality = min(1.0, len(response) / 1000)  # Could be enhanced
+        conversation_manager.context_manager.update_strategy(response_quality)
 
         processed_response = response.replace("{%", "&#123;%").replace("%}", "%&#125;")
         conversation_manager.add_message(
