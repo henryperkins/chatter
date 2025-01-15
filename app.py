@@ -1,4 +1,3 @@
-import logging
 import uuid
 import os
 from datetime import timedelta
@@ -23,26 +22,9 @@ from routes.chat_routes import chat_routes
 from routes.model_routes import bp as model_bp
 from config import Config  # Import centralized configuration
 
-# Initialize logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+from logging_config import get_logger
 
-# Create console handler with a higher log level
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-
-# Create file handler which logs even debug messages
-fh = logging.FileHandler("app.log")
-fh.setLevel(logging.DEBUG)
-
-# Create formatter and add it to the handlers
-formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-ch.setFormatter(formatter)
-fh.setFormatter(formatter)
-
-# Add the handlers to the logger
-logger.addHandler(ch)
-logger.addHandler(fh)
+logger = get_logger(__name__)
 
 # Load environment variables
 load_dotenv()
