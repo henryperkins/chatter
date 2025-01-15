@@ -1,6 +1,52 @@
 // static/js/base.js
 
+/*** Mobile Menu Handling ***/
+function initializeMobileMenu() {
+    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+    const mobileMenu = document.getElementById('mobile-menu');
+    const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
+
+    if (mobileMenuToggle && mobileMenu && mobileMenuBackdrop) {
+        function openMenu() {
+            mobileMenu.classList.remove('-translate-x-full');
+            mobileMenuBackdrop.classList.remove('hidden');
+            mobileMenuToggle.setAttribute('aria-expanded', 'true');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closeMenu() {
+            mobileMenu.classList.add('-translate-x-full');
+            mobileMenuBackdrop.classList.add('hidden');
+            mobileMenuToggle.setAttribute('aria-expanded', 'false');
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        mobileMenuToggle.addEventListener('click', () => {
+            if (mobileMenu.classList.contains('-translate-x-full')) {
+                openMenu();
+            } else {
+                closeMenu();
+            }
+        });
+
+        // Close the menu when clicking on the backdrop
+        mobileMenuBackdrop.addEventListener('click', () => {
+            closeMenu();
+        });
+
+        // Optional: Close the menu when pressing the Escape key
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && !mobileMenu.classList.contains('-translate-x-full')) {
+                closeMenu();
+            }
+        });
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
+    /*** Initialize Mobile Menu ***/
+    initializeMobileMenu();
+    
     /*** Flash Message Handling ***/
     const flashMessages = document.querySelectorAll('[role="alert"]');
     flashMessages.forEach(message => {

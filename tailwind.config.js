@@ -59,6 +59,7 @@ module.exports = {
     mixBlendMode: false,
     isolation: false,
     tableLayout: false,
+    transform: true,
   },
 
   variants: {
