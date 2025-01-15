@@ -4,8 +4,9 @@ import os
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
     DATABASE_URI = os.getenv("DATABASE_URI", "sqlite:///./data/chat_app.db")
+    # Generate a new key if none exists: Fernet.generate_key().decode()
     ENCRYPTION_KEY = os.getenv(
-        "ENCRYPTION_KEY", "b'\x1f\x8d\x9c\x57\xab\x3e\x7c\x0a\xd3\x99\x6e\x5a\x84\x2b\xcd\x1e'"
+        "ENCRYPTION_KEY", "X8F0Bsfq6y6GKTq5_fyCjAczGx_RsBfCMyvsQR_RL7k="
     )
 
     AZURE_API_KEY = os.getenv("AZURE_API_KEY", "your-azure-api-key")

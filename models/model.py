@@ -190,18 +190,31 @@ class Model:
 
                 model_dict = dict(row)
 
-                # Decrypt API key
+                # Handle API key decryption
                 key = Config.ENCRYPTION_KEY
                 if not key:
                     logger.error("Encryption key not configured in application settings")
                     raise ValueError("Encryption key not configured")
 
                 try:
+                    # Ensure key is bytes
                     if isinstance(key, str):
                         key = key.encode()
+                    
+                    # Initialize cipher suite
                     cipher_suite = Fernet(key)
-                    encrypted_key = model_dict["api_key"].encode()
-                    model_dict["api_key"] = cipher_suite.decrypt(encrypted_key).decode()
+                    
+                    # Handle empty or invalid API key
+                    encrypted_key = model_dict.get("api_key", "")
+                    if not encrypted_key:
+                        logger.warning("No API key found for model %d", model_id)
+                        model_dict["api_key"] = ""
+                    else:
+                        # Decrypt the API key
+                        if isinstance(encrypted_key, str):
+                            encrypted_key = encrypted_key.encode()
+                        model_dict["api_key"] = cipher_suite.decrypt(encrypted_key).decode()
+                        
                 except InvalidToken as e:
                     logger.error(
                         "Failed to decrypt API key for model %d. "
@@ -536,12 +549,19 @@ class Model:
         if not isinstance(api_key, str) or len(api_key) < 32:
             raise ValueError("API key must be at least 32 characters long")
 
-        # Encrypt API key
+        # Encrypt API key with proper error handling
         key = Config.ENCRYPTION_KEY
-        if isinstance(key, str):
-            key = key.encode()
-        cipher_suite = Fernet(key)
-        config["api_key"] = cipher_suite.encrypt(api_key.encode()).decode()
+        if not key:
+            raise ValueError("Encryption key not configured")
+            
+        try:
+            if isinstance(key, str):
+                key = key.encode()
+            cipher_suite = Fernet(key)
+            config["api_key"] = cipher_suite.encrypt(api_key.encode()).decode()
+        except Exception as e:
+            logger.error("Failed to encrypt API key: %s", str(e))
+            raise ValueError("Failed to encrypt API key. Please verify encryption configuration")
 
         # Validate temperature
         if config.get("requires_o1_handling", False):
