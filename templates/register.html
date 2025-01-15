@@ -30,6 +30,8 @@
                 {% if form.username.errors %}
                 <p id="username-error" class="text-red-600 dark:text-red-400 text-sm mt-1" role="alert">{{ form.username.errors[0] }}</p>
                 {% endif %}
+                <!-- Add this span for error text -->
+                <span id="error-text" class="text-red-600 dark:text-red-400 text-sm mt-1"></span>
             </div>
 
             <!-- Email -->
