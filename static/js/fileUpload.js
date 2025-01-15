@@ -39,7 +39,7 @@ class FileUploadManager {
      */
     validateFile(file) {
         const errors = [];
-
+        
         // File type validation
         if (!this.ALLOWED_FILE_TYPES.includes(file.type)) {
             errors.push(`Unsupported file type: ${file.type}`);
@@ -55,7 +55,28 @@ class FileUploadManager {
             errors.push(`Duplicate file: ${file.name}`);
         }
 
+        // Estimate token count
+        if (file.size > 0) {
+            const estimatedTokens = this.estimateFileTokens(file);
+            file.tokenCount = estimatedTokens;
+            
+            // Check against token limits
+            const currentTotal = this.uploadedFiles.reduce((sum, f) => sum + (f.tokenCount || 0), 0);
+            if (currentTotal + estimatedTokens > this.MAX_TOKENS) {
+                errors.push(`File would exceed token limit: ${file.name}`);
+            }
+        }
+
         return errors;
+    }
+
+    estimateFileTokens(file) {
+        // Estimate tokens based on file size and type
+        const charsPerToken = 4; // Conservative estimate
+        const baseTokens = Math.ceil(file.size / charsPerToken);
+        
+        // Add overhead for file metadata
+        return baseTokens + 10;
     }
 
     /**

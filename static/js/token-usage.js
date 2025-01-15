@@ -204,7 +204,7 @@ class TokenUsageManager {
             this.elements.tokensLimit.textContent = `/ ${limit.toLocaleString()} max`;
         }
 
-        // Token breakdown (user/assistant/system)
+        // Token breakdown (user/assistant/system/files)
         if (this.elements.userTokens) {
             this.elements.userTokens.textContent = stats.token_breakdown.user.toLocaleString();
         }
@@ -213,6 +213,11 @@ class TokenUsageManager {
         }
         if (this.elements.systemTokens) {
             this.elements.systemTokens.textContent = stats.token_breakdown.system.toLocaleString();
+        }
+        
+        // Add file tokens if available
+        if (stats.token_breakdown.files && this.elements.fileTokens) {
+            this.elements.fileTokens.textContent = stats.token_breakdown.files.toLocaleString();
         }
     }
 

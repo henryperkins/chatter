@@ -62,14 +62,24 @@ class ContextMonitor:
         )
 
     def compress_context(self, messages: List[Dict[str, str]], target_tokens: int) -> List[Dict[str, str]]:
-        """Compress context to fit within token limits"""
+        """Compress context with special handling for file content."""
         compressed = []
         current_tokens = 0
         
         for msg in messages:
+            content = msg["content"]
+            metadata = msg.get("metadata", {})
+            
+            # Special handling for file content
+            if metadata.get("file_content"):
+                content = self.compress_file_content(content, target_tokens - current_tokens)
+            else:
+                content = self.smart_truncate(content, target_tokens - current_tokens)
+            
             compressed_msg = {
                 "role": msg["role"],
-                "content": self.smart_truncate(msg["content"], target_tokens - current_tokens)
+                "content": content,
+                "metadata": metadata
             }
             
             msg_tokens = count_message_tokens(compressed_msg)
@@ -80,6 +90,17 @@ class ContextMonitor:
             current_tokens += msg_tokens
             
         return compressed
+
+    def compress_file_content(self, content: str, max_tokens: int) -> str:
+        """Special compression for file content."""
+        lines = content.splitlines()
+        if len(lines) > 10:
+            # For large files, keep first and last lines with summary
+            summary = f"\n\n[File truncated. Original had {len(lines)} lines]"
+            keep_lines = lines[:5] + lines[-5:]
+            truncated = "\n".join(keep_lines) + summary
+            return truncate_content(truncated, max_tokens)
+        return truncate_content(content, max_tokens)
 
     def smart_truncate(self, content: str, max_tokens: int) -> str:
         """Smart truncation preserving important parts"""
