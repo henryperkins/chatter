@@ -41,13 +41,23 @@ class ContextManager:
         return context
         
     def prioritize_messages(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        """Prioritize messages based on importance"""
+        def get_timestamp(msg):
+            timestamp = msg.get("metadata", {}).get("timestamp", "")
+            try:
+                # Convert ISO format timestamp to timestamp number
+                if isinstance(timestamp, str):
+                    from datetime import datetime
+                    return datetime.fromisoformat(timestamp).timestamp()
+                return float(timestamp)
+            except (ValueError, TypeError):
+                return 0.0
+
         return sorted(
             messages,
             key=lambda msg: (
-                -msg.get("metadata", {}).get("timestamp", 0),
-                0 if msg["role"] == "user" else 1,
-                -self.calculate_importance(msg["content"])
+                -get_timestamp(msg),  # Sort by timestamp descending
+                0 if msg["role"] == "user" else 1,  # User messages first
+                -self.calculate_importance(msg["content"])  # Important messages first
             )
         )
         

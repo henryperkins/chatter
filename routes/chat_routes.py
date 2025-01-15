@@ -584,11 +584,20 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             timeout_seconds=120,
         )
 
-        # Track response quality (basic implementation)
-        response_quality = min(1.0, len(response) / 1000)  # Could be enhanced
-        conversation_manager.context_manager.update_strategy(response_quality)
+        # Handle error responses
+        if isinstance(response, dict) and 'error' in response:
+            logger.error(f"API error: {response['error']}")
+            return jsonify({"error": response['error']}), 500
 
-        processed_response = response.replace("{%", "&#123;%").replace("%}", "%&#125;")
+        # Only process string responses
+        if isinstance(response, str):
+            processed_response = response.replace("{%", "&#123;%").replace("%}", "%&#125;")
+            # Track response quality (basic implementation)
+            response_quality = min(1.0, len(response) / 1000)  # Could be enhanced
+            conversation_manager.context_manager.update_strategy(response_quality)
+        else:
+            logger.error(f"Unexpected response type: {type(response)}")
+            return jsonify({"error": "Unexpected response from API"}), 500
         conversation_manager.add_message(
             chat_id=chat_id,
             role="assistant",
