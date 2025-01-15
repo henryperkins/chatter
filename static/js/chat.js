@@ -687,7 +687,7 @@ async function regenerateResponse(button) {
         for (let i = messages.length - 1; i >= 0; i--) {
             const messageDiv = messages[i];
             if (messageDiv.querySelector('.bg-blue-600')) {
-                lastUserMessage = messageDiv.querySelector('.text-sm').textContent;
+                lastUserMessage = messageDiv.querySelector('.bg-blue-600 p').textContent;
                 break;
             }
         }
