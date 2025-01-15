@@ -1,5 +1,6 @@
-(function() {
-    const { fetchWithCSRF, showFeedback, debounce, throttle } = window.utils;
+import TokenUsageManager from './token-usage.js';
+import FileUploadManager from './fileUpload.js';
+import { fetchWithCSRF, showFeedback, debounce, throttle } from './utils.js';
 
     // *** CHANGED ***: Name these functions so we can properly add/remove them.
     // Debounced handler for input
@@ -826,13 +827,9 @@
         document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
     }
 
-    // Import TokenUsageManager
-    import TokenUsageManager from './token-usage.js';
-
-    // Initialize chat interface
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-})();
+// Initialize chat interface
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}

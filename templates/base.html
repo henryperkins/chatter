@@ -290,18 +290,18 @@
         aria-live="assertive"
     ></div>
 
-    <!-- Core Libraries (load first, no defer) -->
-    <script src="{{ url_for('static', filename='js/dompurify.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/axios.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/markdown-it.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/prism.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/markdown-it-bundle.js') }}"></script>
+    <!-- Core Libraries (load first, with defer) -->
+    <script src="{{ url_for('static', filename='js/dompurify.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/axios.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/markdown-it.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/prism.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/markdown-it-bundle.js') }}" defer></script>
 
-    <!-- Utility Scripts (load after core, utils.js first without defer) -->
+    <!-- Utility Scripts (load after core, utils.js without defer) -->
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dark-mode.js') }}" defer></script>
 
-    <!-- Base Application Script (load last) -->
+    <!-- Base Application Script (load last, with defer) -->
     <script src="{{ url_for('static', filename='js/base.js') }}" defer></script>
 
     {% block scripts %}

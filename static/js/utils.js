@@ -1,8 +1,5 @@
-(function() {
-    console.log("Utils.js initialized");
-
-    /**
-     * Retrieves the CSRF token from a meta tag.
+// Remove IIFE wrapper and add exports
+export function getCSRFToken() {
      * @function getCSRFToken
      * @returns {string} The CSRF token or an empty string if not found.
      */
@@ -232,16 +229,15 @@
             .finally(() => hideLoading(element, originalContent));
     }
 
-    window.utils = {
-        getCSRFToken,
-        fetchWithCSRF,
-        showFeedback,
-        formDataToObject,
-        formatDate,
-        debounce,
-        throttle,
-        showLoading,
-        hideLoading,
-        withLoading
-    };
-})();
+export {
+    getCSRFToken,
+    fetchWithCSRF,
+    showFeedback,
+    formDataToObject,
+    formatDate,
+    debounce,
+    throttle,
+    showLoading,
+    hideLoading,
+    withLoading
+};

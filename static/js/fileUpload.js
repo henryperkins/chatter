@@ -357,9 +357,4 @@ class FileUploadManager {
     }
 }
 
-// Export for use in other modules
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = FileUploadManager;
-} else {
-    window.FileUploadManager = FileUploadManager;
-}
+export default FileUploadManager;
