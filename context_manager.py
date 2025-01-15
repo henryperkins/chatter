@@ -11,7 +11,7 @@ from models.chat import Chat
 class ContextManager:
     def __init__(self, model_max_tokens: int):
         self.model_max_tokens = model_max_tokens
-        self.context_strategy = "full"
+        self.context_strategy = "full"  # Default strategy
         self.context_cache = {}
         self.monitor = ContextMonitor()
         
