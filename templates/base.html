@@ -305,39 +305,6 @@
     <script src="{{ url_for('static', filename='js/base.js') }}" defer></script>
 
     {% block scripts %}
-        <!-- Initialize required globals -->
-        <script>
-            document.addEventListener('DOMContentLoaded', () => {
-
-                // Flash message handling
-                const flashMessages = document.querySelectorAll('[role="alert"]');
-                flashMessages.forEach(message => {
-                    const dismissButton = message.querySelector('button');
-                    let timeoutId;
-
-                    const removeMessage = () => {
-                        message.style.opacity = '0';
-                        message.style.transform = 'translateY(-10px)';
-                        setTimeout(() => message.remove(), 300);
-                    };
-
-                    // Auto-dismiss after 5 seconds
-                    timeoutId = setTimeout(removeMessage, 5000);
-
-                    // Cancel auto-dismiss when hovering
-                    message.addEventListener('mouseenter', () => clearTimeout(timeoutId));
-                    message.addEventListener('mouseleave', () => {
-                        timeoutId = setTimeout(removeMessage, 5000);
-                    });
-
-                    // Manual dismiss
-                    dismissButton?.addEventListener('click', () => {
-                        clearTimeout(timeoutId);
-                        removeMessage();
-                    });
-                });
-            });
-        </script>
     {% endblock %}
 </body>
 </html>
