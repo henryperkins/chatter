@@ -93,17 +93,16 @@ class Model:
                     {k: v if k != "api_key" else "****" for k, v in data.items()},
                 )
 
-                # Check for existing models if not default
-                if not data.get("is_default", False):
-                    check_query = text(
-                        """
-                        SELECT name, deployment_name
-                        FROM models
-                        WHERE (LOWER(name) = LOWER(:name)
-                        OR LOWER(deployment_name) = LOWER(:deployment_name))
-                        AND NOT is_default
+                # Check for existing models with same name/deployment
+                check_query = text(
                     """
-                    )
+                    SELECT name, deployment_name
+                    FROM models
+                    WHERE (LOWER(name) = LOWER(:name)
+                    OR LOWER(deployment_name) = LOWER(:deployment_name))
+                    AND (NOT is_default OR :is_default = 1)
+                """
+                )
                     existing = db.execute(
                         check_query,
                         {
@@ -222,16 +221,16 @@ class Model:
                         model_id,
                         str(e)
                     )
-                    # Return None instead of raising error to allow fallback
-                    return None
+                    # Raise an exception instead of returning None
+                    raise ValueError("Failed to decrypt API key. Encryption key may be incorrect.")
                 except Exception as e:
                     logger.error(
                         "Unexpected error decrypting API key for model %d: %s",
                         model_id,
                         str(e)
                     )
-                    # Return None instead of raising error to allow fallback
-                    return None
+                    # Raise the exception to allow it to be handled by the calling code
+                    raise
 
                 # Log safely (excluding sensitive data)
                 safe_dict = {k: v for k, v in model_dict.items() if k != "api_key"}
@@ -337,8 +336,12 @@ class Model:
                         {"model_id": model_id, "is_default": True},
                     )
 
-                # Create new version
-                Model.create_version(model_id, data)
+                # Increment version and create new version
+                if 'version' in update_data:
+                    update_data['version'] += 1
+                else:
+                    update_data['version'] = 1
+                Model.create_version(model_id, update_data)
 
                 db.commit()
                 logger.info("Model updated (ID %d)", model_id)
@@ -536,6 +539,8 @@ class Model:
         # Check encryption key
         if not Config.ENCRYPTION_KEY:
             raise ValueError("ENCRYPTION_KEY environment variable must be set")
+        if len(Config.ENCRYPTION_KEY) != 44:
+            raise ValueError("ENCRYPTION_KEY must be a 32-byte URL-safe base64-encoded string")
 
         # Validate required fields
         required_fields = [
@@ -569,6 +574,8 @@ class Model:
         api_key = config["api_key"]
         if not isinstance(api_key, str) or len(api_key) < 32:
             raise ValueError("API key must be at least 32 characters long")
+        if len(api_key) > 512:
+            raise ValueError("API key must be less than 512 characters")
 
         # Encrypt API key with proper error handling
         key = Config.ENCRYPTION_KEY

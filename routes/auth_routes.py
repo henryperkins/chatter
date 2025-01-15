@@ -556,8 +556,12 @@ def edit_default_model():
                     Model.update(default_model["id"], model_data)
                 else:
                     model_id = Model.create(model_data)
-                    if not Model.get_by_id(model_id):
-                        raise ValueError("Failed to create and validate model")
+                    try:
+                        created_model = Model.get_by_id(model_id)
+                        if not created_model:
+                            raise ValueError("Failed to retrieve the created model.")
+                    except Exception as e:
+                        raise ValueError(f"Failed to create and validate model: {str(e)}")
 
                 if not is_existing_admin:
                     cost_factor = int(os.environ.get("BCRYPT_COST_FACTOR", 12))
