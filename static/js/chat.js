@@ -932,11 +932,70 @@ window.md = window.markdownit({
     typographer: true
 });
 
-// Initialize chat interface
-document.addEventListener('DOMContentLoaded', () => {
+function init() {
+    console.log('Initializing chat interface');
+
+    // Verify dependencies
+    if (!window.utils || !window.md || !window.DOMPurify || !window.Prism) {
+        console.error('Required dependencies not loaded:', {
+            utils: !!window.utils,
+            md: !!window.md,
+            DOMPurify: !!window.DOMPurify,
+            Prism: !!window.Prism
+        });
+        return;
+    }
+
+    // Initialize elements
+    const elements = initializeElements();
+    if (!elements.messageInput || !elements.sendButton || !elements.chatBox) {
+        console.error('Critical UI elements are missing');
+        return;
+    }
+
+    // Attach event listeners
+    attachEventListeners();
+
+    // Initialize managers
+    if (!window.fileUploadManager) {
+        const uploadBtn = window.innerWidth < 768 ? mobileUploadButton : uploadButton;
+        if (uploadBtn) {
+            window.fileUploadManager = new FileUploadManager(
+                window.CHAT_CONFIG.chatId,
+                window.CHAT_CONFIG.userId,
+                uploadBtn
+            );
+        }
+    }
+
+    if (!window.tokenUsageManager) {
+        window.tokenUsageManager = new TokenUsageManager(window.CHAT_CONFIG);
+        window.tokenUsageManager.updateStats();
+    }
+
+    // Initialize other components
+    initializeMobileMenu();
+    setupDragAndDrop();
+
+    console.log('Chat interface initialized successfully');
+}
+
+// Initialize when the DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOMContentLoaded event fired');
+        if (window.CHAT_CONFIG) {
+            init();
+        } else {
+            console.error('Chat configuration not found');
+        }
+    });
+} else {
+    // DOM is already ready
+    console.log('DOM already loaded');
     if (window.CHAT_CONFIG) {
         init();
     } else {
         console.error('Chat configuration not found');
     }
-});
+}

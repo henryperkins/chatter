@@ -1,17 +1,126 @@
-class TokenUsageManager {
-    constructor(config) {
-        this.chatId = config.chatId;
-        this.elements = {
-            container: document.getElementById('token-usage'),
-            progress: document.getElementById('token-progress'),
-            tokensUsed: document.getElementById('tokens-used'),
-            tokensLimit: document.getElementById('tokens-limit'),
-            userTokens: document.getElementById('user-tokens'),
-            assistantTokens: document.getElementById('assistant-tokens'),
-            systemTokens: document.getElementById('system-tokens'),
-            toggleBtn: document.getElementById('toggle-stats-btn'),
-            refreshBtn: document.getElementById('refresh-stats')
-        };
+// At the top of chat.js, after the imports
+let messageInput, sendButton, chatBox, editTitleBtn, uploadButton, mobileUploadButton, fileInput;
+
+function initializeElements() {
+    // Cache DOM elements
+    messageInput = document.getElementById('message-input');
+    sendButton = document.getElementById('send-button');
+    chatBox = document.getElementById('chat-box');
+    editTitleBtn = document.getElementById('edit-title-btn');
+    uploadButton = document.getElementById('upload-button');
+    mobileUploadButton = document.getElementById('mobile-upload-button');
+    fileInput = document.getElementById('file-input');
+
+    // Log which elements were found
+    console.log('Elements initialized:', {
+        messageInput: !!messageInput,
+        sendButton: !!sendButton,
+        chatBox: !!chatBox,
+        editTitleBtn: !!editTitleBtn,
+        uploadButton: !!uploadButton,
+        mobileUploadButton: !!mobileUploadButton,
+        fileInput: !!fileInput
+    });
+
+    return {
+        messageInput, sendButton, chatBox, editTitleBtn, 
+        uploadButton, mobileUploadButton, fileInput
+    };
+}
+
+function attachEventListeners() {
+    console.log('Attaching event listeners');
+    
+    // Message input handlers
+    if (messageInput) {
+        console.log('Attaching messageInput listeners');
+        messageInput.addEventListener('input', debounce(handleMessageInput, 100));
+        messageInput.addEventListener('keydown', handleMessageKeydown);
+    }
+
+    // Send button handler
+    if (sendButton) {
+        console.log('Attaching sendButton listener');
+        sendButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Send button clicked');
+            sendMessage();
+        });
+    }
+
+    // Edit title button handler
+    if (editTitleBtn) {
+        console.log('Attaching editTitleBtn listener');
+        editTitleBtn.addEventListener('click', handleEditTitle);
+    }
+
+    // File upload handlers
+    if (uploadButton && fileInput) {
+        console.log('Attaching uploadButton listener');
+        uploadButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            fileInput.click();
+        });
+    }
+
+    if (mobileUploadButton && fileInput) {
+        console.log('Attaching mobileUploadButton listener');
+        mobileUploadButton.addEventListener('click', function(e) {
+            e.preventDefault();
+            fileInput.click();
+        });
+    }
+
+    if (fileInput) {
+        console.log('Attaching fileInput listener');
+        fileInput.addEventListener('change', handleFileSelection);
+    }
+}
+
+function handleFileSelection(e) {
+    const files = Array.from(e.target.files || []);
+    if (window.fileUploadManager) {
+        const { validFiles, errors } = window.fileUploadManager.processFiles(files);
+        if (errors.length > 0) {
+            errors.forEach(error => window.utils.showFeedback(error.errors.join(', '), 'error'));
+        }
+        if (validFiles.length > 0) {
+            window.fileUploadManager.uploadedFiles.push(...validFiles);
+            window.fileUploadManager.renderFileList();
+        }
+    }
+}
+
+async function handleEditTitle() {
+    try {
+        const chatTitle = document.getElementById('chat-title');
+        const currentTitle = chatTitle?.textContent?.split('-')[0].trim() || 'New Chat';
+        const newTitle = prompt('Enter new chat title:', currentTitle);
+
+        if (!newTitle || newTitle === currentTitle) return;
+
+        const response = await window.utils.fetchWithCSRF(
+            `/chat/update_chat_title/${window.CHAT_CONFIG.chatId}`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ title: newTitle.trim() })
+            }
+        );
+
+        if (response.success) {
+            const modelName = chatTitle.textContent.split('-')[1]?.trim() || '';
+            chatTitle.textContent = `${newTitle} ${modelName ? '- ' + modelName : ''}`;
+            window.utils.showFeedback('Title updated successfully', 'success');
+        } else {
+            throw new Error(response.error || 'Failed to update title');
+        }
+    } catch (error) {
+        window.utils.showFeedback(error.message, 'error');
+    }
+}
         this.updateInterval = null;
         this.initialize();
     }
