@@ -17,6 +17,7 @@ from flask import (
 )
 from email_validator import validate_email
 from flask_login import current_user, login_required, login_user, logout_user
+from flask_wtf.csrf import CSRFError
 from flask_wtf.csrf import validate_csrf
 from sqlalchemy import text
 
@@ -175,7 +176,14 @@ def register():
     form = RegistrationForm()
     if request.method == "POST":
         try:
-            if not validate_csrf(request.form.get("csrf_token")):
+            csrf_token = (
+                request.form.get("csrf_token") or 
+                request.headers.get('X-CSRFToken') or
+                request.headers.get('X-Csrf-Token')
+            )
+            try:
+                validate_csrf(csrf_token)
+            except CSRFError as e:
                 logger.warning(
                     "CSRF token validation failed during registration",
                     extra={"ip_address": request.remote_addr, "route": request.path},
