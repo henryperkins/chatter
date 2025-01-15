@@ -27,13 +27,18 @@ class ContextManager:
         # Prioritize messages
         prioritized = self.prioritize_messages(messages)
         
-        # Compress context
-        compressed = self.compress_context(prioritized, self.model_max_tokens)
+        # Apply strategy
+        if self.context_strategy == "full":
+            context = prioritized
+        elif self.context_strategy == "compressed":
+            context = self.compress_context(prioritized, self.model_max_tokens)
+        else:  # summary
+            context = self.summarize_context(prioritized)
         
         # Update cache
-        self.context_cache[cache_key] = compressed
+        self.context_cache[cache_key] = context
         
-        return compressed
+        return context
         
     def prioritize_messages(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
         """Prioritize messages based on importance"""
@@ -46,6 +51,20 @@ class ContextManager:
             )
         )
         
+    def update_strategy(self, response_quality: float) -> None:
+        """
+        Adjust context strategy based on response quality.
+        
+        Args:
+            response_quality: Quality score between 0 and 1
+        """
+        if response_quality < 0.7:
+            self.context_strategy = "full"  # Use full context
+        elif response_quality < 0.9:
+            self.context_strategy = "compressed"  # Use compressed context
+        else:
+            self.context_strategy = "summary"  # Use summarized context
+
     def compress_context(self, messages: List[Dict[str, str]], max_tokens: int) -> List[Dict[str, str]]:
         """Compress context to fit within token limit"""
         compressed = []
@@ -66,6 +85,19 @@ class ContextManager:
             
         return compressed
         
+    def summarize_context(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """
+        Create a summary of the context based on the most important messages.
+        """
+        # Basic summarization - keep last 5 messages
+        summary = []
+        for msg in messages[-5:]:
+            summary.append({
+                "role": msg["role"],
+                "content": self.smart_truncate(msg["content"], 100)  # Keep first 100 tokens
+            })
+        return summary
+
     def calculate_importance(self, content: str) -> float:
         """Calculate message importance score"""
         # Basic heuristic - could be enhanced
@@ -212,12 +244,23 @@ class ContextMonitor:
         return compressed
         
     def prioritize_messages(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        def get_timestamp(msg):
+            timestamp = msg.get("metadata", {}).get("timestamp", "")
+            try:
+                # Convert ISO format timestamp to timestamp number
+                if isinstance(timestamp, str):
+                    from datetime import datetime
+                    return datetime.fromisoformat(timestamp).timestamp()
+                return float(timestamp)
+            except (ValueError, TypeError):
+                return 0.0
+
         return sorted(
             messages,
             key=lambda msg: (
-                -msg.get("metadata", {}).get("timestamp", 0),
-                0 if msg["role"] == "user" else 1,
-                -self.calculate_importance(msg["content"])
+                -get_timestamp(msg),  # Sort by timestamp descending
+                0 if msg["role"] == "user" else 1,  # User messages first
+                -self.calculate_importance(msg["content"])  # Important messages first
             )
         )
 
