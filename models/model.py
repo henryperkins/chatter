@@ -185,7 +185,7 @@ class Model:
                 row = db.execute(query, {"id": model_id}).mappings().first()
 
                 if not row:
-                    logger.info("No model found with ID %d", model_id)
+                    logger.warning("No model found with ID %d in database", model_id)
                     return None
 
                 model_dict = dict(row)
@@ -193,28 +193,39 @@ class Model:
                 # Decrypt API key
                 key = Config.ENCRYPTION_KEY
                 if not key:
-                    logger.error("Encryption key not configured")
-                    return None
+                    logger.error("Encryption key not configured in application settings")
+                    raise ValueError("Encryption key not configured")
 
                 try:
                     if isinstance(key, str):
                         key = key.encode()
                     cipher_suite = Fernet(key)
-                    model_dict["api_key"] = cipher_suite.decrypt(
-                        model_dict["api_key"].encode()
-                    ).decode()
-                except InvalidToken:
-                    logger.error("Invalid token for model %d", model_id)
-                    return None
+                    encrypted_key = model_dict["api_key"].encode()
+                    model_dict["api_key"] = cipher_suite.decrypt(encrypted_key).decode()
+                except InvalidToken as e:
+                    logger.error(
+                        "Failed to decrypt API key for model %d. "
+                        "Encryption key mismatch or corrupted data. Error: %s",
+                        model_id,
+                        str(e)
+                    )
+                    raise ValueError("Failed to decrypt API key. Please verify encryption configuration")
+                except Exception as e:
+                    logger.error(
+                        "Unexpected error decrypting API key for model %d: %s",
+                        model_id,
+                        str(e)
+                    )
+                    raise ValueError("Failed to decrypt API key due to unexpected error")
 
                 # Log safely (excluding sensitive data)
                 safe_dict = {k: v for k, v in model_dict.items() if k != "api_key"}
-                logger.debug("Model retrieved by ID %d: %s", model_id, safe_dict)
+                logger.debug("Successfully retrieved model by ID %d: %s", model_id, safe_dict)
                 return Model(**model_dict)
 
         except Exception as e:
             logger.error("Error retrieving model by ID %d: %s", model_id, e)
-            raise
+            raise ValueError(f"Failed to retrieve model: {str(e)}")
 
     @staticmethod
     def update(model_id: int, data: ModelDict) -> None:
