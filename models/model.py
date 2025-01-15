@@ -103,21 +103,21 @@ class Model:
                     AND (NOT is_default OR :is_default = 1)
                 """
                 )
-                    existing = db.execute(
-                        check_query,
-                        {
-                            "name": data["name"],
-                            "deployment_name": data["deployment_name"],
-                        },
-                    ).fetchone()
+                existing = db.execute(
+                    check_query,
+                    {
+                        "name": data["name"],
+                        "deployment_name": data["deployment_name"],
+                    },
+                ).fetchone()
 
-                    if existing:
-                        field = (
-                            "name"
-                            if existing[0].lower() == data["name"].lower()
-                            else "deployment_name"
-                        )
-                        raise ValueError(f"A model with this {field} already exists")
+                if existing:
+                    field = (
+                        "name"
+                        if existing[0].lower() == data["name"].lower()
+                        else "deployment_name"
+                    )
+                    raise ValueError(f"A model with this {field} already exists")
 
                 # Validate configuration
                 Model.validate_model_config(data)
