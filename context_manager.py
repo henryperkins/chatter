@@ -1,7 +1,8 @@
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 import math
 from datetime import datetime
 from token_utils import count_message_tokens, count_conversation_tokens
+from models.chat import Chat
 
 class ContextManager:
     def __init__(self, model_max_tokens: int):
@@ -107,15 +108,15 @@ class ContextMonitor:
         # Basic heuristic - could be enhanced
         return min(1.0, len(content) / 1000)
 
-    def get_context(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    def get_context(self, messages: List[Dict[str, str]], chat_id: str) -> List[Dict[str, str]]:
         """Get optimized context with caching and prioritization"""
         # Try to get from cache
-        if id(messages) in self.context_manager.context_cache:
-            self.context_manager.monitor.track_cache_hit()
-            return self.context_manager.context_cache[id(messages)]
+        if chat_id in self.context_cache:
+            self.monitor.track_cache_hit()
+            return self.context_cache[chat_id]
             
         # Get from database
-        messages = Chat.get_messages(chat_id)
+        messages = Chat.get_messages(chat_id=chat_id)
         
         # Prioritize messages
         prioritized = self.prioritize_messages(messages)
