@@ -588,6 +588,7 @@ button {
 
 <!-- Configuration -->
 <script>
+    console.log('Initializing CHAT_CONFIG');
     window.CHAT_CONFIG = {
         chatId: "{{ chat_id }}",
         editModelUrl: "{{ url_for('model.edit_model', model_id=0) }}".replace('0', ''),
@@ -600,6 +601,7 @@ button {
         userRole: "{{ current_user.role }}",
         models: JSON.parse('{{ models|tojson|safe }}')
     };
+    console.log('CHAT_CONFIG initialized:', window.CHAT_CONFIG);
 </script>
 
 <!-- Token Usage Manager -->

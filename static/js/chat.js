@@ -39,16 +39,84 @@ function init() {
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
     const chatBox = document.getElementById('chat-box');
+    const editTitleBtn = document.getElementById('edit-title-btn');
+    const uploadButton = document.getElementById('upload-button');
+    const mobileUploadButton = document.getElementById('mobile-upload-button');
+    const fileInput = document.getElementById('file-input');
 
+    // Verify critical elements exist
     if (!messageInput || !sendButton || !chatBox) {
         console.error('Critical UI elements are missing');
         return;
     }
 
-    // Add event listeners
+    // Message input and send button
     messageInput.addEventListener('input', debounce(handleMessageInput, 100));
     messageInput.addEventListener('keydown', handleMessageKeydown);
-    sendButton.addEventListener('click', throttledSendMessage);
+    sendButton.addEventListener('click', () => {
+        console.log('Send button clicked');
+        sendMessage();
+    });
+
+    // Edit title button
+    if (editTitleBtn) {
+        editTitleBtn.addEventListener('click', async () => {
+            try {
+                const chatTitle = document.getElementById('chat-title');
+                const currentTitle = chatTitle?.textContent?.split('-')[0].trim() || 'New Chat';
+                const newTitle = prompt('Enter new chat title:', currentTitle);
+    
+                if (!newTitle || newTitle === currentTitle) return;
+
+                const response = await window.utils.fetchWithCSRF(`/chat/update_chat_title/${window.CHAT_CONFIG.chatId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ title: newTitle.trim() })
+                });
+
+                if (response.success) {
+                    const modelName = chatTitle.textContent.split('-')[1]?.trim() || '';
+                    chatTitle.textContent = `${newTitle} ${modelName ? '- ' + modelName : ''}`;
+                    window.utils.showFeedback('Title updated successfully', 'success');
+                } else {
+                    throw new Error(response.error || 'Failed to update title');
+                }
+            } catch (error) {
+                window.utils.showFeedback(error.message, 'error');
+            }
+        });
+    }
+
+    // File upload functionality
+    if (uploadButton && fileInput) {
+        uploadButton.addEventListener('click', () => {
+            fileInput.click();
+        });
+    }
+
+    if (mobileUploadButton && fileInput) {
+        mobileUploadButton.addEventListener('click', () => {
+            fileInput.click();
+        });
+    }
+
+    if (fileInput) {
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files || []);
+            if (window.fileUploadManager) {
+                const { validFiles, errors } = window.fileUploadManager.processFiles(files);
+                if (errors.length > 0) {
+                    errors.forEach(error => window.utils.showFeedback(error.errors.join(', '), 'error'));
+                }
+                if (validFiles.length > 0) {
+                    window.fileUploadManager.uploadedFiles.push(...validFiles);
+                    window.fileUploadManager.renderFileList();
+                }
+            }
+        });
+    }
 
     // Initialize FileUploadManager with chat ID and user ID
     const chatId = window.CHAT_CONFIG.chatId;
@@ -397,6 +465,7 @@ function init() {
     }
 
     async function sendMessage() {
+        console.log('sendMessage function called');
         // Update token usage after sending message
         if (window.tokenUsageManager) {
             window.tokenUsageManager.updateStats();
@@ -520,6 +589,11 @@ function init() {
             showFeedback(error.message, 'error');
         }
     }
+
+    const handleMessageInput = (e) => {
+        console.log('handleMessageInput called');
+        adjustTextareaHeight(e.target);
+    };
 
     function adjustTextareaHeight(textarea) {
         textarea.style.height = 'auto';
