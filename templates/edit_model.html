@@ -171,17 +171,7 @@
                 class="w-full sm:w-auto px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg font-medium hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
                 id="submit-button">
                 <span class="inline-flex items-center">
-                    <span id="button-text">Update Model</span>
-                    <span id="loading-spinner" class="hidden ml-2">
-                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
-                            viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
-                            </circle>
-                            <path class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                            </path>
-                        </svg>
-                    </span>
+                    <span>Update Model</span>
                 </span>
             </button>
             <a href="{{ url_for('chat.chat_interface') }}"
@@ -192,99 +182,16 @@
     </form>
 </div>
 
-<!-- Feedback Message -->
-<div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50"
-    role="alert" aria-live="assertive"></div>
-
 {% endblock content %}
 
 {% block scripts %}
 {{ super() }}
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
+    document.addEventListener("DOMContentLoaded", function() {
         const form = document.getElementById("edit-model-form");
-        const submitButton = document.getElementById("submit-button");
-        const buttonText = document.getElementById("button-text");
-        const loadingSpinner = document.getElementById("loading-spinner");
-
-        form.addEventListener("submit", async (e) => {
-            e.preventDefault();
-
-            try {
-                const formData = new FormData(form);
-
-                // Add version field if not present
-                if (!formData.get('version')) {
-                    formData.set('version', parseInt(form.dataset.version) || 1);
-                }
-
-                // Convert numeric fields
-                const numericFields = {
-                    'max_completion_tokens': parseInt,
-                    'max_tokens': parseInt,
-                    'temperature': parseFloat,
-                    'version': parseInt
-                };
-
-                for (const [field, converter] of Object.entries(numericFields)) {
-                    const value = formData.get(field);
-                    if (value) {
-                        formData.set(field, converter(value));
-                    }
-                }
-
-                // Convert boolean fields
-                formData.set('requires_o1_handling', formData.get('requires_o1_handling') === 'on');
-                formData.set('is_default', formData.get('is_default') === 'on');
-                formData.set('supports_streaming', formData.get('supports_streaming') === 'on');
-
-                // Handle o1-preview and streaming interaction
-                if (formData.get('requires_o1_handling')) {
-                    formData.set('supports_streaming', false);
-                }
-
-                const response = await fetch(form.action, {
-                    method: "POST",
-                    body: formData,
-                    headers: {
-                        "X-CSRFToken": getCSRFToken(),
-                        "X-Requested-With": "XMLHttpRequest"
-                    }
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    showFeedback("Model updated successfully", "success");
-                    setTimeout(() => {
-                        window.location.href = "{{ url_for('chat.chat_interface') }}";
-                    }, 1500);
-                } else {
-                    showFeedback(data.error || "Failed to update model", "error");
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                showFeedback("An unexpected error occurred", "error");
-            } finally {
-                submitButton.disabled = false;
-                buttonText.textContent = "Update Model";
-                loadingSpinner.classList.add("hidden");
-            }
-        });
-
-        function showFeedback(message, type) {
-            const feedbackDiv = document.getElementById('feedback-message');
-            feedbackDiv.textContent = message;
-            feedbackDiv.className = `fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 ${type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-                }`;
-            feedbackDiv.classList.remove('hidden');
-            setTimeout(() => {
-                feedbackDiv.classList.add('hidden');
-            }, 3000);
-        }
-
-        function getCSRFToken() {
-            return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        if (form) {
+            form.classList.add('model-form');
+            form.dataset.submitText = "Update Model";
         }
     });
 </script>
