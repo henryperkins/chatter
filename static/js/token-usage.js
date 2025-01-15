@@ -41,15 +41,58 @@ class TokenUsageManager {
     async updateStats() {
         if (this.elements.container && !this.elements.container.classList.contains('hidden')) {
             try {
-                const response = await fetch(`/stats/${this.chatId}`);
+                // Get current model from the select element
+                const modelSelect = document.getElementById('model-select');
+                const modelId = modelSelect?.value;
+                
+                const response = await fetch(`/stats/${this.chatId}?model_id=${modelId || ''}`);
                 const data = await response.json();
 
                 if (data.success && data.stats) {
                     this.updateDisplay(data.stats);
+                    
+                    // Update model-specific token limits
+                    if (data.stats.model_limits) {
+                        this.updateModelLimits(data.stats.model_limits);
+                    }
                 }
             } catch (error) {
                 console.error('Error fetching token stats:', error);
+                this.showError('Failed to update token usage');
             }
+        }
+    }
+
+    updateModelLimits(limits) {
+        const { max_tokens, max_completion_tokens } = limits;
+        
+        // Update progress bar max value
+        if (this.elements.progress) {
+            this.elements.progress.setAttribute('aria-valuemax', max_tokens);
+        }
+        
+        // Update token limit display
+        if (this.elements.tokensLimit) {
+            this.elements.tokensLimit.textContent = `/ ${max_tokens.toLocaleString()} max`;
+        }
+        
+        // Store limits for real-time calculations
+        this.currentLimits = limits;
+    }
+
+    showError(message) {
+        const errorElement = document.createElement('div');
+        errorElement.className = 'text-red-500 text-sm mt-2';
+        errorElement.textContent = message;
+        
+        // Add error message to container
+        if (this.elements.container) {
+            this.elements.container.appendChild(errorElement);
+            
+            // Remove error after timeout
+            setTimeout(() => {
+                errorElement.remove();
+            }, 5000);
         }
     }
 

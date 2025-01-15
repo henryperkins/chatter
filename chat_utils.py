@@ -17,9 +17,13 @@ from token_utils import get_encoding, truncate_content
 encoding = get_encoding()
 
 
+# Cache for encodings to improve performance
+_encoding_cache = {}
+
 def count_tokens(text: str, model_name: str = MODEL_NAME) -> int:
     """
     Count the number of tokens in a given text for a specific model.
+    Uses caching for better performance with repeated calls.
 
     Args:
         text (str): The text to count tokens for.
@@ -29,10 +33,19 @@ def count_tokens(text: str, model_name: str = MODEL_NAME) -> int:
         int: The number of tokens in the text.
     """
     try:
+        # Get encoding from cache or create new
+        if model_name not in _encoding_cache:
+            try:
+                _encoding_cache[model_name] = tiktoken.encoding_for_model(model_name)
+            except KeyError:
+                _encoding_cache[model_name] = tiktoken.get_encoding("cl100k_base")
+        
+        encoding = _encoding_cache[model_name]
         tokens = encoding.encode(text)
         return len(tokens)
     except Exception as e:
-        raise ValueError(f"Error counting tokens for model {model_name}: {e}")
+        logger.error(f"Error counting tokens for model {model_name}: {e}")
+        raise ValueError(f"Error counting tokens: {str(e)}")
 
 
 def secure_filename(filename: str) -> str:

@@ -20,33 +20,57 @@ class FileUploadHandler:
         # Ensure the quarantine folder exists
         os.makedirs(self.QUARANTINE_FOLDER, exist_ok=True)
 
-    def allowed_file(self, filename: str, file) -> bool:
+    def allowed_file(self, filename: str, file) -> Tuple[bool, List[str]]:
         """
         Check if a file has an allowed extension and MIME type.
+        Returns a tuple of (is_allowed, errors) for better error reporting.
 
         Args:
             filename (str): The filename to check.
             file: The file object.
 
         Returns:
-            bool: True if the file extension and MIME type are allowed, False otherwise.
+            Tuple[bool, List[str]]: (True, []) if allowed, (False, errors) if not
         """
+        errors = []
+        
+        # Check filename security
+        if not filename or filename.strip() == "":
+            errors.append("Empty filename")
+            return False, errors
+            
         # Check extension
-        extension_allowed = (
-            "." in filename
-            and filename.rsplit(".", 1)[1].lower() in self.ALLOWED_EXTENSIONS
-        )
-        if not extension_allowed:
-            return False
+        if "." not in filename:
+            errors.append("Missing file extension")
+            return False, errors
+            
+        ext = filename.rsplit(".", 1)[1].lower()
+        if ext not in self.ALLOWED_EXTENSIONS:
+            errors.append(f"File extension .{ext} not allowed")
+            return False, errors
 
         # Check MIME type
-        import magic
-        file.seek(0)
-        mime_type = magic.from_buffer(file.read(1024), mime=True)
-        file.seek(0)
-        mime_allowed = mime_type in Config.ALLOWED_MIME_TYPES
+        try:
+            import magic
+            file.seek(0)
+            mime_type = magic.from_buffer(file.read(1024), mime=True)
+            file.seek(0)
+            
+            if mime_type not in Config.ALLOWED_MIME_TYPES:
+                errors.append(f"MIME type {mime_type} not allowed")
+                return False, errors
+                
+            # Verify MIME type matches extension
+            expected_mime = Config.MIME_TYPE_MAP.get(ext)
+            if expected_mime and not mime_type.startswith(expected_mime):
+                errors.append(f"MIME type {mime_type} doesn't match extension .{ext}")
+                return False, errors
+                
+        except Exception as e:
+            errors.append(f"Could not verify file type: {str(e)}")
+            return False, errors
 
-        return mime_allowed
+        return True, errors
 
     def validate_files(self, files: List) -> Tuple[List, List]:
         """
