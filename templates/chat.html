@@ -244,16 +244,17 @@
         <!-- Input Area -->
         <div class="sticky bottom-0 border-t border-gray-200 dark:border-gray-700 px-3 sm:px-4 py-2 bg-white dark:bg-gray-900 z-50 mt-auto">
             <div class="flex flex-col sm:flex-row items-start sm:items-end space-y-2 sm:space-y-0 sm:space-x-3 w-full">
-                <!-- Upload Button -->
+                <!-- Upload Button (Desktop) -->
                 <button id="upload-button"
-                    class="p-2.5 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors duration-200 space-x-2"
+                    class="hidden md:flex p-2.5 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 items-center justify-center transition-colors duration-200 space-x-2"
                     aria-label="Upload files">
                     <i class="fas fa-upload text-lg"></i>
                     <span class="hidden sm:inline">Upload Files</span>
                 </button>
                 <!-- Mobile Upload Button -->
                 <button id="mobile-upload-button"
-                    class="md:hidden p-2.5 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors duration-200 space-x-2">
+                    class="flex md:hidden p-2.5 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 items-center justify-center transition-colors duration-200 space-x-2"
+                    aria-label="Upload files">
                     <i class="fas fa-upload text-lg"></i>
                     <span>Tap to Upload</span>
                 </button>
