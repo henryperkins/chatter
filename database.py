@@ -8,6 +8,7 @@ from typing import Optional, Generator
 from flask import g, current_app, Flask
 import click
 from flask.cli import with_appcontext
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,8 @@ def db_session() -> Session:
         raise
     finally:
         session.close()
+
+
 def get_db() -> Session:
     """Get a database connection."""
     if "db" not in g:
@@ -60,7 +63,8 @@ def get_db() -> Session:
         )
         g.db = scoped_session(sessionmaker(bind=engine))()
     return g.db
-    
+
+
 def get_db_pool() -> QueuePool:
     """Get the database connection pool."""
     if "db_engine" not in g:
@@ -76,6 +80,7 @@ def get_db_pool() -> QueuePool:
         )
         g.db_engine = engine
     return g.db_engine.pool
+
 
 def close_db(e: Optional[BaseException] = None) -> None:
     """Return database connection to pool."""
