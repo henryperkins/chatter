@@ -181,14 +181,6 @@ window.TokenUsageManager = TokenUsageManager;
     });
 
     return {
-        messageInput, sendButton, chatBox, editTitleBtn, 
-        uploadButton, mobileUploadButton, fileInput
-    };
-}
-
-function attachEventListeners() {
-    console.log('Attaching event listeners');
-    
     // Message input handlers
     if (messageInput) {
         console.log('Attaching messageInput listeners');
