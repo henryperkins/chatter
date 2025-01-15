@@ -17,8 +17,8 @@ from flask import (
 )
 from email_validator import validate_email
 from flask_login import current_user, login_required, login_user, logout_user
-from flask_wtf.csrf import CSRFError
-from flask_wtf.csrf import validate_csrf
+from flask_wtf.csrf import CSRFError, validate_csrf
+from wtforms.validators import ValidationError
 from sqlalchemy import text
 
 from chat_utils import handle_error, send_reset_email
@@ -183,9 +183,9 @@ def register():
             )
             try:
                 validate_csrf(csrf_token)
-            except CSRFError as e:
+            except (CSRFError, ValidationError) as e:
                 logger.warning(
-                    "CSRF token validation failed during registration",
+                    f"CSRF token validation failed during registration: {e}",
                     extra={"ip_address": request.remote_addr, "route": request.path},
                 )
                 return jsonify({"success": False, "error": "Invalid CSRF token."}), 400
