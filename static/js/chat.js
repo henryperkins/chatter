@@ -24,16 +24,36 @@ const handleMessageKeydown = (e) => {
 };
 
 function init() {
-        // Verify dependencies
-        if (!window.utils || !window.md || !window.DOMPurify || !window.Prism || !window.FileUploadManager) {
-            console.error('Required dependencies not loaded');
-            return;
-        }
+    // Verify dependencies are loaded
+    if (!window.utils || !window.md || !window.DOMPurify || !window.Prism) {
+        console.error('Required dependencies not loaded:', {
+            utils: !!window.utils,
+            md: !!window.md,
+            DOMPurify: !!window.DOMPurify,
+            Prism: !!window.Prism
+        });
+        return;
+    }
 
-        // Initialize FileUploadManager with chat ID and user ID
-        const chatId = window.CHAT_CONFIG.chatId;
-        const userId = window.CHAT_CONFIG.userId;
-        const uploadButton = window.innerWidth < 768 ? document.getElementById('mobile-upload-button') : document.getElementById('upload-button');
+    // Cache DOM elements
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const chatBox = document.getElementById('chat-box');
+
+    if (!messageInput || !sendButton || !chatBox) {
+        console.error('Critical UI elements are missing');
+        return;
+    }
+
+    // Add event listeners
+    messageInput.addEventListener('input', debounce(handleMessageInput, 100));
+    messageInput.addEventListener('keydown', handleMessageKeydown);
+    sendButton.addEventListener('click', throttledSendMessage);
+
+    // Initialize FileUploadManager with chat ID and user ID
+    const chatId = window.CHAT_CONFIG.chatId;
+    const userId = window.CHAT_CONFIG.userId;
+    const uploadButton = window.innerWidth < 768 ? document.getElementById('mobile-upload-button') : document.getElementById('upload-button');
         
         if (!window.fileUploadManager) {
             window.fileUploadManager = new window.FileUploadManager(chatId, userId, uploadButton);
@@ -831,9 +851,18 @@ function init() {
         document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
     }
 
+// Initialize markdown-it
+window.md = window.markdownit({
+    html: true,
+    linkify: true,
+    typographer: true
+});
+
 // Initialize chat interface
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
-    init();
-}
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.CHAT_CONFIG) {
+        init();
+    } else {
+        console.error('Chat configuration not found');
+    }
+});
