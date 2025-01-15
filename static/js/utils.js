@@ -1,14 +1,9 @@
-// Remove IIFE wrapper and add exports
 export function getCSRFToken() {
-     * @function getCSRFToken
-     * @returns {string} The CSRF token or an empty string if not found.
-     */
-    function getCSRFToken() {
-        const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
-        const csrfToken = csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") || "" : "";
-        console.debug("Retrieved CSRF token from meta tag:", csrfToken);
-        return csrfToken;
-    }
+    const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
+    const csrfToken = csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") || "" : "";
+    console.debug("Retrieved CSRF token from meta tag:", csrfToken);
+    return csrfToken;
+}
 
     /**
      * Fetches data from a URL with CSRF token included in the headers.

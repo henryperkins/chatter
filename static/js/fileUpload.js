@@ -1,8 +1,9 @@
 class FileUploadManager {
-    constructor(chatId, userId) {
+    constructor(chatId, userId, uploadButton) {
         this.uploadedFiles = [];
         this.chatId = chatId;
         this.userId = userId;
+        this.uploadButton = uploadButton;
         this.MAX_FILES = 5;
         this.MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
         this.MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB

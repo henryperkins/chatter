@@ -31,8 +31,10 @@ import { fetchWithCSRF, showFeedback, debounce, throttle } from './utils.js';
         // Initialize FileUploadManager with chat ID and user ID
         const chatId = window.CHAT_CONFIG.chatId;
         const userId = window.CHAT_CONFIG.userId;
+        const uploadButton = window.innerWidth < 768 ? document.getElementById('mobile-upload-button') : document.getElementById('upload-button');
+        
         if (!window.fileUploadManager) {
-            window.fileUploadManager = new window.FileUploadManager(chatId, userId);
+            window.fileUploadManager = new window.FileUploadManager(chatId, userId, uploadButton);
         }
 
         // Initialize TokenUsageManager
