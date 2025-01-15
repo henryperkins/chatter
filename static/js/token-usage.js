@@ -217,57 +217,51 @@ class TokenUsageManager {
 
 // Expose TokenUsageManager globally
 window.TokenUsageManager = TokenUsageManager;
-    // Cache DOM elements
-    messageInput = document.getElementById('message-input');
-    sendButton = document.getElementById('send-button');
-    chatBox = document.getElementById('chat-box');
-    editTitleBtn = document.getElementById('edit-title-btn');
-    uploadButton = document.getElementById('upload-button');
-    mobileUploadButton = document.getElementById('mobile-upload-button');
-    fileInput = document.getElementById('file-input');
-
-    // Log which elements were found
-    console.log('Elements initialized:', {
-        messageInput: !!messageInput,
-        sendButton: !!sendButton,
-        chatBox: !!chatBox,
-        editTitleBtn: !!editTitleBtn,
-        uploadButton: !!uploadButton,
-        mobileUploadButton: !!mobileUploadButton,
-        fileInput: !!fileInput
-    });
-
-    return {
-        messageInput,
-        sendButton,
-        chatBox,
-        editTitleBtn,
-        uploadButton,
-        mobileUploadButton,
-        fileInput
-    }
-
-    if (fileInput) {
-        console.log('Attaching fileInput listener');
-        fileInput.addEventListener('change', handleFileSelection);
-    }
-} // End of attachEventListeners function
-
-function handleFileSelection(e) {
-    const files = Array.from(e.target.files || []);
-    if (window.fileUploadManager) {
-        const { validFiles, errors } = window.fileUploadManager.processFiles(files);
-        if (errors.length > 0) {
-            errors.forEach(error => window.utils.showFeedback(error.errors.join(', '), 'error'));
+class TokenUsageManager {
+    constructor(config) {
+        if (!config || !config.chatId) {
+            console.error('TokenUsageManager: Invalid configuration');
+            return;
         }
-        if (validFiles.length > 0) {
-            window.fileUploadManager.uploadedFiles.push(...validFiles);
-            window.fileUploadManager.renderFileList();
+
+        this.chatId = config.chatId;
+        this.elements = this.initializeElements();
+        this.updateInterval = null;
+        
+        if (this.validateElements()) {
+            console.log('TokenUsageManager: Initialized successfully');
+            this.initialize();
+        } else {
+            console.error('TokenUsageManager: Failed to initialize - missing elements');
         }
     }
-}
 
-async function handleEditTitle() {
+    initializeElements() {
+        return {
+            container: document.getElementById('token-usage'),
+            progress: document.getElementById('token-progress'),
+            tokensUsed: document.getElementById('tokens-used'),
+            tokensLimit: document.getElementById('tokens-limit'),
+            userTokens: document.getElementById('user-tokens'),
+            assistantTokens: document.getElementById('assistant-tokens'),
+            systemTokens: document.getElementById('system-tokens'),
+            toggleBtn: document.getElementById('toggle-stats-btn'),
+            refreshBtn: document.getElementById('refresh-stats')
+        };
+    }
+
+    validateElements() {
+        const requiredElements = ['container', 'progress', 'tokensUsed', 'tokensLimit'];
+        return requiredElements.every(elementName => {
+            const exists = !!this.elements[elementName];
+            if (!exists) {
+                console.error(`TokenUsageManager: Missing required element: ${elementName}`);
+            }
+            return exists;
+        });
+    }
+
+    initialize() {
     try {
         const chatTitle = document.getElementById('chat-title');
         const currentTitle = chatTitle?.textContent?.split('-')[0].trim() || 'New Chat';
