@@ -17,15 +17,17 @@ class ModelFormHandler {
         event.preventDefault();
         const form = event.target;
         const submitButton = form.querySelector('button[type="submit"]');
-        const actionUrl = form.dataset.action;
+        const modelId = form.dataset.modelId;
+        const actionUrl = `/edit/${modelId}`;
         
-        if (!actionUrl) {
-            console.error('Form action URL not found');
+        if (!actionUrl || !modelId) {
+            console.error('Form action URL or model ID not found');
             return;
         }
 
         console.debug('Form submission started:', {
             actionUrl,
+            modelId,
             formData: new FormData(form)
         });
         

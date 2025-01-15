@@ -213,7 +213,9 @@ function init() {
         editModelBtn.addEventListener('click', () => {
             const modelId = modelSelect?.value;
             if (modelId) {
-                window.location.href = `${windowExt.CHAT_CONFIG.editModelUrl}${modelId}`;
+                console.debug('Editing model:', modelId);
+                const editUrl = `/edit/${modelId}`;
+                window.location.href = editUrl;
             } else {
                 windowExt.utils.showFeedback('No model selected', 'error');
             }
