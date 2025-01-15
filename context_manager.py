@@ -1,7 +1,11 @@
 from typing import List, Dict, Optional, Tuple, Any
 import math
 from datetime import datetime
-from token_utils import count_message_tokens, count_conversation_tokens
+from token_utils import (
+    count_message_tokens, 
+    count_conversation_tokens,
+    truncate_content
+)
 from models.chat import Chat
 
 class ContextManager:
