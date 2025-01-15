@@ -199,33 +199,37 @@ class ConversationManager:
         truncated = encoding.decode(tokens)
         return f"{truncated}\n\n[Note: Content truncated to fit token limit]"
 
+    def __init__(self):
+        self.context_manager = ContextManager(MAX_TOKENS)
+        self.context_cache = {}
+
     def _manage_context_window(self, chat_id: str, max_tokens: int) -> None:
         """
-        Manage context window to stay within token limits.
+        Manage context window using advanced context management techniques.
 
         Args:
             chat_id: The chat ID to manage context for
             max_tokens: Maximum tokens allowed
         """
         messages = Chat.get_messages(chat_id)
-        current_tokens = 0
-        messages_to_keep: List[Dict[str, Any]] = []
-
-        # Calculate tokens from newest to oldest
-        for msg in reversed(messages):
-            metadata = msg.get("metadata", {})
-            if isinstance(metadata, dict):
-                msg_tokens = metadata.get("token_count", 0)
-                if isinstance(msg_tokens, (int, float)) and current_tokens + msg_tokens <= max_tokens:
-                    messages_to_keep.append(msg)
-                    current_tokens += msg_tokens
-                else:
-                    break
-
+        
+        # Get optimized context
+        optimized_context = self.context_manager.get_context(messages)
+        
+        # Calculate tokens
+        current_tokens = count_conversation_tokens(optimized_context)
+        
         # If we need to remove messages
-        if len(messages_to_keep) < len(messages):
-            keep_ids = [msg["id"] for msg in messages_to_keep if isinstance(msg.get("id"), int)]
+        if len(optimized_context) < len(messages):
+            keep_ids = [msg["id"] for msg in optimized_context if isinstance(msg.get("id"), int)]
             self._remove_old_messages(chat_id, keep_ids)
+            
+        # Update context cache
+        self.context_cache[chat_id] = optimized_context
+        
+        # Track token usage
+        self.context_manager.track_token_usage(current_tokens)
+        self.context_manager.optimize_compression()
 
     def _remove_old_messages(self, chat_id: str, keep_ids: List[int]) -> None:
         """

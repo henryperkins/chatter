@@ -567,10 +567,15 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             requires_o1_handling=getattr(model_obj, "requires_o1_handling", False),
         )
 
+        # Get optimized context
         history = conversation_manager.get_context(
             chat_id,
             include_system=not getattr(model_obj, "requires_o1_handling", False),
         )
+        
+        # Track response quality (basic implementation)
+        response_quality = min(1.0, len(response) / 1000)  # Could be enhanced
+        conversation_manager.context_manager.update_strategy(response_quality)
 
         logger.debug("Sending request to Azure API")
         response = get_azure_response(
