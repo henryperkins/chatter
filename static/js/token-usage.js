@@ -251,7 +251,7 @@ window.TokenUsageManager = TokenUsageManager;
         console.log('Attaching fileInput listener');
         fileInput.addEventListener('change', handleFileSelection);
     }
-}
+} // End of attachEventListeners function
 
 function handleFileSelection(e) {
     const files = Array.from(e.target.files || []);
