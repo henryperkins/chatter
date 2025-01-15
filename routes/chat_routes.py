@@ -295,7 +295,7 @@ def chat_interface() -> Response:
         return cast(Response, redirect(url_for("chat.chat_interface")))
 
     try:
-        model = Model.get_by_id(chat.model_id) if chat.model_id else None
+        model = Chat.get_model(chat_id) if chat.model_id else None
         if not model and chat.model_id:
             logger.error(f"Failed to retrieve model for chat {chat_id}.")
             return (
