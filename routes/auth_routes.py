@@ -269,10 +269,7 @@ def register():
                     f"User {username} registered successfully",
                     extra={"ip_address": ip, "route": request.path, "email": email},
                 )
-                return (
-                    jsonify({"success": True, "message": "Registration successful"}),
-                    200,
-                )
+                return redirect(url_for('auth.login'))
 
             return render_template("register.html", form=form)
 
