@@ -88,8 +88,12 @@ class ModelFormHandler {
                 this.utils.showFeedback("Model saved successfully", "success");
                 if (response.redirect) {
                     console.debug("Redirecting to:", response.redirect);
+                    // Ensure redirect URL is absolute
+                    const redirectUrl = response.redirect.startsWith('/') ? 
+                        window.location.origin + response.redirect :
+                        response.redirect;
                     setTimeout(() => {
-                        window.location.href = response.redirect;
+                        window.location.href = redirectUrl;
                     }, 500);
                 }
             } else {

@@ -9,7 +9,8 @@
     class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 model-form"
     data-version="{{ model.version }}"
     data-model-id="{{ model.id }}"
-    data-action="{{ url_for('model.edit_model', model_id=model.id) }}">
+    data-action="{{ url_for('model.edit_model', model_id=model.id) }}"
+    data-redirect="{{ url_for('chat.chat_interface') }}">
         {{ form.hidden_tag() }}
         <input type="hidden" name="version" value="{{ model.version }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

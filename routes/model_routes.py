@@ -302,12 +302,12 @@ def edit_model(model_id):
                     logger.debug("Sending response with redirect: %s", {
                         "success": True,
                         "message": "Model updated successfully",
-                        "redirect": "/chat/chat_interface"
+                        "redirect": url_for('chat.chat_interface')
                     })
                     return jsonify({
                         "success": True,
                         "message": "Model updated successfully",
-                        "redirect": "/chat/chat_interface"
+                        "redirect": url_for('chat.chat_interface')
                     })
                 except Exception as e:
                     return handle_error(e, "Error updating model", 400)
