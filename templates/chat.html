@@ -604,6 +604,10 @@ button {
     console.log('CHAT_CONFIG initialized:', window.CHAT_CONFIG);
 </script>
 
+<!-- Load managers -->
+<script src="{{ url_for('static', filename='js/token-usage.js') }}"></script>
+<script src="{{ url_for('static', filename='js/fileUpload.js') }}"></script>
+
 <!-- Initialize markdown-it -->
 <script>
     window.md = window.markdownit({
@@ -612,10 +616,6 @@ button {
         typographer: true
     });
 </script>
-
-<!-- Load managers -->
-<script src="{{ url_for('static', filename='js/token-usage.js') }}"></script>
-<script src="{{ url_for('static', filename='js/fileUpload.js') }}"></script>
 
 <!-- Initialize chat after everything else -->
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>

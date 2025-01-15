@@ -1,12 +1,17 @@
 class FileUploadManager {
     constructor(chatId, userId, uploadButton) {
-        this.uploadedFiles = [];
+        // Basic properties
         this.chatId = chatId;
         this.userId = userId;
-        this.uploadButton = uploadButton;
+        this.uploadedFiles = [];
+        this.uploadQueue = [];
+        this.currentUploads = 0;
+
+        // File constraints
         this.MAX_FILES = 5;
-        this.MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-        this.MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50MB
+        this.MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+        this.MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50 MB
+        this.MAX_CONCURRENT_UPLOADS = 3;
         this.ALLOWED_FILE_TYPES = [
             'text/plain',
             'application/pdf',
@@ -17,17 +22,21 @@ class FileUploadManager {
             'image/png',
             'text/csv'
         ];
-        this.uploadQueue = [];
-        this.currentUploads = 0;
-        this.MAX_CONCURRENT_UPLOADS = 3;
+
+        // DOM elements (fall back to ID-based references if not passed)
+        this.uploadButton = uploadButton || document.getElementById('upload-button');
         this.dropZone = document.getElementById('drop-zone');
         this.fileInput = document.getElementById('file-input');
-        this.uploadButton = document.getElementById('upload-button');
         this.uploadedFilesDiv = document.getElementById('uploaded-files');
+
+        // Initialize
         this.setupDragAndDrop();
         this.setupEventListeners();
     }
 
+    /**
+     * Validate an individual file for type, size, and duplication.
+     */
     validateFile(file) {
         const errors = [];
 
@@ -41,7 +50,7 @@ class FileUploadManager {
             errors.push(`File too large: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
         }
 
-        // Duplicate check
+        // Duplicate check (same name and size)
         if (this.uploadedFiles.some(f => f.name === file.name && f.size === file.size)) {
             errors.push(`Duplicate file: ${file.name}`);
         }
@@ -49,6 +58,9 @@ class FileUploadManager {
         return errors;
     }
 
+    /**
+     * Update the visual progress bar for a given file.
+     */
     showUploadProgress(file, progress) {
         const progressElement = document.getElementById(`progress-${file.name}`);
         if (progressElement) {
@@ -57,6 +69,9 @@ class FileUploadManager {
         }
     }
 
+    /**
+     * Display an error using the global feedback mechanism (if available).
+     */
     showError(message, file = null) {
         window.utils.showFeedback(
             file ? `${file.name}: ${message}` : message,
@@ -65,19 +80,27 @@ class FileUploadManager {
         );
     }
 
+    /**
+     * Check each file against validation rules and overall size limits.
+     */
     processFiles(files) {
         const validFiles = [];
         const errors = [];
-        const totalSize = this.uploadedFiles.reduce((sum, file) => sum + file.size, 0);
+
+        // Calculate current total size
+        const currentTotalSize = this.uploadedFiles.reduce((sum, file) => sum + file.size, 0);
 
         for (const file of files) {
             const fileErrors = this.validateFile(file);
+
+            // Skip invalid files
             if (fileErrors.length > 0) {
                 errors.push({ file: file.name, errors: fileErrors });
                 continue;
             }
 
-            if (totalSize + file.size > this.MAX_TOTAL_SIZE) {
+            // Check total limit if adding this file
+            if (currentTotalSize + file.size > this.MAX_TOTAL_SIZE) {
                 errors.push({ file: file.name, errors: ['Total size limit exceeded'] });
                 continue;
             }
@@ -88,6 +111,9 @@ class FileUploadManager {
         return { validFiles, errors };
     }
 
+    /**
+     * Return a Font Awesome icon class based on file type.
+     */
     getFileIcon(fileType) {
         const iconMap = {
             'application/pdf': 'file-pdf',
@@ -106,11 +132,15 @@ class FileUploadManager {
         return 'file';
     }
 
+    /**
+     * Update the on-page file list and storage usage bar.
+     */
     renderFileList() {
         const fileList = document.getElementById('file-list');
-        const totalSize = document.getElementById('total-size');
-        if (!fileList || !totalSize) return;
+        const totalSizeEl = document.getElementById('total-size');
+        if (!fileList || !totalSizeEl) return;
 
+        // Build the file list markup
         fileList.innerHTML = this.uploadedFiles.map((file, index) => `
             <div class="file-item group flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg mb-2 shadow-sm hover:shadow-md transition-all duration-200">
                 <div class="flex items-center space-x-3 w-full">
@@ -128,16 +158,19 @@ class FileUploadManager {
                         </div>
                         <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-1">
                             <div id="progress-${file.name}"
-                                class="bg-blue-500 h-1.5 rounded-full text-[10px] text-center text-white" style="width: 0%">0%</div>
+                                class="bg-blue-500 h-1.5 rounded-full text-[10px] text-center text-white"
+                                style="width: 0%">0%</div>
                         </div>
                     </div>
                     <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                         <button onclick="window.fileUploadManager.showPreview(${index})"
-                                class="text-gray-500 hover:text-blue-500 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" aria-label="Preview file">
+                                class="text-gray-500 hover:text-blue-500 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                aria-label="Preview file">
                             <i class="fas fa-eye text-sm"></i>
                         </button>
                         <button onclick="window.fileUploadManager.removeFile(${index})"
-                                class="text-gray-500 hover:text-red-500 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" aria-label="Remove file">
+                                class="text-gray-500 hover:text-red-500 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                                aria-label="Remove file">
                             <i class="fas fa-times text-sm"></i>
                         </button>
                     </div>
@@ -151,7 +184,7 @@ class FileUploadManager {
         const maxMB = (this.MAX_TOTAL_SIZE / 1024 / 1024).toFixed(2);
         const percentage = Math.min((totalBytes / this.MAX_TOTAL_SIZE) * 100, 100);
 
-        totalSize.innerHTML = `
+        totalSizeEl.innerHTML = `
             <div class="flex items-center justify-between text-sm">
                 <span class="text-gray-700 dark:text-gray-300">Storage Used</span>
                 <span class="font-medium">${totalMB} MB / ${maxMB} MB</span>
@@ -161,28 +194,34 @@ class FileUploadManager {
             </div>
         `;
 
-        // Show/hide the upload area
+        // Show/hide the entire upload section
         if (this.uploadedFilesDiv) {
             this.uploadedFilesDiv.classList.toggle('hidden', this.uploadedFiles.length === 0);
         }
     }
 
+    /**
+     * Remove a file from the list (by index) and re-render.
+     */
     removeFile(index) {
         this.uploadedFiles.splice(index, 1);
         this.renderFileList();
     }
 
+    /**
+     * Perform the actual upload of the files to the server (if any).
+     */
     async uploadFiles(chatId) {
         if (this.uploadedFiles.length === 0) {
             window.utils.showFeedback('No files to upload', 'warning');
             return;
         }
 
-        const uploadButton = document.getElementById('upload-button');
-        if (!uploadButton) return;
+        const uploadBtn = this.uploadButton;
+        if (!uploadBtn) return;
 
         try {
-            await window.utils.withLoading(uploadButton, async () => {
+            await window.utils.withLoading(uploadBtn, async () => {
                 const formData = new FormData();
                 this.uploadedFiles.forEach(file => {
                     formData.append('files[]', file);
@@ -206,6 +245,9 @@ class FileUploadManager {
         }
     }
 
+    /**
+     * Initialize drag-and-drop events (if dropZone is available).
+     */
     setupDragAndDrop() {
         if (!this.dropZone) return;
 
@@ -237,7 +279,7 @@ class FileUploadManager {
                 }
                 const { validFiles, errors } = this.processFiles(files);
                 if (errors.length > 0) {
-                    errors.forEach(error => window.utils.showFeedback(error.errors.join(', '), 'error'));
+                    errors.forEach(err => window.utils.showFeedback(err.errors.join(', '), 'error'));
                 }
                 if (validFiles.length > 0) {
                     this.uploadedFiles.push(...validFiles);
@@ -252,12 +294,19 @@ class FileUploadManager {
         });
     }
 
+    /**
+     * Prevent browser defaults on drag events to allow drop handling.
+     */
     preventDefaults(e) {
         e.preventDefault();
         e.stopPropagation();
     }
 
+    /**
+     * Set up file input and preview/close event listeners.
+     */
     setupEventListeners() {
+        // If the file input is present, handle change events (with debouncing).
         if (this.fileInput) {
             this.fileInput.addEventListener('change', window.utils.debounce((e) => {
                 const files = Array.from(e.target.files);
@@ -274,37 +323,49 @@ class FileUploadManager {
             }, 300));
         }
 
+        // If the upload button is present, wire it to open the file dialog
         if (this.uploadButton) {
             this.uploadButton.addEventListener('click', () => {
-                this.fileInput.click();
+                if (this.fileInput) {
+                    this.fileInput.click();
+                }
             });
         }
 
-        // Close preview modal when clicking outside
+        // Close preview modal when clicking outside it
         document.addEventListener('click', (e) => {
             const previewModal = document.getElementById('file-preview-modal');
-            if (previewModal && !previewModal.contains(e.target) && !e.target.closest('.file-item')) {
+            if (
+                previewModal &&
+                !previewModal.contains(e.target) &&
+                !e.target.closest('.file-item')
+            ) {
                 previewModal.classList.add('hidden');
             }
         });
     }
 
+    /**
+     * Show a quick preview of an uploaded file in a modal.
+     */
     showPreview(index) {
         const file = this.uploadedFiles[index];
         if (!file) return;
 
-        // Create or update preview modal
+        // Create or reuse a preview modal container
         let previewModal = document.getElementById('file-preview-modal');
         if (!previewModal) {
             previewModal = document.createElement('div');
             previewModal.id = 'file-preview-modal';
-            previewModal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-modal flex items-center justify-center p-4 hidden';
+            previewModal.className =
+                'fixed inset-0 bg-black/50 backdrop-blur-sm z-modal flex items-center justify-center p-4 hidden';
             previewModal.innerHTML = `
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                     <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">${file.name}</h3>
                         <button onclick="this.closest('#file-preview-modal').classList.add('hidden')"
-                                class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200" aria-label="Close preview">
+                                class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                                aria-label="Close preview">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
@@ -318,8 +379,16 @@ class FileUploadManager {
         previewContent.innerHTML = this.getPreviewContent(file);
 
         previewModal.classList.remove('hidden');
+
+        // If it's a text/markdown file, load contents asynchronously
+        if (file.type === 'text/plain' || file.type === 'text/markdown') {
+            this.loadTextFileContent(file);
+        }
     }
 
+    /**
+     * Return HTML snippet to preview the file based on type.
+     */
     getPreviewContent(file) {
         if (file.type.startsWith('image/')) {
             return `<img src="${URL.createObjectURL(file)}" alt="Preview of ${file.name}" class="max-w-full h-auto rounded-lg">`;
@@ -345,20 +414,27 @@ class FileUploadManager {
         }
     }
 
+    /**
+     * Asynchronously load text/markdown content from the selected file for preview.
+     */
     async loadTextFileContent(file) {
         const previewContent = document.getElementById('file-preview-content');
         if (!previewContent) return;
 
         try {
             const text = await file.text();
-            previewContent.querySelector('pre').textContent = text;
+            const preElement = previewContent.querySelector('pre');
+            if (preElement) {
+                preElement.textContent = text;
+            }
         } catch (error) {
-            previewContent.querySelector('pre').textContent = 'Failed to load file content';
+            console.error('Failed to load file content:', error);
+            if (previewContent.querySelector('pre')) {
+                previewContent.querySelector('pre').textContent = 'Failed to load file content';
+            }
         }
     }
 }
 
-/* static/js/fileUpload.js */
-
-// Expose FileUploadManager globally
+// Expose globally if needed
 window.FileUploadManager = FileUploadManager;
