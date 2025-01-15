@@ -563,3 +563,31 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
     except Exception as ex:
         logger.error("Error during chat handling: %s", str(ex), exc_info=True)
         return jsonify({"error": "An unexpected error occurred."}), 500
+
+
+@chat_routes.route("/update_model", methods=["POST"])
+@login_required
+def update_model():
+    data = request.get_json()
+    chat_id = data.get("chat_id") or session.get("chat_id")
+    new_model_id = data.get("model_id")
+
+    if not chat_id or not new_model_id:
+        return jsonify({"error": "Chat ID and Model ID are required."}), 400
+
+    if not validate_chat_access(chat_id):
+        return jsonify({"error": "Unauthorized access to chat"}), 403
+
+    try:
+        # Ensure the new model exists
+        model = Model.get_by_id(new_model_id)
+        if not model:
+            return jsonify({"error": "Model not found"}), 404
+
+        # Update the model associated with the chat
+        Chat.update_model(chat_id, new_model_id)
+        logger.info(f"Chat {chat_id} model updated to {new_model_id}")
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error(f"Error updating model for chat {chat_id}: {e}")
+        return jsonify({"error": "Failed to update model."}), 500

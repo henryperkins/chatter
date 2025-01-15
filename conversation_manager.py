@@ -70,22 +70,6 @@ class ConversationManager:
             if isinstance(message.get("metadata"), dict):
                 message["metadata"]["token_count"] = content_tokens
 
-            # Add role-specific base tokens
-            if message["role"] == "system":
-                num_tokens += SYSTEM_TOKENS
-            elif message["role"] == "user":
-                num_tokens += USER_TOKENS
-            elif message["role"] == "assistant":
-                num_tokens += ASSISTANT_TOKENS
-
-            # Count content tokens
-            content_tokens = count_tokens(message["content"], MODEL_NAME)
-            num_tokens += content_tokens
-
-            # Add to message metadata if available
-            if isinstance(message.get("metadata"), dict):
-                message["metadata"]["token_count"] = content_tokens
-
         return num_tokens
 
     def get_context(self, chat_id: str, include_system: bool = False) -> List[Dict[str, str]]:
@@ -153,15 +137,6 @@ class ConversationManager:
                 model_max_tokens = MAX_MESSAGE_TOKENS  # Default for o1-preview
             else:
                 model_max_tokens = MAX_TOKENS  # Default for other models
-
-        """Add a message to the conversation with metadata and formatting."""
-        try:
-            encoding = tiktoken.encoding_for_model(MODEL_NAME)
-        except KeyError:
-            encoding = tiktoken.get_encoding("cl100k_base")
-
-        if model_max_tokens is None:
-            model_max_tokens = MAX_TOKENS if not requires_o1_handling else MAX_MESSAGE_TOKENS
 
         """Add a message to the conversation with metadata and formatting."""
         try:
