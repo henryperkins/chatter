@@ -121,6 +121,12 @@ def allowed_file(filename: str) -> bool:
     return os.path.splitext(filename)[1].lower() in allowed_extensions
 
 
+def count_file_tokens(content: str) -> int:
+    """Count tokens for file content with additional overhead."""
+    base_tokens = count_tokens(content)
+    # Add overhead for file metadata and structure
+    return base_tokens + 10
+
 def process_file(file) -> Tuple[str, str, int]:
     """
     Process an uploaded file by validating, truncating, and reading its content.
@@ -164,7 +170,7 @@ def process_file(file) -> Tuple[str, str, int]:
         try:
             file_content = file.read().decode("utf-8")
             truncated_content = truncate_message(file_content, MAX_FILE_CONTENT_LENGTH)
-            token_count = count_tokens(truncated_content)
+            token_count = count_file_tokens(truncated_content)
             return filename, truncated_content, token_count
         except UnicodeDecodeError as e:
             raise ValueError(f"Failed to decode file {filename}: {e}")
