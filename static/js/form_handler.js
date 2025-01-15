@@ -62,9 +62,12 @@ class ModelFormHandler {
             });
 
             if (response.success) {
+                console.debug("Received response:", response);
                 if (response.redirect) {
+                    console.debug("Redirecting to:", response.redirect);
                     window.location.href = response.redirect;
                 } else {
+                    console.debug("No redirect found in response");
                     this.utils.showFeedback("Model saved successfully", "success");
                 }
             } else {
