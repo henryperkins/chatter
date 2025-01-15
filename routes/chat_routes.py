@@ -531,21 +531,12 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         if not validate_chat_access(chat_id):
             return jsonify({"error": "Unauthorized access to chat"}), 403
 
-        # Get the model from session or database
-        model_obj = None
-        if 'current_model' in session:
-            model_obj = Model.get_by_id(session['current_model']['id'])
+        # Always retrieve the current model associated with the chat
+        model_obj = Chat.get_model(chat_id)
         
         if not model_obj:
-            model_obj = Chat.get_model(chat_id)
-            if model_obj:
-                session['current_model'] = {
-                    'id': model_obj.id,
-                    'name': model_obj.name,
-                    'deployment_name': model_obj.deployment_name,
-                    'supports_streaming': model_obj.supports_streaming,
-                    'requires_o1_handling': model_obj.requires_o1_handling
-                }
+            logger.error(f"No model configured for chat {chat_id}.")
+            return jsonify({"error": "No model configured for this chat."}), 400
         
         model_error = validate_model(model_obj)
         if model_error:
@@ -677,15 +668,6 @@ def update_model():
 
         # Update the model associated with the chat
         Chat.update_model(chat_id, new_model_id)
-        
-        # Update the session with the new model info
-        session['current_model'] = {
-            'id': model.id,
-            'name': model.name,
-            'deployment_name': model.deployment_name,
-            'supports_streaming': model.supports_streaming,
-            'requires_o1_handling': model.requires_o1_handling
-        }
         
         logger.info(f"Chat {chat_id} model updated to {new_model_id}")
         return jsonify({
