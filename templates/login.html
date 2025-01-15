@@ -7,7 +7,7 @@
     <div class="w-full max-w-md px-8 py-6 mx-4 mt-4 text-left bg-white dark:bg-gray-800 shadow-xl rounded-lg transition-all duration-200">
         <h1 class="text-2xl font-bold text-center text-gray-900 dark:text-gray-100 mb-6">Login</h1>
 
-        <div id="error-message" class="space-y-2 mb-4 hidden">
+        <div id="error-message" class="space-y-2 mb-4">
             {% if form.errors %}
                 <div class="bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded-lg relative transition-all duration-200" role="alert">
                     <strong class="font-bold">Errors:</strong>
@@ -27,7 +27,7 @@
             {% endif %}
         </div>
 
-        <form id="login-form" method="POST" action="{{ url_for('auth.login') }}" class="space-y-6 ajax-form" novalidate data-validate="true">
+        <form id="login-form" method="POST" action="{{ url_for('auth.login') }}" class="space-y-6" novalidate>
             {{ form.hidden_tag() }}
             <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token() }}">
 
@@ -189,50 +189,14 @@
             return true;
         }
 
+        // Handle form submission
         if (loginForm) {
-            loginForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-
-                if (!validateForm()) return;
-
-                setLoading(true);
-                const formData = new FormData(loginForm);
-
-                try {
-                    const csrfToken = document.getElementById('csrf_token').value;
-                    const headers = new Headers({
-                        'X-CSRFToken': csrfToken,
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    });
-
-                    const response = await fetch(loginForm.action, {
-                        method: 'POST',
-                        body: new URLSearchParams(formData),
-                        headers: headers,
-                        credentials: 'same-origin'
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok && data.success) {
-                        window.location.href = "{{ url_for('chat.chat_interface') }}";
-                    } else {
-                        showError(data.error || 'Login failed');
-                    }
-                } catch (error) {
-                    console.error('Login error:', error);
-                    showError('An error occurred during login');
-                } finally {
-                    setLoading(false);
-                }
-            });
-
             // Add keyboard accessibility
             loginForm.querySelectorAll('input').forEach(input => {
                 input.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
-                        submitButton.click();
+                        loginForm.submit();
                     }
                 });
             });

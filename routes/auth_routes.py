@@ -77,15 +77,8 @@ def login():
                     "username": username,
                 },
             )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Too many login attempts. Please try again later.",
-                    }
-                ),
-                429,
-            )
+            form.errors['username'] = ['Too many login attempts. Please try again later.']
+            return render_template("login.html", form=form)
 
         try:
             csrf_token = (
@@ -100,7 +93,8 @@ def login():
                     "CSRF token validation failed",
                     extra={"ip_address": request.remote_addr, "route": request.path},
                 )
-                return jsonify({"success": False, "error": "Invalid CSRF token."}), 400
+                form.errors['csrf_token'] = ['Invalid CSRF token. Please refresh the page and try again.']
+                return render_template("login.html", form=form)
 
             if form.validate_on_submit():
                 with db_session() as db:
@@ -126,15 +120,8 @@ def login():
                                 "username": username,
                             },
                         )
-                        return (
-                            jsonify(
-                                {
-                                    "success": False,
-                                    "error": "Invalid username or password",
-                                }
-                            ),
-                            401,
-                        )
+                        form.password.errors.append('Invalid username or password')
+                        return render_template("login.html", form=form)
 
                     user_obj = User(
                         user["id"], user["username"], user["email"], user["role"]
@@ -150,7 +137,7 @@ def login():
                     )
                     return redirect(url_for("chat.chat_interface"))
 
-            return jsonify({"success": False, "errors": form.errors}), 400
+            return render_template("login.html", form=form)
 
         except Exception as e:
             logger.error(
