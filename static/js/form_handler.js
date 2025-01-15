@@ -17,6 +17,12 @@ class ModelFormHandler {
         event.preventDefault();
         const form = event.target;
         const submitButton = form.querySelector('button[type="submit"]');
+        const actionUrl = form.dataset.action;
+        
+        if (!actionUrl) {
+            console.error('Form action URL not found');
+            return;
+        }
         
         try {
             // Show loading state
@@ -52,7 +58,7 @@ class ModelFormHandler {
                 formData.set('supports_streaming', false);
             }
 
-            const response = await this.utils.fetchWithCSRF(form.action, {
+            const response = await this.utils.fetchWithCSRF(actionUrl, {
                 method: form.method || "POST",
                 body: formData,
                 headers: {
