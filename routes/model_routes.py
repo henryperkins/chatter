@@ -282,10 +282,20 @@ def add_model_page():
 def edit_model(model_id):
     """Edit model route handler."""
     try:
-        model = Model.get_by_id(model_id)
-        if not model:
-            logger.warning("Model with ID %d not found", model_id)
-            return jsonify({"error": "Model not found"}), 404
+        try:
+            model = Model.get_by_id(model_id)
+            if not model:
+                logger.warning("Model with ID %d not found in database", model_id)
+                return jsonify({
+                    "error": "Model not found",
+                    "message": f"No model found with ID {model_id}"
+                }), 404
+        except ValueError as e:
+            logger.error("Failed to retrieve model %d: %s", model_id, str(e))
+            return jsonify({
+                "error": "Model configuration error",
+                "message": str(e)
+            }), 500
 
         form = ModelForm(obj=model)
 
