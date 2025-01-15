@@ -78,6 +78,22 @@ DEFAULT_MODEL = "gpt-4"  # Default model name for tiktoken encoding
 MAX_INPUT_TOKENS = int(os.getenv("MAX_INPUT_TOKENS", 8192))  # Max input tokens
 MAX_CONTEXT_TOKENS = int(os.getenv("MAX_CONTEXT_TOKENS", 128000))  # Max context tokens
 
+def validate_token_count(text: str, max_tokens: int) -> Tuple[str, int]:
+    """
+    Validate and truncate text to fit within token limit with improved accuracy.
+    """
+    encoding = get_encoding()
+    tokens = encoding.encode(text)
+    
+    if len(tokens) > max_tokens:
+        # Truncate with buffer for note
+        truncated_tokens = tokens[:max_tokens - 50]  # Leave room for truncation note
+        truncated_text = encoding.decode(truncated_tokens)
+        note = "\n\n[Note: Content truncated due to token limit]"
+        return truncated_text + note, len(truncated_tokens) + len(encoding.encode(note))
+        
+    return text, len(tokens)
+
 # Rate Limiting Constants
 SCRAPE_RATE_LIMIT = "5 per minute"
 CHAT_RATE_LIMIT = "60 per minute"

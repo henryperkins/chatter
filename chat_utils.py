@@ -22,15 +22,7 @@ _encoding_cache = {}
 
 def count_tokens(text: str, model_name: str = MODEL_NAME) -> int:
     """
-    Count the number of tokens in a given text for a specific model.
-    Uses caching for better performance with repeated calls.
-
-    Args:
-        text (str): The text to count tokens for.
-        model_name (str): The name of the model for tokenization.
-
-    Returns:
-        int: The number of tokens in the text.
+    Count tokens with improved accuracy and validation.
     """
     try:
         # Get encoding from cache or create new
@@ -41,11 +33,19 @@ def count_tokens(text: str, model_name: str = MODEL_NAME) -> int:
                 _encoding_cache[model_name] = tiktoken.get_encoding("cl100k_base")
         
         encoding = _encoding_cache[model_name]
+        
+        # Validate encoding
+        if not hasattr(encoding, "encode"):
+            raise ValueError("Invalid encoding object")
+            
+        # Count tokens with safety buffer
         tokens = encoding.encode(text)
-        return len(tokens)
+        return len(tokens) + 10  # Add buffer for potential special tokens
+        
     except Exception as e:
         logger.error(f"Error counting tokens for model {model_name}: {e}")
-        raise ValueError(f"Error counting tokens: {str(e)}")
+        # Fallback to approximate counting
+        return int(len(text) / 4)  # Rough estimate of 1 token per 4 characters
 
 
 def secure_filename(filename: str) -> str:
