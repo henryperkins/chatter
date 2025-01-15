@@ -516,7 +516,7 @@ class Model:
             raise ValueError("Invalid Azure OpenAI API endpoint")
             
         # Validate API version
-        valid_versions = ["2023-07-01-preview", "2023-03-15-preview"]
+        valid_versions = ["2024-12-01-preview", "2023-07-01-preview", "2023-03-15-preview"]
         if config["api_version"] not in valid_versions:
             raise ValueError(f"Invalid API version. Must be one of: {', '.join(valid_versions)}")
 
