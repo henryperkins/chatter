@@ -19,7 +19,8 @@ POOL_RECYCLE = 3600  # Recycle connections after 1 hour
 POOL_TIMEOUT = 60  # Increased timeout for operations
 
 
-def get_db_session() -> Generator[Session, None, None]:
+@contextmanager
+def db_session() -> Session:
     """Get a database session."""
     if "db_session" not in g:
         db_path = str(current_app.config.get("DATABASE", "chat_app.db"))
@@ -37,6 +38,11 @@ def get_db_session() -> Generator[Session, None, None]:
     session = g.db_session()
     try:
         yield session
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        logger.error(f"Session rollback due to exception: {e}")
+        raise
     finally:
         session.close()
 def get_db() -> Session:

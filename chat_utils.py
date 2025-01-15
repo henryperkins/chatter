@@ -11,12 +11,10 @@ from email.mime.multipart import MIMEMultipart
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")  # Default model name
 MAX_FILE_CONTENT_LENGTH = int(os.getenv("MAX_FILE_CONTENT_LENGTH", "8000"))  # Characters
 
+from token_utils import get_encoding, truncate_content
+
 # Initialize tokenizer
-try:
-    encoding = tiktoken.encoding_for_model(MODEL_NAME)
-except KeyError:
-    encoding = tiktoken.get_encoding("cl100k_base")
-    pass
+encoding = get_encoding()
 
 
 def count_tokens(text: str, model_name: str = MODEL_NAME) -> int:
@@ -100,7 +98,7 @@ def extract_context_from_conversation(
 
 def truncate_message(message: str, max_tokens: int = MAX_FILE_CONTENT_LENGTH) -> str:
     """
-    Truncate a message to a specified number of tokens using tiktoken.
+    Truncate a message to a specified number of tokens.
 
     Args:
         message (str): The message to truncate.
@@ -109,13 +107,7 @@ def truncate_message(message: str, max_tokens: int = MAX_FILE_CONTENT_LENGTH) ->
     Returns:
         str: The truncated message.
     """
-    tokens = encoding.encode(message)
-    if len(tokens) > max_tokens:
-        truncated_tokens = tokens[:max_tokens]
-        truncated_message = encoding.decode(truncated_tokens)
-        truncated_message += "\n\n[Note: Input truncated due to token limit.]"
-        return truncated_message
-    return message
+    return truncate_content(message, max_tokens, "[Note: Input truncated due to token limit.]")
 
 
 def allowed_file(filename: str) -> bool:
