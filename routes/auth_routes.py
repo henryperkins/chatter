@@ -87,8 +87,14 @@ def login():
             )
 
         try:
-            csrf_token = request.form.get("csrf_token") or request.headers.get('X-CSRFToken')
-            if not csrf_token or not validate_csrf(csrf_token):
+            csrf_token = (
+                request.form.get("csrf_token") or 
+                request.headers.get('X-CSRFToken') or
+                request.headers.get('X-Csrf-Token')
+            )
+            try:
+                validate_csrf(csrf_token)
+            except Exception as e:
                 logger.warning(
                     "CSRF token validation failed",
                     extra={"ip_address": request.remote_addr, "route": request.path},

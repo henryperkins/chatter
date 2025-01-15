@@ -28,8 +28,8 @@
         </div>
 
         <form id="login-form" method="POST" action="{{ url_for('auth.login') }}" class="space-y-6 ajax-form" novalidate data-validate="true">
-            {{ form.csrf_token }}
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {{ form.hidden_tag() }}
+            <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token() }}">
 
             <!-- Username Field -->
             <div class="space-y-1">
@@ -199,15 +199,16 @@
                 const formData = new FormData(loginForm);
 
                 try {
-                    const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-                    formData.append('csrf_token', csrfToken);
+                    const csrfToken = document.getElementById('csrf_token').value;
+                    const headers = new Headers({
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    });
 
                     const response = await fetch(loginForm.action, {
                         method: 'POST',
-                        body: formData,
-                        headers: {
-                            'X-CSRFToken': csrfToken
-                        },
+                        body: new URLSearchParams(formData),
+                        headers: headers,
                         credentials: 'same-origin'
                     });
 

@@ -221,14 +221,17 @@ def log_request_info():
         g.correlation_id = str(uuid.uuid4())
         if current_user.is_authenticated:
             g.user_id = current_user.id
-        logger.debug(
-            "Request received - Method: %s, Path: %s, Remote: %s, Correlation ID: %s, User ID: %s",
-            request.method,
-            request.path,
-            request.remote_addr,
-            g.correlation_id,
-            getattr(g, "user_id", None)
-        )
+        # Log request information only once
+        if not hasattr(g, '_request_logged'):
+            logger.debug(
+                "Request received - Method: %s, Path: %s, Remote: %s, Correlation ID: %s, User ID: %s",
+                request.method,
+                request.path,
+                request.remote_addr,
+                g.correlation_id,
+                getattr(g, "user_id", None)
+            )
+            g._request_logged = True
     except Exception as e:
         logger.error(
             "Error logging request",
