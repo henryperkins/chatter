@@ -10,6 +10,7 @@
     data-version="{{ model.version }}">
         {{ form.hidden_tag() }}
         <input type="hidden" name="version" value="{{ model.version }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <!-- Model Name -->
         <div class="mb-6">
