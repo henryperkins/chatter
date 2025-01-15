@@ -11,6 +11,62 @@ class ContextManager:
         self.context_cache = {}
         self.monitor = ContextMonitor()
         
+    def get_context(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """
+        Get optimized context with caching and prioritization
+        """
+        # Try to get from cache
+        cache_key = hash(tuple((m['role'], m['content']) for m in messages))
+        if cache_key in self.context_cache:
+            return self.context_cache[cache_key]
+            
+        # Prioritize messages
+        prioritized = self.prioritize_messages(messages)
+        
+        # Compress context
+        compressed = self.compress_context(prioritized, self.model_max_tokens)
+        
+        # Update cache
+        self.context_cache[cache_key] = compressed
+        
+        return compressed
+        
+    def prioritize_messages(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        """Prioritize messages based on importance"""
+        return sorted(
+            messages,
+            key=lambda msg: (
+                -msg.get("metadata", {}).get("timestamp", 0),
+                0 if msg["role"] == "user" else 1,
+                -self.calculate_importance(msg["content"])
+            )
+        )
+        
+    def compress_context(self, messages: List[Dict[str, str]], max_tokens: int) -> List[Dict[str, str]]:
+        """Compress context to fit within token limit"""
+        compressed = []
+        current_tokens = 0
+        
+        for msg in messages:
+            compressed_msg = {
+                "role": msg["role"],
+                "content": self.smart_truncate(msg["content"], max_tokens - current_tokens)
+            }
+            
+            msg_tokens = count_message_tokens(compressed_msg)
+            if current_tokens + msg_tokens > max_tokens:
+                break
+                
+            compressed.append(compressed_msg)
+            current_tokens += msg_tokens
+            
+        return compressed
+        
+    def calculate_importance(self, content: str) -> float:
+        """Calculate message importance score"""
+        # Basic heuristic - could be enhanced
+        return min(1.0, len(content) / 1000)
+        
 class ContextMonitor:
     def __init__(self):
         self.metrics = {

@@ -212,25 +212,38 @@ class ConversationManager:
             chat_id: The chat ID to manage context for
             max_tokens: Maximum tokens allowed
         """
-        messages = Chat.get_messages(chat_id)
-        
-        # Get optimized context
-        optimized_context = self.context_manager.get_context(messages)
-        
-        # Calculate tokens
-        current_tokens = count_conversation_tokens(optimized_context)
-        
-        # If we need to remove messages
-        if len(optimized_context) < len(messages):
-            keep_ids = [msg["id"] for msg in optimized_context if isinstance(msg.get("id"), int)]
-            self._remove_old_messages(chat_id, keep_ids)
+        try:
+            messages = Chat.get_messages(chat_id)
             
-        # Update context cache
-        self.context_cache[chat_id] = optimized_context
-        
-        # Track token usage
-        self.context_manager.track_token_usage(current_tokens)
-        self.context_manager.optimize_compression()
+            # Get optimized context with fallback
+            if hasattr(self.context_manager, 'get_context'):
+                optimized_context = self.context_manager.get_context(messages)
+            else:
+                optimized_context = messages  # Fallback to all messages
+                logger.warning("ContextManager.get_context not available, using full context")
+            
+            # Calculate tokens
+            current_tokens = count_conversation_tokens(optimized_context)
+            
+            # If we need to remove messages
+            if len(optimized_context) < len(messages):
+                keep_ids = [msg["id"] for msg in optimized_context if isinstance(msg.get("id"), int)]
+                self._remove_old_messages(chat_id, keep_ids)
+                
+            # Update context cache
+            self.context_cache[chat_id] = optimized_context
+            
+            # Track token usage
+            if hasattr(self.context_manager, 'track_token_usage'):
+                self.context_manager.track_token_usage(current_tokens)
+            if hasattr(self.context_manager, 'optimize_compression'):
+                self.context_manager.optimize_compression()
+                
+        except Exception as e:
+            logger.error(f"Error managing context window for chat {chat_id}: {e}")
+            # Fallback to keeping all messages if error occurs
+            optimized_context = messages
+            self.context_cache[chat_id] = optimized_context
 
     def _remove_old_messages(self, chat_id: str, keep_ids: List[int]) -> None:
         """
