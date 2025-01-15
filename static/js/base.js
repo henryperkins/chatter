@@ -40,6 +40,13 @@ function initializeMobileMenu() {
                 closeMenu();
             }
         });
+
+        // Close if resized to desktop
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 768) {
+                closeMenu();
+            }
+        });
     }
 }
 

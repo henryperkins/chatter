@@ -14,6 +14,9 @@ module.exports = {
       screens: {
         '2xl': '1440px',
       },
+      translate: {
+        '-full': '-100%',
+      },
       zIndex: {
         'dropdown': '1000',
         'sticky': '1020',

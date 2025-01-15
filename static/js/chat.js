@@ -164,8 +164,7 @@ function init() {
         windowExt.tokenUsageManager.updateStats();
     }
 
-    // Initialize mobile menu
-    initializeMobileMenu();
+    // Mobile menu is initialized in base.js
 
     // Fix chat input visibility (ensure chat box doesn't overlap the input area)
     const messageInputContainer = document.getElementById('message-input-container');
