@@ -228,9 +228,9 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
         return jsonify({"error": "Failed to create new chat"}), 500
 
 
-@chat_routes.route("/chat_interface")
+@chat_routes.route("/chat_interface", methods=["GET"])
 @login_required
-def chat_interface():
+def chat_interface() -> Response:
     logger.debug(f"Current user: id={current_user.id}, role={current_user.role}")
 
     chat_id = request.args.get("chat_id") or session.get("chat_id")

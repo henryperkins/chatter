@@ -41,6 +41,14 @@ function initializeMobileMenu() {
             }
         });
 
+        // Ensure no interference with form redirects
+        document.addEventListener('submit', (event) => {
+            if (event.target.matches('.model-form')) {
+                event.preventDefault();
+                console.debug("Form submission intercepted for debugging.");
+            }
+        });
+
         // Close if resized to desktop
         window.addEventListener('resize', () => {
             if (window.innerWidth >= 768) {
