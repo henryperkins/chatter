@@ -100,7 +100,7 @@ def configure_app() -> None:
     """Configure Flask application settings"""
     # Basic configuration
     app.config["SECRET_KEY"] = Config.SECRET_KEY
-    app.config["DATABASE"] = Config.DATABASE_URI
+    app.config["DATABASE_URI"] = Config.DATABASE_URI
 
     # File upload settings
     app.config.update(

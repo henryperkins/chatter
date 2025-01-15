@@ -24,9 +24,9 @@ POOL_TIMEOUT = 60  # Increased timeout for operations
 def db_session() -> Session:
     """Get a database session."""
     if "db_session" not in g:
-        db_path = str(current_app.config.get("DATABASE", "chat_app.db"))
+        db_uri = current_app.config.get("DATABASE_URI", "sqlite:///chat_app.db")
         engine = create_engine(
-            f"sqlite:///{db_path}",
+            db_uri,
             poolclass=QueuePool,
             pool_size=POOL_SIZE,
             max_overflow=MAX_OVERFLOW,
