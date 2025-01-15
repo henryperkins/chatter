@@ -299,9 +299,11 @@ def edit_model(model_id):
                     validate_immutable_fields(model_id, data)
                     Model.update(model_id, data)
                     logger.info("Model updated successfully: %d", model_id)
-                    return jsonify(
-                        {"success": True, "message": "Model updated successfully"}
-                    )
+                    return jsonify({
+                        "success": True,
+                        "message": "Model updated successfully",
+                        "redirect": "/chat/chat_interface"
+                    })
                 except Exception as e:
                     return handle_error(e, "Error updating model", 400)
 

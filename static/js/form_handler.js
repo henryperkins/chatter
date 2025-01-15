@@ -62,10 +62,13 @@ class ModelFormHandler {
             });
 
             if (response.success) {
-                this.utils.showFeedback("Model saved successfully", "success");
-                setTimeout(() => {
-                    window.location.href = response.redirect || "/chat/chat_interface";
-                }, 1500);
+                const redirectUrl = response.redirect || "/chat/chat_interface";
+                this.utils.showFeedback("Model saved successfully", "success", {
+                    duration: 2000,
+                    onClose: () => {
+                        window.location.href = redirectUrl;
+                    }
+                });
             } else {
                 this.utils.showFeedback(response.error || "Failed to save model", "error");
                 this.displayFormErrors(form, response.errors);
