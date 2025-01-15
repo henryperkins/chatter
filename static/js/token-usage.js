@@ -1,7 +1,24 @@
 class TokenUsageManager {
     constructor(config) {
+        if (!config || !config.chatId) {
+            console.error('TokenUsageManager: Invalid configuration');
+            return;
+        }
+
         this.chatId = config.chatId;
-        this.elements = {
+        this.elements = this.initializeElements();
+        this.updateInterval = null;
+        
+        if (this.validateElements()) {
+            console.log('TokenUsageManager: Initialized successfully');
+            this.initialize();
+        } else {
+            console.error('TokenUsageManager: Failed to initialize - missing elements');
+        }
+    }
+
+    initializeElements() {
+        return {
             container: document.getElementById('token-usage'),
             progress: document.getElementById('token-progress'),
             tokensUsed: document.getElementById('tokens-used'),
@@ -12,21 +29,44 @@ class TokenUsageManager {
             toggleBtn: document.getElementById('toggle-stats-btn'),
             refreshBtn: document.getElementById('refresh-stats')
         };
-        this.updateInterval = null;
-        this.initialize();
+    }
+
+    validateElements() {
+        const requiredElements = ['container', 'progress', 'tokensUsed', 'tokensLimit'];
+        return requiredElements.every(elementName => {
+            const exists = !!this.elements[elementName];
+            if (!exists) {
+                console.error(`TokenUsageManager: Missing required element: ${elementName}`);
+            }
+            return exists;
+        });
     }
 
     initialize() {
-        // Add event listeners
-        if (this.elements.toggleBtn) {
-            this.elements.toggleBtn.addEventListener('click', () => this.toggleDisplay());
-        }
-        if (this.elements.refreshBtn) {
-            this.elements.refreshBtn.addEventListener('click', () => this.updateStats());
-        }
+        try {
+            // Show token usage container
+            if (this.elements.container) {
+                this.elements.container.classList.remove('hidden');
+            }
 
-        // Start periodic updates
-        this.startPeriodicUpdates();
+            // Add event listeners
+            if (this.elements.toggleBtn) {
+                this.elements.toggleBtn.addEventListener('click', () => this.toggleDisplay());
+            }
+            if (this.elements.refreshBtn) {
+                this.elements.refreshBtn.addEventListener('click', () => this.updateStats());
+            }
+
+            // Initial stats update
+            this.updateStats();
+
+            // Start periodic updates
+            this.startPeriodicUpdates();
+
+            console.log('TokenUsageManager: Initialization complete');
+        } catch (error) {
+            console.error('TokenUsageManager: Initialization failed:', error);
+        }
     }
 
     toggleDisplay() {
@@ -39,27 +79,44 @@ class TokenUsageManager {
     }
 
     async updateStats() {
-        if (this.elements.container && !this.elements.container.classList.contains('hidden')) {
-            try {
-                // Get current model from the select element
-                const modelSelect = document.getElementById('model-select');
-                const modelId = modelSelect?.value;
-                
-                const response = await fetch(`/stats/${this.chatId}?model_id=${modelId || ''}`);
-                const data = await response.json();
+        if (!this.elements.container) {
+            console.error('TokenUsageManager: Container element not found');
+            return;
+        }
 
-                if (data.success && data.stats) {
-                    this.updateDisplay(data.stats);
-                    
-                    // Update model-specific token limits
-                    if (data.stats.model_limits) {
-                        this.updateModelLimits(data.stats.model_limits);
-                    }
+        try {
+            console.log('TokenUsageManager: Updating stats...');
+            
+            // Get current model from the select element
+            const modelSelect = document.getElementById('model-select');
+            const modelId = modelSelect?.value;
+            
+            const response = await fetch(`/stats/${this.chatId}?model_id=${modelId || ''}`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
                 }
-            } catch (error) {
-                console.error('Error fetching token stats:', error);
-                this.showError('Failed to update token usage');
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
+
+            const data = await response.json();
+
+            if (data.success && data.stats) {
+                this.updateDisplay(data.stats);
+                
+                if (data.stats.model_limits) {
+                    this.updateModelLimits(data.stats.model_limits);
+                }
+                
+                console.log('TokenUsageManager: Stats updated successfully');
+            } else {
+                throw new Error(data.error || 'Invalid response format');
+            }
+        } catch (error) {
+            console.error('TokenUsageManager: Error updating stats:', error);
+            this.showError('Failed to update token usage');
         }
     }
 
