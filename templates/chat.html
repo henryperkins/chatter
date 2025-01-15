@@ -596,9 +596,9 @@ button {
         allowedFileTypes: JSON.parse('{{ config.get("ALLOWED_FILE_TYPES", ["text/plain", "application/pdf", "image/jpeg", "image/png"]) | tojson | safe }}'),
         csrfToken: "{{ csrf_token() }}",
         userId: "{{ current_user.id }}",
-        userRole: "{{ current_user.role }}"
+        userRole: "{{ current_user.role }}",
+        models: JSON.parse('{{ models|tojson|safe }}')
     };
-    window.CHAT_CONFIG.models = JSON.parse('{{ models|tojson|safe }}');
 </script>
 
 <!-- Token Usage Manager -->
@@ -608,5 +608,5 @@ button {
 <script src="{{ url_for('static', filename='js/fileUpload.js') }}" defer></script>
 
 <!-- Chat Functionality -->
-<script src="{{ url_for('static', filename='js/chat.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/chat.js') }}" type="module" defer></script>
 {% endblock %}
