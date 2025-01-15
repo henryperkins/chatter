@@ -101,7 +101,7 @@ SCRAPE_RATE_LIMIT = "5 per minute"
 CHAT_RATE_LIMIT = "60 per minute"
 
 # Blueprint setup
-chat_routes = Blueprint("chat", __name__)
+chat_routes = Blueprint("chat_routes", __name__)
 limiter = Limiter(key_func=get_remote_address)
 
 # Initialize tokenizer
