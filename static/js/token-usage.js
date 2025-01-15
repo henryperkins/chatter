@@ -238,44 +238,13 @@ window.TokenUsageManager = TokenUsageManager;
     });
 
     return {
-    // Message input handlers
-    if (messageInput) {
-        console.log('Attaching messageInput listeners');
-        messageInput.addEventListener('input', debounce(handleMessageInput, 100));
-        messageInput.addEventListener('keydown', handleMessageKeydown);
-    }
-
-    // Send button handler
-    if (sendButton) {
-        console.log('Attaching sendButton listener');
-        sendButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('Send button clicked');
-            sendMessage();
-        });
-    }
-
-    // Edit title button handler
-    if (editTitleBtn) {
-        console.log('Attaching editTitleBtn listener');
-        editTitleBtn.addEventListener('click', handleEditTitle);
-    }
-
-    // File upload handlers
-    if (uploadButton && fileInput) {
-        console.log('Attaching uploadButton listener');
-        uploadButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            fileInput.click();
-        });
-    }
-
-    if (mobileUploadButton && fileInput) {
-        console.log('Attaching mobileUploadButton listener');
-        mobileUploadButton.addEventListener('click', function(e) {
-            e.preventDefault();
-            fileInput.click();
-        });
+        messageInput,
+        sendButton,
+        chatBox,
+        editTitleBtn,
+        uploadButton,
+        mobileUploadButton,
+        fileInput
     }
 
     if (fileInput) {
