@@ -7,7 +7,7 @@ import tiktoken
 from sqlalchemy import text
 from database import get_db
 from models.chat import Chat
-from chat_utils import count_tokens
+from token_utils import get_encoding, count_message_tokens  # Update imports
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,8 @@ from typing import Union, Tuple, List, Dict, Any, Optional, cast
 
 import bleach
 import tiktoken
-from chat_utils import MODEL_NAME  # Added import for MODEL_NAME
+from chat_utils import MODEL_NAME
+from token_utils import get_encoding  # Add import for get_encoding
 from flask import (
     Blueprint,
     request,
