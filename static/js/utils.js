@@ -14,7 +14,7 @@ function getCSRFToken() {
      * @returns {Promise<object>} The response data as a JSON object.
      * @throws {Error} If the response is not OK or not JSON.
      */
-function fetchWithCSRF(url, options = {}) {
+async function fetchWithCSRF(url, options = {}) {
         const csrfToken = getCSRFToken();
         const headers = {
             'X-Requested-With': 'XMLHttpRequest',
