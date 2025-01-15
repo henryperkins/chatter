@@ -95,6 +95,7 @@ def validate_token_count(text: str, max_tokens: int) -> Tuple[str, int]:
         
     return text, len(tokens)
 
+
 # Rate Limiting Constants
 SCRAPE_RATE_LIMIT = "5 per minute"
 CHAT_RATE_LIMIT = "60 per minute"
@@ -581,6 +582,7 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             api_endpoint=getattr(model_obj, "api_endpoint", ""),
             api_key=getattr(model_obj, "api_key", ""),
             requires_o1_handling=getattr(model_obj, "requires_o1_handling", False),
+            stream=getattr(model_obj, "supports_streaming", False),
             timeout_seconds=120,
         )
 
