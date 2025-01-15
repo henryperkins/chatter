@@ -28,7 +28,8 @@
         </div>
 
         <form id="login-form" method="POST" action="{{ url_for('auth.login') }}" class="space-y-6 ajax-form" novalidate data-validate="true">
-            {{ form.hidden_tag() }}
+            {{ form.csrf_token }}
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
             <!-- Username Field -->
             <div class="space-y-1">
