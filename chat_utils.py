@@ -6,6 +6,7 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from token_utils import cached_count_tokens, estimate_tokens
 
 # Constants
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")  # Default model name
