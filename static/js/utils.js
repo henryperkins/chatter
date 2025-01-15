@@ -224,7 +224,10 @@ export function getCSRFToken() {
             .finally(() => hideLoading(element, originalContent));
     }
 
-export {
+/* static/js/utils.js */
+
+// Attach utility functions to window.utils
+window.utils = {
     getCSRFToken,
     fetchWithCSRF,
     showFeedback,

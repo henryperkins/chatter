@@ -1,27 +1,29 @@
-import TokenUsageManager from './token-usage.js';
-import FileUploadManager from './fileUpload.js';
-import { fetchWithCSRF, showFeedback, debounce, throttle } from './utils.js';
+/* static/js/chat.js */
 
-    // *** CHANGED ***: Name these functions so we can properly add/remove them.
-    // Debounced handler for input
-    const handleMessageInput = (e) => {
-        adjustTextareaHeight(e.target);
-    };
+// Ensure dependencies are available through window
+const TokenUsageManager = window.TokenUsageManager;
+const FileUploadManager = window.FileUploadManager;
+const { fetchWithCSRF, showFeedback, debounce, throttle } = window.utils;
 
-    // Throttled handler for send
-    const throttledSendMessage = throttle(() => {
+// Debounced handler for input
+const handleMessageInput = (e) => {
+    adjustTextareaHeight(e.target);
+};
+
+// Throttled handler for send
+const throttledSendMessage = throttle(() => {
+    sendMessage();
+}, 1000);
+
+// Keydown handler
+const handleMessageKeydown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
         sendMessage();
-    }, 1000);
+    }
+};
 
-    // Keydown handler
-    const handleMessageKeydown = (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    };
-
-    function init() {
+function init() {
         // Verify dependencies
         if (!window.utils || !window.md || !window.DOMPurify || !window.Prism || !window.FileUploadManager) {
             console.error('Required dependencies not loaded');

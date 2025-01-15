@@ -1,8 +1,9 @@
 // static/js/base.js
+/* static/js/base.js */
 
-(function() {
-    // Use utility functions from utils.js if needed
-    const { showFeedback } = window.utils;
+// Use utility functions from utils.js if needed
+// Assuming utils.js attaches functions to window.utils
+const { showFeedback } = window.utils;
 
     document.addEventListener('DOMContentLoaded', function() {
 

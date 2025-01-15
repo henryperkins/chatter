@@ -160,4 +160,7 @@ class TokenUsageManager {
 }
 
 // Export the class
-export default TokenUsageManager;
+/* static/js/token-usage.js */
+
+// Expose TokenUsageManager globally
+window.TokenUsageManager = TokenUsageManager;

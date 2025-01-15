@@ -358,4 +358,7 @@ class FileUploadManager {
     }
 }
 
-export default FileUploadManager;
+/* static/js/fileUpload.js */
+
+// Expose FileUploadManager globally
+window.FileUploadManager = FileUploadManager;
