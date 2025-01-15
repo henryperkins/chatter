@@ -44,28 +44,21 @@ class ConversationManager:
         """
         Returns the number of tokens used by a list of messages with improved accuracy.
         """
-        encoding = get_encoding()
-        num_tokens = 0
-        
-        # Add initial system message overhead if present
-        if messages and messages[0]["role"] == "system":
-            num_tokens += 4  # initial system message overhead
-            
-        for message in messages:
-            num_tokens += count_message_tokens(message, encoding)
+        try:
+            # Count conversation tokens
+            total = count_conversation_tokens(messages)
             
             # Add metadata tokens if present
-            if isinstance(message.get("metadata"), dict):
-                metadata_tokens = len(encoding.encode(str(message["metadata"])))
-                num_tokens += metadata_tokens
-                
-        # Add 3 tokens for every reply after the initial message
-        num_tokens += 3 * (len(messages) - 1)
-        
-        # Add safety buffer
-        num_tokens += 20
-        
-        return num_tokens
+            for message in messages:
+                if isinstance(message.get("metadata"), dict):
+                    total += cached_count_tokens(str(message["metadata"]))
+                    
+            return total
+        except Exception as e:
+            logger.error(f"Error counting tokens: {e}")
+            # Fallback to estimation
+            total_chars = sum(len(str(m)) for m in messages)
+            return estimate_tokens(total_chars)
 
     def get_context(self, chat_id: str, include_system: bool = False) -> List[Dict[str, str]]:
         """

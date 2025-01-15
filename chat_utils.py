@@ -25,27 +25,10 @@ def count_tokens(text: str, model_name: str = MODEL_NAME) -> int:
     Count tokens with improved accuracy and validation.
     """
     try:
-        # Get encoding from cache or create new
-        if model_name not in _encoding_cache:
-            try:
-                _encoding_cache[model_name] = tiktoken.encoding_for_model(model_name)
-            except KeyError:
-                _encoding_cache[model_name] = tiktoken.get_encoding("cl100k_base")
-        
-        encoding = _encoding_cache[model_name]
-        
-        # Validate encoding
-        if not hasattr(encoding, "encode"):
-            raise ValueError("Invalid encoding object")
-            
-        # Count tokens with safety buffer
-        tokens = encoding.encode(text)
-        return len(tokens) + 10  # Add buffer for potential special tokens
-        
+        return cached_count_tokens(text) + 10  # Add buffer for potential special tokens
     except Exception as e:
         logger.error(f"Error counting tokens for model {model_name}: {e}")
-        # Fallback to approximate counting
-        return int(len(text) / 4)  # Rough estimate of 1 token per 4 characters
+        return estimate_tokens(text)
 
 
 def secure_filename(filename: str) -> str:
