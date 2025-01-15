@@ -175,7 +175,8 @@ def register():
                     f"CSRF token validation failed during registration: {e}",
                     extra={"ip_address": request.remote_addr, "route": request.path},
                 )
-                return jsonify({"success": False, "error": "Invalid CSRF token."}), 400
+                form.errors['csrf_token'] = ['Invalid CSRF token. Please refresh the page and try again.']
+                return render_template("register.html", form=form)
 
             ip = request.remote_addr or "unknown"
             if not check_attempts(ip, failed_registrations):
@@ -183,15 +184,8 @@ def register():
                     "Rate limit exceeded for registration attempts",
                     extra={"ip_address": ip, "route": request.path},
                 )
-                return (
-                    jsonify(
-                        {
-                            "success": False,
-                            "error": "Too many registration attempts. Please try again later.",
-                        }
-                    ),
-                    429,
-                )
+                form.errors['username'] = ['Too many registration attempts. Please try again later.']
+                return render_template("register.html", form=form)
 
             if form.validate_on_submit():
                 username = form.username.data.strip()
@@ -222,15 +216,8 @@ def register():
                                 "email": email,
                             },
                         )
-                        return (
-                            jsonify(
-                                {
-                                    "success": False,
-                                    "error": "Username or email already exists",
-                                }
-                            ),
-                            400,
-                        )
+                        form.email.errors.append('Username or email already exists')
+                        return render_template("register.html", form=form)
 
                     # Check if this will be the first user
                     user_count = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
@@ -287,16 +274,7 @@ def register():
                     200,
                 )
 
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "errors": form.errors,
-                        "error": "Please correct the errors in the form.",
-                    }
-                ),
-                400,
-            )
+            return render_template("register.html", form=form)
 
         except Exception as e:
             logger.error(
@@ -309,15 +287,8 @@ def register():
                     "email": form.email.data if form.email.data else None,
                 },
             )
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "An error occurred during registration. Please try again.",
-                    }
-                ),
-                500,
-            )
+            form.errors['non_field_errors'] = ['An unexpected error occurred. Please try again.']
+            return render_template("register.html", form=form)
 
     return render_template("register.html", form=form)
 
