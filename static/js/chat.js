@@ -562,6 +562,11 @@ async function sendMessage() {
             windowExt.fileUploadManager.uploadedFiles = [];
             windowExt.fileUploadManager.renderFileList();
 
+            // Update token usage stats after sending message
+            if (windowExt.tokenUsageManager) {
+                windowExt.tokenUsageManager.updateStats();
+            }
+
             // Handle streaming vs. non-streaming
             if (response.response) {
                 // For non-streaming, append final response
@@ -575,6 +580,11 @@ async function sendMessage() {
             // Show success feedback only for non-streaming
             if (!useStreaming) {
                 windowExt.utils.showFeedback('Message sent successfully', 'success');
+            }
+
+            // Update token usage stats after assistant response
+            if (windowExt.tokenUsageManager) {
+                windowExt.tokenUsageManager.updateStats();
             }
         }, { text: 'Sending...' });
     } catch (error) {

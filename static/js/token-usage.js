@@ -117,8 +117,8 @@ class TokenUsageManager {
             const modelId = modelSelect?.value || '';
 
             // Fetch stats from the server
-            const response = await fetch(`/stats/${this.chatId}?model_id=${modelId}`, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            const response = await fetch(`/chat/stats/${this.chatId}?model_id=${modelId}`, {
+                headers: { 'X-Requested-With': 'X-Requested-With' }
             });
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);

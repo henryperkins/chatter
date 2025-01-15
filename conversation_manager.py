@@ -20,8 +20,6 @@ ASSISTANT_TOKENS: int = 4  # Base tokens for assistant messages
 MAX_MESSAGES: int = int(os.getenv("MAX_MESSAGES", "20"))
 MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "32000"))  # Increased from 16384 to 32000
 MAX_MESSAGE_TOKENS: int = int(os.getenv("MAX_MESSAGE_TOKENS", "32000"))  # Increased from 8192
-MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "32000"))  # Increased from 16384 to 32000
-MAX_MESSAGE_TOKENS: int = int(os.getenv("MAX_MESSAGE_TOKENS", "32000"))  # Increased from 8192
 MODEL_NAME: str = os.getenv("MODEL_NAME", "gpt-4")  # Model for token counting
 
 
@@ -127,25 +125,18 @@ class ConversationManager:
         Raises:
             Exception: If there's an error adding the message to the database.
         """
+        # Initialize encoding
         try:
             encoding = tiktoken.encoding_for_model(MODEL_NAME)
         except KeyError:
             encoding = tiktoken.get_encoding("cl100k_base")
 
+        # Determine model_max_tokens if not provided
         if model_max_tokens is None:
             if requires_o1_handling:
                 model_max_tokens = MAX_MESSAGE_TOKENS  # Default for o1-preview
             else:
                 model_max_tokens = MAX_TOKENS  # Default for other models
-
-        """Add a message to the conversation with metadata and formatting."""
-        try:
-            encoding = tiktoken.encoding_for_model(MODEL_NAME)
-        except KeyError:
-            encoding = tiktoken.get_encoding("cl100k_base")
-
-        if model_max_tokens is None:
-            model_max_tokens = MAX_TOKENS if not requires_o1_handling else MAX_MESSAGE_TOKENS
 
         # Calculate tokens and prepare metadata
         tokens = len(encoding.encode(content))
