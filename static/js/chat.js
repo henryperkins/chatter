@@ -27,8 +27,7 @@
  * @property {any} tokenUsageManager
  */
 
-/** @type {Window & WindowExtensions} */
-const windowExt = window;
+const windowExt = /** @type {Window & WindowExtensions} */ (window);
 
 // Debounced handler for input
 const handleMessageInput = (e) => {
@@ -160,7 +159,7 @@ function init() {
 
     // Initialize TokenUsageManager if needed
     if (!windowExt.tokenUsageManager) {
-        windowExt.tokenUsageManager = new windowExt.TokenUsageManager(windowExt.CHAT_CONFIG);
+        windowExt.tokenUsageManager = new window.TokenUsageManager(windowExt.CHAT_CONFIG);
         // Show token usage stats after new messages
         windowExt.tokenUsageManager.updateStats();
     }

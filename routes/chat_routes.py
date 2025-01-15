@@ -443,18 +443,31 @@ def get_chat_stats(chat_id: str) -> Union[Response, Tuple[Response, int]]:
             "requires_o1_handling": getattr(model_obj, "requires_o1_handling", False),
         }
 
+        # Determine token limit
+        token_limit = 32000 if model_info["requires_o1_handling"] else 16384
+        if token_limit == 0:
+            token_limit = 16384  # Default to 16384 if token_limit is zero
+
         # Add token limit information
-        stats.update(
-            {
-                "model_info": model_info,
-                "token_limit": 32000 if model_info["requires_o1_handling"] else 16384,
-                "token_usage_percentage": (
-                    stats["total_tokens"]
-                    / (32000 if model_info["requires_o1_handling"] else 16384)
-                )
-                * 100,
-            }
-        )
+        try:
+            stats.update(
+                {
+                    "model_info": model_info,
+                    "token_limit": token_limit,
+                    "token_usage_percentage": (
+                        stats["total_tokens"] / token_limit
+                    ) * 100,
+                }
+            )
+        except ZeroDivisionError:
+            logger.error(f"Division by zero error when calculating token usage for chat {chat_id}")
+            stats.update(
+                {
+                    "model_info": model_info,
+                    "token_limit": token_limit,
+                    "token_usage_percentage": 0,
+                }
+            )
 
         return jsonify({"success": True, "stats": stats})
     except Exception as e:
