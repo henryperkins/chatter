@@ -7,13 +7,41 @@ class ContextManager:
     def __init__(self, model_max_tokens: int):
         self.model_max_tokens = model_max_tokens
         self.context_strategy = "full"
-        self.cache = {}
+        self.context_cache = {}
+        self.monitor = ContextMonitor()
+        
+class ContextMonitor:
+    def __init__(self):
         self.metrics = {
             "token_usage": [],
-            "context_hits": 0,
-            "context_misses": 0,
-            "compression_ratio": 1.0
+            "cache_hits": 0,
+            "cache_misses": 0,
+            "compression_ratio": 1.0,
+            "response_quality": []
         }
+        
+    def track_token_usage(self, tokens: int):
+        self.metrics["token_usage"].append(tokens)
+        if len(self.metrics["token_usage"]) > 100:
+            self.metrics["token_usage"].pop(0)
+            
+    def track_cache_hit(self):
+        self.metrics["cache_hits"] += 1
+        
+    def track_cache_miss(self):
+        self.metrics["cache_misses"] += 1
+        
+    def track_response_quality(self, quality: float):
+        self.metrics["response_quality"].append(quality)
+        if len(self.metrics["response_quality"]) > 100:
+            self.metrics["response_quality"].pop(0)
+            
+    def optimize_compression(self):
+        avg_quality = sum(self.metrics["response_quality"]) / len(self.metrics["response_quality"])
+        if avg_quality < 0.7:
+            self.metrics["compression_ratio"] *= 0.9  # More aggressive compression
+        else:
+            self.metrics["compression_ratio"] = min(1.0, self.metrics["compression_ratio"] * 1.1)
 
     def calculate_optimal_window_size(self, message_count: int) -> int:
         """Calculate optimal context window size"""
@@ -80,17 +108,36 @@ class ContextManager:
         return min(1.0, len(content) / 1000)
 
     def get_context(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        """Get optimized context based on current strategy"""
-        base_tokens = count_conversation_tokens(messages)
+        """Get optimized context with caching and prioritization"""
+        # Try to get from cache
+        if id(messages) in self.context_manager.context_cache:
+            self.context_manager.monitor.track_cache_hit()
+            return self.context_manager.context_cache[id(messages)]
+            
+        # Get from database
+        messages = Chat.get_messages(chat_id)
         
-        if base_tokens <= self.model_max_tokens * 0.8:
-            return messages
-            
-        elif base_tokens <= self.model_max_tokens:
-            return self.compress_context(messages, self.model_max_tokens)
-            
-        else:
-            return self.summarize_context(messages)
+        # Prioritize messages
+        prioritized = self.prioritize_messages(messages)
+        
+        # Compress context
+        compressed = self.compress_context(prioritized)
+        
+        # Update cache
+        self.context_manager.context_cache[id(messages)] = compressed
+        self.context_manager.monitor.track_cache_miss()
+        
+        return compressed
+        
+    def prioritize_messages(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        return sorted(
+            messages,
+            key=lambda msg: (
+                -msg.get("metadata", {}).get("timestamp", 0),
+                0 if msg["role"] == "user" else 1,
+                -self.calculate_importance(msg["content"])
+            )
+        )
 
     def summarize_context(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
         """Create a summary of the context"""
@@ -113,10 +160,9 @@ class ContextManager:
             self.context_strategy = "summary"
 
     def track_token_usage(self, tokens: int):
-        """Track token usage for monitoring"""
-        self.metrics["token_usage"].append(tokens)
-        if len(self.metrics["token_usage"]) > 100:
-            self.metrics["token_usage"].pop(0)
+        """Track token usage with enhanced monitoring"""
+        self.context_manager.monitor.track_token_usage(tokens)
+        self.context_manager.monitor.optimize_compression()
 
     def get_token_trend(self) -> float:
         """Get token usage trend"""

@@ -45,19 +45,26 @@ def count_message_tokens(message: dict) -> int:
         
     tokens = 0
     
-    # Special tokens for chat models
+    # Add API-specific formatting tokens
     if MODEL_NAME.startswith("gpt-"):
-        tokens += 3  # <|im_start|> + role + \n
-        if message.get("name"):
-            tokens += 1  # name token
-            
-    # Content tokens
+        tokens += 2  # Start token
+        tokens += 1  # End token
+        
+    # Add role-specific overhead
+    if message["role"] == "system":
+        tokens += 4
+    elif message["role"] == "user":
+        tokens += 3
+    elif message["role"] == "assistant":
+        tokens += 3
+        
+    # Add message content tokens
     tokens += cached_count_tokens(message["content"])
     
-    # Special tokens for chat models
-    if MODEL_NAME.startswith("gpt-"):
-        tokens += 1  # <|im_end|>
-    
+    # Add multi-message overhead if not first message
+    if message.get("is_first", False):
+        tokens += 2
+        
     return tokens
 
 def count_conversation_tokens(messages: List[dict]) -> int:
