@@ -23,6 +23,11 @@ class ModelFormHandler {
             console.error('Form action URL not found');
             return;
         }
+
+        console.debug('Form submission started:', {
+            actionUrl,
+            formData: new FormData(form)
+        });
         
         try {
             // Show loading state
@@ -48,8 +53,16 @@ class ModelFormHandler {
                 if (numericFields.includes(key)) {
                     formData.set(key, Number(value));
                 } else if (booleanFields.includes(key)) {
-                    formData.set(key, value === 'on');
+                    formData.set(key, value === 'on' || value === 'true');
                 }
+                console.debug(`Processing form field: ${key} = ${value}`);
+            }
+
+            // Ensure CSRF token is present
+            if (!formData.get('csrf_token')) {
+                const csrfToken = this.utils.getCSRFToken();
+                formData.append('csrf_token', csrfToken);
+                console.debug('Added CSRF token to form data');
             }
 
             // Handle o1-preview specific logic
@@ -58,23 +71,24 @@ class ModelFormHandler {
                 formData.set('supports_streaming', false);
             }
 
+            console.debug('Sending form data to:', actionUrl);
             const response = await this.utils.fetchWithCSRF(actionUrl, {
-                method: form.method || "POST",
+                method: "POST",
                 body: formData,
                 headers: {
                     "X-CSRFToken": this.utils.getCSRFToken(),
                     "X-Requested-With": "XMLHttpRequest"
                 }
             });
+            console.debug('Received response:', response);
 
             if (response.success) {
-                console.debug("Received response:", response);
+                this.utils.showFeedback("Model saved successfully", "success");
                 if (response.redirect) {
                     console.debug("Redirecting to:", response.redirect);
-                    window.location.href = response.redirect;
-                } else {
-                    console.debug("No redirect found in response");
-                    this.utils.showFeedback("Model saved successfully", "success");
+                    setTimeout(() => {
+                        window.location.href = response.redirect;
+                    }, 500);
                 }
             } else {
                 this.utils.showFeedback(response.error || "Failed to save model", "error");
