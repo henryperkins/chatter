@@ -20,20 +20,33 @@ class FileUploadHandler:
         # Ensure the quarantine folder exists
         os.makedirs(self.QUARANTINE_FOLDER, exist_ok=True)
 
-    def allowed_file(self, filename: str) -> bool:
+    def allowed_file(self, filename: str, file) -> bool:
         """
-        Check if a file has an allowed extension.
+        Check if a file has an allowed extension and MIME type.
 
         Args:
             filename (str): The filename to check.
+            file: The file object.
 
         Returns:
-            bool: True if the file extension is allowed, False otherwise.
+            bool: True if the file extension and MIME type are allowed, False otherwise.
         """
-        return (
+        # Check extension
+        extension_allowed = (
             "." in filename
             and filename.rsplit(".", 1)[1].lower() in self.ALLOWED_EXTENSIONS
         )
+        if not extension_allowed:
+            return False
+
+        # Check MIME type
+        import magic
+        file.seek(0)
+        mime_type = magic.from_buffer(file.read(1024), mime=True)
+        file.seek(0)
+        mime_allowed = mime_type in Config.ALLOWED_MIME_TYPES
+
+        return mime_allowed
 
     def validate_files(self, files: List) -> Tuple[List, List]:
         """

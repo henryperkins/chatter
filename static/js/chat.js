@@ -94,9 +94,9 @@
             editTitleBtn.addEventListener('click', async () => {
                 try {
                     const chatTitle = document.getElementById('chat-title');
-                    const currentTitle = chatTitle.textContent.split('-')[0].trim();
+                    const currentTitle = chatTitle?.textContent?.split('-')[0].trim() || 'New Chat';
                     const newTitle = prompt('Enter new chat title:', currentTitle);
-                    
+        
                     if (!newTitle || newTitle === currentTitle) return;
 
                     const response = await window.utils.fetchWithCSRF(`/chat/update_chat_title/${chatId}`, {
@@ -253,8 +253,6 @@
         });
     }
 
-    // These functions have been integrated directly into init()
-
     function setupDragAndDrop() {
         const dropZone = document.getElementById('drop-zone');
         if (!dropZone) return;
@@ -373,6 +371,7 @@
         // Add message text if present
         if (messageText) {
             formData.append('message', messageText);
+            appendUserMessage(messageText);
         }
 
         // Add files if present
@@ -483,8 +482,6 @@
             sendMessage();
         }
     }
-
-    // These functions have been integrated directly into init()
 
     function adjustTextareaHeight(textarea) {
         textarea.style.height = 'auto';
@@ -720,23 +717,29 @@
             }
         } else {
             messageDiv = document.createElement('div');
-            messageDiv.className = 'flex w-full mt-2 space-x-3 max-w-3xl';
+            messageDiv.className = 'flex w-full mt-2 space-x-2 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl';
             messageDiv.setAttribute('role', 'listitem');
             messageDiv.innerHTML = `
-                <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700" role="img" aria-label="Assistant avatar"></div>
-                <div class="relative max-w-3xl">
-                    <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
-                        <div class="prose dark:prose-invert prose-sm max-w-none overflow-x-auto"></div>
-                    </div>
-                    <div class="absolute right-0 top-0 flex space-x-2">
-                        <button class="copy-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200"
-                                title="Copy to clipboard" aria-label="Copy message to clipboard">
+                <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-700" role="img" aria-label="Assistant avatar"></div>
+                <div class="relative flex-1">
+                    <!-- Action Buttons - Positioned absolutely to the right -->
+                    <div class="absolute right-2 top-2 flex items-center space-x-1 z-10">
+                        <button class="copy-button p-1.5 rounded-md bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200 shadow-sm"
+                                title="Copy to clipboard"
+                                data-raw-content="${message}"
+                                aria-label="Copy message to clipboard">
                             <i class="fas fa-copy"></i>
                         </button>
-                        <button class="regenerate-button p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                                title="Regenerate response">
-                            <i class="fas fa-sync-alt"></i>
+                        <button class="regenerate-button p-1.5 rounded-md bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200 shadow-sm"
+                                title="Regenerate response"
+                                aria-label="Regenerate response">
+                            <i class="fas fa-redo-alt"></i>
                         </button>
+                    </div>
+
+                    <!-- Message Content - With padding to prevent overlap -->
+                    <div class="bg-gray-100 dark:bg-gray-800 p-3 pr-16 rounded-r-lg rounded-bl-lg">
+                        <div class="prose dark:prose-invert prose-sm max-w-none overflow-x-auto"></div>
                     </div>
                     <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
                         ${new Date().toLocaleTimeString()}
@@ -777,6 +780,29 @@
             console.error('Error rendering markdown:', error);
             contentDiv.innerHTML = `<pre>${window.DOMPurify.sanitize(message)}</pre>`;
         }
+    }
+
+    // Function to append user message to chat box
+    function appendUserMessage(message) {
+        if (!message || typeof message !== 'string') {
+            console.error('Invalid message content.');
+            return;
+        }
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'flex w-full mt-2 space-x-2 max-w-[85%] sm:max-w-md md:max-w-2xl ml-auto justify-end';
+        messageDiv.innerHTML = `
+            <div>
+                <div class="relative bg-blue-600 text-white p-2.5 rounded-l-lg rounded-br-lg">
+                    <p class="text-[15px] leading-normal break-words overflow-x-auto">${message}</p>
+                </div>
+                <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                    ${new Date().toLocaleTimeString()}
+                </span>
+            </div>
+        `;
+        document.getElementById('chat-box').appendChild(messageDiv);
+        document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
     }
 
     // Initialize chat interface

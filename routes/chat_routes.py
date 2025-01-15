@@ -4,6 +4,7 @@ from typing import Union, Tuple, List, Dict, Any, Optional, cast
 
 import bleach
 import tiktoken
+from chat_utils import MODEL_NAME  # Added import for MODEL_NAME
 from flask import (
     Blueprint,
     request,
@@ -26,6 +27,7 @@ from chat_utils import (
     generate_chat_title,
     generate_new_chat_id,
     process_file,
+    count_tokens,  # Added import
 )
 from conversation_manager import conversation_manager
 from database import db_session
@@ -72,9 +74,9 @@ MAX_TOTAL_FILE_SIZE = int(os.getenv("MAX_TOTAL_FILE_SIZE", 50 * 1024 * 1024))  #
 MAX_FILE_CONTENT_LENGTH = int(os.getenv("MAX_FILE_CONTENT_LENGTH", 8000))  # Characters
 
 # Token Constants
+DEFAULT_MODEL = "gpt-4"  # Default model name for tiktoken encoding
 MAX_INPUT_TOKENS = int(os.getenv("MAX_INPUT_TOKENS", 8192))  # Max input tokens
 MAX_CONTEXT_TOKENS = int(os.getenv("MAX_CONTEXT_TOKENS", 128000))  # Max context tokens
-DEFAULT_MODEL = "gpt-4"  # Default model name for tiktoken encoding
 
 # Rate Limiting Constants
 SCRAPE_RATE_LIMIT = "5 per minute"
@@ -89,7 +91,7 @@ try:
     encoding = tiktoken.encoding_for_model(DEFAULT_MODEL)
 except KeyError:
     logger.warning(
-        f"Model '{DEFAULT_MODEL}' not found. Falling back to 'cl100k_base' encoding."
+        f"Model '{MODEL_NAME}' not found. Falling back to 'cl100k_base' encoding."
     )
     encoding = tiktoken.get_encoding("cl100k_base")
 
@@ -508,6 +510,15 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             else user_message
         )
 
+        # Check token count of combined message
+        total_tokens = count_tokens(combined_message, DEFAULT_MODEL)
+        if total_tokens > MAX_INPUT_TOKENS:
+            # Truncate the combined message to fit within the token limit
+            encoding = tiktoken.encoding_for_model(DEFAULT_MODEL)
+            tokens = encoding.encode(combined_message)[:MAX_INPUT_TOKENS]
+            truncated_message = encoding.decode(tokens)
+            combined_message = truncated_message + "\n\n[Note: Message truncated due to token limit.]"
+
         if (
             Chat.is_title_default(chat_id)
             and len(conversation_manager.get_context(chat_id)) >= 5
@@ -517,7 +528,7 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                 for msg in conversation_manager.get_context(chat_id)[:5]
             )
             Chat.update_title(chat_id, generate_chat_title(conversation_text))
-
+        
         conversation_manager.add_message(
             chat_id=chat_id,
             role="user",
