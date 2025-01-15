@@ -279,6 +279,23 @@ async function handleEditTitle() {
         window.utils.showFeedback(error.message, 'error');
     }
 }
+
+// Expose TokenUsageManager globally
+window.TokenUsageManager = TokenUsageManager;
+class TokenUsageManager {
+    constructor(config) {
+        this.chatId = config.chatId;
+        this.elements = {
+            container: document.getElementById('token-usage'),
+            progress: document.getElementById('token-progress'),
+            tokensUsed: document.getElementById('tokens-used'),
+            tokensLimit: document.getElementById('tokens-limit'),
+            userTokens: document.getElementById('user-tokens'),
+            assistantTokens: document.getElementById('assistant-tokens'),
+            systemTokens: document.getElementById('system-tokens'),
+            toggleBtn: document.getElementById('toggle-stats-btn'),
+            refreshBtn: document.getElementById('refresh-stats')
+        };
         this.updateInterval = null;
         this.initialize();
     }
@@ -420,14 +437,10 @@ async function handleEditTitle() {
         }
     }
 
-    // Method to be called after each chat message
     handleNewMessage() {
         this.updateStats();
     }
 }
-
-// Export the class
-/* static/js/token-usage.js */
 
 // Expose TokenUsageManager globally
 window.TokenUsageManager = TokenUsageManager;
