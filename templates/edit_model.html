@@ -10,7 +10,7 @@
     data-version="{{ model.version }}"
     data-model-id="{{ model.id }}"
     data-action="{{ url_for('model.edit_model', model_id=model.id) }}"
-    data-redirect="{{ url_for('chat.chat_interface') }}">
+    data-redirect="{{ request.host_url.rstrip('/') + url_for('chat.chat_interface') }}">
         {{ form.hidden_tag() }}
         <input type="hidden" name="version" value="{{ model.version }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

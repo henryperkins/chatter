@@ -92,9 +92,20 @@ class ModelFormHandler {
                     const redirectUrl = response.redirect.startsWith('/') ? 
                         window.location.origin + response.redirect :
                         response.redirect;
-                    setTimeout(() => {
-                        window.location.href = redirectUrl;
-                    }, 500);
+                    // Validate URL
+                    try {
+                        new URL(redirectUrl); // Will throw if invalid
+                        setTimeout(() => {
+                            window.location.href = redirectUrl;
+                        }, 500);
+                    } catch (error) {
+                        console.error('Invalid redirect URL:', redirectUrl);
+                        // Fallback to default chat interface
+                        window.location.href = '/chat/chat_interface';
+                    }
+                } else {
+                    // Default fallback if no redirect provided
+                    window.location.href = '/chat/chat_interface';
                 }
             } else {
                 this.utils.showFeedback(response.error || "Failed to save model", "error");

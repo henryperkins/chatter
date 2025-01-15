@@ -300,15 +300,16 @@ def edit_model(model_id):
                     validate_immutable_fields(model_id, data)
                     Model.update(model_id, data)
                     logger.info("Model updated successfully: %d", model_id)
+                    redirect_url = request.host_url.rstrip('/') + url_for('chat.chat_interface')
                     logger.debug("Sending response with redirect: %s", {
                         "success": True,
                         "message": "Model updated successfully",
-                        "redirect": url_for('chat.chat_interface')
+                        "redirect": redirect_url
                     })
                     return jsonify({
                         "success": True,
                         "message": "Model updated successfully",
-                        "redirect": url_for('chat.chat_interface')
+                        "redirect": redirect_url
                     })
                 except Exception as e:
                     return handle_error(e, "Error updating model", 400)
