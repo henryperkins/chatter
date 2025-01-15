@@ -16,6 +16,7 @@
 
         <form id="registration-form" method="POST" action="{{ url_for('auth.register') }}" class="space-y-6" novalidate>
             {{ form.hidden_tag() }}
+            <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token() }}">
 
             <!-- Username -->
             <div class="space-y-1">
@@ -263,15 +264,19 @@
                 if (!validateForm()) return;
 
                 setLoading(true);
+                const csrfToken = document.getElementById('csrf_token').value;
                 const formData = new FormData(registrationForm);
+
+                const headers = new Headers({
+                    'Accept': 'application/json',
+                    'X-CSRFToken': csrfToken
+                });
 
                 try {
                     const response = await fetch(registrationForm.action, {
                         method: 'POST',
                         body: formData,
-                        headers: {
-                            'Accept': 'application/json'
-                        },
+                        headers: headers,
                         credentials: 'same-origin'
                     });
 
