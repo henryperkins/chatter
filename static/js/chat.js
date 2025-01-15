@@ -34,6 +34,13 @@
             window.fileUploadManager = new window.FileUploadManager(chatId, userId);
         }
 
+        // Initialize TokenUsageManager
+        if (!window.tokenUsageManager) {
+            window.tokenUsageManager = new TokenUsageManager(window.CHAT_CONFIG);
+            // Show token usage stats after new messages
+            window.tokenUsageManager.updateStats();
+        }
+
         // Initialize mobile menu
         initializeMobileMenu();
 
@@ -365,6 +372,10 @@
     }
 
     async function sendMessage() {
+        // Update token usage after sending message
+        if (window.tokenUsageManager) {
+            window.tokenUsageManager.updateStats();
+        }
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
 
@@ -554,6 +565,10 @@
     }
 
     async function regenerateResponse(button) {
+        // Update token usage after regenerating response
+        if (window.tokenUsageManager) {
+            window.tokenUsageManager.updateStats();
+        }
         button.disabled = true;
         try {
             const chatId = new URLSearchParams(window.location.search).get('chat_id');
@@ -810,6 +825,9 @@
         document.getElementById('chat-box').appendChild(messageDiv);
         document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
     }
+
+    // Import TokenUsageManager
+    import TokenUsageManager from './token-usage.js';
 
     // Initialize chat interface
     if (document.readyState === 'loading') {
