@@ -159,4 +159,37 @@ document.addEventListener('DOMContentLoaded', function() {
     // Call initialization functions
     initializeTooltips();
     initializeModals();
+    initializeFontSizeAdjuster();
 });
+
+/*** Font Size Adjustment Handling ***/
+function initializeFontSizeAdjuster() {
+    const decreaseBtn = document.getElementById('decrease-font-size');
+    const increaseBtn = document.getElementById('increase-font-size');
+    const resetBtn = document.getElementById('reset-font-size');
+
+    let currentFontSize = parseFloat(localStorage.getItem('fontSize')) || 1.0;
+    applyFontSize(currentFontSize);
+
+    if (decreaseBtn && increaseBtn && resetBtn) {
+        decreaseBtn.addEventListener('click', () => {
+            currentFontSize = Math.max(0.8, currentFontSize - 0.1);
+            applyFontSize(currentFontSize);
+        });
+
+        increaseBtn.addEventListener('click', () => {
+            currentFontSize = Math.min(1.5, currentFontSize + 0.1);
+            applyFontSize(currentFontSize);
+        });
+
+        resetBtn.addEventListener('click', () => {
+            currentFontSize = 1.0;
+            applyFontSize(currentFontSize);
+        });
+    }
+}
+
+function applyFontSize(fontSize) {
+    document.documentElement.style.fontSize = fontSize + 'em';
+    localStorage.setItem('fontSize', fontSize);
+}
