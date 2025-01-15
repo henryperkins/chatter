@@ -62,7 +62,7 @@ class Model:
     is_default: bool = False
     requires_o1_handling: bool = False
     supports_streaming: bool = False
-    api_version: str = "2024-10-01-preview"
+    api_version: str = "2023-07-01-preview"
     version: int = 1
     created_at: Optional[str] = None
 
@@ -354,7 +354,7 @@ class Model:
             "max_tokens": Config.DEFAULT_MAX_TOKENS,
             "max_completion_tokens": Config.DEFAULT_MAX_COMPLETION_TOKENS,
             "model_type": "azure",
-            "api_version": Config.DEFAULT_API_VERSION,
+            "api_version": "2023-07-01-preview",
             "requires_o1_handling": Config.DEFAULT_REQUIRES_O1_HANDLING,
             "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
             "is_default": True,
@@ -507,13 +507,18 @@ class Model:
             if not config.get(field):
                 raise ValueError(f"Missing required field: {field}")
 
-        # Validate API endpoint
+        # Validate API endpoint and version
         api_endpoint = config["api_endpoint"]
         if (
             not api_endpoint.startswith("https://")
             or "openai.azure.com" not in api_endpoint
         ):
             raise ValueError("Invalid Azure OpenAI API endpoint")
+            
+        # Validate API version
+        valid_versions = ["2023-07-01-preview", "2023-03-15-preview"]
+        if config["api_version"] not in valid_versions:
+            raise ValueError(f"Invalid API version. Must be one of: {', '.join(valid_versions)}")
 
         # Validate API key
         api_key = config["api_key"]
