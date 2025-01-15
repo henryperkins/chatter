@@ -32,11 +32,11 @@ ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
 
 # Create file handler which logs even debug messages
-fh = logging.FileHandler('app.log')
+fh = logging.FileHandler("app.log")
 fh.setLevel(logging.DEBUG)
 
 # Create formatter and add it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 ch.setFormatter(formatter)
 fh.setFormatter(formatter)
 
@@ -222,14 +222,14 @@ def log_request_info():
         if current_user.is_authenticated:
             g.user_id = current_user.id
         # Log request information only once
-        if not hasattr(g, '_request_logged'):
+        if not hasattr(g, "_request_logged"):
             logger.debug(
                 "Request received - Method: %s, Path: %s, Remote: %s, Correlation ID: %s, User ID: %s",
                 request.method,
                 request.path,
                 request.remote_addr,
                 g.correlation_id,
-                getattr(g, "user_id", None)
+                getattr(g, "user_id", None),
             )
             g._request_logged = True
     except Exception as e:
@@ -304,8 +304,4 @@ init_app_components()
 # --- Application Entry Point ---
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(
-        host="0.0.0.0",
-        port=port,
-        debug=True
-    )
+    app.run(host="0.0.0.0", port=port, debug=True)

@@ -15,9 +15,17 @@ from decorators import admin_required
 from forms import ModelForm
 from models import Model
 
-bp = Blueprint("model", __name__)
+# Import centralized logging configuration
+import logging_config  # Ensure centralized logging is initialized
+
+# Initialize logger for this module
 logger = logging.getLogger(__name__)
 
+# Define the Blueprint for model routes
+bp = Blueprint("model", __name__)
+
+
+# Helper Functions
 def validate_csrf_token() -> Optional[tuple]:
     """Validate CSRF token for all POST, PUT, and DELETE requests."""
     try:
@@ -27,7 +35,9 @@ def validate_csrf_token() -> Optional[tuple]:
         flask_validate_csrf(csrf_token)
         return None
     except Exception as e:
+        logger.warning("CSRF validation failed: %s", str(e))
         return jsonify({"success": False, "error": "CSRF token invalid"}), 400
+
 
 def handle_error(error: Exception, message: str, status_code: int = 500) -> tuple:
     """Handle errors with proper logging and responses."""
@@ -36,8 +46,9 @@ def handle_error(error: Exception, message: str, status_code: int = 500) -> tupl
     elif isinstance(error, HTTPException):
         status_code = error.code
 
-    logger.error(f"{message}: {str(error)}")
+    logger.error(f"{message}: {str(error)}", exc_info=True)
     return jsonify({"error": str(error), "success": False}), status_code
+
 
 def extract_model_data(form: ModelForm) -> dict:
     """
@@ -100,12 +111,19 @@ def get_models():
                 "api_version": m.api_version,
                 "version": m.version,
             }
-        for m in models
+            for m in models
         ]
+        logger.info(
+            "Retrieved %d models with offset %d and limit %d",
+            len(model_list),
+            offset,
+            limit,
+        )
         return jsonify(model_list)
 
     except Exception as e:
         return handle_error(e, "Error retrieving models")
+
 
 @bp.route("/models", methods=["POST"])
 @login_required
@@ -120,12 +138,12 @@ def create_model():
 
     form = ModelForm()
     if not form.validate_on_submit():
-        logger.error("Form validation failed: %s", form.errors)
+        logger.warning("Model form validation failed: %s", form.errors)
         return jsonify({"error": form.errors, "success": False}), 400
 
     try:
         data = extract_model_data(form)
-        
+
         # Validate required fields
         required_fields = ["name", "deployment_name", "api_endpoint", "api_key"]
         for field in required_fields:
@@ -142,16 +160,25 @@ def create_model():
         )
         Model.validate_model_config(data)
         model_id = Model.create(data)
-        logger.info(f"Model created successfully with ID: {model_id}")
-        return jsonify(
-            {"id": model_id, "success": True, "message": "Model created successfully"}
-        ), 201
+        logger.info("Model created successfully with ID: %d", model_id)
+        return (
+            jsonify(
+                {
+                    "id": model_id,
+                    "success": True,
+                    "message": "Model created successfully",
+                }
+            ),
+            201,
+        )
 
     except ValueError as e:
         return handle_error(e, "Validation error during model creation", 400)
     except Exception as e:
         if "UNIQUE constraint failed: models.deployment_name" in str(e):
-            return handle_error(e, "A model with this deployment name already exists", 400)
+            return handle_error(
+                e, "A model with this deployment name already exists", 400
+            )
         return handle_error(e, "Unexpected error during model creation")
 
 
@@ -168,13 +195,14 @@ def update_model(model_id: int):
 
     data = request.get_json()
     if not data:
+        logger.warning("No data provided for updating model %d", model_id)
         return jsonify({"error": "No data provided", "success": False}), 400
 
     try:
-        logger.info(f"Updating model with ID: {model_id}")
+        logger.info("Updating model with ID: %d", model_id)
         validate_immutable_fields(model_id, data)
         Model.update(model_id, data)
-        logger.info(f"Model updated successfully: {model_id}")
+        logger.info("Model updated successfully: %d", model_id)
         return jsonify({"success": True, "message": "Model updated successfully"})
 
     except ValueError as e:
@@ -195,15 +223,16 @@ def delete_model(model_id: int):
         return csrf_error
 
     try:
-        logger.info(f"Deleting model with ID: {model_id}")
+        logger.info("Deleting model with ID: %d", model_id)
         Model.delete(model_id)
-        logger.info(f"Model deleted successfully: {model_id}")
+        logger.info("Model deleted successfully: %d", model_id)
         return jsonify({"success": True, "message": "Model deleted successfully"})
 
     except ValueError as e:
         return handle_error(e, f"Error deleting model {model_id}", 400)
     except Exception as e:
         return handle_error(e, f"Unexpected error during model deletion {model_id}")
+
 
 @bp.route("/add-model", methods=["GET"])
 @login_required
@@ -213,6 +242,7 @@ def add_model_page():
     Render a page for adding a model.
     """
     form = ModelForm()
+    logger.debug("Rendering add model page")
     return render_template("add_model.html", form=form)
 
 
@@ -224,6 +254,7 @@ def edit_model(model_id):
     try:
         model = Model.get_by_id(model_id)
         if not model:
+            logger.warning("Model with ID %d not found", model_id)
             return jsonify({"error": "Model not found"}), 404
 
         form = ModelForm(obj=model)
@@ -238,17 +269,22 @@ def edit_model(model_id):
                     data = extract_model_data(form)
                     validate_immutable_fields(model_id, data)
                     Model.update(model_id, data)
-                    logger.info(f"Model updated successfully: {model_id}")
-                    return jsonify({"success": True, "message": "Model updated successfully"})
+                    logger.info("Model updated successfully: %d", model_id)
+                    return jsonify(
+                        {"success": True, "message": "Model updated successfully"}
+                    )
                 except Exception as e:
                     return handle_error(e, "Error updating model", 400)
 
+            logger.warning("Form validation failed during model edit: %s", form.errors)
             return jsonify({"error": form.errors}), 400
 
+        logger.debug("Rendering edit model page for model ID %d", model_id)
         return render_template("edit_model.html", form=form, model=model)
 
     except Exception as e:
         return handle_error(e, "Error in edit_model")
+
 
 @bp.route("/models/default/<int:model_id>", methods=["POST"])
 @login_required
@@ -262,14 +298,15 @@ def set_default_model(model_id: int):
         return csrf_error
 
     try:
-        logger.info(f"Setting model {model_id} as default")
+        logger.info("Setting model %d as default", model_id)
         Model.set_default(model_id)
-        logger.info(f"Model {model_id} set as default successfully")
+        logger.info("Model %d set as default successfully", model_id)
         return jsonify(
             {"success": True, "message": "Model set as default successfully"}
         )
     except Exception as e:
         return handle_error(e, "Unexpected error setting default model")
+
 
 @bp.route("/models/<int:model_id>/immutable-fields", methods=["GET"])
 @login_required
@@ -279,9 +316,11 @@ def get_immutable_fields(model_id: int):
     """
     try:
         immutable_fields = Model.get_immutable_fields(model_id)
+        logger.info("Retrieved immutable fields for model ID %d", model_id)
         return jsonify(immutable_fields)
     except Exception as e:
         return handle_error(e, "Error retrieving immutable fields")
+
 
 @bp.route("/models/<int:model_id>/versions", methods=["GET"])
 @login_required
@@ -293,6 +332,7 @@ def get_version_history(model_id: int):
         limit = request.args.get("limit", 10, type=int)
         offset = request.args.get("offset", 0, type=int)
         versions = Model.get_version_history(model_id, limit, offset)
+        logger.info("Retrieved version history for model ID %d", model_id)
         return jsonify(versions)
     except Exception as e:
         return handle_error(e, "Error retrieving version history")
@@ -319,9 +359,9 @@ def revert_to_version(model_id: int, version: int):
         if version not in [v["version"] for v in versions]:
             raise ValueError(f"Version {version} not found in model history.")
 
-        logger.info(f"Reverting model {model_id} to version {version}")
+        logger.info("Reverting model %d to version %d", model_id, version)
         Model.revert_to_version(model_id, version)
-        logger.info(f"Model {model_id} reverted to version {version} successfully")
+        logger.info("Model %d reverted to version %d successfully", model_id, version)
         return jsonify(
             {"success": True, "message": "Model reverted to version successfully"}
         )

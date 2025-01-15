@@ -1,4 +1,3 @@
-
 class TokenUsageManager {
     constructor(config) {
         this.chatId = config.chatId;
@@ -19,32 +18,38 @@ class TokenUsageManager {
 
     initialize() {
         // Add event listeners
-        this.elements.toggleBtn.addEventListener('click', () => this.toggleDisplay());
-        this.elements.refreshBtn.addEventListener('click', () => this.updateStats());
+        if (this.elements.toggleBtn) {
+            this.elements.toggleBtn.addEventListener('click', () => this.toggleDisplay());
+        }
+        if (this.elements.refreshBtn) {
+            this.elements.refreshBtn.addEventListener('click', () => this.updateStats());
+        }
 
         // Start periodic updates
         this.startPeriodicUpdates();
     }
 
     toggleDisplay() {
-        this.elements.container.classList.toggle('hidden');
-        if (!this.elements.container.classList.contains('hidden')) {
-            this.updateStats();
+        if (this.elements.container) {
+            this.elements.container.classList.toggle('hidden');
+            if (!this.elements.container.classList.contains('hidden')) {
+                this.updateStats();
+            }
         }
     }
 
     async updateStats() {
-        if (this.elements.container.classList.contains('hidden')) return;
+        if (this.elements.container && !this.elements.container.classList.contains('hidden')) {
+            try {
+                const response = await fetch(`/stats/${this.chatId}`);
+                const data = await response.json();
 
-        try {
-            const response = await fetch(`/stats/${this.chatId}`);
-            const data = await response.json();
-            
-            if (data.success && data.stats) {
-                this.updateDisplay(data.stats);
+                if (data.success && data.stats) {
+                    this.updateDisplay(data.stats);
+                }
+            } catch (error) {
+                console.error('Error fetching token stats:', error);
             }
-        } catch (error) {
-            console.error('Error fetching token stats:', error);
         }
     }
 
@@ -54,31 +59,45 @@ class TokenUsageManager {
         const percentage = stats.token_usage_percentage;
 
         // Update progress bar
-        this.elements.progress.style.width = `${Math.min(percentage, 100)}%`;
-        this.updateProgressColor(percentage);
+        if (this.elements.progress) {
+            this.elements.progress.style.width = `${Math.min(percentage, 100)}%`;
+            this.updateProgressColor(percentage);
+        }
 
         // Update counts
-        this.elements.tokensUsed.textContent = `${used.toLocaleString()} tokens used`;
-        this.elements.tokensLimit.textContent = `/ ${limit.toLocaleString()} max`;
-        this.elements.userTokens.textContent = stats.token_breakdown.user.toLocaleString();
-        this.elements.assistantTokens.textContent = stats.token_breakdown.assistant.toLocaleString();
-        this.elements.systemTokens.textContent = stats.token_breakdown.system.toLocaleString();
+        if (this.elements.tokensUsed) {
+            this.elements.tokensUsed.textContent = `${used.toLocaleString()} tokens used`;
+        }
+        if (this.elements.tokensLimit) {
+            this.elements.tokensLimit.textContent = `/ ${limit.toLocaleString()} max`;
+        }
+        if (this.elements.userTokens) {
+            this.elements.userTokens.textContent = stats.token_breakdown.user.toLocaleString();
+        }
+        if (this.elements.assistantTokens) {
+            this.elements.assistantTokens.textContent = stats.token_breakdown.assistant.toLocaleString();
+        }
+        if (this.elements.systemTokens) {
+            this.elements.systemTokens.textContent = stats.token_breakdown.system.toLocaleString();
+        }
     }
 
     updateProgressColor(percentage) {
-        this.elements.progress.classList.remove('bg-blue-600', 'bg-yellow-600', 'bg-red-600');
-        if (percentage > 90) {
-            this.elements.progress.classList.add('bg-red-600');
-        } else if (percentage > 75) {
-            this.elements.progress.classList.add('bg-yellow-600');
-        } else {
-            this.elements.progress.classList.add('bg-blue-600');
+        if (this.elements.progress) {
+            this.elements.progress.classList.remove('bg-blue-600', 'bg-yellow-600', 'bg-red-600');
+            if (percentage > 90) {
+                this.elements.progress.classList.add('bg-red-600');
+            } else if (percentage > 75) {
+                this.elements.progress.classList.add('bg-yellow-600');
+            } else {
+                this.elements.progress.classList.add('bg-blue-600');
+            }
         }
     }
 
     startPeriodicUpdates() {
         this.updateInterval = setInterval(() => {
-            if (!this.elements.container.classList.contains('hidden')) {
+            if (this.elements.container && !this.elements.container.classList.contains('hidden')) {
                 this.updateStats();
             }
         }, 30000); // Update every 30 seconds if visible

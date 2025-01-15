@@ -5,7 +5,7 @@ from typing import Optional, List, Dict, Union, Any
 
 from sqlalchemy import text
 
-from .base import db_session
+from database import db_session
 from .model import Model  # Import at top level for type hints
 
 logger = logging.getLogger(__name__)

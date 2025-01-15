@@ -1,7 +1,7 @@
-import logging
+import logging  # noqa: F401
 from logging.config import dictConfig
 import os
-from logging.handlers import RotatingFileHandler
+from logging.handlers import RotatingFileHandler  # noqa: F401
 
 # Create logs directory if it doesn't exist
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'logs')
@@ -21,8 +21,8 @@ logconfig_dict = {
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'json' if os.getenv('FLASK_ENV') == 'production' else 'standard',
-            'level': 'ERROR',
+            'formatter': 'standard',
+            'level': 'DEBUG',
         },
         'file': {
             'class': 'logging.handlers.RotatingFileHandler',

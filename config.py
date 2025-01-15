@@ -4,14 +4,30 @@ import os
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
     DATABASE_URI = os.getenv("DATABASE_URI", "sqlite:///./data/chat_app.db")
-    ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "your-encryption-key")
+    ENCRYPTION_KEY = os.getenv(
+        "ENCRYPTION_KEY", "b'\x1f\x8d\x9c\x57\xab\x3e\x7c\x0a\xd3\x99\x6e\x5a\x84\x2b\xcd\x1e'"
+    )
 
     AZURE_API_KEY = os.getenv("AZURE_API_KEY", "your-azure-api-key")
     AZURE_API_ENDPOINT = os.getenv("AZURE_API_ENDPOINT", "https://openai.azure.com/")
     AZURE_API_VERSION = os.getenv("AZURE_API_VERSION", "2024-12-01-preview")
     AZURE_DEPLOYMENT_NAME = os.getenv(
-        "AZURE_OPENAI_DEPLOYMENT_NAME", "default-deployment"
+        "AZURE_OPENAI_DEPLOYMENT_NAME", "o1-preview"
     )
+
+    # Added missing default model configurations
+    DEFAULT_MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "Default Model")
+    DEFAULT_DEPLOYMENT_NAME = os.getenv("DEFAULT_DEPLOYMENT_NAME", AZURE_DEPLOYMENT_NAME)
+    DEFAULT_MODEL_DESCRIPTION = os.getenv(
+        "DEFAULT_MODEL_DESCRIPTION", "Default model description"
+    )
+    DEFAULT_API_ENDPOINT = os.getenv("DEFAULT_API_ENDPOINT", AZURE_API_ENDPOINT)
+    DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", "1.0"))
+    DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", 32000))
+    DEFAULT_MAX_COMPLETION_TOKENS = int(os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", 8300))
+    DEFAULT_REQUIRES_O1_HANDLING = bool(os.getenv("DEFAULT_REQUIRES_O1_HANDLING", True))
+    DEFAULT_SUPPORTS_STREAMING = bool(os.getenv("DEFAULT_SUPPORTS_STREAMING", False))
+    DEFAULT_API_VERSION = os.getenv("DEFAULT_API_VERSION", AZURE_API_VERSION)
 
     EMAIL_SENDER = os.getenv("EMAIL_SENDER", "no-reply@example.com")
     SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.example.com")
@@ -48,27 +64,6 @@ class Config:
     MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", 32000))
     MAX_MESSAGE_TOKENS = int(os.getenv("MAX_MESSAGE_TOKENS", 32000))
-
-    DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", "1.0"))
-    DEFAULT_MAX_TOKENS = None
-    DEFAULT_MAX_COMPLETION_TOKENS = int(
-        os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", 8300)
-    )
-    DEFAULT_REQUIRES_O1_HANDLING = bool(os.getenv("DEFAULT_REQUIRES_O1_HANDLING", True))
-    DEFAULT_SUPPORTS_STREAMING = bool(os.getenv("DEFAULT_SUPPORTS_STREAMING", False))
-
-    DEFAULT_MODEL_CONFIG = {
-        "name": MODEL_NAME,
-        "deployment_name": AZURE_DEPLOYMENT_NAME,
-        "api_endpoint": AZURE_API_ENDPOINT,
-        "api_key": AZURE_API_KEY,
-        "api_version": AZURE_API_VERSION,
-        "temperature": DEFAULT_TEMPERATURE,
-        "max_tokens": DEFAULT_MAX_TOKENS,
-        "max_completion_tokens": DEFAULT_MAX_COMPLETION_TOKENS,
-        "requires_o1_handling": DEFAULT_REQUIRES_O1_HANDLING,
-        "supports_streaming": DEFAULT_SUPPORTS_STREAMING,
-    }
 
     PASSWORD_MIN_LENGTH = int(os.getenv("PASSWORD_MIN_LENGTH", 8))
     PASSWORD_REQUIRE_UPPERCASE = bool(os.getenv("PASSWORD_REQUIRE_UPPERCASE", True))

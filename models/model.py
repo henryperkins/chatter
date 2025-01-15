@@ -16,13 +16,14 @@ from cryptography.fernet import Fernet, InvalidToken
 
 from sqlalchemy import text
 
-from .base import db_session, get_db_pool
+from database import db_session, get_db_pool
 from config import Config
 
 logger = logging.getLogger(__name__)
 
 # Type aliases for better readability
 ModelDict = Dict[str, Any]
+
 
 @dataclass
 class Model:
@@ -47,6 +48,7 @@ class Model:
         version: Model configuration version
         created_at: Creation timestamp
     """
+
     id: int
     name: str
     deployment_name: str
@@ -88,25 +90,34 @@ class Model:
             with db_session() as db:
                 logger.debug(
                     "Creating model with data: %s",
-                    {k: v if k != 'api_key' else '****' for k, v in data.items()}
+                    {k: v if k != "api_key" else "****" for k, v in data.items()},
                 )
 
                 # Check for existing models if not default
                 if not data.get("is_default", False):
-                    check_query = text("""
+                    check_query = text(
+                        """
                         SELECT name, deployment_name
                         FROM models
                         WHERE (LOWER(name) = LOWER(:name)
                         OR LOWER(deployment_name) = LOWER(:deployment_name))
                         AND NOT is_default
-                    """)
-                    existing = db.execute(check_query, {
-                        "name": data["name"],
-                        "deployment_name": data["deployment_name"]
-                    }).fetchone()
+                    """
+                    )
+                    existing = db.execute(
+                        check_query,
+                        {
+                            "name": data["name"],
+                            "deployment_name": data["deployment_name"],
+                        },
+                    ).fetchone()
 
                     if existing:
-                        field = "name" if existing[0].lower() == data["name"].lower() else "deployment_name"
+                        field = (
+                            "name"
+                            if existing[0].lower() == data["name"].lower()
+                            else "deployment_name"
+                        )
                         raise ValueError(f"A model with this {field} already exists")
 
                 # Validate configuration
@@ -114,10 +125,13 @@ class Model:
 
                 # Update default status if needed
                 if data.get("is_default", False):
-                    db.execute(text("UPDATE models SET is_default = 0 WHERE is_default = 1"))
+                    db.execute(
+                        text("UPDATE models SET is_default = 0 WHERE is_default = 1")
+                    )
 
                 # Insert new model
-                query = text("""
+                query = text(
+                    """
                     INSERT INTO models (
                         name, deployment_name, description, api_endpoint, api_key,
                         api_version, temperature, max_tokens, max_completion_tokens,
@@ -130,7 +144,8 @@ class Model:
                         CURRENT_TIMESTAMP
                     )
                     RETURNING id
-                """)
+                """
+                )
                 result = db.execute(query, data)
                 model_id = result.scalar()
 
@@ -168,19 +183,19 @@ class Model:
             with db_session() as db:
                 query = text("SELECT * FROM models WHERE id = :id")
                 row = db.execute(query, {"id": model_id}).mappings().first()
-                
+
                 if not row:
                     logger.info("No model found with ID %d", model_id)
                     return None
 
                 model_dict = dict(row)
-                
+
                 # Decrypt API key
                 key = Config.ENCRYPTION_KEY
                 if not key:
                     logger.error("Encryption key not configured")
                     return None
-                
+
                 try:
                     if isinstance(key, str):
                         key = key.encode()
@@ -191,9 +206,9 @@ class Model:
                 except InvalidToken:
                     logger.error("Invalid token for model %d", model_id)
                     return None
-                
+
                 # Log safely (excluding sensitive data)
-                safe_dict = {k: v for k, v in model_dict.items() if k != 'api_key'}
+                safe_dict = {k: v for k, v in model_dict.items() if k != "api_key"}
                 logger.debug("Model retrieved by ID %d: %s", model_id, safe_dict)
                 return Model(**model_dict)
 
@@ -223,14 +238,23 @@ class Model:
 
                 # Filter allowed fields
                 allowed_fields = {
-                    "name", "deployment_name", "description", "api_endpoint",
-                    "api_key", "api_version", "temperature", "max_tokens",
-                    "max_completion_tokens", "model_type", "requires_o1_handling",
-                    "supports_streaming", "is_default", "version"
+                    "name",
+                    "deployment_name",
+                    "description",
+                    "api_endpoint",
+                    "api_key",
+                    "api_version",
+                    "temperature",
+                    "max_tokens",
+                    "max_completion_tokens",
+                    "model_type",
+                    "requires_o1_handling",
+                    "supports_streaming",
+                    "is_default",
+                    "version",
                 }
                 update_data = {
-                    key: value for key, value in data.items() 
-                    if key in allowed_fields
+                    key: value for key, value in data.items() if key in allowed_fields
                 }
 
                 if not update_data:
@@ -245,23 +269,27 @@ class Model:
                 set_clause = ", ".join(f"{key} = :{key}" for key in update_data)
                 params = cast(Dict[str, Any], {**update_data, "model_id": model_id})
 
-                query = text(f"""
+                query = text(
+                    f"""
                     UPDATE models
                     SET {set_clause}
                     WHERE id = :model_id
-                """).bindparams(**params)
+                """
+                ).bindparams(**params)
 
                 db.execute(query)
 
                 # Update default status if needed
                 if update_data.get("is_default", False):
                     db.execute(
-                        text("""
+                        text(
+                            """
                             UPDATE models
                             SET is_default = 0
                             WHERE id != :model_id AND is_default = :is_default
-                        """),
-                        {"model_id": model_id, "is_default": True}
+                        """
+                        ),
+                        {"model_id": model_id, "is_default": True},
                     )
 
                 # Create new version
@@ -289,12 +317,16 @@ class Model:
         with db_session() as db:
             try:
                 # Check if model is in use
-                check_query = text("""
+                check_query = text(
+                    """
                     SELECT COUNT(*) as count
                     FROM chats
                     WHERE model_id = :model_id
-                """)
-                result = db.execute(check_query, {"model_id": model_id}).mappings().first()
+                """
+                )
+                result = (
+                    db.execute(check_query, {"model_id": model_id}).mappings().first()
+                )
                 if result and result["count"] > 0:
                     raise ValueError("Cannot delete model that is in use by chats")
 
@@ -309,9 +341,26 @@ class Model:
                 logger.error("Failed to delete model %d: %s", model_id, e)
                 raise
 
-    # endregion
-
-    # region Model Management
+    @staticmethod
+    def create_default_model() -> None:
+        """Create a default model configuration."""
+        default_model_data = {
+            "name": Config.DEFAULT_MODEL_NAME,
+            "deployment_name": Config.DEFAULT_DEPLOYMENT_NAME,
+            "description": Config.DEFAULT_MODEL_DESCRIPTION,
+            "api_endpoint": Config.DEFAULT_API_ENDPOINT,
+            "api_key": Config.AZURE_API_KEY,
+            "temperature": Config.DEFAULT_TEMPERATURE,
+            "max_tokens": Config.DEFAULT_MAX_TOKENS,
+            "max_completion_tokens": Config.DEFAULT_MAX_COMPLETION_TOKENS,
+            "model_type": "azure",
+            "api_version": Config.DEFAULT_API_VERSION,
+            "requires_o1_handling": Config.DEFAULT_REQUIRES_O1_HANDLING,
+            "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
+            "is_default": True,
+            "version": 1,
+        }
+        Model.create(default_model_data)
 
     @staticmethod
     def get_default() -> Optional["Model"]:
@@ -328,7 +377,7 @@ class Model:
                 row = db.execute(query, {"is_default": True}).mappings().first()
                 if row:
                     model_dict = dict(row)
-                    safe_dict = {k: v for k, v in model_dict.items() if k != 'api_key'}
+                    safe_dict = {k: v for k, v in model_dict.items() if k != "api_key"}
                     logger.debug("Default model retrieved: %s", safe_dict)
                     return Model(**model_dict)
                 logger.info("No default model found")
@@ -351,20 +400,25 @@ class Model:
         """
         with db_session() as db:
             try:
-                query = text("""
+                query = text(
+                    """
                     SELECT * FROM models
                     ORDER BY created_at DESC
                     LIMIT :limit OFFSET :offset
-                """)
-                rows = db.execute(query, {
-                    "limit": limit,
-                    "offset": offset
-                }).mappings().all()
-                
+                """
+                )
+                rows = (
+                    db.execute(query, {"limit": limit, "offset": offset})
+                    .mappings()
+                    .all()
+                )
+
                 models = [Model(**dict(row)) for row in rows]
                 logger.debug(
                     "Retrieved %d models (limit=%d, offset=%d)",
-                    len(models), limit, offset
+                    len(models),
+                    limit,
+                    offset,
                 )
                 return models
             except Exception as e:
@@ -386,19 +440,27 @@ class Model:
             try:
                 # Update default status
                 db.execute(
-                    text("UPDATE models SET is_default = 0 WHERE is_default = :current_default"),
-                    {"current_default": True}
+                    text(
+                        "UPDATE models SET is_default = 0 WHERE is_default = :current_default"
+                    ),
+                    {"current_default": True},
                 )
                 db.execute(
                     text("UPDATE models SET is_default = 1 WHERE id = :model_id"),
-                    {"model_id": model_id}
+                    {"model_id": model_id},
                 )
 
                 # Verify single default
-                duplicate_check = db.execute(
-                    text("SELECT COUNT(*) as count FROM models WHERE is_default = :is_default"),
-                    {"is_default": True}
-                ).mappings().first()
+                duplicate_check = (
+                    db.execute(
+                        text(
+                            "SELECT COUNT(*) as count FROM models WHERE is_default = :is_default"
+                        ),
+                        {"is_default": True},
+                    )
+                    .mappings()
+                    .first()
+                )
 
                 if duplicate_check and duplicate_check["count"] > 1:
                     raise ValueError("More than one default model exists")
@@ -432,8 +494,14 @@ class Model:
 
         # Validate required fields
         required_fields = [
-            "name", "deployment_name", "api_endpoint", "api_key",
-            "api_version", "model_type", "max_completion_tokens", "version"
+            "name",
+            "deployment_name",
+            "api_endpoint",
+            "api_key",
+            "api_version",
+            "model_type",
+            "max_completion_tokens",
+            "version",
         ]
         for field in required_fields:
             if not config.get(field):
@@ -441,7 +509,10 @@ class Model:
 
         # Validate API endpoint
         api_endpoint = config["api_endpoint"]
-        if not api_endpoint.startswith("https://") or "openai.azure.com" not in api_endpoint:
+        if (
+            not api_endpoint.startswith("https://")
+            or "openai.azure.com" not in api_endpoint
+        ):
             raise ValueError("Invalid Azure OpenAI API endpoint")
 
         # Validate API key
@@ -480,7 +551,9 @@ class Model:
                 tokens = int(max_completion_tokens)
                 max_limit = 8300 if config.get("requires_o1_handling") else 16384
                 if not 1 <= tokens <= max_limit:
-                    raise ValueError(f"max_completion_tokens must be between 1 and {max_limit}")
+                    raise ValueError(
+                        f"max_completion_tokens must be between 1 and {max_limit}"
+                    )
                 config["max_completion_tokens"] = tokens
             except (TypeError, ValueError):
                 raise ValueError("max_completion_tokens must be a valid integer")
@@ -500,22 +573,29 @@ class Model:
         """
         with db_session() as db:
             try:
-                curr_version = db.execute(
-                    text("SELECT MAX(version) FROM model_versions WHERE model_id = :id"),
-                    {"id": model_id}
-                ).scalar() or 0
+                curr_version = (
+                    db.execute(
+                        text(
+                            "SELECT MAX(version) FROM model_versions WHERE model_id = :id"
+                        ),
+                        {"id": model_id},
+                    ).scalar()
+                    or 0
+                )
 
                 json_data = json.dumps(data)
                 db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO model_versions (model_id, version, data)
                         VALUES (:model_id, :version, :data)
-                    """),
+                    """
+                    ),
                     {
                         "model_id": model_id,
                         "version": curr_version + 1,
-                        "data": json_data
-                    }
+                        "data": json_data,
+                    },
                 )
                 db.commit()
             except Exception as e:
@@ -524,7 +604,9 @@ class Model:
                 raise
 
     @staticmethod
-    def get_version_history(model_id: int, limit: int = 10, offset: int = 0) -> List[ModelDict]:
+    def get_version_history(
+        model_id: int, limit: int = 10, offset: int = 0
+    ) -> List[ModelDict]:
         """
         Get version history for a model.
 
@@ -537,17 +619,17 @@ class Model:
             List[ModelDict]: List of version records
         """
         with db_session() as db:
-            query = text("""
+            query = text(
+                """
                 SELECT * FROM model_versions
                 WHERE model_id = :model_id
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """)
-            result = db.execute(query, {
-                "model_id": model_id,
-                "limit": limit,
-                "offset": offset
-            })
+            """
+            )
+            result = db.execute(
+                query, {"model_id": model_id, "limit": limit, "offset": offset}
+            )
             return [dict(row) for row in result]
 
     @staticmethod
@@ -564,14 +646,15 @@ class Model:
         """
         with db_session() as db:
             try:
-                version_query = text("""
+                version_query = text(
+                    """
                     SELECT data FROM model_versions
                     WHERE model_id = :model_id AND version = :version
-                """)
-                version_data = db.execute(version_query, {
-                    "model_id": model_id,
-                    "version": version
-                }).scalar()
+                """
+                )
+                version_data = db.execute(
+                    version_query, {"model_id": model_id, "version": version}
+                ).scalar()
 
                 if not version_data:
                     raise ValueError(f"Version {version} not found")
@@ -586,8 +669,7 @@ class Model:
             except Exception as e:
                 db.rollback()
                 logger.error(
-                    "Failed to revert model %d to version %d: %s",
-                    model_id, version, e
+                    "Failed to revert model %d to version %d: %s", model_id, version, e
                 )
                 raise
 
@@ -596,4 +678,4 @@ class Model:
     @staticmethod
     def get_immutable_fields(model_id: int) -> List[str]:
         """Get fields that cannot be modified."""
-        return ['id', 'created_at']
+        return ["id", "created_at"]

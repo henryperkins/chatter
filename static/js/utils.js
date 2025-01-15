@@ -9,13 +9,8 @@
     function getCSRFToken() {
         const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
         const csrfToken = csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") || "" : "";
-        console.debug("Retrieved CSRF token from meta tag:", csrfToken);  // Add this line for debugging
+        console.debug("Retrieved CSRF token from meta tag:", csrfToken);
         return csrfToken;
-    }
-
-    // Set default CSRF token for axios if available
-    if (typeof axios !== 'undefined') {
-        axios.defaults.headers.common["X-CSRFToken"] = getCSRFToken();
     }
 
     /**
@@ -43,7 +38,7 @@
         }
 
         try {
-            const response = await fetch(url, { ...options, headers });
+            const response = await fetch(url, { ...options, headers, credentials: 'same-origin' });
 
             const contentType = response.headers.get('content-type');
             let data;
@@ -195,9 +190,9 @@
     }
 
     /**
-     * Shows a loading spinner on an element.
+     * Shows a loading spinner on a button element.
      * @function showLoading
-     * @param {HTMLElement} element - The element to show the loading spinner on.
+     * @param {HTMLButtonElement} element - The button element to show the loading spinner on.
      * @param {object} [options={}] - Additional options for the spinner.
      */
     function showLoading(element, options = {}) {
@@ -212,9 +207,9 @@
     }
 
     /**
-     * Hides the loading spinner on an element.
+     * Hides the loading spinner on a button element.
      * @function hideLoading
-     * @param {HTMLElement} element - The element to hide the loading spinner on.
+     * @param {HTMLButtonElement} element - The button element to hide the loading spinner on.
      * @param {string} originalContent - The original content of the element.
      */
     function hideLoading(element, originalContent) {
@@ -225,7 +220,7 @@
     /**
      * Wraps a function with a loading spinner.
      * @function withLoading
-     * @param {HTMLElement} element - The element to show the loading spinner on.
+     * @param {HTMLButtonElement} element - The button element to show the loading spinner on.
      * @param {function} callback - The function to execute while showing the spinner.
      * @param {object} [options={}] - Additional options for the spinner.
      * @returns {Promise} The result of the callback function.
@@ -237,7 +232,6 @@
             .finally(() => hideLoading(element, originalContent));
     }
 
-    // Export functions that need to be globally accessible
     window.utils = {
         getCSRFToken,
         fetchWithCSRF,

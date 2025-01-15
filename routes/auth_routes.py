@@ -95,7 +95,7 @@ def login():
             )
             try:
                 validate_csrf(csrf_token)
-            except Exception as e:
+            except Exception:
                 logger.warning(
                     "CSRF token validation failed",
                     extra={"ip_address": request.remote_addr, "route": request.path},
@@ -635,11 +635,23 @@ def edit_default_model():
                         "email": registration_data.get("email"),
                     },
                 )
-                return redirect(
-                    url_for(
-                        "auth.login" if not is_existing_admin else "chat.chat_interface"
+
+                # Log in the new admin user
+                with db_session() as db:
+                    user = (
+                        db.execute(
+                            text("SELECT * FROM users WHERE username = :username"),
+                            {"username": registration_data["username"]},
+                        )
+                        .mappings()
+                        .first()
                     )
+                user_obj = User(
+                    user["id"], user["username"], user["email"], user["role"]
                 )
+                login_user(user_obj)
+
+                return redirect(url_for("chat.chat_interface"))
 
         except Exception as e:
             logger.error(

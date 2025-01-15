@@ -4,7 +4,7 @@ from typing import Optional, List
 
 from sqlalchemy import text
 
-from .base import db_session
+from database import db_session
 
 logger = logging.getLogger(__name__)
 

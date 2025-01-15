@@ -1,32 +1,12 @@
 import logging
-from contextlib import contextmanager
-from typing import Optional
-from sqlalchemy.orm import Session
-from sqlalchemy.pool import QueuePool
-from database import get_db_session, get_db_pool
+# Removed unused imports
 from sqlalchemy.ext.declarative import declarative_base
 
 
 logger = logging.getLogger(__name__)
 
 
-@contextmanager
-def db_session(pool: Optional[QueuePool] = None) -> Session:
-    """Provide a transactional scope around a series of operations."""
-    if pool is None:
-        pool = get_db_pool()
-    
-    session_gen = get_db_session()
-    session = next(session_gen)
-    try:
-        yield session
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Session rollback due to exception: {e}")
-        raise
-    finally:
-        session.close()
+# Removed redundant db_session function; using db_session from database.py instead
 
 
 # Import Base from SQLAlchemy
