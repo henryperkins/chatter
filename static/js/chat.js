@@ -675,7 +675,7 @@ async function regenerateResponse(button) {
     button.disabled = true;
 
     try {
-        const chatId = new URLSearchParams(window.location.search).get('chat_id');
+        const chatId = windowExt.CHAT_CONFIG.chatId;
         if (!chatId) {
             windowExt.utils.showFeedback('Chat ID not found', 'error');
             return;
