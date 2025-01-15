@@ -3,7 +3,7 @@ import os
 
 class Config:
     SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
-    DATABASE_URI = os.getenv("DATABASE_URI", "sqlite:///chat_app.db")
+    DATABASE_URI = os.getenv("DATABASE_URI", "sqlite:///./data/chat_app.db")
     ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "your-encryption-key")
 
     AZURE_API_KEY = os.getenv("AZURE_API_KEY", "your-azure-api-key")
