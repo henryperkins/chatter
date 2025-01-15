@@ -59,12 +59,26 @@ def validate_model(model: Optional[Any]) -> Optional[str]:
         "deployment_name",
         "api_endpoint",
         "api_key",
-        "max_completion_tokens"
+        "max_completion_tokens",
+        "model_type",
+        "api_version"
     ]
     
     for attr in required_attrs:
         if not hasattr(model, attr) or not getattr(model, attr):
             return f"Invalid model configuration: missing {attr}"
+    
+    # Additional validation for API endpoint
+    if not model.api_endpoint.startswith("https://"):
+        return "API endpoint must be a valid HTTPS URL"
+    
+    # Validate API key length
+    if len(model.api_key) < 32:
+        return "API key must be at least 32 characters"
+    
+    # Validate max_completion_tokens
+    if model.max_completion_tokens < 1 or model.max_completion_tokens > 16384:
+        return "max_completion_tokens must be between 1 and 16384"
     
     return None
 
@@ -517,7 +531,22 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         if not validate_chat_access(chat_id):
             return jsonify({"error": "Unauthorized access to chat"}), 403
 
-        model_obj = Chat.get_model(chat_id)
+        # Get the model from session or database
+        model_obj = None
+        if 'current_model' in session:
+            model_obj = Model.get_by_id(session['current_model']['id'])
+        
+        if not model_obj:
+            model_obj = Chat.get_model(chat_id)
+            if model_obj:
+                session['current_model'] = {
+                    'id': model_obj.id,
+                    'name': model_obj.name,
+                    'deployment_name': model_obj.deployment_name,
+                    'supports_streaming': model_obj.supports_streaming,
+                    'requires_o1_handling': model_obj.requires_o1_handling
+                }
+        
         model_error = validate_model(model_obj)
         if model_error:
             return jsonify({"error": model_error}), 400
@@ -636,15 +665,39 @@ def update_model():
         return jsonify({"error": "Unauthorized access to chat"}), 403
 
     try:
-        # Ensure the new model exists
+        # Ensure the new model exists and is valid
         model = Model.get_by_id(new_model_id)
         if not model:
             return jsonify({"error": "Model not found"}), 404
 
+        # Validate the model configuration
+        model_error = validate_model(model)
+        if model_error:
+            return jsonify({"error": model_error}), 400
+
         # Update the model associated with the chat
         Chat.update_model(chat_id, new_model_id)
+        
+        # Update the session with the new model info
+        session['current_model'] = {
+            'id': model.id,
+            'name': model.name,
+            'deployment_name': model.deployment_name,
+            'supports_streaming': model.supports_streaming,
+            'requires_o1_handling': model.requires_o1_handling
+        }
+        
         logger.info(f"Chat {chat_id} model updated to {new_model_id}")
-        return jsonify({"success": True})
+        return jsonify({
+            "success": True,
+            "model": {
+                "id": model.id,
+                "name": model.name,
+                "deployment_name": model.deployment_name,
+                "supports_streaming": model.supports_streaming,
+                "requires_o1_handling": model.requires_o1_handling
+            }
+        })
     except Exception as e:
-        logger.error(f"Error updating model for chat {chat_id}: {e}")
-        return jsonify({"error": "Failed to update model."}), 500
+        logger.error(f"Error updating model for chat {chat_id}: {e}", exc_info=True)
+        return jsonify({"error": "Failed to update model. Please check the logs."}), 500

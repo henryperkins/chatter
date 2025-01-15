@@ -177,7 +177,7 @@ class Model:
             Optional[Model]: Model instance if found, None otherwise
 
         Raises:
-            Exception: If there's an error retrieving the model
+            ValueError: If there's an error retrieving the model
         """
         try:
             with db_session() as db:
@@ -222,23 +222,44 @@ class Model:
                         model_id,
                         str(e)
                     )
-                    raise ValueError("Failed to decrypt API key. Please verify encryption configuration")
+                    # Return None instead of raising error to allow fallback
+                    return None
                 except Exception as e:
                     logger.error(
                         "Unexpected error decrypting API key for model %d: %s",
                         model_id,
                         str(e)
                     )
-                    raise ValueError("Failed to decrypt API key due to unexpected error")
+                    # Return None instead of raising error to allow fallback
+                    return None
 
                 # Log safely (excluding sensitive data)
                 safe_dict = {k: v for k, v in model_dict.items() if k != "api_key"}
                 logger.debug("Successfully retrieved model by ID %d: %s", model_id, safe_dict)
-                return Model(**model_dict)
+                
+                # Create and return the model instance
+                model = Model(**model_dict)
+                
+                # Validate the model configuration
+                required_attrs = [
+                    "deployment_name",
+                    "api_endpoint",
+                    "api_key",
+                    "max_completion_tokens",
+                    "model_type",
+                    "api_version"
+                ]
+                
+                for attr in required_attrs:
+                    if not hasattr(model, attr) or not getattr(model, attr):
+                        logger.error(f"Model {model_id} missing required attribute: {attr}")
+                        return None
+                
+                return model
 
         except Exception as e:
-            logger.error("Error retrieving model by ID %d: %s", model_id, e)
-            raise ValueError(f"Failed to retrieve model: {str(e)}")
+            logger.error("Error retrieving model by ID %d: %s", model_id, e, exc_info=True)
+            return None
 
     @staticmethod
     def update(model_id: int, data: ModelDict) -> None:
