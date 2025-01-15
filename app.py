@@ -245,7 +245,7 @@ def index() -> Response:
     """Root URL handler"""
     if not current_user.is_authenticated:
         return redirect(url_for("auth.login"))
-    return redirect(url_for("chat_routes.chat_interface"))
+    return redirect(url_for("chat.chat_interface"))
 
 
 @app.route("/clear-session")
