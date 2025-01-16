@@ -17,6 +17,7 @@ from flask import (
     request,
     render_template,
     url_for,
+    redirect,
 )
 from flask_login import login_required
 from flask_wtf.csrf import validate_csrf as flask_validate_csrf
@@ -178,52 +179,39 @@ def create_model():
         return csrf_error
 
     form = ModelForm()
-    if not form.validate_on_submit():
-        logger.warning("Model form validation failed: %s", form.errors)
-        return jsonify({"error": form.errors, "success": False}), 400
+    if form.validate_on_submit():
+        try:
+            data = extract_model_data(form)
 
-    try:
-        data = extract_model_data(form)
+            # Validate required fields
+            required_fields = ["name", "deployment_name", "api_endpoint", "api_key"]
+            for field in required_fields:
+                if not data.get(field):
+                    raise ValueError(f"Missing required field: {field}")
 
-        # Validate required fields
-        required_fields = ["name", "deployment_name", "api_endpoint", "api_key"]
-        for field in required_fields:
-            if not data.get(field):
-                raise ValueError(f"Missing required field: {field}")
+            # Validate API endpoint
+            if not data["api_endpoint"].startswith("https://"):
+                raise ValueError("API endpoint must be a valid HTTPS URL.")
 
-        # Validate API endpoint
-        if not data["api_endpoint"].startswith("https://"):
-            raise ValueError("API endpoint must be a valid HTTPS URL.")
-
-        logger.info(
-            "Creating model with data: %s",
-            {k: v if k != "api_key" else "****" for k, v in data.items()},
-        )
-        Model.validate_model_config(data)
-        model_id = Model.create(data)
-        logger.info("Model created successfully with ID: %d", model_id)
-        redirect_url = url_for('chat.chat_interface', _external=True)
-        logger.debug("Sending response with redirect: %s", {
-            "id": model_id,
-            "success": True,
-            "message": "Model created successfully",
-            "redirect": redirect_url
-        })
-        return jsonify({
-            "id": model_id,
-            "success": True,
-            "message": "Model created successfully",
-            "redirect": redirect_url
-        }), 201
-
-    except ValueError as e:
-        return handle_error(e, "Validation error during model creation", 400)
-    except Exception as e:
-        if "UNIQUE constraint failed: models.deployment_name" in str(e):
-            return handle_error(
-                e, "A model with this deployment name already exists", 400
+            logger.info(
+                "Creating model with data: %s",
+                {k: v if k != "api_key" else "****" for k, v in data.items()},
             )
-        return handle_error(e, "Unexpected error during model creation")
+            Model.validate_model_config(data)
+            model_id = Model.create(data)
+            logger.info("Model created successfully with ID: %d", model_id)
+            # Redirect to chat interface upon success
+            return redirect(url_for('chat.chat_interface'))
+
+        except ValueError as e:
+            logger.error("Validation error during model creation: %s", str(e))
+            return render_template("add_model.html", form=form, error=str(e))
+        except Exception as e:
+            logger.error("Unexpected error during model creation: %s", str(e), exc_info=True)
+            return render_template("add_model.html", form=form, error="An unexpected error occurred.")
+    else:
+        logger.warning("Model form validation failed: %s", form.errors)
+        return render_template("add_model.html", form=form, errors=form.errors)
 
 
 @bp.route("/models/<int:model_id>", methods=["PUT"])
