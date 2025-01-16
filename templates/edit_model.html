@@ -185,7 +185,35 @@
             </a>
         </div>
     </form>
+    
+    <!-- Debug Section -->
+    <div class="mt-8 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <h3 class="text-lg font-semibold mb-4">Debug Information</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <h4 class="font-medium mb-2">Form Data</h4>
+                <pre id="form-data-debug" class="text-sm bg-gray-200 dark:bg-gray-700 p-2 rounded"></pre>
+            </div>
+            <div>
+                <h4 class="font-medium mb-2">Model Data</h4>
+                <pre id="model-data-debug" class="text-sm bg-gray-200 dark:bg-gray-700 p-2 rounded">{{ model|tojson(indent=2) }}</pre>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Display form data
+        const form = document.getElementById('edit-model-form');
+        const formDataDebug = document.getElementById('form-data-debug');
+        
+        if (form && formDataDebug) {
+            const formData = new FormData(form);
+            formDataDebug.textContent = JSON.stringify(Object.fromEntries(formData), null, 2);
+        }
+    });
+</script>
 
 {% endblock content %}
 

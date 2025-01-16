@@ -23,13 +23,16 @@ class ModelFormHandler {
 
         if (!actionUrl) {
             console.error("Form action URL not found");
+            this.utils.showFeedback("Form submission error: No action URL", "error");
             return;
         }
 
-        console.debug("Form submission started:", {
-            actionUrl,
-            formData: new FormData(form),
-        });
+        console.group("Form Submission Debug");
+        console.debug("Form submission started");
+        console.debug("Form:", form);
+        console.debug("Action URL:", actionUrl);
+        console.debug("Form Data:", Object.fromEntries(new FormData(form)));
+        console.debug("Form Dataset:", form.dataset);
 
         try {
             // Show loading state
@@ -105,19 +108,25 @@ class ModelFormHandler {
             });
             console.debug("Received response:", response);
 
+            console.debug("Server Response:", response);
+            
+            if (!response) {
+                throw new Error("No response received from server");
+            }
+
             if (response.success) {
                 this.utils.showFeedback("Model saved successfully", "success");
                 if (response.redirect) {
                     console.debug("Redirecting to:", response.redirect);
                     window.location.href = response.redirect;
                 } else {
-                    console.error("No redirect URL provided in response.");
+                    console.warn("No redirect URL provided in response");
+                    this.utils.showFeedback("Model saved but no redirect provided", "warning");
                 }
             } else {
-                this.utils.showFeedback(
-                    response.error || "Failed to save model",
-                    "error"
-                );
+                const errorMessage = response.error || "Failed to save model";
+                console.error("Form submission failed:", errorMessage, response.errors);
+                this.utils.showFeedback(errorMessage, "error");
                 this.displayFormErrors(form, response.errors);
             }
         } catch (error) {

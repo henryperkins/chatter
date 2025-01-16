@@ -28,27 +28,51 @@ async function fetchWithCSRF(url, options = {}) {
     }
 
     try {
+        console.debug("Making request to:", url);
+        console.debug("Request options:", {
+            method: options.method,
+            headers,
+            body: options.body
+        });
+
         const response = await fetch(url, {
             ...options,
             headers,
             credentials: 'same-origin'
         });
+
+        console.debug("Received response:", {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries(response.headers.entries())
+        });
+
         const contentType = response.headers.get('content-type');
         let data;
 
         if (contentType && contentType.includes('application/json')) {
             data = await response.json();
+            console.debug("Parsed JSON response:", data);
         } else {
             const text = await response.text();
+            console.debug("Raw response text:", text);
             throw new Error(`Invalid response from server: ${text}`);
         }
 
         if (!response.ok) {
-            throw new Error(data.error || `HTTP error! status: ${response.status}`);
+            const error = new Error(data.error || `HTTP error! status: ${response.status}`);
+            error.response = response;
+            error.data = data;
+            throw error;
         }
         return data;
     } catch (error) {
-        console.error('Error in fetchWithCSRF:', error);
+        console.error('Error in fetchWithCSRF:', {
+            message: error.message,
+            stack: error.stack,
+            response: error.response,
+            data: error.data
+        });
         throw error;
     }
 }
