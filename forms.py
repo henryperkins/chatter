@@ -216,9 +216,10 @@ class ModelForm(FlaskForm):
             ),
         ],
         filters=[
-            lambda x: None if x in ('', None, 'None') else int(x)
+            lambda x: None if x in ('', None, 'None') else int(float(x)) if x else None
         ],
-        default=None
+        default=None,
+        render_kw={"placeholder": "Leave blank for no limit"}
     )
     max_completion_tokens = IntegerField(
         "Max Completion Tokens (Output)",
@@ -279,13 +280,21 @@ class ModelForm(FlaskForm):
         """
         Validate temperature based on whether special handling is required.
         """
-        if self.requires_o1_handling.data:
-            # For o1 models, temperature must be exactly 1.0
-            if field.data is not None and float(field.data) != 1.0:
-                raise ValidationError("For o1 models, temperature must be exactly 1.0.")
-            field.data = 1.0  # Ensure temperature is set to 1.0
-        elif field.data is not None and not (0 <= field.data <= 2):
-            raise ValidationError("Temperature must be between 0 and 2.")
+        if field.data in ('', None, 'None'):
+            field.data = None
+            return
+            
+        try:
+            temp = float(field.data)
+            if self.requires_o1_handling.data:
+                if temp != 1.0:
+                    raise ValidationError("For o1 models, temperature must be exactly 1.0.")
+                field.data = 1.0
+            elif not (0 <= temp <= 2):
+                raise ValidationError("Temperature must be between 0 and 2.")
+            field.data = temp
+        except (ValueError, TypeError):
+            raise ValidationError("Temperature must be a valid number between 0 and 2.")
 
     def validate_max_tokens(self, field: Any) -> None:
         """

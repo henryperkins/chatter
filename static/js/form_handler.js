@@ -55,13 +55,13 @@ class ModelFormHandler {
             const formData = new FormData(form);
             const data = {};
 
-            // Process form data
+            // Process form data with better type handling
             formData.forEach((value, key) => {
-                let stringValue = "";
-                if (typeof value === "string") {
-                    stringValue = value;
-                } else if (value instanceof File) {
+                let stringValue = value;
+                if (value instanceof File) {
                     stringValue = "";
+                } else if (typeof value !== "string") {
+                    stringValue = String(value);
                 }
 
                 // Handle numeric fields with proper null/empty handling
@@ -105,15 +105,33 @@ class ModelFormHandler {
             }
 
             console.debug("Sending form data to:", actionUrl);
-            const response = await this.utils.fetchWithCSRF(actionUrl, {
-                method: "POST",
-                body: JSON.stringify(data),
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": csrfToken,
-                    "X-Requested-With": "XMLHttpRequest",
-                },
-            });
+            let response;
+            try {
+                response = await this.utils.fetchWithCSRF(actionUrl, {
+                    method: "POST",
+                    body: JSON.stringify(data),
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": csrfToken,
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                });
+
+                if (!response) {
+                    throw new Error("No response received from server");
+                }
+
+                // Handle non-JSON responses
+                const contentType = response.headers.get("content-type");
+                if (!contentType || !contentType.includes("application/json")) {
+                    const text = await response.text();
+                    throw new Error(`Invalid response format: ${text}`);
+                }
+            } catch (error) {
+                console.error("Network or response error:", error);
+                this.utils.showFeedback("Network error occurred. Please try again.", "error");
+                return;
+            }
             console.debug("Received response:", response);
 
             console.debug("Server Response:", response);
