@@ -215,6 +215,7 @@
 
 {% block scripts %}
 {{ super() }}
+<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         const form = document.getElementById("edit-model-form");

@@ -1,5 +1,47 @@
+// static/js/utils.js
+
+/**
+ * Extend the Window interface to include the utils property.
+ * @typedef {Object} Utils
+ * @property {() => string} getCSRFToken
+ * @property {(url: string, options?: RequestInit) => Promise<{ response: Response, data: any }>} fetchWithCSRF
+ * @property {(message: string, type?: string, options?: object) => void} showFeedback
+ * @property {(formData: FormData) => object} formDataToObject
+ * @property {(dateString: string) => string} formatDate
+ * @property {(func: Function, wait: number) => Function} debounce
+ * @property {(func: Function, limit: number) => Function} throttle
+ * @property {(element: HTMLElement, options?: object) => void} showLoading
+ * @property {(element: HTMLElement, originalContent: string) => void} hideLoading
+ * @property {(element: HTMLElement, callback: Function, options?: object) => Promise<void>} withLoading
+ */
+
+/**
+ * @typedef {Window & { utils?: Utils }} CustomWindow
+ */
+
+/** @type {CustomWindow} */
+const customWindow = window;
+
+/**
+ * Custom error class for fetch errors.
+ */
+class FetchError extends Error {
+    /**
+     * @param {string} message
+     * @param {number} status
+     * @param {any} data
+     */
+    constructor(message, status, data) {
+        super(message);
+        this.name = 'FetchError';
+        this.status = status;
+        this.data = data;
+    }
+}
+
 /**
  * Retrieve the CSRF token from a meta tag named "csrf-token".
+ * @returns {string} CSRF token
  */
 function getCSRFToken() {
     const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
@@ -11,6 +53,9 @@ function getCSRFToken() {
 /**
  * Fetch data from a URL with a CSRF token in headers (or FormData).
  * Rejects if response is not OK or not JSON.
+ * @param {string} url
+ * @param {RequestInit} [options={}]
+ * @returns {Promise<{ response: Response, data: any }>}
  */
 async function fetchWithCSRF(url, options = {}) {
     const csrfToken = getCSRFToken();
@@ -56,38 +101,34 @@ async function fetchWithCSRF(url, options = {}) {
         } else {
             const text = await response.text();
             console.debug("Raw response text:", text);
-            throw new Error(`Invalid response from server: ${text}`);
+            throw new FetchError(`Invalid response from server: ${text}`, response.status, text);
         }
 
         if (!response.ok) {
-            const error = new Error(data.error || `HTTP error! status: ${response.status}`);
-            error.response = response;
-            error.data = data;
-            throw error;
+            throw new FetchError(data.error || `HTTP error! status: ${response.status}`, response.status, data);
         }
-        return data;
+
+        return { response, data };
     } catch (error) {
-        console.error('Error in fetchWithCSRF:', {
-            message: error.message,
-            stack: error.stack,
-            response: error.response,
-            data: error.data
-        });
-        
+        console.error('Error in fetchWithCSRF:', error);
+
         // Handle specific error types
-        if (error.response && error.response.status === 500) {
+        if (error instanceof FetchError && error.status === 500) {
             if (error.data && error.data.error) {
                 throw new Error(error.data.error);
             }
             throw new Error("Server error occurred. Please try again.");
         }
-        
+
         throw error;
     }
 }
 
 /**
  * Display a feedback message (success, error, etc.) at the top of the page.
+ * @param {string} message
+ * @param {string} [type="success"]
+ * @param {object} [options={}]
  */
 function showFeedback(message, type = "success", options = {}) {
     const { duration = 5000, position = "top" } = options;
@@ -147,6 +188,8 @@ function showFeedback(message, type = "success", options = {}) {
 
 /**
  * Convert a FormData object into a plain JS object.
+ * @param {FormData} formData
+ * @returns {object}
  */
 function formDataToObject(formData) {
     const object = {};
@@ -158,6 +201,8 @@ function formDataToObject(formData) {
 
 /**
  * Format a date string like "2025-01-01" into a more readable form.
+ * @param {string} dateString
+ * @returns {string}
  */
 function formatDate(dateString) {
     const date = new Date(dateString);
@@ -170,6 +215,9 @@ function formatDate(dateString) {
 
 /**
  * Debounce a function to limit its rate of execution.
+ * @param {Function} func
+ * @param {number} wait
+ * @returns {Function}
  */
 function debounce(func, wait) {
     let timeout;
@@ -181,6 +229,9 @@ function debounce(func, wait) {
 
 /**
  * Throttle a function to limit its frequency of execution.
+ * @param {Function} func
+ * @param {number} limit
+ * @returns {Function}
  */
 function throttle(func, limit) {
     let inThrottle;
@@ -195,6 +246,8 @@ function throttle(func, limit) {
 
 /**
  * Show a loading spinner on a button element.
+ * @param {HTMLElement} element
+ * @param {object} [options={}]
  */
 function showLoading(element, options = {}) {
     const { text = "Loading...", size = "1.5rem" } = options;
@@ -210,6 +263,8 @@ function showLoading(element, options = {}) {
 
 /**
  * Hide a loading spinner, restoring the original content.
+ * @param {HTMLElement} element
+ * @param {string} originalContent
  */
 function hideLoading(element, originalContent) {
     element.disabled = false;
@@ -218,6 +273,10 @@ function hideLoading(element, originalContent) {
 
 /**
  * Wrap a callback with loading spinner logic.
+ * @param {HTMLElement} element
+ * @param {Function} callback
+ * @param {object} [options={}]
+ * @returns {Promise<void>}
  */
 function withLoading(element, callback, options = {}) {
     const originalContent = element.innerHTML;
@@ -227,7 +286,7 @@ function withLoading(element, callback, options = {}) {
 }
 
 // Attach functions to window.utils so they're globally available
-window.utils = {
+customWindow.utils = {
     getCSRFToken,
     fetchWithCSRF,
     showFeedback,

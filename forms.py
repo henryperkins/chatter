@@ -26,6 +26,26 @@ from typing import Any
 from database import get_db
 from sqlalchemy import text
 
+# Custom Fields to handle None values in IntegerField and FloatField
+class NullableIntegerField(IntegerField):
+    def process_formdata(self, valuelist):
+        if valuelist and valuelist[0]:
+            try:
+                self.data = int(valuelist[0])
+            except (ValueError, TypeError):
+                self.data = None
+        else:
+            self.data = None
+
+class NullableFloatField(FloatField):
+    def process_formdata(self, valuelist):
+        if valuelist and valuelist[0]:
+            try:
+                self.data = float(valuelist[0])
+            except (ValueError, TypeError):
+                self.data = None
+        else:
+            self.data = None
 
 class LoginForm(FlaskForm):
     """
@@ -200,28 +220,22 @@ class ModelForm(FlaskForm):
         # Remove any trailing slashes
         field.data = field.data.rstrip("/")
 
-    temperature = FloatField(
+    temperature = NullableFloatField(
         "Temperature (Creativity Level)",
         validators=[
             Optional(),
             NumberRange(min=0, max=2, message="Temperature must be between 0 and 2."),
         ],
     )
-    max_tokens = IntegerField(
+    max_tokens = NullableIntegerField(
         "Max Tokens (Input)",
         validators=[
-            Optional(),
-            NumberRange(
-                min=1, max=4000, message="Max tokens must be between 1 and 4000."
-            ),
-        ],
-        filters=[
-            lambda x: None if x in ('', None, 'None') else int(float(x)) if x else None
+            Optional(),  # Removed NumberRange validator
         ],
         default=None,
         render_kw={"placeholder": "Leave blank for no limit"}
     )
-    max_completion_tokens = IntegerField(
+    max_completion_tokens = NullableIntegerField(
         "Max Completion Tokens (Output)",
         validators=[
             DataRequired(message="Max completion tokens is required."),
@@ -266,7 +280,7 @@ class ModelForm(FlaskForm):
     requires_o1_handling = BooleanField("Special Handling for o1-preview Models")
     supports_streaming = BooleanField("Enable Response Streaming")
     is_default = BooleanField("Set as Default Model")
-    version = IntegerField(
+    version = NullableIntegerField(
         "Version",
         default=1,
         render_kw={"type": "hidden"},  # Make it a hidden field
@@ -305,10 +319,13 @@ class ModelForm(FlaskForm):
             field.data = None
         elif field.data is not None:
             try:
-                if field.data <= 0:
-                    raise ValidationError("Max tokens must be a positive integer.")
+                value = int(field.data)
+                if not (1 <= value <= 4000):
+                    raise ValidationError("Max tokens must be between 1 and 4000.")
+                field.data = value  # Ensure the value is an integer
             except (TypeError, ValueError):
-                field.data = None
+                raise ValidationError("Max tokens must be a valid integer between 1 and 4000.")
+
     def validate_requires_o1_handling(self, field: Any) -> None:
         """
         Additional validation when special handling is required.
@@ -386,7 +403,7 @@ class DefaultModelForm(FlaskForm):
         ],
         default="9SPmgaBZ0tlnQrdRU0IxLsanKHZiEUMD2RASDEUhOchf6gyqRLWCJQQJ99BAACHYHv6XJ3w3AAABACOGKt5l"
     )
-    temperature = FloatField(
+    temperature = NullableFloatField(
         "Temperature",
         validators=[
             DataRequired(message="Temperature is required for o1-preview."),
@@ -395,13 +412,13 @@ class DefaultModelForm(FlaskForm):
         default=1.0,
         render_kw={"readonly": True}
     )
-    max_tokens = IntegerField(
+    max_tokens = NullableIntegerField(
         "Max Tokens",
         validators=[Optional()],
         default=None,
         render_kw={"readonly": True, "disabled": True}
     )
-    max_completion_tokens = IntegerField(
+    max_completion_tokens = NullableIntegerField(
         "Max Completion Tokens",
         validators=[
             DataRequired(message="Max completion tokens is required."),
@@ -524,6 +541,7 @@ def validate_password_strength(password: str) -> None:
             raise ValidationError(
                 "Password must not contain three or more repeated characters in a row."
             )
+
 class ResetPasswordForm(FlaskForm):
     """
     Form for resetting a user's password.

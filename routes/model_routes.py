@@ -346,13 +346,13 @@ def edit_model(model_id):
                             data[field] = None
                         else:
                             data[field] = converter(value)
-                    except (ValueError, TypeError) as e:
+                    except (ValueError, TypeError):
                         logger.warning(f"Invalid {field} value: {value}")
                         data[field] = None
                 elif value is not None:
                     try:
                         data[field] = converter(value)
-                    except (ValueError, TypeError) as e:
+                    except (ValueError, TypeError):
                         logger.warning(f"Invalid {field} value: {value}")
                         data[field] = None
                     
@@ -378,7 +378,7 @@ def edit_model(model_id):
                 current_default = Model.get_default()
                 if current_default and current_default.id == model_id:
                     # Find another model to set as default
-                    other_models = Model.get_all(limit=1)
+                    other_models = Model.get_all(limit=1, exclude_id=model_id)
                     if other_models:
                         Model.set_default(other_models[0].id)
                     else:

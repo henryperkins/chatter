@@ -16,7 +16,7 @@ from cryptography.fernet import Fernet, InvalidToken
 
 from sqlalchemy import text
 
-from database import db_session, get_db_pool
+from database import db_session
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -322,13 +322,14 @@ class Model:
                             {"model_id": model_id}
                         )
                     else:
-                        # Ensure at least one model remains default
-                        default_count = db.execute(
-                            text("SELECT COUNT(*) FROM models WHERE is_default = 1 AND id != :model_id"),
-                            {"model_id": model_id}
-                        ).scalar()
-                        if default_count == 0:
-                            raise ValueError("Cannot unset default model without setting another as default")
+                        # Ensure at least one model remains default when unsetting is_default
+                        if update_data.get("is_default") is False:
+                            default_count = db.execute(
+                                text("SELECT COUNT(*) FROM models WHERE is_default = 1 AND id != :model_id"),
+                                {"model_id": model_id}
+                            ).scalar()
+                            if default_count == 0:
+                                raise ValueError("Cannot unset default model without setting another as default")
 
                 # Validate configuration before update
                 Model.validate_model_config(update_data)
@@ -442,8 +443,7 @@ class Model:
         Returns:
             Optional[Model]: Default model instance if found, None otherwise
         """
-        pool = get_db_pool()
-        with db_session(pool) as db:
+        with db_session() as db:
             try:
                 query = text("SELECT * FROM models WHERE is_default = :is_default")
                 row = db.execute(query, {"is_default": True}).mappings().first()
@@ -459,38 +459,53 @@ class Model:
                 raise
 
     @staticmethod
-    def get_all(limit: int = 10, offset: int = 0) -> List["Model"]:
+    def get_all(limit: int = 10, offset: int = 0, exclude_id: Optional[int] = None) -> List["Model"]:
         """
         Retrieve all models with pagination.
 
         Args:
             limit: Maximum number of models to return
             offset: Number of models to skip
+            exclude_id: ID of the model to exclude from results
 
         Returns:
             List[Model]: List of model instances
         """
         with db_session() as db:
             try:
-                query = text(
+                if exclude_id is not None:
+                    query = text(
+                        """
+                        SELECT * FROM models
+                        WHERE id != :exclude_id
+                        ORDER BY created_at DESC
+                        LIMIT :limit OFFSET :offset
                     """
-                    SELECT * FROM models
-                    ORDER BY created_at DESC
-                    LIMIT :limit OFFSET :offset
-                """
-                )
+                    )
+                    params = {"exclude_id": exclude_id, "limit": limit, "offset": offset}
+                else:
+                    query = text(
+                        """
+                        SELECT * FROM models
+                        ORDER BY created_at DESC
+                        LIMIT :limit OFFSET :offset
+                    """
+                    )
+                    params = {"limit": limit, "offset": offset}
+
                 rows = (
-                    db.execute(query, {"limit": limit, "offset": offset})
+                    db.execute(query, params)
                     .mappings()
                     .all()
                 )
 
                 models = [Model(**dict(row)) for row in rows]
                 logger.debug(
-                    "Retrieved %d models (limit=%d, offset=%d)",
+                    "Retrieved %d models (limit=%d, offset=%d, exclude_id=%s)",
                     len(models),
                     limit,
                     offset,
+                    exclude_id,
                 )
                 return models
             except Exception as e:
