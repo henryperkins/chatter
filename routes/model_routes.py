@@ -325,20 +325,35 @@ def edit_model(model_id):
                     "success": False
                 }), 400
 
-            # Extract and validate data
+            # Extract and validate data with improved error handling
             data = extract_model_data(form)
-            # Handle null/empty values for numeric fields
-            for field in ['max_tokens', 'max_completion_tokens', 'temperature']:
+            
+            # Handle numeric fields with proper validation
+            numeric_fields = {
+                'max_tokens': int,
+                'max_completion_tokens': int,
+                'temperature': float,
+                'version': int
+            }
+            
+            for field, converter in numeric_fields.items():
                 value = data.get(field)
-                if value is None or value == '':
+                if value in ('', None, 'None'):
                     data[field] = None
                 elif isinstance(value, str):
                     try:
-                        if field == 'temperature':
-                            data[field] = float(value)
+                        if value.strip() == '':
+                            data[field] = None
                         else:
-                            data[field] = int(value)
-                    except (ValueError, TypeError):
+                            data[field] = converter(value)
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"Invalid {field} value: {value}")
+                        data[field] = None
+                elif value is not None:
+                    try:
+                        data[field] = converter(value)
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"Invalid {field} value: {value}")
                         data[field] = None
                     
             logger.debug("Extracted model data: %s", {

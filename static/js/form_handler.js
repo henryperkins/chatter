@@ -64,14 +64,13 @@ class ModelFormHandler {
                     stringValue = "";
                 }
 
-                // Handle numeric fields
+                // Handle numeric fields with proper null/empty handling
                 if (["max_tokens", "max_completion_tokens", "version"].includes(key)) {
-                    if (stringValue === "" || stringValue === null || stringValue === undefined) {
+                    if (stringValue === "" || stringValue === null || stringValue === undefined || stringValue === "None") {
                         data[key] = null;
-                    } else if (!isNaN(stringValue)) {
-                        data[key] = parseInt(stringValue, 10);
                     } else {
-                        data[key] = null;
+                        const parsed = parseFloat(stringValue);
+                        data[key] = isNaN(parsed) ? null : parsed;
                     }
                 }
                 // Handle temperature field
@@ -137,13 +136,28 @@ class ModelFormHandler {
                 if (response.error) {
                     errorMessage = response.error;
                 } else if (response.errors) {
-                    errorMessage = Object.values(response.errors)
-                        .flat()
-                        .join(". ");
+                    // Format errors with field names
+                    errorMessage = Object.entries(response.errors)
+                        .map(([field, errors]) => {
+                            const fieldName = field.replace(/_/g, ' ');
+                            return `${fieldName}: ${errors.join(', ')}`;
+                        })
+                        .join('. ');
                 }
                 
-                console.error("Form submission failed:", errorMessage, response.errors);
-                this.utils.showFeedback(errorMessage, "error");
+                console.error("Form submission failed:", {
+                    message: errorMessage,
+                    errors: response.errors,
+                    status: response.status
+                });
+                
+                // Show detailed error feedback
+                this.utils.showFeedback(errorMessage, "error", {
+                    duration: 10000, // Show for 10 seconds
+                    position: "top"
+                });
+                
+                // Display field-specific errors
                 this.displayFormErrors(form, response.errors);
             }
         } catch (error) {
@@ -164,17 +178,36 @@ class ModelFormHandler {
             el.classList.remove("border-red-500")
         );
 
-        // Display new errors
+        // Display new errors with improved formatting
         if (errors) {
             Object.entries(errors).forEach(([field, messages]) => {
                 const input = form.querySelector(`[name="${field}"]`);
-                if (input) {
+                const container = input?.closest('.mb-6') || input?.parentElement;
+                
+                if (input && container) {
+                    // Add error styling
                     input.classList.add("border-red-500");
+                    
+                    // Create error message container
                     const errorDiv = document.createElement("div");
-                    errorDiv.className = "error-text text-red-500 text-sm mt-1";
-                    errorDiv.textContent = messages[0];
-                    if (input.parentNode) {
-                        input.parentNode.appendChild(errorDiv);
+                    errorDiv.className = "error-text text-red-500 text-sm mt-1 space-y-1";
+                    
+                    // Add each error message
+                    messages.forEach(message => {
+                        const errorMessage = document.createElement("div");
+                        errorMessage.textContent = message;
+                        errorDiv.appendChild(errorMessage);
+                    });
+                    
+                    // Insert after input or at end of container
+                    container.appendChild(errorDiv);
+                    
+                    // Scroll to first error if needed
+                    if (Object.keys(errors)[0] === field) {
+                        input.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center'
+                        });
                     }
                 }
             });

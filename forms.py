@@ -216,7 +216,7 @@ class ModelForm(FlaskForm):
             ),
         ],
         filters=[
-            lambda x: int(x) if x and str(x).strip() and x != 'None' else None
+            lambda x: None if x in ('', None, 'None') else int(x)
         ],
         default=None
     )
