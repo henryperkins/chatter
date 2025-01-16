@@ -327,6 +327,11 @@ def edit_model(model_id):
 
             # Extract and validate data
             data = extract_model_data(form)
+            # Handle null values for numeric fields
+            for field in ['max_tokens', 'max_completion_tokens', 'temperature']:
+                if data.get(field) is None:
+                    data[field] = None  # Ensure None is preserved
+                    
             logger.debug("Extracted model data: %s", {
                 k: v if k != "api_key" else "****" for k, v in data.items()
             })

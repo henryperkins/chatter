@@ -215,6 +215,7 @@ class ModelForm(FlaskForm):
                 min=1, max=4000, message="Max tokens must be between 1 and 4000."
             ),
         ],
+        default=None
     )
     max_completion_tokens = IntegerField(
         "Max Completion Tokens (Output)",
@@ -290,8 +291,12 @@ class ModelForm(FlaskForm):
         if self.requires_o1_handling.data:
             # When requires_o1_handling is True, automatically set max_tokens to None
             field.data = None
-        elif field.data is not None and field.data <= 0:
-            raise ValidationError("Max tokens must be a positive integer.")
+        elif field.data is not None:
+            try:
+                if field.data <= 0:
+                    raise ValidationError("Max tokens must be a positive integer.")
+            except (TypeError, ValueError):
+                field.data = None
     def validate_requires_o1_handling(self, field: Any) -> None:
         """
         Additional validation when special handling is required.

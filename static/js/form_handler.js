@@ -66,7 +66,7 @@ class ModelFormHandler {
 
                 // Handle numeric fields
                 if (["max_tokens", "max_completion_tokens", "version"].includes(key)) {
-                    data[key] = stringValue ? parseInt(stringValue, 10) : null;
+                    data[key] = stringValue && !isNaN(stringValue) ? parseInt(stringValue, 10) : null;
                 }
                 // Handle temperature field
                 else if (key === "temperature") {
