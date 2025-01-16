@@ -2,7 +2,7 @@
 
 class ModelFormHandler {
     constructor() {
-        this.utils = window.utils || {};
+        this.utils = window['utils'] || {};
         this.initializeForms();
     }
 
@@ -57,11 +57,9 @@ class ModelFormHandler {
 
             // Process form data with better type handling
             formData.forEach((value, key) => {
-                let stringValue = value;
-                if (value instanceof File) {
-                    stringValue = "";
-                } else if (typeof value !== "string") {
-                    stringValue = String(value);
+                let stringValue = "";
+                if (typeof value === "string") {
+                    stringValue = value;
                 }
 
                 // Handle numeric fields with proper null/empty handling
@@ -91,6 +89,11 @@ class ModelFormHandler {
                 }
                 console.debug(`Processing form field: ${key} = ${stringValue}`);
             });
+
+            // Remove 'api_key' from data if it's empty
+            if (!data.api_key) {
+                delete data.api_key;
+            }
 
             // Handle o1-preview specific logic
             if (data.requires_o1_handling) {
@@ -233,5 +236,7 @@ class ModelFormHandler {
     }
 }
 
-// Initialize form handler
-window.modelFormHandler = new ModelFormHandler();
+document.addEventListener("DOMContentLoaded", function() {
+    // Initialize form handler
+    window['modelFormHandler'] = new ModelFormHandler();
+});

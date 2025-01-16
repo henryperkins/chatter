@@ -53,7 +53,7 @@
         <div class="mb-6">
             {{ form.api_key.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
             {{ form.api_key(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", type="password",
-            placeholder="Enter new API key (leave blank to keep current)") }}
+            placeholder="Enter API key") }}
             {% if form.api_key.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.api_key.errors[0] }}</p>
             {% endif %}
@@ -183,6 +183,8 @@
     </form>
     
     <!-- Debug Section -->
+    {% set model_safe = model.__dict__.copy() %}
+    {% set _ = model_safe.pop('api_key', None) %}
     <div class="mt-8 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg">
         <h3 class="text-lg font-semibold mb-4">Debug Information</h3>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -192,7 +194,7 @@
             </div>
             <div>
                 <h4 class="font-medium mb-2">Model Data</h4>
-                <pre id="model-data-debug" class="text-sm bg-gray-200 dark:bg-gray-700 p-2 rounded">{{ model|tojson(indent=2) }}</pre>
+                <pre id="model-data-debug" class="text-sm bg-gray-200 dark:bg-gray-700 p-2 rounded">{{ model_safe|tojson(indent=2) }}</pre>
             </div>
         </div>
     </div>
@@ -215,7 +217,6 @@
 
 {% block scripts %}
 {{ super() }}
-<script src="{{ url_for('static', filename='js/utils.js') }}"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
         const form = document.getElementById("edit-model-form");

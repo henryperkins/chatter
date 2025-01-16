@@ -183,6 +183,9 @@ def internal_server_error(error: HTTPException) -> Tuple[Dict[str, str], int]:
 @app.errorhandler(Exception)
 def handle_exception(e):
     """Handle all uncaught exceptions"""
+    if request.path.startswith('/static/'):
+        # Let Flask handle static file exceptions
+        raise e
     logger.exception(
         "Unhandled exception occurred - URL: %s, Method: %s, User: %s, Error: %s",
         request.url,

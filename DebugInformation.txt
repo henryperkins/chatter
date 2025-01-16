@@ -1,0 +1,154 @@
+Debug Information
+Form Data
+{
+  "csrf_token": "ImY1OTc1ZTA0MTMxYzM4YWE2NzY3MDYzZDViYTljZmQ1YTA5NTRkZTQi.Z4lb2A.48lDlxyHs2M_H1MX3bnO9VUjI0U",
+  "version": "1",
+  "name": "o1-preview",
+  "deployment_name": "o1-preview",
+  "description": "Azure OpenAI o1-preview model",
+  "api_endpoint": "https://openai-hp.openai.azure.com",
+  "api_key": "9SPmgaBZ0tlnQrdRU0IxLsanKHZiEUMD2RASDEUhOchf6gyqRLWCJQQJ99BAACHYHv6XJ3w3AAABACOGKt5l",
+  "model_type": "o1-preview",
+  "temperature": "1.0",
+  "max_tokens": "",
+  "max_completion_tokens": "8300",
+  "api_version": "2024-12-01-preview",
+  "requires_o1_handling": "y",
+  "supports_streaming": "y",
+  "is_default": "y"
+}
+Model Data
+{
+  "api_endpoint": "https://openai-hp.openai.azure.com",
+  "api_key": "9SPmgaBZ0tlnQrdRU0IxLsanKHZiEUMD2RASDEUhOchf6gyqRLWCJQQJ99BAACHYHv6XJ3w3AAABACOGKt5l",
+  "api_version": "2024-12-01-preview",
+  "created_at": "2025-01-16 08:42:24",
+  "deployment_name": "o1-preview",
+  "description": "Azure OpenAI o1-preview model",
+  "id": 1,
+  "is_default": 1,
+  "max_completion_tokens": 8300,
+  "max_tokens": null,
+  "model_type": "o1-preview",
+  "name": "o1-preview",
+  "requires_o1_handling": 0,
+  "supports_streaming": 0,
+  "temperature": 1.0,
+  "version": 1
+}
+
+Browser Console Logs:
+
+
+content.dart.js:43353 
+ 
+ POST http://127.0.0.1:1000/websites/exists net::ERR_CONNECTION_REFUSED
+(anonymous)	@	content.dart.js:43353
+(anonymous)	@	content.dart.js:4366
+call$2	@	content.dart.js:33315
+call$1	@	content.dart.js:33303
+runUnary$2$2	@	content.dart.js:35538
+call$0	@	content.dart.js:34171
+_Future__propagateToListeners	@	content.dart.js:4660
+_completeWithValue$1	@	content.dart.js:34023
+call$0	@	content.dart.js:34111
+_microtaskLoop	@	content.dart.js:4721
+_startMicrotaskLoop	@	content.dart.js:4727
+call$1	@	content.dart.js:33192
+childList		
+call$1	@	content.dart.js:33202
+_scheduleAsyncCallback	@	content.dart.js:4741
+_rootScheduleMicrotask	@	content.dart.js:4959
+scheduleMicrotask	@	content.dart.js:4770
+schedule$1	@	content.dart.js:34963
+_setPendingEvents$1	@	content.dart.js:34661
+_subscribe$4	@	content.dart.js:34497
+listen$4$cancelOnError$onDone$onError	@	content.dart.js:34916
+listen$4$cancelOnError$onDone$onError	@	content.dart.js:34348
+toBytes$0	@	content.dart.js:43446
+(anonymous)	@	content.dart.js:43333
+(anonymous)	@	content.dart.js:4366
+call$2	@	content.dart.js:33315
+_asyncStartSync	@	content.dart.js:4330
+send$1	@	content.dart.js:43389
+(anonymous)	@	content.dart.js:43268
+(anonymous)	@	content.dart.js:4366
+call$2	@	content.dart.js:33315
+_asyncStartSync	@	content.dart.js:4330
+_sendUnstreamed$body$BaseClient	@	content.dart.js:43280
+_sendUnstreamed$5	@	content.dart.js:43233
+post$4$body$encoding$headers	@	content.dart.js:43230
+call$1	@	content.dart.js:43221
+(anonymous)	@	content.dart.js:11032
+(anonymous)	@	content.dart.js:4366
+call$2	@	content.dart.js:33315
+_asyncStartSync	@	content.dart.js:4330
+_withClient$body	@	content.dart.js:11065
+_withClient	@	content.dart.js:11013
+post	@	content.dart.js:11010
+(anonymous)	@	content.dart.js:79892
+(anonymous)	@	content.dart.js:4366
+call$2	@	content.dart.js:33315
+_asyncStartSync	@	content.dart.js:4330
+_httpPost$body$PiecesHttpClient	@	content.dart.js:79905
+_httpPost$2	@	content.dart.js:79878
+(anonymous)	@	content.dart.js:79818
+(anonymous)	@	content.dart.js:4366
+call$2	@	content.dart.js:33315
+_asyncStartSync	@	content.dart.js:4330
+post$body$PiecesHttpClient	@	content.dart.js:79875
+post$2	@	content.dart.js:79764
+(anonymous)	@	content.dart.js:29976
+(anonymous)	@	content.dart.js:4366
+call$2	@	content.dart.js:33315
+_asyncStartSync	@	content.dart.js:4330
+SitesVisitCountTracker_createWebsite$body	@	content.dart.js:30035
+SitesVisitCountTracker_createWebsite	@	content.dart.js:29953
+Placement_run	@	content.dart.js:28262
+call$0	@	content.dart.js:78622
+call$0	@	content.dart.js:33252
+setTimeout		
+_TimerImpl$2	@	content.dart.js:33221
+_TimerImpl$	@	content.dart.js:4318
+Timer__createTimer	@	content.dart.js:4314
+createTimer$2	@	content.dart.js:35566
+Timer_Timer	@	content.dart.js:4868
+onMutation$2	@	content.dart.js:78468
+(anonymous)	@	content.dart.js:2008
+form_handler.js:33 Form Submission Debug
+utils.js:38 
+ 
+ POST http://127.0.0.1:5000/models/edit/1 500 (INTERNAL SERVER ERROR)
+fetchWithCSRF	@	utils.js:38
+handleFormSubmit	@	form_handler.js:110
+(anonymous)	@	form_handler.js:15
+utils.js:70 
+ Error in fetchWithCSRF: 
+{message: "int() argument must be a string, a bytes-like object or a real number, not 'NoneType'", stack: 'Error: int() argument must be a string, a bytes-li…//127.0.0.1:5000/static/js/form_handler.js:15:21)', response: Response, data: {…}}
+data
+: 
+{error: "int() argument must be a string, a bytes-like object or a real number, not 'NoneType'", success: false}
+message
+: 
+"int() argument must be a string, a bytes-like object or a real number, not 'NoneType'"
+response
+: 
+Response {type: 'basic', url: 'http://127.0.0.1:5000/models/edit/1', redirected: false, status: 500, ok: false, …}
+stack
+: 
+"Error: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'\n    at Object.fetchWithCSRF (http://127.0.0.1:5000/static/js/utils.js:63:27)\n    at async ModelFormHandler.handleFormSubmit (http://127.0.0.1:5000/static/js/form_handler.js:110:28)\n    at async HTMLFormElement.<anonymous> (http://127.0.0.1:5000/static/js/form_handler.js:15:21)"
+[[Prototype]]
+: 
+Object
+fetchWithCSRF	@	utils.js:70
+await in fetchWithCSRF		
+handleFormSubmit	@	form_handler.js:110
+(anonymous)	@	form_handler.js:15
+form_handler.js:131 
+ Network or response error: Error: int() argument must be a string, a bytes-like object or a real number, not 'NoneType'
+    at Object.fetchWithCSRF (utils.js:80:23)
+    at async ModelFormHandler.handleFormSubmit (form_handler.js:110:28)
+    at async HTMLFormElement.<anonymous> (form_handler.js:15:21)
+handleFormSubmit	@	form_handler.js:131
+await in handleFormSubmit		
+(anonymous)	@	form_handler.js:15
