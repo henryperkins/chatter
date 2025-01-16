@@ -1,13 +1,15 @@
+// Remove TypeScript-specific syntax and use JSDoc for type annotations
 
 class ModelFormHandler {
     constructor() {
+        /** @type {any} */
         this.utils = window.utils || {};
         this.initializeForms();
     }
 
     initializeForms() {
         document.addEventListener("DOMContentLoaded", () => {
-            document.querySelectorAll(".model-form").forEach(form => {
+            document.querySelectorAll(".model-form").forEach((form) => {
                 form.addEventListener("submit", this.handleFormSubmit.bind(this));
             });
         });
@@ -17,20 +19,18 @@ class ModelFormHandler {
         event.preventDefault();
         const form = event.target;
         const submitButton = form.querySelector('button[type="submit"]');
-        const modelId = form.dataset.modelId;
-        const actionUrl = `/edit/${modelId}`;
-        
-        if (!actionUrl || !modelId) {
-            console.error('Form action URL or model ID not found');
+        const actionUrl = form.dataset.action;
+
+        if (!actionUrl) {
+            console.error("Form action URL not found");
             return;
         }
 
-        console.debug('Form submission started:', {
+        console.debug("Form submission started:", {
             actionUrl,
-            modelId,
-            formData: new FormData(form)
+            formData: new FormData(form),
         });
-        
+
         try {
             // Show loading state
             submitButton.disabled = true;
@@ -47,42 +47,63 @@ class ModelFormHandler {
             `;
 
             const formData = new FormData(form);
-            const numericFields = ['max_tokens', 'max_completion_tokens', 'temperature', 'version'];
-            const booleanFields = ['requires_o1_handling', 'is_default', 'supports_streaming'];
+            const data = {};
 
             // Process form data
-            for (const [key, value] of formData.entries()) {
-                if (numericFields.includes(key)) {
-                    formData.set(key, Number(value));
-                } else if (booleanFields.includes(key)) {
-                    formData.set(key, value === 'on' || value === 'true');
+            formData.forEach((value, key) => {
+                let stringValue = "";
+                if (typeof value === "string") {
+                    stringValue = value;
+                } else if (value instanceof File) {
+                    stringValue = "";
                 }
-                console.debug(`Processing form field: ${key} = ${value}`);
+
+                // Handle numeric fields
+                if (["max_tokens", "max_completion_tokens", "version"].includes(key)) {
+                    data[key] = stringValue ? parseInt(stringValue, 10) : null;
+                }
+                // Handle temperature field
+                else if (key === "temperature") {
+                    data[key] = stringValue ? parseFloat(stringValue) : null;
+                }
+                // Handle boolean fields
+                else if (
+                    ["requires_o1_handling", "is_default", "supports_streaming"].includes(
+                        key
+                    )
+                ) {
+                    data[key] = stringValue === "on" || stringValue === "true";
+                }
+                // Handle other fields
+                else {
+                    data[key] = stringValue;
+                }
+                console.debug(`Processing form field: ${key} = ${stringValue}`);
+            });
+
+            // Handle o1-preview specific logic
+            if (data.requires_o1_handling) {
+                data.temperature = 1.0;
+                data.supports_streaming = false;
             }
 
             // Ensure CSRF token is present
-            if (!formData.get('csrf_token')) {
-                const csrfToken = this.utils.getCSRFToken();
-                formData.append('csrf_token', csrfToken);
-                console.debug('Added CSRF token to form data');
+            const csrfToken = this.utils.getCSRFToken();
+            if (!data.csrf_token && csrfToken) {
+                data.csrf_token = csrfToken;
             }
 
-            // Handle o1-preview specific logic
-            if (formData.get('requires_o1_handling')) {
-                formData.set('temperature', 1.0);
-                formData.set('supports_streaming', false);
-            }
-
-            console.debug('Sending form data to:', actionUrl);
+            console.debug("Sending form data to:", actionUrl);
             const response = await this.utils.fetchWithCSRF(actionUrl, {
                 method: "POST",
-                body: formData,
+                body: JSON.stringify(data),
                 headers: {
-                    "X-CSRFToken": this.utils.getCSRFToken(),
-                    "X-Requested-With": "XMLHttpRequest"
-                }
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken,
+                    "X-Requested-With": "XMLHttpRequest",
+                },
             });
-            console.debug('Received response:', response);
+            console.debug("Received response:", response);
 
             if (response.success) {
                 this.utils.showFeedback("Model saved successfully", "success");
@@ -93,7 +114,10 @@ class ModelFormHandler {
                     console.error("No redirect URL provided in response.");
                 }
             } else {
-                this.utils.showFeedback(response.error || "Failed to save model", "error");
+                this.utils.showFeedback(
+                    response.error || "Failed to save model",
+                    "error"
+                );
                 this.displayFormErrors(form, response.errors);
             }
         } catch (error) {
@@ -109,19 +133,23 @@ class ModelFormHandler {
 
     displayFormErrors(form, errors) {
         // Clear previous errors
-        form.querySelectorAll('.error-text').forEach(el => el.remove());
-        form.querySelectorAll('.border-red-500').forEach(el => el.classList.remove('border-red-500'));
+        form.querySelectorAll(".error-text").forEach((el) => el.remove());
+        form.querySelectorAll(".border-red-500").forEach((el) =>
+            el.classList.remove("border-red-500")
+        );
 
         // Display new errors
         if (errors) {
             Object.entries(errors).forEach(([field, messages]) => {
                 const input = form.querySelector(`[name="${field}"]`);
                 if (input) {
-                    input.classList.add('border-red-500');
-                    const errorDiv = document.createElement('div');
-                    errorDiv.className = 'error-text text-red-500 text-sm mt-1';
+                    input.classList.add("border-red-500");
+                    const errorDiv = document.createElement("div");
+                    errorDiv.className = "error-text text-red-500 text-sm mt-1";
                     errorDiv.textContent = messages[0];
-                    input.parentNode.appendChild(errorDiv);
+                    if (input.parentNode) {
+                        input.parentNode.appendChild(errorDiv);
+                    }
                 }
             });
         }

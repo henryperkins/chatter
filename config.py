@@ -6,26 +6,28 @@ class Config:
     DATABASE_URI = os.getenv("DATABASE_URI", "sqlite:///./data/chat_app.db")
     # Generate a new key if none exists: Fernet.generate_key().decode()
     ENCRYPTION_KEY = os.getenv(
-        "ENCRYPTION_KEY", "X8F0Bsfq6y6GKTq5_fyCjAczGx_RsBfCMyvsQR_RL7k="
+        "ENCRYPTION_KEY", "I_bNh30H5SiGBreBGP7jKHPvb5SfGRl9e1WRAn1_3bw="
     )
 
     AZURE_API_KEY = os.getenv("AZURE_API_KEY", "your-azure-api-key")
     AZURE_API_ENDPOINT = os.getenv("AZURE_API_ENDPOINT", "https://openai.azure.com/")
     AZURE_API_VERSION = os.getenv("AZURE_API_VERSION", "2024-12-01-preview")
-    AZURE_DEPLOYMENT_NAME = os.getenv(
-        "AZURE_OPENAI_DEPLOYMENT_NAME", "o1-preview"
-    )
+    AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "o1-preview")
 
     # Added missing default model configurations
     DEFAULT_MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "Default Model")
-    DEFAULT_DEPLOYMENT_NAME = os.getenv("DEFAULT_DEPLOYMENT_NAME", AZURE_DEPLOYMENT_NAME)
+    DEFAULT_DEPLOYMENT_NAME = os.getenv(
+        "DEFAULT_DEPLOYMENT_NAME", AZURE_DEPLOYMENT_NAME
+    )
     DEFAULT_MODEL_DESCRIPTION = os.getenv(
         "DEFAULT_MODEL_DESCRIPTION", "Default model description"
     )
     DEFAULT_API_ENDPOINT = os.getenv("DEFAULT_API_ENDPOINT", AZURE_API_ENDPOINT)
     DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", "1.0"))
     DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", 32000))
-    DEFAULT_MAX_COMPLETION_TOKENS = int(os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", 8300))
+    DEFAULT_MAX_COMPLETION_TOKENS = int(
+        os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", 8300)
+    )
     DEFAULT_REQUIRES_O1_HANDLING = bool(os.getenv("DEFAULT_REQUIRES_O1_HANDLING", True))
     DEFAULT_SUPPORTS_STREAMING = bool(os.getenv("DEFAULT_SUPPORTS_STREAMING", False))
     DEFAULT_API_VERSION = os.getenv("DEFAULT_API_VERSION", AZURE_API_VERSION)

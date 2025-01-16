@@ -1,3 +1,13 @@
+"""
+Module for handling model routes.
+
+This module provides routes for managing AI model configurations, including:
+- CRUD operations for model records
+- Model validation and configuration
+- Version control and history tracking
+- Default model management
+"""
+
 import logging
 from typing import Optional
 
@@ -192,16 +202,19 @@ def create_model():
         Model.validate_model_config(data)
         model_id = Model.create(data)
         logger.info("Model created successfully with ID: %d", model_id)
-        return (
-            jsonify(
-                {
-                    "id": model_id,
-                    "success": True,
-                    "message": "Model created successfully",
-                }
-            ),
-            201,
-        )
+        redirect_url = url_for('chat.chat_interface', _external=True)
+        logger.debug("Sending response with redirect: %s", {
+            "id": model_id,
+            "success": True,
+            "message": "Model created successfully",
+            "redirect": redirect_url
+        })
+        return jsonify({
+            "id": model_id,
+            "success": True,
+            "message": "Model created successfully",
+            "redirect": redirect_url
+        }), 201
 
     except ValueError as e:
         return handle_error(e, "Validation error during model creation", 400)
@@ -323,55 +336,55 @@ def edit_model(model_id):
                     "message": "Form validation failed",
                     "success": False
                 }), 400
-                
-                # Extract and validate data
-                data = extract_model_data(form)
-                logger.debug("Extracted model data: %s", {
-                    k: v if k != "api_key" else "****" for k, v in data.items()
-                })
-                validate_immutable_fields(model_id, data)
-                
-                # Handle o1-preview model constraints
-                if data.get('requires_o1_handling'):
-                    if data.get('supports_streaming', False):
-                        raise ValueError("o1-preview models do not support streaming")
-                    data['temperature'] = 1.0  # Force temperature for o1-preview
-                    data['supports_streaming'] = False  # Force disable streaming
-                    logger.info("Enforcing o1-preview constraints for model %d", model_id)
-                
-                # Handle is_default setting
-                if data.get('is_default'):
-                    Model.set_default(model_id)
-                    logger.info("Set model %d as default", model_id)
-                else:
-                    # If unsetting default, ensure another model is set as default
-                    current_default = Model.get_default()
-                    if current_default and current_default.id == model_id:
-                        # Find another model to set as default
-                        other_models = Model.get_all(limit=1)
-                        if other_models:
-                            Model.set_default(other_models[0].id)
-                        else:
-                            raise ValueError("Cannot unset default model - no other models exist")
-                
-                # Validate model configuration
-                Model.validate_model_config(data)
-                
-                # Update model with validated data
-                Model.update(model_id, data)
-                logger.info("Model updated successfully: %d", model_id)
-                
-                redirect_url = url_for('chat.chat_interface', _external=True)
-                logger.debug("Sending response with redirect: %s", {
-                    "success": True,
-                    "message": "Model updated successfully",
-                    "redirect": redirect_url
-                })
-                return jsonify({
-                    "success": True,
-                    "message": "Model updated successfully",
-                    "redirect": redirect_url
-                })
+
+            # Extract and validate data
+            data = extract_model_data(form)
+            logger.debug("Extracted model data: %s", {
+                k: v if k != "api_key" else "****" for k, v in data.items()
+            })
+            validate_immutable_fields(model_id, data)
+            
+            # Handle o1-preview model constraints
+            if data.get('requires_o1_handling'):
+                if data.get('supports_streaming', False):
+                    raise ValueError("o1-preview models do not support streaming")
+                data['temperature'] = 1.0  # Force temperature for o1-preview
+                data['supports_streaming'] = False  # Force disable streaming
+                logger.info("Enforcing o1-preview constraints for model %d", model_id)
+            
+            # Handle is_default setting
+            if data.get('is_default'):
+                Model.set_default(model_id)
+                logger.info("Set model %d as default", model_id)
+            else:
+                # If unsetting default, ensure another model is set as default
+                current_default = Model.get_default()
+                if current_default and current_default.id == model_id:
+                    # Find another model to set as default
+                    other_models = Model.get_all(limit=1)
+                    if other_models:
+                        Model.set_default(other_models[0].id)
+                    else:
+                        raise ValueError("Cannot unset default model - no other models exist")
+            
+            # Validate model configuration
+            Model.validate_model_config(data)
+            
+            # Update model with validated data
+            Model.update(model_id, data)
+            logger.info("Model updated successfully: %d", model_id)
+            
+            redirect_url = url_for('chat.chat_interface', _external=True)
+            logger.debug("Sending response with redirect: %s", {
+                "success": True,
+                "message": "Model updated successfully",
+                "redirect": redirect_url
+            })
+            return jsonify({
+                "success": True,
+                "message": "Model updated successfully",
+                "redirect": redirect_url
+            })
 
         logger.debug("Rendering edit model page for model ID %d", model_id)
         return render_template("edit_model.html", form=form, model=model)
