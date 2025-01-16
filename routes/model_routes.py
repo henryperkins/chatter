@@ -16,9 +16,6 @@ from decorators import admin_required
 from forms import ModelForm
 from models import Model
 
-# Import centralized logging configuration
-import logging_config  # Ensure centralized logging is initialized
-
 # Initialize logger for this module
 logger = logging.getLogger(__name__)
 
@@ -43,10 +40,14 @@ def validate_csrf_token() -> Optional[tuple]:
             request.form.get("csrf_token") or
             (request.get_json(silent=True) or {}).get("csrf_token")
         )
-        
+
         if not csrf_token:
-            logger.warning("CSRF token missing from request - Headers: %s, Form: %s, JSON: %s",
-                         request.headers, request.form, request.get_json(silent=True))
+            logger.warning(
+                "CSRF token missing from request - Headers: %s, Form: %s, JSON: %s",
+                request.headers,
+                request.form,
+                request.get_json(silent=True)
+            )
             raise ValueError("CSRF token is required for this request.")
 
         # Validate the token
@@ -304,28 +305,73 @@ def edit_model(model_id):
             if csrf_error:
                 return csrf_error
 
-            if form.validate_on_submit():
-                try:
-                    data = extract_model_data(form)
-                    validate_immutable_fields(model_id, data)
-                    Model.update(model_id, data)
-                    logger.info("Model updated successfully: %d", model_id)
-                    redirect_url = url_for('chat.chat_interface', _external=True)
-                    logger.debug("Sending response with redirect: %s", {
-                        "success": True,
-                        "message": "Model updated successfully",
-                        "redirect": redirect_url
-                    })
-                    return jsonify({
-                        "success": True,
-                        "message": "Model updated successfully",
-                        "redirect": redirect_url
-                    })
-                except Exception as e:
-                    return handle_error(e, "Error updating model", 400)
-
-            logger.warning("Form validation failed during model edit: %s", form.errors)
-            return jsonify({"error": form.errors}), 400
+            # Log raw form data
+            logger.debug("Raw form data: %s", request.form)
+            
+            # Bind form data from request
+            form = ModelForm(request.form)
+            
+            # Log form data after binding
+            logger.debug("Form data after binding: %s", {
+                k: v if k != "api_key" else "****" for k, v in form.data.items()
+            })
+            
+            if not form.validate():
+                logger.warning("Form validation failed: %s", form.errors)
+                return jsonify({
+                    "error": form.errors,
+                    "message": "Form validation failed",
+                    "success": False
+                }), 400
+                
+                # Extract and validate data
+                data = extract_model_data(form)
+                logger.debug("Extracted model data: %s", {
+                    k: v if k != "api_key" else "****" for k, v in data.items()
+                })
+                validate_immutable_fields(model_id, data)
+                
+                # Handle o1-preview model constraints
+                if data.get('requires_o1_handling'):
+                    if data.get('supports_streaming', False):
+                        raise ValueError("o1-preview models do not support streaming")
+                    data['temperature'] = 1.0  # Force temperature for o1-preview
+                    data['supports_streaming'] = False  # Force disable streaming
+                    logger.info("Enforcing o1-preview constraints for model %d", model_id)
+                
+                # Handle is_default setting
+                if data.get('is_default'):
+                    Model.set_default(model_id)
+                    logger.info("Set model %d as default", model_id)
+                else:
+                    # If unsetting default, ensure another model is set as default
+                    current_default = Model.get_default()
+                    if current_default and current_default.id == model_id:
+                        # Find another model to set as default
+                        other_models = Model.get_all(limit=1)
+                        if other_models:
+                            Model.set_default(other_models[0].id)
+                        else:
+                            raise ValueError("Cannot unset default model - no other models exist")
+                
+                # Validate model configuration
+                Model.validate_model_config(data)
+                
+                # Update model with validated data
+                Model.update(model_id, data)
+                logger.info("Model updated successfully: %d", model_id)
+                
+                redirect_url = url_for('chat.chat_interface', _external=True)
+                logger.debug("Sending response with redirect: %s", {
+                    "success": True,
+                    "message": "Model updated successfully",
+                    "redirect": redirect_url
+                })
+                return jsonify({
+                    "success": True,
+                    "message": "Model updated successfully",
+                    "redirect": redirect_url
+                })
 
         logger.debug("Rendering edit model page for model ID %d", model_id)
         return render_template("edit_model.html", form=form, model=model)

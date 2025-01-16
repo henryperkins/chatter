@@ -108,6 +108,7 @@ class Model:
                     {
                         "name": data["name"],
                         "deployment_name": data["deployment_name"],
+                        "is_default": data.get("is_default", False)
                     },
                 ).fetchone()
 
@@ -274,8 +275,7 @@ class Model:
         """
         with db_session() as db:
             try:
-                Model.validate_model_config(data)
-
+                # Get existing model to check current state
                 model = Model.get_by_id(model_id)
                 if not model:
                     raise ValueError(f"Model with ID {model_id} not found")
@@ -306,8 +306,32 @@ class Model:
                     return
 
                 # Handle o1-preview settings
-                if update_data.get("requires_o1_handling", False):
+                if update_data.get("requires_o1_handling", False) or model.requires_o1_handling:
+                    # Force disable streaming for o1-preview models
                     update_data["supports_streaming"] = False
+                    # Force temperature to 1.0 for o1-preview models
+                    update_data["temperature"] = 1.0
+                    logger.debug("Enforcing o1-preview constraints for model %d", model_id)
+
+                # Ensure is_default is properly handled
+                if "is_default" in update_data:
+                    if update_data["is_default"]:
+                        # Set all other models to non-default
+                        db.execute(
+                            text("UPDATE models SET is_default = 0 WHERE id != :model_id"),
+                            {"model_id": model_id}
+                        )
+                    else:
+                        # Ensure at least one model remains default
+                        default_count = db.execute(
+                            text("SELECT COUNT(*) FROM models WHERE is_default = 1 AND id != :model_id"),
+                            {"model_id": model_id}
+                        ).scalar()
+                        if default_count == 0:
+                            raise ValueError("Cannot unset default model without setting another as default")
+
+                # Validate configuration before update
+                Model.validate_model_config(update_data)
 
                 # Build update query
                 set_clause = ", ".join(f"{key} = :{key}" for key in update_data)
@@ -348,8 +372,8 @@ class Model:
 
             except Exception as e:
                 db.rollback()
-                logger.error("Failed to update model %d: %s", model_id, e)
-                raise
+                logger.error("Failed to update model %d: %s", model_id, e, exc_info=True)
+                raise ValueError(f"Failed to update model: {str(e)}")
 
     @staticmethod
     def delete(model_id: int) -> None:

@@ -292,16 +292,17 @@ class ModelForm(FlaskForm):
             field.data = None
         elif field.data is not None and field.data <= 0:
             raise ValidationError("Max tokens must be a positive integer.")
-def validate_requires_o1_handling(self, field: Any) -> None:
-    """
-    Additional validation when special handling is required.
-    """
-    if field.data:
-        # When requires_o1_handling is True, automatically set temperature and max_tokens to None
-        # and disable streaming support
-        self.temperature.data = None
-        self.max_tokens.data = None
-        self.supports_streaming.data = False
+    def validate_requires_o1_handling(self, field: Any) -> None:
+        """
+        Additional validation when special handling is required.
+        """
+        if field.data:
+            # When requires_o1_handling is True, automatically set temperature and max_tokens to None
+            # and disable streaming support
+            self.temperature.data = 1.0
+            self.max_tokens.data = None
+            self.supports_streaming.data = False
+            self.max_completion_tokens.data = 8300
 
 
 class DefaultModelForm(FlaskForm):

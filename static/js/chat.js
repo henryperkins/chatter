@@ -214,7 +214,7 @@ function init() {
             const modelId = modelSelect?.value;
             if (modelId) {
                 console.debug('Editing model:', modelId);
-                const editUrl = `/edit/${modelId}`;
+                const editUrl = windowExt.CHAT_CONFIG.editModelUrl + modelId;
                 window.location.href = editUrl;
             } else {
                 windowExt.utils.showFeedback('No model selected', 'error');
