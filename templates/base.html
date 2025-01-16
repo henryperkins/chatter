@@ -326,8 +326,9 @@
 
     <!-- Base Application Script (load last) -->
     <script src="{{ url_for('static', filename='js/base.js') }}"></script>
-
+    
     {% block scripts %}
+    <script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>
     {% endblock %}
 </body>
 </html>

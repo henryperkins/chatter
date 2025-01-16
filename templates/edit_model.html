@@ -7,14 +7,10 @@
     <h1 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-100">Edit Model: {{ model.name }}</h1>
 <form id="edit-model-form"
     class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 model-form"
-    data-version="{{ model.version }}"
-    data-model-id="{{ model.id }}"
-    data-action="{{ url_for('model.edit_model', model_id=model.id) }}"
-    action="{{ url_for('model.edit_model', model_id=model.id) }}"
-    data-redirect="{{ request.host_url.rstrip('/') + url_for('chat.chat_interface') }}">
+    method="POST"
+    action="{{ url_for('model.edit_model', model_id=model.id) }}">
         {{ form.hidden_tag() }}
         <input type="hidden" name="version" value="{{ model.version }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
         <!-- Model Name -->
         <div class="mb-6">

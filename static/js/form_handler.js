@@ -2,28 +2,31 @@
 
 class ModelFormHandler {
     constructor() {
-        /** @type {any} */
         this.utils = window.utils || {};
         this.initializeForms();
     }
 
     initializeForms() {
         document.addEventListener("DOMContentLoaded", () => {
-            document.querySelectorAll(".model-form").forEach((form) => {
-                form.addEventListener("submit", this.handleFormSubmit.bind(this));
-            });
+            const form = document.getElementById("edit-model-form");
+            if (form) {
+                form.addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    await this.handleFormSubmit(e);
+                });
+            }
         });
     }
 
     async handleFormSubmit(event) {
-        event.preventDefault();
         const form = event.target;
         const submitButton = form.querySelector('button[type="submit"]');
-        const actionUrl = form.dataset.action;
+        const actionUrl = form.action;
 
-        if (!actionUrl) {
-            console.error("Form action URL not found");
-            this.utils.showFeedback("Form submission error: No action URL", "error");
+        // Validate endpoint
+        if (!actionUrl || !actionUrl.includes('/models/edit/')) {
+            console.error('Invalid form action URL:', actionUrl);
+            this.utils.showFeedback("Invalid form configuration", "error");
             return;
         }
 

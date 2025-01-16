@@ -284,38 +284,38 @@ def add_model_page():
 def edit_model(model_id):
     """Edit model route handler."""
     try:
-        try:
-            model = Model.get_by_id(model_id)
-            if not model:
-                logger.warning("Model with ID %d not found in database", model_id)
-                return jsonify({
-                    "error": "Model not found",
-                    "message": f"No model found with ID {model_id}"
-                }), 404
-        except ValueError as e:
-            logger.error("Failed to retrieve model %d: %s", model_id, str(e))
+        model = Model.get_by_id(model_id)
+        if not model:
+            logger.warning("Model with ID %d not found in database", model_id)
             return jsonify({
-                "error": "Model configuration error",
-                "message": str(e)
-            }), 500
+                "error": "Model not found",
+                "message": f"No model found with ID {model_id}"
+            }), 404
 
         form = ModelForm(obj=model)
 
         if request.method == "POST":
+            # Validate CSRF first
             csrf_error = validate_csrf_token()
             if csrf_error:
                 return csrf_error
 
-            # Log raw form data
-            logger.debug("Raw form data: %s", request.form)
+            # Handle JSON data
+            if request.is_json:
+                form_data = request.get_json()
+            else:
+                form_data = request.form
+
+            # Bind and validate form
+            form = ModelForm(data=form_data)
             
-            # Bind form data from request
-            form = ModelForm(request.form)
-            
-            # Log form data after binding
-            logger.debug("Form data after binding: %s", {
-                k: v if k != "api_key" else "****" for k, v in form.data.items()
-            })
+            if not form.validate():
+                logger.warning("Form validation failed: %s", form.errors)
+                return jsonify({
+                    "success": False,
+                    "errors": form.errors,
+                    "message": "Form validation failed"
+                }), 400
             
             if not form.validate():
                 logger.warning("Form validation failed: %s", form.errors)
