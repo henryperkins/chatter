@@ -66,7 +66,13 @@ class ModelFormHandler {
 
                 // Handle numeric fields
                 if (["max_tokens", "max_completion_tokens", "version"].includes(key)) {
-                    data[key] = stringValue && !isNaN(stringValue) ? parseInt(stringValue, 10) : null;
+                    if (stringValue === "" || stringValue === null || stringValue === undefined) {
+                        data[key] = null;
+                    } else if (!isNaN(stringValue)) {
+                        data[key] = parseInt(stringValue, 10);
+                    } else {
+                        data[key] = null;
+                    }
                 }
                 // Handle temperature field
                 else if (key === "temperature") {
@@ -127,7 +133,15 @@ class ModelFormHandler {
                     this.utils.showFeedback("Model saved but no redirect provided", "warning");
                 }
             } else {
-                const errorMessage = response.error || "Failed to save model";
+                let errorMessage = "Failed to save model";
+                if (response.error) {
+                    errorMessage = response.error;
+                } else if (response.errors) {
+                    errorMessage = Object.values(response.errors)
+                        .flat()
+                        .join(". ");
+                }
+                
                 console.error("Form submission failed:", errorMessage, response.errors);
                 this.utils.showFeedback(errorMessage, "error");
                 this.displayFormErrors(form, response.errors);

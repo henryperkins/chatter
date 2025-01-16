@@ -215,7 +215,9 @@ class ModelForm(FlaskForm):
                 min=1, max=4000, message="Max tokens must be between 1 and 4000."
             ),
         ],
-        filters=[lambda x: x if x is not None and x != '' else None],
+        filters=[
+            lambda x: int(x) if x and str(x).strip() and x != 'None' else None
+        ],
         default=None
     )
     max_completion_tokens = IntegerField(

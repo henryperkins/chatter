@@ -73,6 +73,15 @@ async function fetchWithCSRF(url, options = {}) {
             response: error.response,
             data: error.data
         });
+        
+        // Handle specific error types
+        if (error.response && error.response.status === 500) {
+            if (error.data && error.data.error) {
+                throw new Error(error.data.error);
+            }
+            throw new Error("Server error occurred. Please try again.");
+        }
+        
         throw error;
     }
 }
