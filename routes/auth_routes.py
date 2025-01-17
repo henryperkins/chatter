@@ -448,10 +448,7 @@ def reset_password(token: str):
                 )
 
             if request.method == "POST" and form.validate_on_submit():
-                hashed_password = bcrypt.hashpw(
-                    form.password.data.strip().encode("utf-8"),
-                    bcrypt.gensalt(rounds=12),
-                )
+                hashed_password = generate_password_hash(form.password.data.strip())
 
                 db.execute(
                     text(
@@ -561,11 +558,7 @@ def edit_default_model():
                         raise ValueError(f"Failed to create and validate model: {str(e)}")
 
                 if not is_existing_admin:
-                    cost_factor = int(os.environ.get("BCRYPT_COST_FACTOR", 12))
-                    hashed_pw = bcrypt.hashpw(
-                        registration_data["password"].encode("utf-8"),
-                        bcrypt.gensalt(rounds=cost_factor),
-                    )
+                    hashed_pw = generate_password_hash(registration_data["password"])
 
                     db.execute(
                         text(

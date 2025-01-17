@@ -3,7 +3,6 @@ Flask-Login==0.6.2
 Flask-WTF==1.2.1
 Flask-Limiter==3.5.0
 Werkzeug==2.3.7
-bcrypt==4.0.1
 python-dotenv==1.0.1
 requests==2.31.0
 email-validator==2.0.0.post2
