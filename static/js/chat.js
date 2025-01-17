@@ -613,6 +613,16 @@ async function handleModelChange() {
 
     try {
         await windowExt.utils.withLoading(modelSelect, async () => {
+            // Confirm switch if there are unsent messages
+            const messageInput = document.getElementById('message-input');
+            if (messageInput?.value.trim()) {
+                if (!confirm('Changing models will clear your unsent message. Continue?')) {
+                    modelSelect.value = originalValue;
+                    return;
+                }
+                messageInput.value = '';
+            }
+
             const response = await windowExt.utils.fetchWithCSRF('/chat/update_model', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -623,17 +633,29 @@ async function handleModelChange() {
             });
 
             if (response.success) {
-                const selectedOption = modelSelect.options[modelSelect.selectedIndex];
-                if (selectedOption) {
-                    const modelName = selectedOption.textContent;
-                    const chatTitle = document.getElementById('chat-title');
-                    if (chatTitle) {
-                        const currentTitle = chatTitle.textContent.split('-')[0].trim();
-                        chatTitle.textContent = `${currentTitle} - ${modelName}`;
-                    }
+                // Update UI elements
+                const chatTitle = document.getElementById('chat-title');
+                if (chatTitle) {
+                    const currentTitle = chatTitle.textContent.split('-')[0].trim();
+                    const selectedOption = modelSelect.options[modelSelect.selectedIndex];
+                    chatTitle.textContent = `${currentTitle} - ${selectedOption.textContent}`;
                 }
+
+                // Update token usage display if needed
+                if (windowExt.tokenUsageManager) {
+                    windowExt.tokenUsageManager.updateStats();
+                }
+
+                // Update model configuration
                 modelSelect.dataset.originalValue = modelId;
                 windowExt.utils.showFeedback('Model updated successfully', 'success');
+
+                // Handle o1 model UI adjustments
+                if (response.model.requires_o1_handling) {
+                    adjustUIForO1Model(response.model);
+                } else {
+                    resetUIForStandardModel();
+                }
             } else {
                 throw new Error(response.error || 'Failed to update model');
             }
@@ -641,6 +663,35 @@ async function handleModelChange() {
     } catch (error) {
         windowExt.utils.showFeedback(error.message, 'error');
         modelSelect.value = originalValue; // Revert selection
+    }
+}
+
+function adjustUIForO1Model(model) {
+    // Disable streaming options for o1 models
+    const streamingElements = document.querySelectorAll('.streaming-option');
+    streamingElements.forEach(el => {
+        el.classList.add('hidden');
+    });
+
+    // Update token limit display
+    const tokenLimit = document.getElementById('tokens-limit');
+    if (tokenLimit) {
+        tokenLimit.textContent = `/ ${model.max_completion_tokens.toLocaleString()} max`;
+    }
+}
+
+function resetUIForStandardModel() {
+    // Re-enable streaming options
+    const streamingElements = document.querySelectorAll('.streaming-option');
+    streamingElements.forEach(el => {
+        el.classList.remove('hidden');
+    });
+
+    // Reset token limit display
+    const tokenLimit = document.getElementById('tokens-limit');
+    if (tokenLimit) {
+        const defaultLimit = windowExt.CHAT_CONFIG.defaultMaxTokens || 16384;
+        tokenLimit.textContent = `/ ${defaultLimit.toLocaleString()} max`;
     }
 }
 

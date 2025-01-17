@@ -4,8 +4,6 @@ from typing import Union, Tuple, List, Dict, Any, Optional, cast
 
 import bleach
 import tiktoken
-from chat_utils import MODEL_NAME
-from token_utils import get_encoding  # Add import for get_encoding
 from flask import (
     Blueprint,
     request,
@@ -28,7 +26,8 @@ from chat_utils import (
     generate_chat_title,
     generate_new_chat_id,
     process_file,
-    count_tokens,  # Added import
+    count_tokens,
+    truncate_content,
 )
 from conversation_manager import conversation_manager
 from database import db_session
@@ -36,79 +35,22 @@ from models.chat import Chat
 from models.model import Model
 
 # Import centralized logging configuration
-import logging_config  # noqa: F401 Ensure logging is initialized
+import logging_config  # Ensure logging is initialized
 import logging
 
 # Get logger for this module
 logger = logging.getLogger(__name__)
 
-
-def validate_model(model: Optional[Any]) -> Optional[str]:
-    """Validate the model configuration.
-    
-    Args:
-        model: The model object to validate
-        
-    Returns:
-        Optional[str]: Error message if validation fails, None if successful
-    """
-    if not model:
-        return "No model configured for this chat."
-    
-    required_attrs = [
-        "deployment_name",
-        "api_endpoint",
-        "api_key",
-        "max_completion_tokens",
-        "model_type",
-        "api_version"
-    ]
-    
-    for attr in required_attrs:
-        if not hasattr(model, attr) or not getattr(model, attr):
-            return f"Invalid model configuration: missing {attr}"
-    
-    # Additional validation for API endpoint
-    if not model.api_endpoint.startswith("https://"):
-        return "API endpoint must be a valid HTTPS URL"
-    
-    # Validate API key length
-    if len(model.api_key) < 32:
-        return "API key must be at least 32 characters"
-    
-    # Validate max_completion_tokens
-    if model.max_completion_tokens < 1 or model.max_completion_tokens > 16384:
-        return "max_completion_tokens must be between 1 and 16384"
-    
-    return None
-
-
 # File Constants
 MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", 10 * 1024 * 1024))  # 10 MB per file
 MAX_TOTAL_FILE_SIZE = int(os.getenv("MAX_TOTAL_FILE_SIZE", 50 * 1024 * 1024))  # 50 MB
-MAX_FILE_CONTENT_LENGTH = int(os.getenv("MAX_FILE_CONTENT_LENGTH", 8000))  # Characters
+ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx', 'md'}
 
 # Token Constants
 DEFAULT_MODEL = "gpt-4"  # Default model name for tiktoken encoding
 MAX_INPUT_TOKENS = int(os.getenv("MAX_INPUT_TOKENS", 8192))  # Max input tokens
 MAX_CONTEXT_TOKENS = int(os.getenv("MAX_CONTEXT_TOKENS", 128000))  # Max context tokens
-
-def validate_token_count(text: str, max_tokens: int) -> Tuple[str, int]:
-    """
-    Validate and truncate text to fit within token limit with improved accuracy.
-    """
-    encoding = get_encoding()
-    tokens = encoding.encode(text)
-    
-    if len(tokens) > max_tokens:
-        # Truncate with buffer for note
-        truncated_tokens = tokens[:max_tokens - 50]  # Leave room for truncation note
-        truncated_text = encoding.decode(truncated_tokens)
-        note = "\n\n[Note: Content truncated due to token limit]"
-        return truncated_text + note, len(truncated_tokens) + len(encoding.encode(note))
-        
-    return text, len(tokens)
-
+MODEL_NAME = DEFAULT_MODEL  # For compatibility
 
 # Rate Limiting Constants
 SCRAPE_RATE_LIMIT = "5 per minute"
@@ -123,7 +65,7 @@ try:
     encoding = tiktoken.encoding_for_model(DEFAULT_MODEL)
 except KeyError:
     logger.warning(
-        f"Model '{MODEL_NAME}' not found. Falling back to 'cl100k_base' encoding."
+        f"Model '{DEFAULT_MODEL}' not found. Falling back to 'cl100k_base' encoding."
     )
     encoding = tiktoken.get_encoding("cl100k_base")
 
@@ -152,6 +94,69 @@ def validate_chat_access(chat_id: str) -> bool:
         bool: True if user has access, False otherwise
     """
     return Chat.can_access_chat(chat_id, current_user.id, current_user.role)
+
+
+def validate_model(model: Optional[Any]) -> Optional[str]:
+    """Validate the model configuration.
+
+    Args:
+        model: The model object to validate
+
+    Returns:
+        Optional[str]: Error message if validation fails, None if successful
+    """
+    if not model:
+        return "No model configured for this chat."
+
+    required_attrs = [
+        "deployment_name",
+        "api_endpoint",
+        "api_key",
+        "max_completion_tokens",
+        "model_type",
+        "api_version",
+    ]
+
+    for attr in required_attrs:
+        if not hasattr(model, attr) or not getattr(model, attr):
+            return f"Invalid model configuration: missing {attr}"
+
+    # Additional validation for API endpoint
+    if not model.api_endpoint.startswith("https://"):
+        return "API endpoint must be a valid HTTPS URL"
+
+    # Validate API key length
+    if len(model.api_key) < 32:
+        return "API key must be at least 32 characters"
+
+    # Validate max_completion_tokens
+    if model.max_completion_tokens < 1 or model.max_completion_tokens > 16384:
+        return "max_completion_tokens must be between 1 and 16384"
+
+    # Additional validations can be added here
+
+    return None
+
+
+def truncate_content(text: str, max_tokens: int, truncation_note: str) -> str:
+    """
+    Truncate text to fit within the max token limit and append a truncation note.
+
+    Args:
+        text: The text to truncate
+        max_tokens: The maximum number of tokens allowed
+        truncation_note: The note to append after truncation
+
+    Returns:
+        str: The truncated text with the truncation note appended
+    """
+    encoding = tiktoken.encoding_for_model(DEFAULT_MODEL)
+    tokens = encoding.encode(text)
+    truncation_note_tokens = encoding.encode(truncation_note)
+    allowed_tokens = max_tokens - len(truncation_note_tokens)
+    truncated_tokens = tokens[:allowed_tokens]
+    truncated_text = encoding.decode(truncated_tokens)
+    return truncated_text + truncation_note
 
 
 def process_uploaded_files(
@@ -295,8 +300,8 @@ def chat_interface() -> Response:
         return cast(Response, redirect(url_for("chat.chat_interface")))
 
     try:
-        model = Chat.get_model(chat_id) if chat.model_id else None
-        if not model and chat.model_id:
+        model_obj = Chat.get_model(chat_id) if chat.model_id else None
+        if not model_obj and chat.model_id:
             logger.error(f"Failed to retrieve model for chat {chat_id}.")
             return (
                 render_template(
@@ -307,7 +312,7 @@ def chat_interface() -> Response:
             )
 
         chat_title = chat.title
-        model_name = model.name if model else "Default Model"
+        model_name = model_obj.name if model_obj else "Default Model"
     except Exception as e:
         logger.error(f"Error retrieving model for chat {chat_id}: {str(e)}")
         return (
@@ -492,7 +497,9 @@ def get_chat_stats(chat_id: str) -> Union[Response, Tuple[Response, int]]:
                 }
             )
         except ZeroDivisionError:
-            logger.error(f"Division by zero error when calculating token usage for chat {chat_id}")
+            logger.error(
+                f"Division by zero error when calculating token usage for chat {chat_id}"
+            )
             stats.update(
                 {
                     "model_info": model_info,
@@ -507,79 +514,101 @@ def get_chat_stats(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         return jsonify({"error": "Failed to get chat statistics"}), 500
 
 
+def validate_chat_request(request_data):
+    """Validate incoming chat request."""
+    try:
+        # CSRF validation
+        csrf_token = request_data.form.get("csrf_token")
+        if not csrf_token:
+            return {"valid": False, "error": "Missing CSRF token"}
+
+        try:
+            validate_csrf(csrf_token)
+        except CSRFError as e:
+            return {"valid": False, "error": f"Invalid CSRF token: {str(e)}"}
+
+        # Chat ID validation
+        chat_id = request_data.headers.get("X-Chat-ID") or session.get("chat_id")
+        if not chat_id:
+            return {"valid": False, "error": "Chat ID not found"}
+
+        # Access validation
+        if not validate_chat_access(chat_id):
+            return {"valid": False, "error": "Unauthorized access to chat"}
+
+        return {"valid": True, "chat_id": chat_id}
+    except Exception as e:
+        logger.error(f"Request validation error: {str(e)}", exc_info=True)
+        return {"valid": False, "error": "Request validation failed"}
+
+
 @chat_routes.route("/", methods=["POST"])
 @login_required
 @limiter.limit(CHAT_RATE_LIMIT)
 def handle_chat() -> Union[Response, Tuple[Response, int]]:
     """Handle incoming chat messages and return AI responses."""
     try:
-        # Manually validate CSRF token
-        try:
-            csrf_token = request.form.get("csrf_token")
-            if not csrf_token:
-                raise CSRFError("Missing CSRF token in form data.")
+        # 1. Validate request structure
+        validation_result = validate_chat_request(request)
+        if not validation_result["valid"]:
+            logger.error(f"Chat request validation failed: {validation_result['error']}")
+            return jsonify({"error": validation_result["error"]}), 400
 
-            validate_csrf(csrf_token)
-        except CSRFError as e:
-            logger.error(f"CSRF validation failed: {e.description}")
-            return jsonify({"error": "Invalid CSRF token."}), 400
+        chat_id = validation_result["chat_id"]
 
-        chat_id = request.headers.get("X-Chat-ID") or session.get("chat_id")
-        if not chat_id:
-            return jsonify({"error": "Chat ID not found."}), 400
-
-        if not validate_chat_access(chat_id):
-            return jsonify({"error": "Unauthorized access to chat"}), 403
-
-        # Always retrieve the current model associated with the chat
+        # 2. Get and validate model
         model_obj = Chat.get_model(chat_id)
-        
-        if not model_obj:
-            logger.error(f"No model configured for chat {chat_id}.")
-            return jsonify({"error": "No model configured for this chat."}), 400
-        
         model_error = validate_model(model_obj)
         if model_error:
+            logger.error(f"Model validation failed for chat {chat_id}: {model_error}")
             return jsonify({"error": model_error}), 400
 
-        if "message" not in request.form:
-            return jsonify({"error": "Message is required."}), 400
-
-        user_message = bleach.clean(request.form.get("message", "").strip())
-        if not user_message and not request.files:
+        # 3. Process message content
+        message = request.form.get("message", "").strip()
+        if not message and not request.files:
+            logger.warning("No message or files provided")
             return jsonify({"error": "Message or files are required."}), 400
 
-        logger.debug(f"User message: {user_message}")
+        # 4. Process files if present
+        combined_message = message
+        included_files, excluded_files, file_contents, total_tokens = [], [], [], 0
+        if request.files:
+            included_files, excluded_files, file_contents, file_tokens = process_uploaded_files(
+                request.files.getlist("files[]")
+            )
+            total_tokens += file_tokens
 
-        included_files, excluded_files, file_contents, total_tokens = (
-            process_uploaded_files(request.files.getlist("files[]"))
-        )
+        # Add message tokens
+        if message:
+            message_tokens = count_tokens(message, MODEL_NAME)
+            total_tokens += message_tokens
 
-        combined_message = (
-            (user_message + "\n" + "".join(file_contents))
-            if file_contents
-            else user_message
-        )
-
-        # Check token count of combined message
-        total_tokens = count_tokens(combined_message, DEFAULT_MODEL)
+        # Check token count
         if total_tokens > MAX_INPUT_TOKENS:
-            # Truncate the combined message to fit within the token limit
-            encoding = tiktoken.encoding_for_model(DEFAULT_MODEL)
-            tokens = encoding.encode(combined_message)[:MAX_INPUT_TOKENS]
-            truncated_message = encoding.decode(tokens)
-            combined_message = truncated_message + "\n\n[Note: Message truncated due to token limit.]"
+            combined_message = truncate_content(
+                combined_message,
+                MAX_INPUT_TOKENS,
+                "\n\n[Note: Message truncated due to token limit.]",
+            )
+            logger.info("Input content truncated due to token limit")
 
-        if (
-            Chat.is_title_default(chat_id)
-            and len(conversation_manager.get_context(chat_id)) >= 5
-        ):
+        # Combine message and file contents
+        if file_contents:
+            combined_message = message + "\n" + "".join(file_contents)
+
+        # Clean the combined message
+        combined_message = bleach.clean(combined_message)
+        logger.debug(f"Combined user message: {combined_message}")
+
+        # 5. Update chat title if necessary
+        if Chat.is_title_default(chat_id) and len(conversation_manager.get_context(chat_id)) >= 5:
             conversation_text = "\n".join(
                 f"{msg['role']}: {msg['content']}"
                 for msg in conversation_manager.get_context(chat_id)[:5]
             )
             Chat.update_title(chat_id, generate_chat_title(conversation_text))
-        
+
+        # 6. Add message to conversation
         conversation_manager.add_message(
             chat_id=chat_id,
             role="user",
@@ -588,12 +617,13 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
             requires_o1_handling=getattr(model_obj, "requires_o1_handling", False),
         )
 
-        # Get optimized context
+        # 7. Get optimized context
         history = conversation_manager.get_context(
             chat_id,
             include_system=not getattr(model_obj, "requires_o1_handling", False),
         )
-        
+
+        # 8. Get model response
         logger.debug("Sending request to Azure API")
         response = get_azure_response(
             messages=history,
@@ -607,44 +637,40 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         )
 
         # Handle error responses
-        if isinstance(response, dict) and 'error' in response:
+        if isinstance(response, dict) and "error" in response:
             logger.error(f"API error: {response['error']}")
-            return jsonify({"error": response['error']}), 500
+            return jsonify({"error": response["error"]}), 500
 
-        # Only process string responses
+        # Process response
         if isinstance(response, str):
             processed_response = response.replace("{%", "&#123;%").replace("%}", "%&#125;")
-            # Track response quality (basic implementation)
-            response_quality = min(1.0, len(response) / 1000)  # Could be enhanced
-            conversation_manager.context_manager.update_strategy(response_quality)
+            conversation_manager.add_message(
+                chat_id=chat_id,
+                role="assistant",
+                content=processed_response,
+                model_max_tokens=getattr(model_obj, "max_tokens", None),
+                requires_o1_handling=model_obj.requires_o1_handling,
+            )
+            return jsonify(
+                {
+                    "response": processed_response,
+                    "included_files": included_files if request.files else [],
+                    "excluded_files": excluded_files if request.files else [],
+                }
+            )
         else:
             logger.error(f"Unexpected response type: {type(response)}")
             return jsonify({"error": "Unexpected response from API"}), 500
-        conversation_manager.add_message(
-            chat_id=chat_id,
-            role="assistant",
-            content=processed_response,
-            model_max_tokens=getattr(model_obj, "max_tokens", None),
-            requires_o1_handling=getattr(model_obj, "requires_o1_handling", False),
-        )
-        return cast(
-            Response,
-            jsonify(
-                {
-                    "response": processed_response,
-                    "included_files": included_files,
-                    "excluded_files": excluded_files,
-                }
-            ),
-        )
-    except Exception as ex:
-        logger.error("Error during chat handling: %s", str(ex), exc_info=True)
+
+    except Exception as e:
+        logger.error("Error during chat handling: %s", str(e), exc_info=True)
         return jsonify({"error": "An unexpected error occurred."}), 500
 
 
 @chat_routes.route("/update_model", methods=["POST"])
 @login_required
 def update_model():
+    """Update the model for a chat with proper transaction handling."""
     data = request.get_json()
     chat_id = data.get("chat_id") or session.get("chat_id")
     new_model_id = data.get("model_id")
@@ -656,30 +682,67 @@ def update_model():
         return jsonify({"error": "Unauthorized access to chat"}), 403
 
     try:
-        # Ensure the new model exists and is valid
-        model = Model.get_by_id(new_model_id)
-        if not model:
-            return jsonify({"error": "Model not found"}), 404
+        with db_session() as db:
+            # Get and validate model within transaction
+            model = Model.get_by_id(new_model_id)
+            if not model:
+                return jsonify({"error": "Model not found"}), 404
 
-        # Validate the model configuration
-        model_error = validate_model(model)
-        if model_error:
-            return jsonify({"error": model_error}), 400
+            model_error = validate_model(model)
+            if model_error:
+                return jsonify({"error": model_error}), 400
 
-        # Update the model associated with the chat
-        Chat.update_model(chat_id, new_model_id)
-        
-        logger.info(f"Chat {chat_id} model updated to {new_model_id}")
-        return jsonify({
-            "success": True,
-            "model": {
-                "id": model.id,
-                "name": model.name,
-                "deployment_name": model.deployment_name,
-                "supports_streaming": model.supports_streaming,
-                "requires_o1_handling": model.requires_o1_handling
-            }
-        })
+            # Check for active streaming
+            active_stream = db.execute(
+                text(
+                    """
+                    SELECT COUNT(*) FROM messages 
+                    WHERE chat_id = :chat_id 
+                    AND metadata->>'$.streaming' = 'true'
+                    AND timestamp >= datetime('now', '-1 minute')
+                """
+                ),
+                {"chat_id": chat_id},
+            ).scalar()
+
+            if active_stream:
+                return (
+                    jsonify(
+                        {
+                            "error": "Cannot switch models during active streaming"
+                        }
+                    ),
+                    409,
+                )
+
+            # Update model within transaction
+            Chat.update_model(chat_id, new_model_id)
+            db.commit()
+
+            logger.info(f"Chat {chat_id} model updated to {new_model_id}")
+            # Return model details for UI update
+            return jsonify(
+                {
+                    "success": True,
+                    "model": {
+                        "id": model.id,
+                        "name": model.name,
+                        "deployment_name": model.deployment_name,
+                        "supports_streaming": model.supports_streaming,
+                        "requires_o1_handling": model.requires_o1_handling,
+                        "max_completion_tokens": model.max_completion_tokens,
+                    },
+                }
+            )
+
     except Exception as e:
-        logger.error(f"Error updating model for chat {chat_id}: {e}", exc_info=True)
-        return jsonify({"error": "Failed to update model. Please check the logs."}), 500
+        logger.error(
+            f"Error updating model for chat {chat_id}: {e}",
+            exc_info=True,
+        )
+        return (
+            jsonify(
+                {"error": "Failed to update model. Please check the logs."}
+            ),
+            500,
+        )

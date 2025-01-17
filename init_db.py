@@ -22,7 +22,7 @@ def init_db():
         Config.DEFAULT_MODEL_NAME,
         Config.DEFAULT_DEPLOYMENT_NAME,
         Config.DEFAULT_MODEL_DESCRIPTION,
-        Config.DEFAULT_MODEL_TYPE,
+        "azure",  # Default model type
         Config.DEFAULT_API_ENDPOINT,
         Config.AZURE_API_KEY,
         Config.DEFAULT_TEMPERATURE,

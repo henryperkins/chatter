@@ -270,12 +270,12 @@ def validate_api_endpoint(
         return response.status_code == 200
     except requests.exceptions.Timeout:
         logger.error("Validation failed due to a timeout.")
-        raise
+        return {"error": "The request timed out. Please check your network connection and try again."}
     except requests.exceptions.RequestException as e:
         logger.error(f"Validation failed with a request exception: {str(e)}")
-        raise
+        return {"error": f"Request error: {str(e)}"}
     except Exception as e:
         logger.error(
             f"An unexpected error occurred during API endpoint validation: {str(e)}"
         )
-        raise
+        return {"error": "An unexpected error occurred during validation. Please try again later."}

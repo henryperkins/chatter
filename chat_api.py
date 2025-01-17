@@ -175,7 +175,14 @@ def get_azure_response(
         )
         safe_api_params = {k: v for k, v in api_params.items() if k != 'api_key'}
         logger.debug("API parameters at the time of error: %s", safe_api_params)
-        return {"error": f"OpenAI API error occurred: {str(e)}"}
+
+        # Map technical errors to user-friendly messages
+        error_mapping = {
+            "Invalid API key": "The provided API key is invalid. Please check your configuration.",
+            "Model not found": "The selected model is not available. Please choose a different model.",
+        }
+        user_message = error_mapping.get(str(e), "An unexpected error occurred.")
+        return {"error": user_message}
     except Exception as e:
         logger.exception(
             "Error in get_azure_response (%s model)",
@@ -183,7 +190,7 @@ def get_azure_response(
         )
         safe_api_params = {k: v for k, v in api_params.items() if k != 'api_key'}
         logger.debug("API parameters at the time of error: %s", safe_api_params)
-        return {"error": "An unexpected error occurred"}
+        return {"error": "An unexpected error occurred. Please try again later."}
 
 
 def scrape_data(query: str) -> str:
