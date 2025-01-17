@@ -693,8 +693,8 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                     }
                 )
             else:
-            logger.error(f"Unexpected response type: {type(response)}")
-            return jsonify({"error": "Unexpected response from API"}), 500
+                logger.error(f"Unexpected response type: {type(response)}")
+                return jsonify({"error": "Unexpected response from API"}), 500
 
     except Exception as e:
         logger.error("Error during chat handling: %s", str(e), exc_info=True)
