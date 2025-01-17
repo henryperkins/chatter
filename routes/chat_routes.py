@@ -28,7 +28,6 @@ from chat_utils import (
     generate_new_chat_id,
     process_file,
     count_tokens,
-    truncate_content,
 )
 from conversation_manager import conversation_manager
 from database import db_session
@@ -36,7 +35,6 @@ from models.chat import Chat
 from models.model import Model
 
 # Import centralized logging configuration
-import logging_config  # Ensure logging is initialized
 import logging
 
 # Get logger for this module
@@ -632,69 +630,68 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         )
 
         # 8. Get model response
-        try:
-            # Log full model configuration
-            logger.debug("Model configuration:", {
-                "deployment_name": getattr(model_obj, "deployment_name", ""),
-                "api_endpoint": getattr(model_obj, "api_endpoint", ""),
-                "api_version": getattr(model_obj, "api_version", ""),
-                "requires_o1_handling": getattr(model_obj, "requires_o1_handling", False),
-                "supports_streaming": getattr(model_obj, "supports_streaming", False),
-                "max_completion_tokens": getattr(model_obj, "max_completion_tokens", 0),
-                "model_type": getattr(model_obj, "model_type", "azure")
-            })
+        # Log full model configuration
+        logger.debug("Model configuration: %s", {
+            "deployment_name": getattr(model_obj, "deployment_name", ""),
+            "api_endpoint": getattr(model_obj, "api_endpoint", ""),
+            "api_version": getattr(model_obj, "api_version", ""),
+            "requires_o1_handling": getattr(model_obj, "requires_o1_handling", False),
+            "supports_streaming": getattr(model_obj, "supports_streaming", False),
+            "max_completion_tokens": getattr(model_obj, "max_completion_tokens", 0),
+            "model_type": getattr(model_obj, "model_type", "azure")
+        })
 
-            # Verify API version is set
-            api_version = getattr(model_obj, "api_version", "2024-12-01-preview")
-            if not api_version:
-                logger.error("API version is not set in model configuration")
-                return jsonify({"error": "API version is not configured for this model"}), 400
+        # Verify API version is set
+        api_version = getattr(model_obj, "api_version", "2024-12-01-preview")
+        if not api_version:
+            logger.error("API version is not set in model configuration")
+            return jsonify({"error": "API version is not configured for this model"}), 400
 
-            logger.debug("Sending request to Azure API with version: %s", api_version)
-            response = get_azure_response(
-                messages=history,
-                deployment_name=getattr(model_obj, "deployment_name", ""),
-                max_completion_tokens=getattr(model_obj, "max_completion_tokens", 0),
-                api_endpoint=getattr(model_obj, "api_endpoint", ""),
-                api_key=getattr(model_obj, "api_key", ""),
-                api_version=api_version,
-                requires_o1_handling=getattr(model_obj, "requires_o1_handling", False),
-                stream=getattr(model_obj, "supports_streaming", False),
-                timeout_seconds=120,
+        logger.debug("Sending request to Azure API with version: %s", api_version)
+        response = get_azure_response(
+            messages=history,
+            deployment_name=getattr(model_obj, "deployment_name", ""),
+            max_completion_tokens=getattr(model_obj, "max_completion_tokens", 0),
+            api_endpoint=getattr(model_obj, "api_endpoint", ""),
+            api_key=getattr(model_obj, "api_key", ""),
+            api_version=api_version,
+            requires_o1_handling=getattr(model_obj, "requires_o1_handling", False),
+            stream=getattr(model_obj, "supports_streaming", False),
+            timeout_seconds=120,
+        )
+
+        # Handle error responses
+        if isinstance(response, dict) and "error" in response:
+            logger.error(f"API error: {response['error']}")
+            return jsonify({
+                "error": response["error"],
+                "details": {
+                    "deployment": getattr(model_obj, "deployment_name", ""),
+                    "endpoint": getattr(model_obj, "api_endpoint", ""),
+                    "version": api_version
+                }
+            }), 500
+
+        # Process response
+        if isinstance(response, str):
+            processed_response = response.replace("{%", "&#123;%").replace("%}", "%&#125;")
+            conversation_manager.add_message(
+                chat_id=chat_id,
+                role="assistant",
+                content=processed_response,
+                model_max_tokens=getattr(model_obj, "max_tokens", None),
+                requires_o1_handling=model_obj.requires_o1_handling,
             )
-
-            # Handle error responses
-            if isinstance(response, dict) and "error" in response:
-                logger.error(f"API error: {response['error']}")
-                return jsonify({
-                    "error": response["error"],
-                    "details": {
-                        "deployment": getattr(model_obj, "deployment_name", ""),
-                        "endpoint": getattr(model_obj, "api_endpoint", ""),
-                        "version": api_version
-                    }
-                }), 500
-
-            # Process response
-            if isinstance(response, str):
-                processed_response = response.replace("{%", "&#123;%").replace("%}", "%&#125;")
-                conversation_manager.add_message(
-                    chat_id=chat_id,
-                    role="assistant",
-                    content=processed_response,
-                    model_max_tokens=getattr(model_obj, "max_tokens", None),
-                    requires_o1_handling=model_obj.requires_o1_handling,
-                )
-                return jsonify(
-                    {
-                        "response": processed_response,
-                        "included_files": included_files if request.files else [],
-                        "excluded_files": excluded_files if request.files else [],
-                    }
-                )
-            else:
-                logger.error(f"Unexpected response type: {type(response)}")
-                return jsonify({"error": "Unexpected response from API"}), 500
+            return jsonify(
+                {
+                    "response": processed_response,
+                    "included_files": included_files if request.files else [],
+                    "excluded_files": excluded_files if request.files else [],
+                }
+            )
+        else:
+            logger.error(f"Unexpected response type: {type(response)}")
+            return jsonify({"error": "Unexpected response from API"}), 500
 
     except Exception as e:
         logger.error("Error during chat handling: %s", str(e), exc_info=True)
