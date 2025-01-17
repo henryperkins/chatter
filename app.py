@@ -27,7 +27,7 @@ from logging_config import get_logger
 logger = get_logger(__name__)
 
 # Load environment variables
-load_dotenv()
+load_dotenv(dotenv_path=".env")
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -183,7 +183,7 @@ def internal_server_error(error: HTTPException) -> Tuple[Dict[str, str], int]:
 @app.errorhandler(Exception)
 def handle_exception(e):
     """Handle all uncaught exceptions"""
-    if request.path.startswith('/static/'):
+    if request.path.startswith("/static/"):
         # Let Flask handle static file exceptions
         raise e
     logger.exception(
