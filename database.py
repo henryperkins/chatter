@@ -22,20 +22,13 @@ POOL_TIMEOUT = 60  # Increased timeout for operations
 
 from sqlalchemy.orm import scoped_session, sessionmaker
 
-engine = create_engine(
-    current_app.config["DATABASE_URI"],
-    poolclass=QueuePool,
-    pool_size=POOL_SIZE,
-    max_overflow=MAX_OVERFLOW,
-    pool_recycle=POOL_RECYCLE,
-    pool_timeout=POOL_TIMEOUT,
-    connect_args={"timeout": 30},
-)
-Session = scoped_session(sessionmaker(bind=engine))
+# engine and Session will be initialized in init_app()
 
 @contextmanager
 def db_session() -> Generator[Session, None, None]:
     """Get a database session."""
+    if 'Session' not in globals():
+        raise RuntimeError("Database session is not initialized. Call init_app(app) first.")
     session = Session()
     try:
         yield session
@@ -128,5 +121,16 @@ def init_db_command():
 
 def init_app(app: Flask) -> None:
     """Register database functions with Flask app."""
+    global engine, Session
+    engine = create_engine(
+        app.config["DATABASE_URI"],
+        poolclass=QueuePool,
+        pool_size=POOL_SIZE,
+        max_overflow=MAX_OVERFLOW,
+        pool_recycle=POOL_RECYCLE,
+        pool_timeout=POOL_TIMEOUT,
+        connect_args={"timeout": 30},
+    )
+    Session = scoped_session(sessionmaker(bind=engine))
     app.teardown_appcontext(close_db)
     app.cli.add_command(init_db_command)
