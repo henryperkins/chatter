@@ -675,8 +675,8 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
                     }
                 }), 500
 
-        # Process response
-        if isinstance(response, str):
+            # Process response
+            if isinstance(response, str):
             processed_response = response.replace("{%", "&#123;%").replace("%}", "%&#125;")
             conversation_manager.add_message(
                 chat_id=chat_id,
