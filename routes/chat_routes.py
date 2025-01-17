@@ -313,6 +313,7 @@ def chat_interface() -> Response:
 
         chat_title = chat.title
         model_name = model_obj.name if model_obj else "Default Model"
+        current_model = model_obj
     except Exception as e:
         logger.error(f"Error retrieving model for chat {chat_id}: {str(e)}")
         return (
@@ -365,6 +366,7 @@ def chat_interface() -> Response:
             chat_id=chat_id,
             chat_title=chat_title,
             model_name=model_name,
+            current_model=current_model,
             messages=messages,
             models=models,
             conversations=conversations,

@@ -44,7 +44,7 @@
                     </div>
                 </div>
                 <!-- Hidden input to store the current model's requires_o1_handling status -->
-                <input type="hidden" id="requires-o1-handling" value="{{ current_model.requires_o1_handling|lower }}">
+                <input type="hidden" id="requires-o1-handling" value="{{ current_model.requires_o1_handling|lower if current_model else 'false' }}">
             </div>
             {% endif %}
 
