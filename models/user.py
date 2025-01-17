@@ -58,6 +58,12 @@ class User(UserMixin):
                             "reset_token_expiry",
                         ],
                     )
+                    # Ensure password_hash is string
+                    if isinstance(user_dict.get("password_hash"), bytes):
+                        user_dict["password_hash"] = user_dict["password_hash"].decode("utf-8")
+                    # Ensure password_hash is string
+                    if isinstance(user_dict.get("password_hash"), bytes):
+                        user_dict["password_hash"] = user_dict["password_hash"].decode("utf-8")
                     logger.debug(f"User retrieved by ID {user_id}: {user_dict}")
                     return User(**user_dict)
                 logger.info(f"No user found with ID: {user_id}")

@@ -107,8 +107,12 @@ def login():
                         .first()
                     )
 
+                    password_hash = user["password_hash"]
+                    if isinstance(password_hash, bytes):
+                        password_hash = password_hash.decode("utf-8")
+                        
                     if not user or not check_password_hash(
-                        user["password_hash"],
+                        password_hash,
                         form.password.data.strip()
                     ):
                         log_failed_attempt(username, failed_logins)
@@ -246,6 +250,8 @@ def register():
 
                     # Create regular user
                     hashed_pw = generate_password_hash(password)
+                    if isinstance(hashed_pw, bytes):
+                        hashed_pw = hashed_pw.decode("utf-8")
 
                     db.execute(
                         text(
@@ -447,6 +453,8 @@ def reset_password(token: str):
 
             if request.method == "POST" and form.validate_on_submit():
                 hashed_password = generate_password_hash(form.password.data.strip())
+                if isinstance(hashed_password, bytes):
+                    hashed_password = hashed_password.decode("utf-8")
 
                 db.execute(
                     text(
@@ -557,6 +565,8 @@ def edit_default_model():
 
                 if not is_existing_admin:
                     hashed_pw = generate_password_hash(registration_data["password"])
+                    if isinstance(hashed_pw, bytes):
+                        hashed_pw = hashed_pw.decode("utf-8")
 
                     db.execute(
                         text(
