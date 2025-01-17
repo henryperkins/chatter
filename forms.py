@@ -350,6 +350,9 @@ class DefaultModelForm(FlaskForm):
         from config import Config
         if not Config.ENCRYPTION_KEY:
             raise ValueError("ENCRYPTION_KEY environment variable must be set")
+        # Ensure temperature is set to 1.0
+        if self.temperature.data is None:
+            self.temperature.data = 1.0
 
     name = StringField(
         "Model Name",
@@ -405,10 +408,7 @@ class DefaultModelForm(FlaskForm):
     )
     temperature = NullableFloatField(
         "Temperature",
-        validators=[
-            DataRequired(message="Temperature is required for o1-preview."),
-            NumberRange(min=1.0, max=1.0, message="Temperature must be exactly 1.0 for o1-preview."),
-        ],
+        validators=[Optional()],  # Change from DataRequired to Optional
         default=1.0,
         render_kw={"readonly": True}
     )
@@ -466,9 +466,11 @@ class DefaultModelForm(FlaskForm):
 
     def validate_temperature(self, field: Any) -> None:
         """
-        Ensure temperature is exactly 1.0 for o1-preview.
+        Ensure temperature is exactly 1.0 for o1-preview or None
         """
-        if field.data != 1.0:
+        if field.data is None:
+            field.data = 1.0  # Set to 1.0 if None
+        elif field.data != 1.0:
             raise ValidationError("Temperature must be exactly 1.0 for o1-preview.")
 
     def validate_max_completion_tokens(self, field: Any) -> None:
