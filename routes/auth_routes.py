@@ -347,9 +347,7 @@ def forgot_password():
                     )
 
                 reset_token = secrets.token_urlsafe(32)
-                reset_token_hash = bcrypt.hashpw(
-                    reset_token.encode("utf-8"), bcrypt.gensalt(rounds=12)
-                )
+                reset_token_hash = generate_password_hash(reset_token)
 
                 db.execute(
                     text(
