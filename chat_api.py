@@ -33,164 +33,137 @@ def get_azure_response(
     api_version: Optional[str] = None,
     requires_o1_handling: bool = False,
     stream: bool = False,
-    timeout_seconds: int = 600,  # Increased timeout to 10 minutes
+    timeout_seconds: int = 600,
 ) -> ResponseType:
     """
     Sends a chat message to the Azure OpenAI API and returns the response.
 
     Args:
         messages: List of message dictionaries with 'role' and 'content' keys.
-        deployment_name: The name of the deployment (model) to use. If not provided,
-            the default deployment will be used.
+        deployment_name: The name of the deployment (model) to use.
         selected_model_id: The ID of the selected model (optional).
         max_completion_tokens: The maximum number of completion tokens to generate.
-        api_endpoint: The Azure OpenAI endpoint URL (optional).
-        api_key: The Azure OpenAI API key (optional).
-        api_version: The Azure OpenAI API version (optional).
-        requires_o1_handling: Whether to use o1-preview specific handling (optional).
+        api_endpoint: The Azure OpenAI endpoint URL.
+        api_key: The Azure OpenAI API key.
+        api_version: The Azure OpenAI API version.
+        requires_o1_handling: Whether to use o1-preview specific handling.
+        stream: Whether to stream the response.
+        timeout_seconds: Timeout for the API call.
 
     Returns:
-        The response string from the Azure OpenAI API.
+        The response string or stream from the Azure OpenAI API.
 
     Raises:
-        ValueError: If the selected model is not found.
-        OpenAIError: If there is an error during API communication.
+        ValueError: If required parameters are missing or invalid.
         Exception: If any other error occurs.
     """
     try:
-        # Initialize defaults with proper types
-        api_params: Dict[str, Any] = {
-            "messages": [],  # Will be populated based on model type
-            "stream": stream and not requires_o1_handling,  # Enable streaming if requested and supported
+        # Validate required parameters
+        if not deployment_name:
+            raise ValueError("Deployment name is required")
+        if not api_endpoint:
+            raise ValueError("API endpoint is required")
+        if not api_key:
+            raise ValueError("API key is required")
+        if not api_version:
+            raise ValueError("API version is required")
+        if not messages:
+            raise ValueError("Messages are required")
+
+        # Log configuration details
+        logger.debug("Initializing Azure API client with config:", {
+            "deployment_name": deployment_name,
+            "api_endpoint": api_endpoint,
+            "requires_o1_handling": requires_o1_handling,
+            "stream": stream,
+            "max_completion_tokens": max_completion_tokens
+        })
+
+        # Initialize client
+        client = initialize_client_from_model({
+            "deployment_name": deployment_name,
+            "api_endpoint": api_endpoint,
+            "api_key": api_key,
+            "api_version": api_version,
+            "requires_o1_handling": requires_o1_handling,
+            "timeout_seconds": timeout_seconds
+        })
+
+        # Validate and prepare messages
+        if not isinstance(messages, list):
+            raise ValueError("Messages must be a list")
+        
+        validated_messages = []
+        for msg in messages:
+            if not isinstance(msg, dict):
+                raise ValueError("Each message must be a dictionary")
+            if "role" not in msg or "content" not in msg:
+                raise ValueError("Each message must have 'role' and 'content' keys")
+            validated_messages.append({
+                "role": msg["role"],
+                "content": str(msg["content"])
+            })
+
+        logger.debug("Sending validated messages:", validated_messages)
+
+        # Prepare API parameters
+        api_params = {
+            "model": deployment_name,
+            "messages": validated_messages,
+            "temperature": 1.0 if requires_o1_handling else 0.7,
+            "max_tokens": max_completion_tokens,
+            "stream": stream and not requires_o1_handling
         }
 
-        # Create model config from provided credentials or get from database
-        model_config = {}
-        if selected_model_id:
-            model = Model.get_by_id(selected_model_id)
-            if not model:
-                raise ValueError("Selected model not found.")
-            model_config = model.__dict__
-
-        # Override with any provided credentials
-        if api_endpoint:
-            model_config["api_endpoint"] = api_endpoint
-        if api_key:
-            model_config["api_key"] = api_key
-        if api_version:
-            model_config["api_version"] = api_version
-        if deployment_name:
-            model_config["deployment_name"] = deployment_name
-        model_config["requires_o1_handling"] = requires_o1_handling
-
-        # Initialize client from model config
-        (
-            client,
-            deployment_name,
-            temperature,
-            max_tokens,
-            max_completion_tokens,
-            requires_o1_handling,
-        ) = initialize_client_from_model(
-            model_config,
-            timeout_seconds=timeout_seconds,
-        )
-
-        # Update api_params with model/deployment info
-        api_params["model"] = deployment_name
-        if max_completion_tokens:
-            api_params["max_completion_tokens"] = max_completion_tokens
-
-        # Filter messages based on model requirements
-        api_messages = [
-            {"role": msg["role"], "content": msg["content"]}
-            for msg in messages
-            if not requires_o1_handling or msg["role"] != "system"
-        ]
-        api_params["messages"] = api_messages
-
-        # Set parameters based on model type
-        if requires_o1_handling:
-            # Required parameters for o1-preview
-            api_params.update(
-                {
-                    "temperature": 1,  # Must be 1 for o1-preview
-                    "max_completion_tokens": max_completion_tokens or 8500,
-                    "stream": False,  # Streaming not supported
-                }
-            )
-            # Remove 'max_tokens' if present
-            api_params.pop("max_tokens", None)
-        else:
-            # Parameters for other models
-            if temperature is not None:
-                api_params["temperature"] = temperature
-            if max_tokens is not None:
-                api_params["max_tokens"] = max_tokens
-            # Remove 'max_completion_tokens' if present
-            api_params.pop("max_completion_tokens", None)
-
-        # Log the final API parameters for debugging
-        logger.debug("Final API parameters: %s", api_params)
-        logger.debug("Sending request to Azure OpenAI with parameters: %s", api_params)
-
-        # Make the API call
+        # Make API call
+        logger.debug("Making API call with parameters:", api_params)
         response = client.chat.completions.create(**api_params)
 
         # Handle streaming response
-        if stream and not requires_o1_handling:
+        if stream:
             logger.debug("Returning streaming response")
             return response
 
         # Handle non-streaming response
-        logger.debug("Raw API response: %s", response.model_dump_json())
+        logger.debug("Received raw API response:", response)
 
-        # Extract model response with enhanced error checking
         if not response.choices:
-            logger.error("No choices in model response")
-            raise ValueError("Model response contained no choices")
-
+            logger.error("No choices in API response")
+            raise ValueError("API returned no choices")
+        
         if not response.choices[0].message:
             logger.error("No message in first choice")
-            raise ValueError("Model response choice contained no message")
+            raise ValueError("API response choice contained no message")
 
-        model_response = response.choices[0].message.content
-        if not model_response:
-            logger.error("Empty content in model response")
-            raise ValueError("Model returned empty response content")
+        content = response.choices[0].message.content
+        if not content:
+            logger.error("Empty content in API response")
+            raise ValueError("API returned empty content")
 
-        # Log successful response
-        logger.info(
-            "Response received from the model (length: %d): %s",
-            len(model_response),
-            model_response[:100] + "..." if len(model_response) > 100 else model_response,
-        )
-        return model_response
+        logger.info("Response received from the model (length: %d): %s",
+            len(content), content[:100] + "..." if len(content) > 100 else content)
 
+        return content
+
+    except ValueError as e:
+        logger.error("Validation error in get_azure_response: %s", str(e))
+        return {"error": f"Configuration error: {str(e)}"}
     except OpenAIError as e:
-        logger.exception(
-            "OpenAI API error with %s model: %s",
-            "o1-preview" if requires_o1_handling else "standard",
-            str(e)
-        )
-        safe_api_params = {k: v for k, v in api_params.items() if k != 'api_key'}
-        logger.debug("API parameters at the time of error: %s", safe_api_params)
-
-        # Map technical errors to user-friendly messages
+        logger.error("OpenAI API error: %s", str(e), exc_info=True)
         error_mapping = {
             "Invalid API key": "The provided API key is invalid. Please check your configuration.",
             "Model not found": "The selected model is not available. Please choose a different model.",
+            "Rate limit exceeded": "The API rate limit has been exceeded. Please try again later.",
+            "Invalid request": "The API request was invalid. Please check your configuration.",
+            "AuthenticationError": "Authentication failed. Please check your API key and endpoint.",
+            "APIConnectionError": "Could not connect to the API. Please check your network connection.",
+            "APIError": "An unexpected API error occurred. Please try again later."
         }
-        user_message = error_mapping.get(str(e), "An unexpected error occurred.")
+        user_message = error_mapping.get(str(e), f"An API error occurred: {str(e)}")
         return {"error": user_message}
     except Exception as e:
-        logger.exception(
-            "Error in get_azure_response (%s model)",
-            "o1-preview" if requires_o1_handling else "standard"
-        )
-        safe_api_params = {k: v for k, v in api_params.items() if k != 'api_key'}
-        logger.debug("API parameters at the time of error: %s", safe_api_params)
-        return {"error": "An unexpected error occurred. Please try again later."}
+        logger.error("Unexpected error in get_azure_response: %s", str(e), exc_info=True)
+        return {"error": "An unexpected error occurred. Please check the logs and try again."}
 
 
 def scrape_data(query: str) -> str:
