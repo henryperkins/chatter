@@ -677,22 +677,22 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
 
             # Process response
             if isinstance(response, str):
-            processed_response = response.replace("{%", "&#123;%").replace("%}", "%&#125;")
-            conversation_manager.add_message(
-                chat_id=chat_id,
-                role="assistant",
-                content=processed_response,
-                model_max_tokens=getattr(model_obj, "max_tokens", None),
-                requires_o1_handling=model_obj.requires_o1_handling,
-            )
-            return jsonify(
-                {
-                    "response": processed_response,
-                    "included_files": included_files if request.files else [],
-                    "excluded_files": excluded_files if request.files else [],
-                }
-            )
-        else:
+                processed_response = response.replace("{%", "&#123;%").replace("%}", "%&#125;")
+                conversation_manager.add_message(
+                    chat_id=chat_id,
+                    role="assistant",
+                    content=processed_response,
+                    model_max_tokens=getattr(model_obj, "max_tokens", None),
+                    requires_o1_handling=model_obj.requires_o1_handling,
+                )
+                return jsonify(
+                    {
+                        "response": processed_response,
+                        "included_files": included_files if request.files else [],
+                        "excluded_files": excluded_files if request.files else [],
+                    }
+                )
+            else:
             logger.error(f"Unexpected response type: {type(response)}")
             return jsonify({"error": "Unexpected response from API"}), 500
 
