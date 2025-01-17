@@ -632,40 +632,48 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
         )
 
         # 8. Get model response
-        # Log full model configuration
-        logger.debug("Model configuration:", {
-            "deployment_name": getattr(model_obj, "deployment_name", ""),
-            "api_endpoint": getattr(model_obj, "api_endpoint", ""),
-            "api_version": getattr(model_obj, "api_version", ""),
-            "requires_o1_handling": getattr(model_obj, "requires_o1_handling", False),
-            "supports_streaming": getattr(model_obj, "supports_streaming", False),
-            "max_completion_tokens": getattr(model_obj, "max_completion_tokens", 0),
-            "model_type": getattr(model_obj, "model_type", "azure")
-        })
+        try:
+            # Log full model configuration
+            logger.debug("Model configuration:", {
+                "deployment_name": getattr(model_obj, "deployment_name", ""),
+                "api_endpoint": getattr(model_obj, "api_endpoint", ""),
+                "api_version": getattr(model_obj, "api_version", ""),
+                "requires_o1_handling": getattr(model_obj, "requires_o1_handling", False),
+                "supports_streaming": getattr(model_obj, "supports_streaming", False),
+                "max_completion_tokens": getattr(model_obj, "max_completion_tokens", 0),
+                "model_type": getattr(model_obj, "model_type", "azure")
+            })
 
-        # Verify API version is set
-        api_version = getattr(model_obj, "api_version", "2024-12-01-preview")
-        if not api_version:
-            logger.error("API version is not set in model configuration")
-            return jsonify({"error": "API version is not configured for this model"}), 400
+            # Verify API version is set
+            api_version = getattr(model_obj, "api_version", "2024-12-01-preview")
+            if not api_version:
+                logger.error("API version is not set in model configuration")
+                return jsonify({"error": "API version is not configured for this model"}), 400
 
-        logger.debug("Sending request to Azure API with version: %s", api_version)
-        response = get_azure_response(
-            messages=history,
-            deployment_name=getattr(model_obj, "deployment_name", ""),
-            max_completion_tokens=getattr(model_obj, "max_completion_tokens", 0),
-            api_endpoint=getattr(model_obj, "api_endpoint", ""),
-            api_key=getattr(model_obj, "api_key", ""),
-            api_version=api_version,
-            requires_o1_handling=getattr(model_obj, "requires_o1_handling", False),
-            stream=getattr(model_obj, "supports_streaming", False),
-            timeout_seconds=120,
-        )
+            logger.debug("Sending request to Azure API with version: %s", api_version)
+            response = get_azure_response(
+                messages=history,
+                deployment_name=getattr(model_obj, "deployment_name", ""),
+                max_completion_tokens=getattr(model_obj, "max_completion_tokens", 0),
+                api_endpoint=getattr(model_obj, "api_endpoint", ""),
+                api_key=getattr(model_obj, "api_key", ""),
+                api_version=api_version,
+                requires_o1_handling=getattr(model_obj, "requires_o1_handling", False),
+                stream=getattr(model_obj, "supports_streaming", False),
+                timeout_seconds=120,
+            )
 
-        # Handle error responses
-        if isinstance(response, dict) and "error" in response:
-            logger.error(f"API error: {response['error']}")
-            return jsonify({"error": response["error"]}), 500
+            # Handle error responses
+            if isinstance(response, dict) and "error" in response:
+                logger.error(f"API error: {response['error']}")
+                return jsonify({
+                    "error": response["error"],
+                    "details": {
+                        "deployment": getattr(model_obj, "deployment_name", ""),
+                        "endpoint": getattr(model_obj, "api_endpoint", ""),
+                        "version": api_version
+                    }
+                }), 500
 
         # Process response
         if isinstance(response, str):

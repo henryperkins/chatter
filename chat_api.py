@@ -163,7 +163,16 @@ def get_azure_response(
         return {"error": user_message}
     except Exception as e:
         logger.error("Unexpected error in get_azure_response: %s", str(e), exc_info=True)
-        return {"error": "An unexpected error occurred. Please check the logs and try again."}
+        return {
+            "error": str(e),
+            "details": {
+                "deployment": deployment_name,
+                "endpoint": api_endpoint,
+                "version": api_version,
+                "requires_o1_handling": requires_o1_handling,
+                "stream": stream
+            }
+        }
 
 
 def scrape_data(query: str) -> str:
