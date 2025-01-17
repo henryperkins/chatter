@@ -427,8 +427,8 @@ def reset_password(token: str):
                 .first()
             )
 
-            if not user or not bcrypt.checkpw(
-                token.encode("utf-8"), user["reset_token_hash"]
+            if not user or not check_password_hash(
+                user["reset_token_hash"], token
             ):
                 logger.warning(
                     "Invalid or expired reset token used",
