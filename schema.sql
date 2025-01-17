@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
+    password_hash TEXT NOT NULL CHECK (password_hash <> ''),
     role TEXT NOT NULL DEFAULT 'user', -- 'user' or 'admin'
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     reset_token TEXT DEFAULT NULL, -- Token for password reset

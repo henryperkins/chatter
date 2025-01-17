@@ -180,12 +180,38 @@ def internal_server_error(error: HTTPException) -> Tuple[Dict[str, str], int]:
     )
 
 
+@app.errorhandler(400)
+def bad_request(error):
+    logger.warning(f"Bad request: {str(error)}")
+    return jsonify(error="Bad request", message=str(error)), 400
+
+@app.errorhandler(401)
+def unauthorized(error):
+    logger.warning(f"Unauthorized access attempt: {str(error)}")
+    return jsonify(error="Unauthorized", message="Please login to access this resource"), 401
+
+@app.errorhandler(403)
+def forbidden(error):
+    logger.warning(f"Forbidden access attempt: {str(error)}")
+    return jsonify(error="Forbidden", message="You don't have permission to access this resource"), 403
+
+@app.errorhandler(404)
+def not_found(error):
+    logger.info(f"Resource not found: {str(error)}")
+    return jsonify(error="Not found", message="The requested resource was not found"), 404
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    logger.error(f"Internal server error: {str(error)}")
+    return jsonify(error="Internal server error", message="An unexpected error occurred"), 500
+
 @app.errorhandler(Exception)
 def handle_exception(e):
     """Handle all uncaught exceptions"""
     if request.path.startswith("/static/"):
         # Let Flask handle static file exceptions
         raise e
+        
     logger.exception(
         "Unhandled exception occurred - URL: %s, Method: %s, User: %s, Error: %s",
         request.url,
@@ -193,10 +219,11 @@ def handle_exception(e):
         current_user.id if current_user.is_authenticated else "anonymous",
         str(e),
     )
-    return (
-        jsonify(error="An internal error occurred", message="Please try again later"),
-        500,
-    )
+    
+    if app.config.get("ENV") == "production":
+        return jsonify(error="Internal server error", message="Please try again later"), 500
+    else:
+        return jsonify(error="Internal server error", message=str(e)), 500
 
 
 @app.before_request

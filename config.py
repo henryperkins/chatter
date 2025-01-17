@@ -2,14 +2,21 @@ import os
 
 
 class Config:
-    SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
-    DATABASE_URI = os.getenv("DATABASE_URI", "sqlite:///./data/chat_app.db")
-    # Generate a new key if none exists: Fernet.generate_key().decode()
-    ENCRYPTION_KEY = os.getenv(
-        "ENCRYPTION_KEY", "I_bNh30H5SiGBreBGP7jKHPvb5SfGRl9e1WRAn1_3bw="
-    )
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    if not SECRET_KEY:
+        raise ValueError("SECRET_KEY environment variable is not set.")
 
-    AZURE_API_KEY = os.getenv("AZURE_API_KEY", "your-azure-api-key")
+    DATABASE_URI = os.getenv("DATABASE_URI")
+    if not DATABASE_URI:
+        raise ValueError("DATABASE_URI environment variable is not set.")
+
+    ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
+    if not ENCRYPTION_KEY:
+        raise ValueError("ENCRYPTION_KEY environment variable is not set.")
+
+    AZURE_API_KEY = os.getenv("AZURE_API_KEY")
+    if not AZURE_API_KEY:
+        raise ValueError("AZURE_API_KEY environment variable is not set.")
     AZURE_API_ENDPOINT = os.getenv("AZURE_API_ENDPOINT", "https://openai.azure.com/")
     AZURE_API_VERSION = os.getenv("AZURE_API_VERSION", "2024-12-01-preview")
     AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "o1-preview")

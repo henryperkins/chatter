@@ -20,23 +20,23 @@ POOL_RECYCLE = 3600  # Recycle connections after 1 hour
 POOL_TIMEOUT = 60  # Increased timeout for operations
 
 
-@contextmanager
-def db_session() -> Session:
-    """Get a database session."""
-    if "db_session" not in g:
-        db_uri = current_app.config.get("DATABASE_URI", "sqlite:///chat_app.db")
-        engine = create_engine(
-            db_uri,
-            poolclass=QueuePool,
-            pool_size=POOL_SIZE,
-            max_overflow=MAX_OVERFLOW,
-            pool_recycle=POOL_RECYCLE,
-            pool_timeout=POOL_TIMEOUT,
-            connect_args={"timeout": 30},
-        )
-        g.db_session = scoped_session(sessionmaker(bind=engine))
+from sqlalchemy.orm import scoped_session, sessionmaker
 
-    session = g.db_session()
+engine = create_engine(
+    current_app.config["DATABASE_URI"],
+    poolclass=QueuePool,
+    pool_size=POOL_SIZE,
+    max_overflow=MAX_OVERFLOW,
+    pool_recycle=POOL_RECYCLE,
+    pool_timeout=POOL_TIMEOUT,
+    connect_args={"timeout": 30},
+)
+Session = scoped_session(sessionmaker(bind=engine))
+
+@contextmanager
+def db_session() -> Generator[Session, None, None]:
+    """Get a database session."""
+    session = Session()
     try:
         yield session
         session.commit()

@@ -5,7 +5,7 @@ Authentication routes for the application.
 import logging
 import os
 import secrets
-import bcrypt
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask import (
     Blueprint,
     jsonify,
@@ -107,9 +107,9 @@ def login():
                         .first()
                     )
 
-                    if not user or not bcrypt.checkpw(
-                        form.password.data.strip().encode("utf-8"),
+                    if not user or not check_password_hash(
                         user["password_hash"],
+                        form.password.data.strip()
                     ):
                         log_failed_attempt(username, failed_logins)
                         logger.warning(
@@ -245,10 +245,7 @@ def register():
                             return redirect(url_for("auth.edit_default_model"))
 
                     # Create regular user
-                    cost_factor = int(os.environ.get("BCRYPT_COST_FACTOR", 12))
-                    hashed_pw = bcrypt.hashpw(
-                        password.encode("utf-8"), bcrypt.gensalt(rounds=cost_factor)
-                    )
+                    hashed_pw = generate_password_hash(password)
 
                     db.execute(
                         text(
