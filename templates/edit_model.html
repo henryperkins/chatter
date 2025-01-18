@@ -103,7 +103,7 @@
                     accent-blue-600",
                     type="range",
                     min="500",
-                    max="16384",
+                    max="{{ DEFAULT_MAX_COMPLETION_TOKENS }}",
                     step="100",
                     value=model.max_completion_tokens,
                     oninput="document.getElementById('max-completion-tokens-value').textContent = this.value"

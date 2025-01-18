@@ -1,7 +1,7 @@
 import uuid
 import os
 from datetime import timedelta
-from typing import Dict, Optional, Tuple
+from typing import Optional, Tuple
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, redirect, url_for, request, session, g
@@ -9,9 +9,9 @@ from flask_login import current_user, logout_user
 from flask_talisman import Talisman
 from flask_sslify import SSLify
 from flask_wtf.csrf import CSRFError
-from werkzeug.wrappers import Response
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.wrappers import Response as WerkzeugResponse
 from sqlalchemy import text
 
 from database import init_app, get_db
@@ -119,7 +119,7 @@ def init_app_components() -> None:
 
     # Initialize extensions
     login_manager.init_app(app)
-    login_manager.login_view = "auth.login"
+    login_manager.login_view = "auth.login"  # type: ignore
 
     csrf.init_app(app)
     limiter.init_app(app)
@@ -143,7 +143,7 @@ def init_app_components() -> None:
 
 # --- Error Handlers ---
 @app.errorhandler(400)
-def bad_request(error: HTTPException) -> Tuple[Dict[str, str], int]:
+def bad_request(error: HTTPException) -> Tuple[WerkzeugResponse, int]:
     """Handle HTTP 400 Bad Request errors"""
     logger.exception("400 Bad Request - URL: %s", request.url)
     return (
@@ -152,26 +152,35 @@ def bad_request(error: HTTPException) -> Tuple[Dict[str, str], int]:
     )
 
 
+@app.errorhandler(401)
+def unauthorized(error: HTTPException) -> Tuple[WerkzeugResponse, int]:
+    """Handle HTTP 401 Unauthorized errors"""
+    logger.warning(f"Unauthorized access attempt: {str(error)}")
+    return jsonify(error="Unauthorized", message="Please login to access this resource"), 401
+
+
 @app.errorhandler(403)
-def forbidden(error: HTTPException) -> Tuple[Dict[str, str], int]:
+def forbidden(error: HTTPException) -> Tuple[WerkzeugResponse, int]:
     """Handle HTTP 403 Forbidden errors"""
+    logger.warning(f"Forbidden access attempt: {str(error)}")
     return jsonify(error="Forbidden", message="Access denied"), 403
 
 
 @app.errorhandler(404)
-def not_found(error: HTTPException) -> Tuple[Dict[str, str], int]:
+def not_found(error: HTTPException) -> Tuple[WerkzeugResponse, int]:
     """Handle HTTP 404 Not Found errors"""
+    logger.info(f"Resource not found: {str(error)}")
     return jsonify(error="Not found", message="Resource not found"), 404
 
 
 @app.errorhandler(429)
-def rate_limit_exceeded(error: HTTPException) -> Tuple[Dict[str, str], int]:
+def rate_limit_exceeded(error: HTTPException) -> Tuple[WerkzeugResponse, int]:
     """Handle HTTP 429 Too Many Requests errors"""
     return jsonify(error="Rate limit exceeded", message="Please try again later"), 429
 
 
 @app.errorhandler(500)
-def internal_server_error(error: HTTPException) -> Tuple[Dict[str, str], int]:
+def internal_server_error(error: HTTPException) -> Tuple[WerkzeugResponse, int]:
     """Handle HTTP 500 Internal Server Error"""
     logger.error(f"500 Internal Server Error: {error} - URL: {request.url}")
     return (
@@ -180,38 +189,13 @@ def internal_server_error(error: HTTPException) -> Tuple[Dict[str, str], int]:
     )
 
 
-@app.errorhandler(400)
-def bad_request(error):
-    logger.warning(f"Bad request: {str(error)}")
-    return jsonify(error="Bad request", message=str(error)), 400
-
-@app.errorhandler(401)
-def unauthorized(error):
-    logger.warning(f"Unauthorized access attempt: {str(error)}")
-    return jsonify(error="Unauthorized", message="Please login to access this resource"), 401
-
-@app.errorhandler(403)
-def forbidden(error):
-    logger.warning(f"Forbidden access attempt: {str(error)}")
-    return jsonify(error="Forbidden", message="You don't have permission to access this resource"), 403
-
-@app.errorhandler(404)
-def not_found(error):
-    logger.info(f"Resource not found: {str(error)}")
-    return jsonify(error="Not found", message="The requested resource was not found"), 404
-
-@app.errorhandler(500)
-def internal_server_error(error):
-    logger.error(f"Internal server error: {str(error)}")
-    return jsonify(error="Internal server error", message="An unexpected error occurred"), 500
-
 @app.errorhandler(Exception)
 def handle_exception(e):
     """Handle all uncaught exceptions"""
     if request.path.startswith("/static/"):
         # Let Flask handle static file exceptions
         raise e
-        
+
     logger.exception(
         "Unhandled exception occurred - URL: %s, Method: %s, User: %s, Error: %s",
         request.url,
@@ -219,13 +203,23 @@ def handle_exception(e):
         current_user.id if current_user.is_authenticated else "anonymous",
         str(e),
     )
-    
+
     if app.config.get("ENV") == "production":
         return jsonify(error="Internal server error", message="Please try again later"), 500
     else:
         return jsonify(error="Internal server error", message=str(e)), 500
 
 
+@app.errorhandler(CSRFError)
+def handle_csrf_error(e: CSRFError) -> Tuple[WerkzeugResponse, int]:
+    """Handle CSRF token errors"""
+    return (
+        jsonify(error="Invalid CSRF token", message="Please refresh and try again"),
+        400,
+    )
+
+
+# --- Request Hooks ---
 @app.before_request
 def log_request_info():
     """Log request information with correlation ID and user context."""
@@ -254,24 +248,15 @@ def log_request_info():
         )
 
 
-@app.errorhandler(CSRFError)
-def handle_csrf_error(e: CSRFError) -> Tuple[Dict[str, str], int]:
-    """Handle CSRF token errors"""
-    return (
-        jsonify(error="Invalid CSRF token", message="Please refresh and try again"),
-        400,
-    )
-
-
 # --- Routes ---
 @app.route("/favicon.ico")
-def favicon() -> Response:
+def favicon() -> WerkzeugResponse:
     """Handle favicon requests"""
     return redirect(url_for("static", filename="favicon.ico"))
 
 
 @app.route("/")
-def index() -> Response:
+def index() -> WerkzeugResponse:
     """Root URL handler"""
     if not current_user.is_authenticated:
         return redirect(url_for("auth.login"))
@@ -279,7 +264,7 @@ def index() -> Response:
 
 
 @app.route("/clear-session")
-def clear_session() -> Response:
+def clear_session() -> WerkzeugResponse:
     """Clear user session"""
     logout_user()
     session.clear()
@@ -290,6 +275,7 @@ def clear_session() -> Response:
 @login_manager.user_loader
 def load_user(user_id: str) -> Optional[User]:
     """Load user by ID"""
+    db = None
     try:
         db = get_db()
         result = db.execute(
@@ -305,7 +291,8 @@ def load_user(user_id: str) -> Optional[User]:
         app.logger.error(f"Error loading user: {e}")
         return None
     finally:
-        db.close()
+        if db is not None:
+            db.close()
 
 
 # --- Application Initialization ---

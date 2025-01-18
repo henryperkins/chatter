@@ -22,6 +22,7 @@ from flask import (
 from flask_login import login_required
 from flask_wtf.csrf import validate_csrf as flask_validate_csrf
 from werkzeug.exceptions import HTTPException
+from config import Config
 
 from decorators import admin_required
 from forms import ModelForm
@@ -369,7 +370,7 @@ def add_model_page():
     if request.method == "POST":
         return create_model()
     logger.debug("Rendering add model page")
-    return render_template("add_model.html", form=form)
+    return render_template("add_model.html", form=form, DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS)
 
 
 @bp.route("/edit/<int:model_id>", methods=["GET", "POST"])
@@ -505,7 +506,7 @@ def edit_model(model_id):
             )
 
         logger.debug("Rendering edit model page for model ID %d", model_id)
-        return render_template("edit_model.html", form=form, model=model)
+        return render_template("edit_model.html", form=form, model=model, DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS)
 
     except Exception as e:
         return handle_error(e, "Error in edit_model")
