@@ -446,7 +446,7 @@ def init_db_command():
                         "deployment_name": os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-deployment"),
                         "description": os.getenv("DEFAULT_MODEL_DESCRIPTION", "Azure GPT-4 Model"),
                         "model_type": "azure",
-                        "api_endpoint": os.getenv("AZURE_API_ENDPOINT"),
+                        "api_endpoint": os.getenv("AZURE_API_ENDPOINT", "https://hp-east2.openai.azure.com/openai/deployments/gpt-deployment?api-version=2024-12-01-preview"),
                         "api_key": os.getenv("AZURE_API_KEY"),
                         "temperature": float(os.getenv("DEFAULT_TEMPERATURE", "0.7")),
                         "max_tokens": int(os.getenv("DEFAULT_MAX_TOKENS", "4000")),
