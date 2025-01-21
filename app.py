@@ -18,7 +18,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.wrappers import Response as WerkzeugResponse
 from sqlalchemy import text
 
-from database import init_app, db_session
+from database import init_app, db_session, is_initialized
 from extensions import limiter, login_manager, csrf
 from models import User
 from routes.auth_routes import bp as auth_bp
