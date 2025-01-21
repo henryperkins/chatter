@@ -281,11 +281,12 @@ def register():
                     if isinstance(hashed_pw, bytes):
                         hashed_pw = hashed_pw.decode("utf-8")
 
-                    db.execute(
+                    result = db.execute(
                         text(
                             """
                             INSERT INTO users (username, email, password_hash, role, is_verified)
                             VALUES (:username, :email, :password_hash, :role, TRUE)
+                            RETURNING id, username, email, role
                         """
                         ),
                         {
@@ -294,7 +295,11 @@ def register():
                             "password_hash": hashed_pw,
                             "role": "user",
                         },
-                    )
+                    ).fetchone()
+
+                    # Create User object and log them in
+                    user_obj = User(result[0], result[1], result[2], result[3])
+                    login_user(user_obj)
 
                 logger.info(
                     "User registration successful",
@@ -305,7 +310,12 @@ def register():
                         "duration_ms": (datetime.now() - start_time).total_seconds() * 1000
                     }
                 )
-                return redirect(url_for('auth.login'))
+
+                # Check if we need to configure default model
+                model_count = db.execute(text("SELECT COUNT(*) FROM models")).scalar()
+                if model_count == 0:
+                    return redirect(url_for('auth.edit_default_model'))
+                return redirect(url_for('chat.chat_interface'))
 
             return render_template("register.html", form=form)
 
