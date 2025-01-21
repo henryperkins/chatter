@@ -117,6 +117,39 @@ def init_db(db_uri: str = None) -> None:
             sessionmaker(bind=engine),
             scopefunc=lambda: id(g) if hasattr(g, '_get_current_object') else None
         )
+
+        # Read and execute schema.sql
+        with current_app.open_resource('schema.sql') as f:
+            schema_sql = f.read().decode('utf8')
+            with engine.connect() as conn:
+                # Execute schema as a single transaction
+                conn.execute(text(schema_sql))
+                conn.commit()
+
+        # Create default provider
+        with db_session() as db:
+            provider_exists = db.execute(text(
+                "SELECT id FROM providers WHERE slug = 'azure-openai'"
+            )).scalar()
+            
+            if not provider_exists:
+                db.execute(text("""
+                    INSERT INTO providers (
+                        name, slug, api_base_url, capabilities, 
+                        requires_authentication, api_version_format
+                    ) VALUES (
+                        'Azure OpenAI', 'azure-openai', :api_base_url,
+                        :capabilities, TRUE, :api_version
+                    )
+                """), {
+                    "api_base_url": os.getenv("AZURE_API_ENDPOINT", "").rstrip("/"),
+                    "capabilities": json.dumps({
+                        "supports_streaming": True,
+                        "max_tokens": 4000
+                    }),
+                    "api_version": os.getenv("AZURE_API_VERSION", "2023-05-15")
+                })
+                db.commit()
         
         # Read and execute schema.sql
         with current_app.open_resource('schema.sql') as f:
