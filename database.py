@@ -77,8 +77,6 @@ def db_session() -> Generator[Session, None, None]:
         try:
             if session.is_active:
                 session.close()
-            if db_state['Session'] is not None and hasattr(db_state['Session'], 'remove'):
-                db_state['Session'].remove()
         except Exception as e:
             logger.error(f"Error cleaning up session: {str(e)}", exc_info=True)
 
@@ -91,8 +89,12 @@ def close_db(e: Optional[BaseException] = None) -> None:
         session = db_state.get('Session')
         if session and hasattr(session, 'remove'):
             try:
-                session.remove()
-                logger.debug("Database session closed successfully")
+                # Only remove if session is not in a transaction
+                if not session.in_transaction():
+                    session.remove()
+                    logger.debug("Database session closed successfully")
+                else:
+                    logger.debug("Skipping session removal - transaction in progress")
             except Exception as e:
                 logger.error(f"Error closing database session: {str(e)}", exc_info=True)
 
