@@ -96,7 +96,7 @@ def init_db(db_uri: str = None) -> None:
         # Create engine with proper PostgreSQL settings
         # Create engine with proper PostgreSQL settings including SSL
         connect_args = {
-            'sslmode': 'verify-full',
+            'sslmode': 'verify-ca',
             'sslcert': '/etc/ssl/certs/ca-certificates.crt'
         }
         engine = create_engine(
@@ -229,10 +229,12 @@ def init_app(app: Flask) -> None:
     if not is_initialized():
         try:
             # Configure PostgreSQL connection with SSL settings
-            connect_args = {
-                'sslmode': 'verify-full',
-                'sslcert': '/etc/ssl/certs/ca-certificates.crt'
-            }
+            connect_args = {}
+            if 'sslmode=disable' not in db_uri:
+                connect_args = {
+                    'sslmode': 'verify-ca',
+                    'sslcert': '/etc/ssl/certs/ca-certificates.crt'
+                }
             db_state['engine'] = create_engine(
                 app.config["DATABASE_URI"],
                 pool_size=POOL_SIZE,
