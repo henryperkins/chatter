@@ -1,7 +1,8 @@
  # database.py
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import scoped_session, sessionmaker, Session
+from sqlalchemy.orm import scoped_session, sessionmaker, Session as SessionType
+from sqlalchemy.orm.session import Session
 from sqlalchemy.orm.scoping import scoped_session as ScopedSession
 import logging
 from typing import Optional, Generator
@@ -20,13 +21,12 @@ POOL_TIMEOUT = 30  # Timeout for acquiring a connection from the pool
 
 # Global engine and Session objects
 engine = None
-Session: Optional[ScopedSession] = None
+Session: Optional[ScopedSession[SessionType]] = None
 _initialized = False
 
 def is_initialized() -> bool:
     return _initialized and Session is not None
-
-@contextmanager  # type: ignore
+@contextmanager
 def db_session() -> Generator[Session, None, None]:
     """
     Get a database session for PostgreSQL.
