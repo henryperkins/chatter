@@ -94,13 +94,16 @@ def configure_app() -> None:
     # Initialize database only once at startup
     if not is_initialized():
         try:
+            logger.info("Starting database initialization...")
             init_app(app)
             if not is_initialized():
-                raise RuntimeError("Database failed to initialize properly")
-            logger.info("Database initialized successfully")
+                logger.error("Database initialization completed but is_initialized() still returns False")
+                raise RuntimeError("Database failed to initialize properly - initialization state inconsistent")
+            logger.info("Database initialization completed and verified successfully")
         except Exception as e:
-            logger.error("Database initialization failed: %s", str(e))
-            raise RuntimeError(f"Failed to initialize database: {str(e)}")
+            logger.error("Database initialization failed with exception", exc_info=True)
+            logger.error("Current app config: %s", {k: v for k, v in app.config.items() if k != 'SECRET_KEY'})
+            raise RuntimeError(f"Critical error during database initialization: {str(e)}")
 
     # File upload settings
     app.config.update(
