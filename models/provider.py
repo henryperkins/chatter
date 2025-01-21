@@ -193,8 +193,8 @@ class Provider:
                         name, slug, api_base_url, capabilities, requires_authentication,
                         api_version_format, created_at
                     ) VALUES (
-                        :name, :slug, :api_base_url, :requires_authentication,
-                        NOW()
+                        :name, :slug, :api_base_url, :capabilities, :requires_authentication,
+                        :api_version_format, NOW()
                     )
                     RETURNING id
                 """
