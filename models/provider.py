@@ -191,10 +191,10 @@ class Provider:
                     """
                     INSERT INTO providers (
                         name, slug, api_base_url, capabilities, requires_authentication,
-                        api_version_format, created_at
+                        api_version_format
                     ) VALUES (
                         :name, :slug, :api_base_url, :capabilities, :requires_authentication,
-                        :api_version_format, NOW()
+                        :api_version_format
                     )
                     RETURNING id
                 """
