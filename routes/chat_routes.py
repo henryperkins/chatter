@@ -421,7 +421,7 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         now=datetime.now,
         today=today,
         yesterday=yesterday,
-    )
+    ))
 
 
 @chat_routes.route("/get_chat_context/<chat_id>")
