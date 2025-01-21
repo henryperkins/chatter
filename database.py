@@ -87,24 +87,17 @@ def db_session() -> Generator[Session, None, None]:
 
     session = db_state['Session']()
     try:
-        # Start transaction with proper isolation
-        if not session.in_transaction():
-            session.begin()
-        
-        # Set reasonable timeouts
-        session.execute(text("SET lock_timeout = '5s'"))
-        session.execute(text("SET statement_timeout = '30s'"))
-        
-        yield session
-        
-        # Commit only if no errors
-        if session.in_transaction():
-            session.commit()
+        # Set reasonable timeouts BEFORE starting the transaction
+        with session.begin():
+            # Set session parameters
+            session.execute(text("SET lock_timeout = '5s'"))
+            session.execute(text("SET statement_timeout = '30s'"))
+            
+            yield session
+            
+            # Commit happens automatically at the end of the with block
             
     except Exception as e:
-        # Rollback on error
-        if session.in_transaction():
-            session.rollback()
         logger.error(f"Database operation failed: {str(e)}")
         raise
     finally:
