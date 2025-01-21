@@ -396,25 +396,6 @@ def db_health_check():
             "error": str(e),
             "initialized": is_initialized()
         }), 500
-    except Exception as e:
-        logger.error(
-            "Health check failed",
-            exc_info=True,
-            extra={
-                "error": str(e),
-                "stack_trace": traceback.format_exc(),
-                "system": {
-                    "memory": psutil.virtual_memory().percent,
-                    "cpu": psutil.cpu_percent(),
-                    "disk": psutil.disk_usage('/').percent
-                }
-            }
-        )
-        return jsonify({
-            "status": "unhealthy",
-            "error": "Service unavailable",
-            "request_id": request.headers.get("X-Request-ID")
-        }), 500
 
 
 # --- User Loader ---
