@@ -370,7 +370,7 @@ def load_user(user_id: str) -> Optional[User]:
     """Load user by ID."""
     try:
         with db_session() as db:
-            user = db.query(User).filter_by(id=user_id).first()
+            user = db.query(User).filter(User.id == user_id).first()
             return user
     except Exception as e:
         logger.error(f"Error loading user: {e}")
