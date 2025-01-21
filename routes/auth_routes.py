@@ -211,6 +211,11 @@ def register():
                 email = form.email.data.lower().strip() if form.email.data else ""
                 password = form.password.data if form.password.data else ""
 
+                # Hash password before any database operations
+                hashed_pw = generate_password_hash(password)
+                if isinstance(hashed_pw, bytes):
+                    hashed_pw = hashed_pw.decode("utf-8")
+
                 with db_session() as db:
                     # Check for existing user
                     existing_user = (
