@@ -313,6 +313,25 @@ def health_check() -> Union[WerkzeugResponse, Tuple[WerkzeugResponse, Literal[50
                 "memory_usage": psutil.Process().memory_info().rss
             }
         })
+    except Exception as e:
+        logger.error(
+            "Health check failed",
+            exc_info=True,
+            extra={
+                "error": str(e),
+                "stack_trace": traceback.format_exc(),
+                "system": {
+                    "memory": psutil.virtual_memory().percent,
+                    "cpu": psutil.cpu_percent(),
+                    "disk": psutil.disk_usage('/').percent
+                }
+            }
+        )
+        return jsonify({
+            "status": "unhealthy",
+            "error": "Service unavailable",
+            "request_id": request.headers.get("X-Request-ID")
+        }), 500
 
 @app.route("/health/db")
 def db_health_check():
