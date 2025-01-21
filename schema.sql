@@ -38,7 +38,8 @@ CREATE TABLE users (
     reset_token TEXT DEFAULT NULL,
     email_verification_token TEXT DEFAULT NULL,
     is_verified BOOLEAN DEFAULT FALSE,
-    reset_token_expiry TIMESTAMP DEFAULT NULL
+    reset_token_expiry TIMESTAMP DEFAULT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
 
 -- MODELS TABLE
