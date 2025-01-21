@@ -429,8 +429,9 @@ def init_db_command():
     """Clear existing data and create new tables."""
     try:
         logger.info("Starting database initialization...")
-        init_app(app)
-        logger.info("Database initialization completed successfully")
+        with app.app_context():
+            init_app(app)
+            logger.info("Database initialization completed successfully")
     except Exception as e:
         logger.error(f"Database initialization failed: {e}", exc_info=True)
         raise
