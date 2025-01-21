@@ -83,6 +83,22 @@ def configure_security() -> None:
     )
 
 
+def create_default_user():
+    """Create a default admin user if none exists"""
+    from werkzeug.security import generate_password_hash
+    
+    with db_session() as db:
+        # Check if any users exist
+        user_count = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
+        if user_count == 0:
+            # Create default admin user
+            db.execute(text("""
+                INSERT INTO users (username, email, password_hash, role)
+                VALUES ('admin', 'admin@example.com', :hash, 'admin')
+            """), {"hash": generate_password_hash("admin")})
+            db.commit()
+            logger.info("Created default admin user")
+
 def configure_app() -> None:
     """Configure Flask application settings"""
     # Basic configuration first
@@ -103,6 +119,10 @@ def configure_app() -> None:
                 if not is_initialized():
                     logger.error("Database initialization completed but is_initialized() still returns False")
                     raise RuntimeError("Database failed to initialize properly - initialization state inconsistent")
+                
+                # Create default admin user if none exists
+                create_default_user()
+                
                 logger.info("Database initialization completed and verified successfully")
         except Exception as e:
             logger.error("Database initialization failed with exception", exc_info=True)

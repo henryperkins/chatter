@@ -44,12 +44,9 @@ def is_initialized() -> bool:
             hasattr(db_state['Session'], 'remove'))
 @contextmanager
 def db_session() -> Generator[Session, None, None]:
-    """Get a database session for PostgreSQL."""
+    """Get a database session with proper transaction handling"""
     if not current_app:
         raise RuntimeError("Cannot access database outside of Flask application context")
-
-    if not is_initialized():
-        raise RuntimeError("Database not initialized. Make sure init_app() is called during application setup")
 
     db_state = get_db_state()
     if db_state['Session'] is None:
@@ -58,27 +55,21 @@ def db_session() -> Generator[Session, None, None]:
     session = db_state['Session']()
     try:
         yield session
-        if session.is_active:
-            try:
-                session.commit()
-            except Exception as commit_error:
-                logger.error(f"Commit failed: {str(commit_error)}", exc_info=True)
-                session.rollback()
-                raise
+        # Only commit if no errors and session is active
+        if session.is_active and not session.in_transaction():
+            session.commit()
     except Exception as e:
-        logger.error(f"Session rollback due to exception: {str(e)}", exc_info=True)
+        # Only rollback if session is active
         if session.is_active:
-            try:
-                session.rollback()
-            except Exception as rollback_error:
-                logger.error(f"Rollback failed: {str(rollback_error)}", exc_info=True)
+            session.rollback()
+        logger.error(f"Database operation failed: {e}")
         raise
     finally:
+        # Always close the session
         try:
-            if session.is_active:
-                session.close()
+            session.close()
         except Exception as e:
-            logger.error(f"Error cleaning up session: {str(e)}", exc_info=True)
+            logger.error(f"Error closing session: {e}")
 
 
 def close_db(e: Optional[BaseException] = None) -> None:

@@ -43,35 +43,23 @@ class User(UserMixin):
 
     @staticmethod
     def get_by_id(user_id: int) -> Optional["User"]:
-        """
-        Retrieve a user by their ID.
-        """
-        with db_session() as db:
-            try:
+        """Retrieve a user by their ID with proper session handling"""
+        try:
+            with db_session() as db:
+                # Use scalar() instead of fetchone() for simpler handling
                 query = text("SELECT * FROM users WHERE id = :user_id")
-                row = db.execute(query, {"user_id": user_id}).fetchone()
-                if row:
+                result = db.execute(query, {"user_id": user_id})
+                if result:
                     user_dict = row_to_dict(
-                        row,
-                        [
-                            "id",
-                            "username",
-                            "email",
-                            "password_hash",
-                            "role",
-                            "created_at",
-                            "reset_token",
-                            "reset_token_expiry",
-                        ],
+                        result.fetchone(),
+                        ["id", "username", "email", "password_hash", "role", "created_at"]
                     )
-                    # Ensure password_hash is string
-                    logger.debug(f"User retrieved by ID {user_id}: {user_dict}")
                     return User(**user_dict)
                 logger.info(f"No user found with ID: {user_id}")
                 return None
-            except Exception as e:
-                logger.error(f"Error retrieving user by ID {user_id}: {e}")
-                raise
+        except Exception as e:
+            logger.error(f"Error retrieving user by ID {user_id}: {e}")
+            return None
 
     @staticmethod
     def get_by_email(email: str) -> Optional["User"]:
