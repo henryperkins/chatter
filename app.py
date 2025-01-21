@@ -298,6 +298,27 @@ def log_request_info():
         )
 
 
+@app.before_request
+def validate_user_session():
+    """Clear invalid user sessions and handle authentication cleanup."""
+    try:
+        if current_user.is_authenticated:
+            user = User.get_by_id(current_user.id)
+            if not user:
+                logger.info(
+                    "Clearing invalid session for non-existent user ID: %s",
+                    current_user.id
+                )
+                logout_user()
+                session.clear()
+                return redirect(url_for('auth.login'))
+    except Exception as e:
+        logger.error("Error validating user session: %s", str(e))
+        logout_user()
+        session.clear()
+        return redirect(url_for('auth.login'))
+
+
 # --- Routes ---
 @app.route("/favicon.ico")
 def favicon() -> WerkzeugResponse:
