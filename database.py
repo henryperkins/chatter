@@ -77,7 +77,7 @@ def is_initialized() -> bool:
             hasattr(db_state['Session'], 'remove'))
 @contextmanager
 def db_session() -> Generator[Session, None, None]:
-    """Get a database session with proper transaction handling and retries"""
+    """Get a database session with proper transaction handling"""
     if not current_app:
         raise RuntimeError("Cannot access database outside of Flask application context")
 
@@ -87,38 +87,39 @@ def db_session() -> Generator[Session, None, None]:
 
     session = db_state['Session']()
     try:
-        # Add advisory lock to prevent concurrent modifications
+        # Start transaction
+        session.begin()
+        
+        # Set reasonable timeouts
         session.execute(text("SET lock_timeout = '5s'"))
+        session.execute(text("SET statement_timeout = '30s'"))
         
         yield session
         
-        # Only commit if no errors and session is active
-        if session.is_active and not session.in_transaction():
-            try:
-                session.commit()
-            except Exception as commit_error:
-                logger.error(f"Commit failed: {commit_error}")
-                if session.is_active:
-                    session.rollback()
-                raise
-    except OperationalError as e:
-        session.rollback()
+        # Commit only if no errors
+        if session.in_transaction():
+            session.commit()
+            
+    except Exception as e:
+        # Rollback on error
+        if session.in_transaction():
+            session.rollback()
         logger.error(f"Database operation failed: {str(e)}")
         raise
-    except Exception as e:
-        session.rollback()
-        logger.error(f"Unexpected error in database operation: {str(e)}")
-        raise
     finally:
+        # Close session properly
         try:
             if session.is_active:
                 session.close()
         except Exception as e:
             logger.warning(f"Error closing session: {str(e)}")
         finally:
-            # Ensure session is removed from registry
+            # Remove session from registry
             if 'Session' in db_state and hasattr(db_state['Session'], 'remove'):
                 db_state['Session'].remove()
+                
+            # Log session metrics
+            logger.debug(f"Session closed - active: {session.is_active}, in_transaction: {session.in_transaction()}")
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
