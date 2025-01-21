@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 import sys
+import os
 sys.path.append('.')
 
 from database import init_db
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from models.user import User
-from models.model import Model
 
 def reset_database():
     """Reset the database to initial state"""
@@ -17,9 +14,16 @@ def reset_database():
         print("Database reset cancelled")
         return
 
+    # Get database URI from environment or use default
+    db_uri = os.getenv('DATABASE_URI', 'sqlite:///instance/chatter.db')
+    
     # Initialize fresh database
-    init_db()
-    print("Database has been reset successfully")
+    try:
+        init_db(db_uri)
+        print("Database has been reset successfully")
+    except Exception as e:
+        print(f"Error resetting database: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     reset_database()

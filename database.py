@@ -82,44 +82,33 @@ def execute_statement(db, statement: str) -> None:
         raise e
 
 
-def init_db() -> None:
+def init_db(db_uri: str = None) -> None:
     """Initialize database tables."""
+    if db_uri is None:
+        # Use a default SQLite database if no URI provided
+        db_uri = 'sqlite:///instance/chatter.db'
+    
+    engine = create_engine(db_uri)
+    Session = sessionmaker(bind=engine)
+    
     try:
-        with db_session() as db:
-            with current_app.open_resource("schema.sql") as f:
-                sql_content = f.read().decode("utf8")
-
-                # Split scripts by semicolon and filter out empty statements
-                statements = [stmt.strip() for stmt in sql_content.split(";") if stmt.strip()]
-
-                # Execute CREATE TABLE statements first
-                for statement in statements:
-                    if "CREATE TABLE" in statement.upper():
-                        try:
-                            db.execute(text(statement))
-                            db.commit()
-                            logger.info(f"Created table from statement: {statement[:50]}...")
-                        except Exception as e:
-                            logger.error(f"Error creating table: {e}")
-                            raise
-
-                # Then execute CREATE INDEX statements
-                for statement in statements:
-                    if "CREATE INDEX" in statement.upper():
-                        try:
-                            db.execute(text(statement))
-                            db.commit()
-                            logger.info(f"Created index from statement: {statement[:50]}...")
-                        except Exception as e:
-                            logger.warning(f"Warning creating index: {e}")
-                            # Don't raise here, as index creation failures are not fatal
-
-                logger.info("Database initialization completed successfully")
-
+        # Import all models to ensure they're registered with the metadata
+        from models.user import User
+        from models.model import Model
+        
+        # Import Base from your models
+        from models.base import Base
+        
+        # Create all tables
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
+        
+        logger.info("Database initialization completed successfully")
+        
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise RuntimeError(
-            "Failed to initialize the database. Please check the schema file and try again."
+            "Failed to initialize the database. Please check the models and try again."
         )
 
 
