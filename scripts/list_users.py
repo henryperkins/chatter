@@ -4,6 +4,7 @@ from datetime import datetime
 from textwrap import dedent
 from typing import List, Dict, Any
 from flask import Flask
+from sqlalchemy import text
 
 sys.path.append('.')
 
