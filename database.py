@@ -157,7 +157,8 @@ def create_default_model(db) -> None:
             "max_tokens": Config.DEFAULT_MAX_TOKENS
         },
         "requires_authentication": True,
-        "api_version_format": Config.AZURE_API_VERSION
+        "api_version_format": Config.AZURE_API_VERSION,
+        "created_at": None  # Let the database handle this
     }
     
     try:
