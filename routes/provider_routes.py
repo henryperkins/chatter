@@ -76,7 +76,9 @@ def add_provider() -> Response:
                         "name": form.name.data or "",
                         "slug": form.slug.data or "",
                         "api_base_url": (form.api_base_url.data or "").rstrip("/"),
-                        "requires_authentication": form.requires_authentication.data or False
+                        "capabilities": "{}",  # Default empty JSON capabilities
+                        "requires_authentication": form.requires_authentication.data or False,
+                        "api_version_format": None  # Default null api_version_format
                     },
                 )
                 provider_id: Optional[int] = result.scalar()
