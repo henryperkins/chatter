@@ -278,6 +278,14 @@ def register():
                         return render_template("register.html", form=form)
 
                     # Create regular user
+                    logger.info(
+                        "Creating new user",
+                        extra={
+                            "username": username,
+                            "email": email,
+                            "is_first_user": is_first_user
+                        }
+                    )
                     hashed_pw = generate_password_hash(password)
                     if isinstance(hashed_pw, bytes):
                         hashed_pw = hashed_pw.decode("utf-8")
@@ -315,6 +323,12 @@ def register():
                 # Check if we need to configure default model
                 model_count = db.execute(text("SELECT COUNT(*) FROM models")).scalar()
                 if model_count == 0:
+                    # Store registration data in session before redirect
+                    session["registration_data"] = {
+                        "username": username,
+                        "email": email,
+                        "password": password,
+                    }
                     return redirect(url_for('auth.edit_default_model'))
                 return redirect(url_for('chat.chat_interface'))
 
