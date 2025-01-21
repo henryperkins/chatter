@@ -248,6 +248,7 @@ def process_uploaded_files(
 
 
 @chat_routes.route("/")
+@chat_routes.route("/chat_interface")
 @login_required
 def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Redirect to the chat interface."""
