@@ -238,15 +238,39 @@ def register():
                         form.email.errors = ['Username or email already exists']
                         return render_template("register.html", form=form)
 
-                    # Store registration data in session if first user
+                    # Create first user as admin
                     if is_first_user:
-                        session["registration_data"] = {
-                            "username": username,
-                            "email": email,
-                            "password": password,
-                        }
-                        logger.info("First user registration - redirecting to model config")
-                        return redirect(url_for("auth.edit_default_model"))
+                        logger.info("Creating first admin user")
+                        result = db.execute(
+                            text(
+                                """
+                                INSERT INTO users (username, email, password_hash, role, is_verified)
+                                VALUES (:username, :email, :password_hash, 'admin', TRUE)
+                                RETURNING id, username, email, role
+                            """
+                            ),
+                            {
+                                "username": username,
+                                "email": email,
+                                "password_hash": hashed_pw,
+                            },
+                        ).fetchone()
+
+                        # Create User object and log them in
+                        user_obj = User(result[0], result[1], result[2], result[3])
+                        login_user(user_obj)
+
+                        logger.info(
+                            "First admin user created successfully",
+                            extra={
+                                "ip_address": ip,
+                                "route": request.path,
+                                "email_hash": hashlib.sha256(email.encode()).hexdigest(),
+                                "duration_ms": (datetime.now() - start_time).total_seconds() * 1000
+                            }
+                        )
+
+                        return redirect(url_for('chat.chat_interface'))
 
                     # For non-first users, check username uniqueness
                     existing_username = db.execute(
