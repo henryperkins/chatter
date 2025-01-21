@@ -163,10 +163,10 @@ def create_default_model(db) -> None:
                 "name": "Azure OpenAI",
                 "slug": "azure-openai",
                 "api_base_url": Config.AZURE_API_ENDPOINT.rstrip("/"),
-                "capabilities": json.dumps({
+                "capabilities": {
                     "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
                     "max_tokens": Config.DEFAULT_MAX_TOKENS
-                }),
+                },
                 "requires_authentication": True,
                 "api_version_format": Config.DEFAULT_API_VERSION
             }
