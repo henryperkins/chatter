@@ -10,11 +10,12 @@ This module provides a Model class for managing AI model configurations, includi
 
 import logging
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List, cast
 from cryptography.fernet import Fernet, InvalidToken
 
-from sqlalchemy import text
+from sqlalchemy import text, Column, Integer, Float, Boolean, String, DateTime
+from sqlalchemy.orm import mapped_column
 
 from database import db_session
 from .provider import Provider
@@ -58,15 +59,15 @@ class Model:
     model_type: str
     api_endpoint: str
     api_key: str
-    temperature: Optional[float] = Field(default=None, sa_column=Column(Float, nullable=True))
-    max_tokens: Optional[int] = Field(default=None, sa_column=Column(Integer, nullable=True))
-    max_completion_tokens: Optional[int] = Field(default=8300, sa_column=Column(Integer, nullable=False))
-    is_default: bool = Field(default=False, sa_column=Column(Boolean, nullable=False))
-    requires_o1_handling: bool = Field(default=False, sa_column=Column(Boolean, nullable=False))
-    supports_streaming: bool = Field(default=False, sa_column=Column(Boolean, nullable=False))
-    api_version: str = Field(default="2023-07-01-preview", sa_column=Column(String(50), nullable=False))
-    version: int = Field(default=1, sa_column=Column(Integer, nullable=False))
-    created_at: Optional[str] = Field(default=None, sa_column=Column(DateTime, nullable=True))
+    temperature: Optional[float] = field(default=None, metadata={"sa": mapped_column(Float, nullable=True)})
+    max_tokens: Optional[int] = field(default=None, metadata={"sa": mapped_column(Integer, nullable=True)})
+    max_completion_tokens: Optional[int] = field(default=8300, metadata={"sa": mapped_column(Integer, nullable=False)})
+    is_default: bool = field(default=False, metadata={"sa": mapped_column(Boolean, nullable=False)})
+    requires_o1_handling: bool = field(default=False, metadata={"sa": mapped_column(Boolean, nullable=False)})
+    supports_streaming: bool = field(default=False, metadata={"sa": mapped_column(Boolean, nullable=False)})
+    api_version: str = field(default="2023-07-01-preview", metadata={"sa": mapped_column(String(50), nullable=False)})
+    version: int = field(default=1, metadata={"sa": mapped_column(Integer, nullable=False)})
+    created_at: Optional[str] = field(default=None, metadata={"sa": mapped_column(DateTime, nullable=True)})
 
     # Add provider capability constants
     PROVIDER_CAPABILITIES = {
