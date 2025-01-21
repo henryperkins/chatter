@@ -45,7 +45,6 @@ def format_user(user: Dict[str, Any]) -> str:
         Role: {user['role']}
         Created At: {created_at.strftime('%Y-%m-%d %H:%M:%S')}
         Verified: {user.get('is_verified', 'N/A')}
-        Active: {user.get('is_active', 'N/A')}
     """).strip()
 
 def list_users(show_password_hashes: bool = False) -> List[Dict[str, Any]]:
@@ -55,7 +54,7 @@ def list_users(show_password_hashes: bool = False) -> List[Dict[str, Any]]:
         with db_session() as db:
             # Select basic user info
             query = text("""
-                SELECT id, username, email, role, created_at, is_verified, is_active
+                SELECT id, username, email, role, created_at, is_verified
                 FROM users
                 ORDER BY created_at DESC
             """)
@@ -64,7 +63,7 @@ def list_users(show_password_hashes: bool = False) -> List[Dict[str, Any]]:
                 # Include password hashes if requested
                 query = text("""
                     SELECT id, username, email, role, created_at, 
-                           is_verified, is_active, password_hash
+                           is_verified, password_hash
                     FROM users
                     ORDER BY created_at DESC
                 """)
