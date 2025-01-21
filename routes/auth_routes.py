@@ -237,27 +237,6 @@ def register():
                     user_count = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
                     is_first_user = user_count == 0
 
-                    if is_first_user:
-                        model_count = db.execute(
-                            text("SELECT COUNT(*) FROM models")
-                        ).scalar()
-                        if model_count == 0:
-                            session["registration_data"] = {
-                                "username": username,
-                                "email": email,
-                                "password": password,
-                            }
-                            logger.info(
-                                "Redirecting first user to default model configuration",
-                                extra={
-                                    "ip_address": ip,
-                                    "route": request.path,
-                                    "username": username,
-                                    "email": email,
-                                },
-                            )
-                            return redirect(url_for("auth.edit_default_model"))
-
                     # Check username uniqueness after form validation
                     existing_username = db.execute(
                         text("SELECT id FROM users WHERE LOWER(username) = LOWER(:username)"),
@@ -320,16 +299,6 @@ def register():
                     }
                 )
 
-                # Check if we need to configure default model
-                model_count = db.execute(text("SELECT COUNT(*) FROM models")).scalar()
-                if model_count == 0:
-                    # Store registration data in session before redirect
-                    session["registration_data"] = {
-                        "username": username,
-                        "email": email,
-                        "password": password,
-                    }
-                    return redirect(url_for('auth.edit_default_model'))
                 return redirect(url_for('chat.chat_interface'))
 
             return render_template("register.html", form=form)

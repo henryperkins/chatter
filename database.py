@@ -113,7 +113,12 @@ def init_db(db_uri: str = None) -> None:
         Base.metadata.drop_all(bind=engine)
         Base.metadata.create_all(bind=engine)
         
-        logger.info("Database initialization completed successfully")
+        # Create a session to create the default model
+        Session = sessionmaker(bind=engine)
+        with Session() as session:
+            create_default_model(session)
+        
+        logger.info("Database initialization completed successfully with default model")
         
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
