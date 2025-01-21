@@ -46,7 +46,7 @@ CREATE TABLE models (
     id SERIAL PRIMARY KEY,
     provider_id INTEGER REFERENCES providers(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    model_identifier TEXT NOT NULL,
+    deployment_name TEXT NOT NULL,
     description TEXT,
     capabilities TEXT[] DEFAULT '{}',
     api_endpoint TEXT NOT NULL,
