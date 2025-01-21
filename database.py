@@ -157,10 +157,11 @@ def create_default_model(db) -> None:
             "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
             "max_tokens": Config.DEFAULT_MAX_TOKENS
         }),
-        "requires_authentication": True
+        "requires_authentication": True,
+        "api_key": Config.AZURE_API_KEY,  # Add API key
+        "api_version": Config.DEFAULT_API_VERSION,  # Add API version
+        "version": 1  # Add version number
     }
-
-    # Remove created_at as it should be handled by the database default value
     
     try:
         provider_id = Provider.create(default_provider)
