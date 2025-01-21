@@ -262,12 +262,18 @@ class Model:
                         
                         try:
                             model_dict["api_key"] = cipher_suite.decrypt(encrypted_key).decode()
-                        except InvalidToken:
-                            # Try to re-encrypt with current key if decryption fails
-                            logger.warning("Encryption key mismatch for model %d. Attempting re-encryption...", model_id)
+                        except InvalidToken as token_error:
+                            logger.error("Failed to decrypt API key for model %d: %s", model_id, str(token_error))
+                            # Check if the key might be already decrypted
                             try:
-                                # Re-encrypt with current key
-                                model_dict["api_key"] = cipher_suite.encrypt(encrypted_key).decode()
+                                # If the key is already in plaintext, re-encrypt it
+                                if isinstance(encrypted_key, bytes):
+                                    encrypted_key = encrypted_key.decode()
+                                # Test if it's already plaintext
+                                if len(encrypted_key) > 100:  # Encrypted keys are typically longer
+                                    raise ValueError("Invalid key format")
+                                # Re-encrypt the plaintext key
+                                model_dict["api_key"] = cipher_suite.encrypt(encrypted_key.encode()).decode()
                                 # Update the database with the newly encrypted key
                                 with db_session() as db:
                                     db.execute(
@@ -277,9 +283,9 @@ class Model:
                                     db.commit()
                                 logger.info("Successfully re-encrypted API key for model %d", model_id)
                             except Exception as reencrypt_error:
-                                logger.error("Failed to re-encrypt API key for model %d: %s", model_id, str(reencrypt_error))
+                                logger.error("Failed to handle API key for model %d: %s", model_id, str(reencrypt_error))
                                 model_dict["api_key"] = ""
-                                raise ValueError("Failed to decrypt and re-encrypt API key. Please check encryption configuration.")
+                                raise ValueError("Failed to handle API key. Please check encryption configuration.")
 
                 except Exception as e:
                     logger.error(

@@ -59,22 +59,25 @@ def db_session() -> Generator[Session, None, None]:
             try:
                 session.commit()
             except Exception as commit_error:
-                logger.error(f"Commit failed: {str(commit_error)}")
+                logger.error(f"Commit failed: {str(commit_error)}", exc_info=True)
                 session.rollback()
                 raise
     except Exception as e:
-        if session.is_active:
-            session.rollback()
         logger.error(f"Session rollback due to exception: {str(e)}", exc_info=True)
+        if session.is_active:
+            try:
+                session.rollback()
+            except Exception as rollback_error:
+                logger.error(f"Rollback failed: {str(rollback_error)}", exc_info=True)
         raise
     finally:
         try:
             if session.is_active:
                 session.close()
-            if db_state['Session'] is not None:
+            if db_state['Session'] is not None and hasattr(db_state['Session'], 'remove'):
                 db_state['Session'].remove()
         except Exception as e:
-            logger.error(f"Error cleaning up session: {str(e)}")
+            logger.error(f"Error cleaning up session: {str(e)}", exc_info=True)
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
@@ -84,12 +87,17 @@ def close_db(e: Optional[BaseException] = None) -> None:
         session = db_state.get('Session')
         if session:
             try:
-                if session.is_active:  # Check if the session is active
-                    session.rollback()  # Rollback any pending transactions
+                # Get the actual session object from the scoped session
+                if hasattr(session, 'registry'):
+                    actual_session = session()
+                    if actual_session.is_active:
+                        actual_session.rollback()
+                    actual_session.close()
+                # Remove the scoped session
                 if hasattr(session, 'remove'):
-                    session.remove()  # Safely remove the session
+                    session.remove()
             except Exception as e:
-                logger.error(f"Error closing database session: {str(e)}")
+                logger.error(f"Error closing database session: {str(e)}", exc_info=True)
 
 
 def execute_statement(db, statement: str) -> None:

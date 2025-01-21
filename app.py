@@ -341,18 +341,26 @@ def db_health_check():
     """Database health check endpoint"""
     try:
         with db_session() as db:
+            # Test both read and write operations
             db.execute(text("SELECT 1"))
+            # Test a simple write operation
+            test_id = db.execute(text("INSERT INTO test_table (value) VALUES ('test') RETURNING id")).scalar()
+            if test_id:
+                db.execute(text("DELETE FROM test_table WHERE id = :id"), {"id": test_id})
+            db.commit()
         return jsonify({
             "status": "healthy",
             "database": "connected",
-            "initialized": is_initialized()
+            "initialized": is_initialized(),
+            "read_write": "success"
         })
     except Exception as e:
         logger.error("Database health check failed", exc_info=True)
         return jsonify({
             "status": "unhealthy",
             "error": str(e),
-            "initialized": is_initialized()
+            "initialized": is_initialized(),
+            "read_write": "failed"
         }), 500
 
 
