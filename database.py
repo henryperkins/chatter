@@ -114,12 +114,7 @@ def init_db(db_uri: str = None) -> None:
                         conn.execute(text(statement))
                 conn.commit()
         
-        # Create a session to create the default model
-        Session = sessionmaker(bind=engine)
-        with Session() as session:
-            create_default_model(session)
-        
-        logger.info("Database initialization completed successfully with default model")
+        logger.info("Database initialization completed successfully")
         
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
@@ -244,12 +239,8 @@ def init_app(app: Flask) -> None:
 
             logger.info("Database engine and session initialized successfully")
 
-            # Initialize database schema first
+            # Initialize database schema only
             init_db(app.config["DATABASE_URI"])
-
-            # Then create default model
-            with db_session() as db:
-                create_default_model(db)
 
             # Register cleanup function
             app.teardown_appcontext(close_db)
