@@ -25,7 +25,12 @@ Session: Optional[ScopedSession[SessionType]] = None
 _initialized = False
 
 def is_initialized() -> bool:
-    return _initialized and Session is not None
+    """Check if database is properly initialized."""
+    global Session, engine
+    return (_initialized and 
+            Session is not None and 
+            engine is not None and
+            hasattr(Session, 'remove'))
 @contextmanager
 def db_session() -> Generator[Session, None, None]:
     """
@@ -126,27 +131,33 @@ def init_app(app: Flask) -> None:
     Register database functions with Flask app and initialize PostgreSQL connection.
     """
     logger.info("Initializing database with init_app(app)")
+    
     if not app.config.get("DATABASE_URI"):
         logger.error("DATABASE_URI is not set in app configuration.")
-    logger.info("Database engine and session initialized successfully.")
-    logger.info("Database functions registered with Flask app.")
+        raise ValueError("DATABASE_URI must be set in app configuration")
+        
     global engine, Session, _initialized
 
-    # Configure PostgreSQL connection
-    engine = create_engine(
-        app.config["DATABASE_URI"],
-        pool_size=POOL_SIZE,
-        max_overflow=MAX_OVERFLOW,
-        pool_recycle=POOL_RECYCLE,
-        pool_timeout=POOL_TIMEOUT,
-    )
+    if not is_initialized():
+        # Configure PostgreSQL connection
+        engine = create_engine(
+            app.config["DATABASE_URI"],
+            pool_size=POOL_SIZE,
+            max_overflow=MAX_OVERFLOW,
+            pool_recycle=POOL_RECYCLE,
+            pool_timeout=POOL_TIMEOUT,
+        )
 
-    # Create a scoped session for PostgreSQL
-    Session = scoped_session(sessionmaker(bind=engine))
-    _initialized = True
+        # Create a scoped session for PostgreSQL
+        Session = scoped_session(sessionmaker(bind=engine))
+        _initialized = True
+
+        logger.info("Database engine and session initialized successfully")
 
     # Register cleanup function
     app.teardown_appcontext(close_db)
 
     # Add CLI command for database initialization
     app.cli.add_command(init_db_command)
+    
+    logger.info("Database functions registered with Flask app")

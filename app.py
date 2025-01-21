@@ -87,10 +87,18 @@ def configure_app() -> None:
     """Configure Flask application settings"""
     # Basic configuration first
     app.config["SECRET_KEY"] = Config.SECRET_KEY
+    if not Config.DATABASE_URI:
+        raise ValueError("DATABASE_URI must be set in Config")
     app.config["DATABASE_URI"] = Config.DATABASE_URI
-
-    # Initialize database after setting DATABASE_URI
-    init_app(app)
+    
+    # Ensure database is properly initialized
+    try:
+        init_app(app)
+        if not is_initialized():
+            raise RuntimeError("Database failed to initialize properly")
+    except Exception as e:
+        logger.error("Database initialization failed: %s", str(e))
+        raise
 
     # File upload settings
     app.config.update(
