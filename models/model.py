@@ -58,15 +58,15 @@ class Model:
     model_type: str
     api_endpoint: str
     api_key: str
-    temperature: Optional[float] = None
-    max_tokens: Optional[int] = None
-    max_completion_tokens: Optional[int] = 8300
-    is_default: bool = False
-    requires_o1_handling: bool = False
-    supports_streaming: bool = False
-    api_version: str = "2023-07-01-preview"
-    version: int = 1
-    created_at: Optional[str] = None
+    temperature: Optional[float] = Field(default=None, sa_column=Column(Float, nullable=True))
+    max_tokens: Optional[int] = Field(default=None, sa_column=Column(Integer, nullable=True))
+    max_completion_tokens: Optional[int] = Field(default=8300, sa_column=Column(Integer, nullable=False))
+    is_default: bool = Field(default=False, sa_column=Column(Boolean, nullable=False))
+    requires_o1_handling: bool = Field(default=False, sa_column=Column(Boolean, nullable=False))
+    supports_streaming: bool = Field(default=False, sa_column=Column(Boolean, nullable=False))
+    api_version: str = Field(default="2023-07-01-preview", sa_column=Column(String(50), nullable=False))
+    version: int = Field(default=1, sa_column=Column(Integer, nullable=False))
+    created_at: Optional[str] = Field(default=None, sa_column=Column(DateTime, nullable=True))
 
     # Add provider capability constants
     PROVIDER_CAPABILITIES = {
