@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+import os
 from datetime import datetime
 from textwrap import dedent
 from typing import List, Dict, Any
@@ -8,14 +9,28 @@ from sqlalchemy import text
 
 sys.path.append('.')
 
+# Import config
+from config import Config
+
 # Create a minimal Flask app
 app = Flask(__name__)
-app.config['DATABASE_URI'] = 'postgresql://username:password@localhost/dbname'  # Update with your actual DB URI
+
+# Get database URI from config
+db_uri = Config.DATABASE_URI
+if not db_uri:
+    print("Error: DATABASE_URI is not configured in config.py")
+    sys.exit(1)
+
+app.config['DATABASE_URI'] = db_uri
 
 # Initialize database within app context
 from database import init_app
 with app.app_context():
-    init_app(app)
+    try:
+        init_app(app)
+    except Exception as e:
+        print(f"Error initializing database: {e}")
+        sys.exit(1)
 
 def format_user(user: Dict[str, Any]) -> str:
     """Format user information for display"""
