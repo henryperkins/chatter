@@ -93,14 +93,6 @@ def init_db(db_uri: str = None) -> None:
         raise ValueError("DATABASE_URI must be provided either directly or in app config")
     
     try:
-        # Import all models to ensure they're registered with the metadata
-        from models.user import User
-        from models.chat import Chat
-        from models.model import Model
-        from models.provider import Provider
-        from models.uploaded_file import UploadedFile
-        from models.base import Base
-        
         # Create engine with proper PostgreSQL settings
         engine = create_engine(
             db_uri,
@@ -110,9 +102,14 @@ def init_db(db_uri: str = None) -> None:
             pool_timeout=POOL_TIMEOUT
         )
         
-        # Drop and recreate all tables
-        Base.metadata.drop_all(bind=engine)
-        Base.metadata.create_all(bind=engine)
+        # Read and execute schema.sql
+        with current_app.open_resource('schema.sql') as f:
+            with engine.connect() as conn:
+                # Split on semicolon and execute each statement
+                for statement in f.read().decode('utf8').split(';'):
+                    if statement.strip():
+                        conn.execute(text(statement))
+                conn.commit()
         
         # Create a session to create the default model
         Session = sessionmaker(bind=engine)
