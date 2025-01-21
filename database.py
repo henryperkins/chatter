@@ -130,6 +130,40 @@ def init_db_command():
     click.echo("Initialized the database.")
 
 
+def create_default_model(db) -> None:
+    """Create default model if none exists"""
+    from models import Model
+    from config import Config
+    
+    default_exists = db.execute(text("SELECT COUNT(*) FROM models WHERE is_default = TRUE")).scalar()
+    if default_exists:
+        return
+
+    logger.info("Creating default model")
+    default_model = {
+        "name": Config.DEFAULT_MODEL_NAME,
+        "deployment_name": Config.DEFAULT_DEPLOYMENT_NAME,
+        "description": Config.DEFAULT_MODEL_DESCRIPTION,
+        "model_type": "o1-preview",  # Default type
+        "api_endpoint": Config.DEFAULT_API_ENDPOINT,
+        "api_key": Config.AZURE_API_KEY,
+        "temperature": Config.DEFAULT_TEMPERATURE,
+        "max_tokens": Config.DEFAULT_MAX_TOKENS,
+        "max_completion_tokens": Config.DEFAULT_MAX_COMPLETION_TOKENS,
+        "is_default": True,
+        "requires_o1_handling": Config.DEFAULT_REQUIRES_O1_HANDLING,
+        "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
+        "api_version": Config.DEFAULT_API_VERSION,
+        "version": 1,
+    }
+    
+    try:
+        Model.create(default_model)
+        logger.info("Default model created successfully")
+    except Exception as e:
+        logger.error(f"Failed to create default model: {e}", exc_info=True)
+        raise
+
 def init_app(app: Flask) -> None:
     """Register database functions with Flask app and initialize PostgreSQL connection."""
     logger.info("Initializing database with init_app(app)")
@@ -142,27 +176,35 @@ def init_app(app: Flask) -> None:
 
     # Only initialize if not already initialized
     if not is_initialized():
-        # Configure PostgreSQL connection
-        db_state['engine'] = create_engine(
-            app.config["DATABASE_URI"],
-            pool_size=POOL_SIZE,
-            max_overflow=MAX_OVERFLOW,
-            pool_recycle=POOL_RECYCLE,
-            pool_timeout=POOL_TIMEOUT,
-        )
+        try:
+            # Configure PostgreSQL connection
+            db_state['engine'] = create_engine(
+                app.config["DATABASE_URI"],
+                pool_size=POOL_SIZE,
+                max_overflow=MAX_OVERFLOW,
+                pool_recycle=POOL_RECYCLE,
+                pool_timeout=POOL_TIMEOUT,
+            )
 
-        # Create a scoped session factory bound to the application context
-        db_state['Session'] = scoped_session(
-            sessionmaker(bind=db_state['engine']),
-            scopefunc=lambda: id(g) if hasattr(g, '_get_current_object') else None
-        )
+            # Create a scoped session factory bound to the application context
+            db_state['Session'] = scoped_session(
+                sessionmaker(bind=db_state['engine']),
+                scopefunc=lambda: id(g) if hasattr(g, '_get_current_object') else None
+            )
 
-        logger.info("Database engine and session initialized successfully")
+            logger.info("Database engine and session initialized successfully")
 
-        # Register cleanup function
-        app.teardown_appcontext(close_db)
+            # Create default model if it doesn't exist
+            with db_session() as db:
+                create_default_model(db)
 
-        # Add CLI command for database initialization
-        app.cli.add_command(init_db_command)
-        
-        logger.info("Database functions registered with Flask app")
+            # Register cleanup function
+            app.teardown_appcontext(close_db)
+
+            # Add CLI command for database initialization
+            app.cli.add_command(init_db_command)
+            
+            logger.info("Database functions registered with Flask app")
+        except Exception as e:
+            logger.error(f"Database initialization failed: {e}", exc_info=True)
+            raise
