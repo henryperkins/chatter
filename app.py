@@ -98,49 +98,7 @@ def configure_app() -> None:
             with app.app_context():
                 init_app(app)
                 
-                # Set up default model if none exists
-                with db_session() as db:
-                    default_model = db.execute(
-                        text("SELECT id FROM models WHERE is_default = TRUE")
-                    ).scalar()
-                    
-                    if not default_model:
-                        logger.info("Creating default GPT-4 model configuration...")
-                        model_data = {
-                            "name": os.getenv("DEFAULT_MODEL_NAME", "GPT-4"),
-                            "deployment_name": os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-deployment"),
-                            "description": os.getenv("DEFAULT_MODEL_DESCRIPTION", "Azure GPT-4 Model"),
-                            "model_type": "azure",
-                            "api_endpoint": "https://hp-east2.openai.azure.com/openai/deployments/gpt-deployment?api-version=2024-12-01-preview",
-                            "api_key": os.getenv("AZURE_API_KEY"),
-                            "temperature": float(os.getenv("DEFAULT_TEMPERATURE", "0.7")),
-                            "max_tokens": int(os.getenv("DEFAULT_MAX_TOKENS", "4000")),
-                            "max_completion_tokens": int(os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "4000")),
-                            "requires_o1_handling": True,
-                            "supports_streaming": True,
-                            "api_version": os.getenv("AZURE_API_VERSION", "2023-05-15"),
-                            "is_default": True,
-                            "version": 1
-                        }
-                        
-                        db.execute(
-                            text("""
-                                INSERT INTO models (
-                                    name, deployment_name, description, model_type,
-                                    api_endpoint, api_key, temperature, max_tokens,
-                                    max_completion_tokens, requires_o1_handling,
-                                    supports_streaming, api_version, is_default, version
-                                ) VALUES (
-                                    :name, :deployment_name, :description, :model_type,
-                                    :api_endpoint, :api_key, :temperature, :max_tokens,
-                                    :max_completion_tokens, :requires_o1_handling,
-                                    :supports_streaming, :api_version, :is_default, :version
-                                )
-                            """),
-                            model_data
-                        )
-                        db.commit()
-                        logger.info("Default model configuration created successfully")
+                # Database initialization will handle default model creation
                 
                 if not is_initialized():
                     logger.error("Database initialization completed but is_initialized() still returns False")

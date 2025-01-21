@@ -85,7 +85,7 @@ def execute_statement(db, statement: str) -> None:
 
 
 def init_db(db_uri: str = None) -> None:
-    """Initialize database tables."""
+    """Initialize database tables and create default provider/model."""
     if not current_app:
         raise RuntimeError("Cannot initialize database outside of Flask application context")
         
@@ -127,14 +127,15 @@ def init_db(db_uri: str = None) -> None:
                 conn.execute(text(schema_sql))
                 conn.commit()
 
-        # Create default provider
+        # Create default provider and model
         with db_session() as db:
+            # Create default provider if it doesn't exist
             provider_exists = db.execute(text(
                 "SELECT id FROM providers WHERE slug = 'azure-openai'"
             )).scalar()
             
             if not provider_exists:
-                db.execute(text("""
+                provider_id = db.execute(text("""
                     INSERT INTO providers (
                         name, slug, api_base_url, capabilities, 
                         requires_authentication, api_version_format
@@ -142,6 +143,7 @@ def init_db(db_uri: str = None) -> None:
                         'Azure OpenAI', 'azure-openai', :api_base_url,
                         :capabilities, TRUE, :api_version
                     )
+                    RETURNING id
                 """), {
                     "api_base_url": os.getenv("AZURE_API_ENDPOINT", "").rstrip("/"),
                     "capabilities": json.dumps({
@@ -149,8 +151,45 @@ def init_db(db_uri: str = None) -> None:
                         "max_tokens": 4000
                     }),
                     "api_version": os.getenv("AZURE_API_VERSION", "2023-05-15")
+                }).scalar()
+            else:
+                provider_id = provider_exists
+
+            # Create default model if it doesn't exist
+            default_model = db.execute(text(
+                "SELECT id FROM models WHERE is_default = TRUE"
+            )).scalar()
+            
+            if not default_model:
+                db.execute(text("""
+                    INSERT INTO models (
+                        provider_id, name, deployment_name, description,
+                        api_endpoint, api_key, model_type, temperature,
+                        max_tokens, max_completion_tokens, requires_o1_handling,
+                        supports_streaming, is_default, api_version, version
+                    ) VALUES (
+                        :provider_id, :name, :deployment_name, :description,
+                        :api_endpoint, :api_key, :model_type, :temperature,
+                        :max_tokens, :max_completion_tokens, :requires_o1_handling,
+                        :supports_streaming, TRUE, :api_version, 1
+                    )
+                """), {
+                    "provider_id": provider_id,
+                    "name": os.getenv("DEFAULT_MODEL_NAME", "GPT-4"),
+                    "deployment_name": os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-deployment"),
+                    "description": os.getenv("DEFAULT_MODEL_DESCRIPTION", "Azure GPT-4 Model"),
+                    "api_endpoint": os.getenv("AZURE_API_ENDPOINT", "https://hp-east2.openai.azure.com/openai/deployments/gpt-deployment?api-version=2024-12-01-preview"),
+                    "api_key": os.getenv("AZURE_API_KEY"),
+                    "model_type": "azure",
+                    "temperature": float(os.getenv("DEFAULT_TEMPERATURE", "0.7")),
+                    "max_tokens": int(os.getenv("DEFAULT_MAX_TOKENS", "4000")),
+                    "max_completion_tokens": int(os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "4000")),
+                    "requires_o1_handling": True,
+                    "supports_streaming": True,
+                    "api_version": os.getenv("AZURE_API_VERSION", "2023-05-15")
                 })
                 db.commit()
+                logger.info("Default model configuration created successfully")
         
         logger.info("Database initialization completed successfully")
         
