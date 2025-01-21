@@ -94,17 +94,6 @@ def main():
                 if args.show_hashes:
                     print(f"Password Hash: {user['password_hash']}")
                 print("-" * 60)
-        
-        if not users:
-            print("No users found in the database")
-            return
-
-        print(f"Found {len(users)} users:\n")
-        for user in users:
-            print(format_user(user))
-            if args.show_hashes:
-                print(f"Password Hash: {user['password_hash']}")
-            print("-" * 60)
             
     except Exception as e:
         print(f"Error listing users: {e}")
