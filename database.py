@@ -2,7 +2,7 @@
 
 import os
 from sqlalchemy import create_engine, text, event
-from sqlalchemy.orm import scoped_session, sessionmaker, Session as SessionType
+from sqlalchemy.orm import scoped_session, sessionmaker, Session as SessionType, Session
 from sqlalchemy.pool import QueuePool
 from sqlalchemy.exc import OperationalError
 from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
@@ -21,6 +21,7 @@ POOL_SIZE = 5
 MAX_OVERFLOW = 10
 POOL_TIMEOUT = 30
 POOL_PRE_PING = True
+# Removed POOL_RECYCLE since it wasn't used consistently
 
 def create_db_engine(db_uri: str):
     return create_engine(
@@ -405,7 +406,7 @@ def init_app(app: Flask) -> None:
                 app.config["DATABASE_URI"],
                 pool_size=POOL_SIZE,
                 max_overflow=MAX_OVERFLOW,
-                pool_recycle=POOL_RECYCLE,
+                # Removed pool_recycle since it wasn't used consistently
                 pool_timeout=POOL_TIMEOUT,
                 pool_pre_ping=POOL_PRE_PING,  # Add connection health checks
                 connect_args=connect_args
