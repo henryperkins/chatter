@@ -725,17 +725,17 @@ def edit_default_model():
                     if field in default_model:
                         getattr(form, field).data = default_model[field]
             else:
-                form.name.data = Config.DEFAULT_MODEL_NAME
-                form.deployment_name.data = Config.DEFAULT_DEPLOYMENT_NAME
-                form.description.data = Config.DEFAULT_MODEL_DESCRIPTION
-                form.api_endpoint.data = Config.DEFAULT_API_ENDPOINT
-                form.api_key.data = Config.AZURE_API_KEY
-                form.temperature.data = Config.DEFAULT_TEMPERATURE
-                form.max_tokens.data = Config.DEFAULT_MAX_TOKENS
-                form.max_completion_tokens.data = Config.DEFAULT_MAX_COMPLETION_TOKENS
-                form.requires_o1_handling.data = Config.DEFAULT_REQUIRES_O1_HANDLING
-                form.supports_streaming.data = Config.DEFAULT_SUPPORTS_STREAMING
-                form.api_version.data = Config.DEFAULT_API_VERSION
+                form.name.data = os.getenv("DEFAULT_MODEL_NAME", "GPT-4")
+                form.deployment_name.data = os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-deployment")
+                form.description.data = os.getenv("DEFAULT_MODEL_DESCRIPTION", "Azure GPT-4 Model")
+                form.api_endpoint.data = os.getenv("AZURE_API_ENDPOINT")
+                form.api_key.data = os.getenv("AZURE_API_KEY")
+                form.temperature.data = float(os.getenv("DEFAULT_TEMPERATURE", "0.7"))
+                form.max_tokens.data = int(os.getenv("DEFAULT_MAX_TOKENS", "4000"))
+                form.max_completion_tokens.data = int(os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "4000"))
+                form.requires_o1_handling.data = True
+                form.supports_streaming.data = True
+                form.api_version.data = os.getenv("AZURE_API_VERSION", "2023-05-15")
                 form.model_type.data = "o1-preview"
     except Exception as e:
         logger.error(
