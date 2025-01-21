@@ -111,7 +111,7 @@ def configure_app() -> None:
                             "deployment_name": os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-deployment"),
                             "description": os.getenv("DEFAULT_MODEL_DESCRIPTION", "Azure GPT-4 Model"),
                             "model_type": "azure",
-                            "api_endpoint": f"{os.getenv('AZURE_API_ENDPOINT', '')}/openai/deployments/{os.getenv('AZURE_DEPLOYMENT_NAME', 'gpt-deployment')}",
+                            "api_endpoint": "https://hp-east2.openai.azure.com/openai/deployments/gpt-deployment",
                             "api_key": os.getenv("AZURE_API_KEY"),
                             "temperature": float(os.getenv("DEFAULT_TEMPERATURE", "0.7")),
                             "max_tokens": int(os.getenv("DEFAULT_MAX_TOKENS", "4000")),
