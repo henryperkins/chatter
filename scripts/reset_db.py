@@ -13,7 +13,7 @@ def reset_database():
     print("WARNING: This will delete all data in the database!")
     response = input("Are you sure you want to continue? [y/N]: ")
     
-    if response.lower() != 'y':
+    if response.lower() not in ['y', 'yes']:
         print("Database reset cancelled")
         return
 
