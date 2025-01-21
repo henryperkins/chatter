@@ -1,10 +1,11 @@
  # database.py
 
 import os
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import scoped_session, sessionmaker, Session as SessionType, sessionmaker
-from sqlalchemy.orm.session import Session
-from sqlalchemy.orm.scoping import scoped_session as ScopedSession
+from sqlalchemy import create_engine, text, event
+from sqlalchemy.orm import scoped_session, sessionmaker, Session as SessionType
+from sqlalchemy.pool import QueuePool
+from sqlalchemy.exc import OperationalError
+from tenacity import retry, stop_after_attempt, wait_fixed, retry_if_exception_type
 import logging
 import json
 from typing import Optional, Generator
@@ -16,14 +17,44 @@ from contextlib import contextmanager
 logger = logging.getLogger(__name__)
 
 # Connection pool settings for PostgreSQL
-POOL_SIZE = 20  # Increased from 10
-MAX_OVERFLOW = 30  # Increased from 20
-POOL_RECYCLE = 900  # 15 minutes instead of 30
-POOL_TIMEOUT = 5  # Reduced from 10 seconds
-POOL_PRE_PING = True  # Add connection health checks
+POOL_SIZE = 5
+MAX_OVERFLOW = 10
+POOL_TIMEOUT = 30
+POOL_PRE_PING = True
+
+def create_db_engine(db_uri: str):
+    return create_engine(
+        db_uri,
+        poolclass=QueuePool,
+        pool_size=POOL_SIZE,
+        max_overflow=MAX_OVERFLOW,
+        pool_timeout=POOL_TIMEOUT,
+        pool_pre_ping=True,
+        connect_args={
+            'connect_timeout': 10,
+            'keepalives': 1,
+            'keepalives_idle': 30,
+            'keepalives_interval': 10,
+            'keepalives_count': 5
+        }
+    )
 
 # Add this line to define SessionLocal
 SessionLocal = sessionmaker(autocommit=False, autoflush=False)
+
+def with_db_retries(max_attempts=3, wait_seconds=0.5):
+    def decorator(func):
+        @retry(stop=stop_after_attempt(max_attempts), 
+              wait=wait_fixed(wait_seconds),
+              retry=retry_if_exception_type(OperationalError))
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except OperationalError as e:
+                logger.warning(f"Database operation failed, retrying: {str(e)}")
+                raise
+        return wrapper
+    return decorator
 
 def get_db_state():
     """Get database state from application context"""
@@ -45,7 +76,7 @@ def is_initialized() -> bool:
             hasattr(db_state['Session'], 'remove'))
 @contextmanager
 def db_session() -> Generator[Session, None, None]:
-    """Get a database session with proper transaction handling"""
+    """Get a database session with proper transaction handling and retries"""
     if not current_app:
         raise RuntimeError("Cannot access database outside of Flask application context")
 
@@ -55,7 +86,11 @@ def db_session() -> Generator[Session, None, None]:
 
     session = db_state['Session']()
     try:
+        # Add advisory lock to prevent concurrent modifications
+        session.execute(text("SET lock_timeout = '5s'"))
+        
         yield session
+        
         # Only commit if no errors and session is active
         if session.is_active and not session.in_transaction():
             try:
@@ -65,20 +100,24 @@ def db_session() -> Generator[Session, None, None]:
                 if session.is_active:
                     session.rollback()
                 raise
+    except OperationalError as e:
+        session.rollback()
+        logger.error(f"Database operation failed: {str(e)}")
+        raise
     except Exception as e:
-        logger.error(f"Database operation failed: {e}")
-        if session.is_active and session.in_transaction():
-            try:
-                session.rollback()
-            except Exception as rollback_error:
-                logger.error(f"Rollback failed: {rollback_error}")
+        session.rollback()
+        logger.error(f"Unexpected error in database operation: {str(e)}")
         raise
     finally:
         try:
             if session.is_active:
                 session.close()
         except Exception as e:
-            logger.error(f"Error closing session: {e}")
+            logger.warning(f"Error closing session: {str(e)}")
+        finally:
+            # Ensure session is removed from registry
+            if 'Session' in db_state and hasattr(db_state['Session'], 'remove'):
+                db_state['Session'].remove()
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
@@ -112,7 +151,7 @@ def execute_statement(db, statement: str) -> None:
 
 
 def init_db(db_uri: str = None) -> None:
-    """Initialize database tables and create default provider/model."""
+    """Initialize database with proper connection handling"""
     if not current_app:
         raise RuntimeError("Cannot initialize database outside of Flask application context")
         
@@ -121,16 +160,32 @@ def init_db(db_uri: str = None) -> None:
         raise ValueError("DATABASE_URI must be provided either directly or in app config")
     
     try:
-        # Create engine with proper PostgreSQL settings
-        connect_args = {}
-        engine = create_engine(
-            db_uri,
-            pool_size=POOL_SIZE,
-            max_overflow=MAX_OVERFLOW,
-            pool_recycle=POOL_RECYCLE,
-            pool_timeout=POOL_TIMEOUT,
-            connect_args=connect_args
+        engine = create_db_engine(db_uri)
+        
+        # Configure session factory with proper isolation
+        global SessionLocal
+        SessionLocal = scoped_session(
+            sessionmaker(
+                bind=engine,
+                autocommit=False,
+                autoflush=False,
+                expire_on_commit=True
+            ),
+            scopefunc=lambda: id(g) if hasattr(g, '_get_current_object') else None
         )
+        
+        # Add connection health check
+        @event.listens_for(engine, "engine_connect")
+        def ping_connection(connection, branch):
+            if branch:
+                return
+                
+            # Run a simple query to check connection
+            try:
+                connection.scalar(text("SELECT 1"))
+            except Exception:
+                connection.invalidate()
+                raise
 
         # Drop all existing tables
         with engine.connect() as conn:
@@ -310,6 +365,26 @@ def create_default_model(db) -> None:
         except Exception as e:
             logger.error(f"Failed to create default provider and model: {e}", exc_info=True)
             raise
+
+def monitor_connections():
+    """Monitor and log connection pool status"""
+    with db_session() as session:
+        stats = session.execute(text("""
+            SELECT 
+                state, count(*) 
+            FROM pg_stat_activity 
+            WHERE datname = current_database()
+            GROUP BY state
+        """)).fetchall()
+        
+        logger.info(f"Database connection stats: {dict(stats)}")
+        
+        pool_stats = {
+            'checked_out': session.connection().connection.pool.checkedout(),
+            'checked_in': session.connection().connection.pool.checkedin(),
+            'overflow': session.connection().connection.pool.overflow()
+        }
+        logger.info(f"Connection pool stats: {pool_stats}")
 
 def init_app(app: Flask) -> None:
     """Register database functions with Flask app and initialize PostgreSQL connection."""
