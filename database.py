@@ -157,7 +157,7 @@ def create_default_model(db) -> None:
             "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
             "max_tokens": Config.DEFAULT_MAX_TOKENS
         }),
-        "created_at": None  # Ensure created_at is explicitly set to None
+        "created_at": None,  # Ensure created_at is explicitly set to None
         "requires_authentication": True,
         "api_version_format": Config.AZURE_API_VERSION
     }
