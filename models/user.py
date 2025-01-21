@@ -52,8 +52,14 @@ class User(UserMixin):
     def get_by_id(user_id: int) -> Optional["User"]:
         """Retrieve a user by their ID with proper session handling"""
         try:
+            # Use a fresh session for each operation
             with db_session() as db:
-                query = text("SELECT * FROM users WHERE id = :user_id")
+                query = text("""
+                    SELECT id, username, email, password_hash, role, 
+                           created_at, reset_token, reset_token_expiry
+                    FROM users 
+                    WHERE id = :user_id
+                """)
                 result = db.execute(query, {"user_id": user_id})
                 row = result.mappings().first()
                 
@@ -65,7 +71,17 @@ class User(UserMixin):
                 user_data = dict(row)
                 
                 # Create User instance
-                return User.from_dict(user_data)
+                return User(
+                    id=user_data["id"],
+                    username=user_data["username"],
+                    email=user_data["email"],
+                    password_hash=user_data.get("password_hash"),
+                    role=user_data.get("role", "user"),
+                    created_at=user_data.get("created_at", datetime.now()),
+                    reset_token=user_data.get("reset_token"),
+                    reset_token_expiry=user_data.get("reset_token_expiry"),
+                    is_active=True
+                )
                 
         except Exception as e:
             logger.error(f"Error retrieving user by ID {user_id}: {e}")
