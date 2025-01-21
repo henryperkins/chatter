@@ -88,7 +88,8 @@ def db_session() -> Generator[Session, None, None]:
     session = db_state['Session']()
     try:
         # Start transaction with proper isolation
-        session.begin()
+        if not session.in_transaction():
+            session.begin()
         
         # Set reasonable timeouts
         session.execute(text("SET lock_timeout = '5s'"))

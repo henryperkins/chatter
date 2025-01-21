@@ -52,7 +52,6 @@ class User(UserMixin):
     def get_by_id(user_id: int) -> Optional["User"]:
         """Retrieve a user by their ID with proper session handling"""
         try:
-            # Use a fresh session for each operation
             with db_session() as db:
                 query = text("""
                     SELECT id, username, email, password_hash, role, 

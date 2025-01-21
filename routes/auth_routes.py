@@ -362,6 +362,8 @@ def register():
 @limiter.limit("5 per minute")
 def forgot_password():
     """Handle forgot password requests."""
+    form = ResetPasswordForm()  # Initialize form
+    
     if request.method == "POST":
         email = request.form.get("email", "").strip()
 
@@ -478,7 +480,7 @@ def forgot_password():
                 500,
             )
 
-    return render_template("forgot_password.html")
+    return render_template("forgot_password.html", form=form)  # Pass form to template
 
 @bp.route("/reset_password/<token>", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
