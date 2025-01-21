@@ -136,37 +136,57 @@ def init_db_command():
 
 
 def create_default_model(db) -> None:
-    """Create default model if none exists"""
-    from models import Model
+    """Create default provider and model if they don't exist"""
+    from models import Model, Provider
     from config import Config
     
+    # Check if default model exists
     default_exists = db.execute(text("SELECT COUNT(*) FROM models WHERE is_default = TRUE")).scalar()
     if default_exists:
         return
 
-    logger.info("Creating default model")
-    default_model = {
-        "name": Config.DEFAULT_MODEL_NAME,
-        "deployment_name": Config.DEFAULT_DEPLOYMENT_NAME,
-        "description": Config.DEFAULT_MODEL_DESCRIPTION,
-        "model_type": "gpt",  # Default type
-        "api_endpoint": Config.DEFAULT_API_ENDPOINT,
-        "api_key": Config.AZURE_API_KEY,
-        "temperature": Config.DEFAULT_TEMPERATURE,
-        "max_tokens": Config.DEFAULT_MAX_TOKENS,
-        "max_completion_tokens": Config.DEFAULT_MAX_COMPLETION_TOKENS,
-        "is_default": True,
-        "requires_o1_handling": Config.DEFAULT_REQUIRES_O1_HANDLING,
-        "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
-        "api_version": Config.DEFAULT_API_VERSION,
-        "version": 1,
+    logger.info("Creating default provider and model")
+    
+    # Create default provider first
+    default_provider = {
+        "name": "Azure OpenAI",
+        "slug": "azure-openai",
+        "api_base_url": Config.AZURE_API_ENDPOINT,
+        "requires_authentication": True,
+        "capabilities": {
+            "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
+            "max_tokens": Config.DEFAULT_MAX_TOKENS
+        }
     }
     
     try:
+        provider_id = Provider.create(default_provider)
+        if not provider_id:
+            raise ValueError("Failed to create default provider")
+            
+        # Now create the default model with the provider_id
+        default_model = {
+            "name": Config.DEFAULT_MODEL_NAME,
+            "deployment_name": Config.DEFAULT_DEPLOYMENT_NAME,
+            "description": Config.DEFAULT_MODEL_DESCRIPTION,
+            "model_type": "gpt",  # Default type
+            "provider_id": provider_id,  # Link to the provider we just created
+            "api_endpoint": Config.DEFAULT_API_ENDPOINT,
+            "api_key": Config.AZURE_API_KEY,
+            "temperature": Config.DEFAULT_TEMPERATURE,
+            "max_tokens": Config.DEFAULT_MAX_TOKENS,
+            "max_completion_tokens": Config.DEFAULT_MAX_COMPLETION_TOKENS,
+            "is_default": True,
+            "requires_o1_handling": Config.DEFAULT_REQUIRES_O1_HANDLING,
+            "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
+            "api_version": Config.DEFAULT_API_VERSION,
+            "version": 1,
+        }
+        
         Model.create(default_model)
-        logger.info("Default model created successfully")
+        logger.info("Default provider and model created successfully")
     except Exception as e:
-        logger.error(f"Failed to create default model: {e}", exc_info=True)
+        logger.error(f"Failed to create default provider and model: {e}", exc_info=True)
         raise
 
 def init_app(app: Flask) -> None:
