@@ -213,6 +213,13 @@ def init_db(db_uri: str = None) -> None:
                 "api_version": "2024-12-01-preview"
             }).scalar()
 
+            # Validate required environment variables
+            api_endpoint = os.getenv("AZURE_API_ENDPOINT")
+            api_key = os.getenv("AZURE_API_KEY")
+                
+            if not api_endpoint or not api_key:
+                raise ValueError("AZURE_API_ENDPOINT and AZURE_API_KEY must be set in environment")
+
             # Create default model
             db.execute(text("""
                 INSERT INTO models (
@@ -231,8 +238,8 @@ def init_db(db_uri: str = None) -> None:
                 "name": os.getenv("DEFAULT_MODEL_NAME", "GPT-4"),
                 "deployment_name": os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-deployment"),
                 "description": os.getenv("DEFAULT_MODEL_DESCRIPTION", "Azure GPT-4 Model"),
-                "api_endpoint": os.getenv("AZURE_API_ENDPOINT"),
-                "api_key": os.getenv("AZURE_API_KEY"),
+                "api_endpoint": api_endpoint,
+                "api_key": api_key,
                 "model_type": "azure",
                 "temperature": float(os.getenv("DEFAULT_TEMPERATURE", "0.7")),
                 "max_tokens": int(os.getenv("DEFAULT_MAX_TOKENS", "16384")),

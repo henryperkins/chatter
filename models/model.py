@@ -634,19 +634,31 @@ class Model:
             provider_caps.get('max_tokens', 16384)
         )
 
-        # Continue with existing validation logic...
-        # Example: Check if required fields are present
-        required_fields = [
-            "provider_id",
-            "name",
-            "deployment_name",
-            "model_type",
-            "api_endpoint",
-            "api_key"
-        ]
-        for field in required_fields:
-            if field not in config or not config[field]:
+        # Validate required fields with strict type checking
+        required_fields = {
+            "provider_id": (int, "Provider ID must be an integer"),
+            "name": (str, "Name must be a non-empty string"),
+            "deployment_name": (str, "Deployment name must be a non-empty string"),
+            "model_type": (str, "Model type must be a non-empty string"),
+            "api_endpoint": (str, "API endpoint must be a valid HTTPS URL"),
+            "api_key": (str, "API key must be a non-empty string")
+        }
+
+        for field, (expected_type, error_msg) in required_fields.items():
+            if field not in config:
                 raise ValueError(f"Missing required field: {field}")
+            
+            value = config[field]
+            if value is None or value == "":
+                raise ValueError(error_msg)
+                
+            if not isinstance(value, expected_type):
+                raise ValueError(f"{field} must be of type {expected_type.__name__}")
+
+        # Additional API endpoint validation
+        api_endpoint = config["api_endpoint"]
+        if not isinstance(api_endpoint, str) or not api_endpoint.startswith("https://"):
+            raise ValueError("API endpoint must be a valid HTTPS URL")
 
         # Validate temperature
         temperature = config.get("temperature")
