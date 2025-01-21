@@ -39,19 +39,18 @@ def is_initialized() -> bool:
             hasattr(db_state['Session'], 'remove'))
 @contextmanager
 def db_session() -> Generator[Session, None, None]:
-    """
-    Get a database session for PostgreSQL.
-    """
+    """Get a database session for PostgreSQL."""
     if not current_app:
         raise RuntimeError("Cannot access database outside of Flask application context")
 
     if not is_initialized():
         raise RuntimeError("Database not initialized. Make sure init_app() is called during application setup")
 
-    if Session is None:
+    db_state = get_db_state()
+    if db_state['Session'] is None:
         raise RuntimeError("Session factory is not initialized")
 
-    session = Session()  # type: ignore
+    session = db_state['Session']()
     try:
         yield session
         session.commit()
@@ -60,8 +59,8 @@ def db_session() -> Generator[Session, None, None]:
         logger.error(f"Session rollback due to exception: {e}", exc_info=True)
         raise
     finally:
-        if Session is not None:
-            Session.remove()  # Only remove if Session exists
+        if db_state['Session'] is not None:
+            db_state['Session'].remove()
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
