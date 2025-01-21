@@ -86,12 +86,14 @@ def close_db(e: Optional[BaseException] = None) -> None:
     logger.debug("Closing database session")
     if current_app:
         db_state = get_db_state()
-        session = db_state.get('Session')
-        if session and hasattr(session, 'remove'):
+        session_factory = db_state.get('Session')
+        if session_factory and hasattr(session_factory, 'remove'):
             try:
+                # Get the actual session instance
+                session = session_factory()
                 # Only remove if session is not in a transaction
                 if not session.in_transaction():
-                    session.remove()
+                    session_factory.remove()
                     logger.debug("Database session closed successfully")
                 else:
                     logger.debug("Skipping session removal - transaction in progress")
