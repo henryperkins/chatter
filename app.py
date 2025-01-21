@@ -91,14 +91,16 @@ def configure_app() -> None:
         raise ValueError("DATABASE_URI must be set in Config")
     app.config["DATABASE_URI"] = Config.DATABASE_URI
     
-    # Ensure database is properly initialized
-    try:
-        init_app(app)
-        if not is_initialized():
-            raise RuntimeError("Database failed to initialize properly")
-    except Exception as e:
-        logger.error("Database initialization failed: %s", str(e))
-        raise
+    # Initialize database only once at startup
+    if not is_initialized():
+        try:
+            init_app(app)
+            if not is_initialized():
+                raise RuntimeError("Database failed to initialize properly")
+            logger.info("Database initialized successfully")
+        except Exception as e:
+            logger.error("Database initialization failed: %s", str(e))
+            raise RuntimeError(f"Failed to initialize database: {str(e)}")
 
     # File upload settings
     app.config.update(
