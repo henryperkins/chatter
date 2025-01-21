@@ -145,23 +145,42 @@ def create_default_model(db) -> None:
 
     logger.info("Creating default provider and model")
     
-    # Create default provider first
-    default_provider = {
+    # Try to get existing provider first
+    provider_id = db.execute(text(
+        "SELECT id FROM providers WHERE name = :name OR slug = :slug"
+    ), {
         "name": "Azure OpenAI",
-        "slug": "azure-openai",
-        "api_base_url": Config.AZURE_API_ENDPOINT.rstrip("/"),
-        "capabilities": json.dumps({
-            "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
-            "max_tokens": Config.DEFAULT_MAX_TOKENS
-        }),
-        "requires_authentication": True,
-        "api_version_format": Config.DEFAULT_API_VERSION
-    }
+        "slug": "azure-openai"
+    }).scalar()
     
-    try:
-        provider_id = Provider.create(default_provider)
-        if not provider_id:
-            raise ValueError("Failed to create default provider")
+    if not provider_id:
+        # Create default provider if it doesn't exist
+        default_provider = {
+            "name": "Azure OpenAI",
+            "slug": "azure-openai",
+            "api_base_url": Config.AZURE_API_ENDPOINT.rstrip("/"),
+            "capabilities": json.dumps({
+                "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
+                "max_tokens": Config.DEFAULT_MAX_TOKENS
+            }),
+            "requires_authentication": True,
+            "api_version_format": Config.DEFAULT_API_VERSION
+        }
+        
+        try:
+            provider_id = Provider.create(default_provider)
+            if not provider_id:
+                raise ValueError("Failed to create default provider")
+        except ValueError as e:
+            if "already exists" not in str(e):
+                raise
+            # If provider exists, get its ID
+            provider_id = db.execute(text(
+                "SELECT id FROM providers WHERE name = :name OR slug = :slug"
+            ), {
+                "name": default_provider["name"],
+                "slug": default_provider["slug"]
+            }).scalar()
             
         # Now create the default model with the provider_id
         default_model = {
