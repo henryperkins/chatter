@@ -1,5 +1,6 @@
  # database.py
 
+import os
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import scoped_session, sessionmaker, Session as SessionType
 from sqlalchemy.orm.session import Session
