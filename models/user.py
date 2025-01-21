@@ -36,6 +36,11 @@ class User(UserMixin):
         if self.password_hash is None:
             self.password_hash = ""
 
+    @classmethod
+    def get(cls, user_id: int) -> Optional["User"]:
+        """Get user by ID for Flask-Login"""
+        return cls.get_by_id(user_id)
+
     @staticmethod
     def get_by_id(user_id: int) -> Optional["User"]:
         """

@@ -148,6 +148,10 @@ def init_app_components() -> None:
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"  # type: ignore
 
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.get(int(user_id))
+
     csrf.init_app(app)
     limiter.init_app(app)
 
@@ -362,32 +366,6 @@ def db_health_check():
             "initialized": is_initialized(),
             "read_write": "failed"
         }), 500
-
-
-# --- User Loader ---
-def load_user(user_id: str) -> Optional[User]:
-    """Load user by ID"""
-    try:
-        # Use a separate session for load_user
-        db = SessionLocal()
-        result = db.execute(
-            text("SELECT id, username, email, role FROM users WHERE id = :id"),
-            {"id": int(user_id)},
-        ).fetchone()
-        if result:
-            return User(
-                id=result.id,
-                username=result.username,
-                email=result.email,
-                role=result.role
-            )
-        else:
-            return None
-    except Exception as e:
-        logger.error(f"Error loading user: {e}")
-        return None
-    finally:
-        db.close()
 
 
 # --- Application Initialization ---
