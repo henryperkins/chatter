@@ -173,6 +173,11 @@ def register():
     if current_user.is_authenticated:
         return redirect(url_for("chat.chat_interface"))
 
+    # Check if there are any existing users
+    with db_session() as db:
+        user_count = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
+        is_first_user = user_count == 0
+
     form = RegistrationForm()
     if request.method == "POST":
         try:
@@ -233,11 +238,17 @@ def register():
                         form.email.errors = ['Username or email already exists']
                         return render_template("register.html", form=form)
 
-                    # Check if this will be the first user
-                    user_count = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
-                    is_first_user = user_count == 0
+                    # Store registration data in session if first user
+                    if is_first_user:
+                        session["registration_data"] = {
+                            "username": username,
+                            "email": email,
+                            "password": password,
+                        }
+                        logger.info("First user registration - redirecting to model config")
+                        return redirect(url_for("auth.edit_default_model"))
 
-                    # Check username uniqueness after form validation
+                    # For non-first users, check username uniqueness
                     existing_username = db.execute(
                         text("SELECT id FROM users WHERE LOWER(username) = LOWER(:username)"),
                         {"username": username},
@@ -258,11 +269,10 @@ def register():
 
                     # Create regular user
                     logger.info(
-                        "Creating new user",
+                        "Creating new regular user",
                         extra={
                             "username": username,
                             "email": email,
-                            "is_first_user": is_first_user
                         }
                     )
                     hashed_pw = generate_password_hash(password)
@@ -273,7 +283,7 @@ def register():
                         text(
                             """
                             INSERT INTO users (username, email, password_hash, role, is_verified)
-                            VALUES (:username, :email, :password_hash, :role, TRUE)
+                            VALUES (:username, :email, :password_hash, 'user', TRUE)
                             RETURNING id, username, email, role
                         """
                         ),
@@ -281,7 +291,6 @@ def register():
                             "username": username,
                             "email": email,
                             "password_hash": hashed_pw,
-                            "role": "user",
                         },
                     ).fetchone()
 
