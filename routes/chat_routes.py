@@ -295,10 +295,10 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
                 "stack_trace": traceback.format_exc()
             }
         )
-        return jsonify({
+        return make_response(jsonify({
             "error": "Failed to create new chat",
             "request_id": request.headers.get("X-Request-ID")
-        }), 500
+        }), 500)
 
 
 @chat_routes.route("/chat_interface", methods=["GET"])

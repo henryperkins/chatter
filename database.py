@@ -1,8 +1,8 @@
-# database.py
+ # database.py
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import scoped_session, sessionmaker, Session
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.orm.scoping import scoped_session as ScopedSession
 import logging
 from typing import Optional, Generator
 from flask import g, current_app, Flask
@@ -20,18 +20,27 @@ POOL_TIMEOUT = 30  # Timeout for acquiring a connection from the pool
 
 # Global engine and Session objects
 engine = None
-Session = None
+Session: Optional[ScopedSession] = None
+_initialized = False
 
+def is_initialized() -> bool:
+    return _initialized and Session is not None
 
-@contextmanager
+@contextmanager  # type: ignore
 def db_session() -> Generator[Session, None, None]:
     """
     Get a database session for PostgreSQL.
     """
-    if 'Session' not in globals() or Session is None:
+    if not current_app:
+        raise RuntimeError("Cannot access database outside of Flask application context")
+
+    if not is_initialized():
         raise RuntimeError("Database session is not initialized. Call init_app(app) first.")
 
-    session = Session()
+    if Session is None:
+        raise RuntimeError("Session is not initialized")
+
+    session = Session()  # type: ignore
     try:
         yield session
         session.commit()
@@ -43,13 +52,24 @@ def db_session() -> Generator[Session, None, None]:
         session.close()
 
 
-
-
-
-
 def close_db(e: Optional[BaseException] = None) -> None:
     """Clean up the database session."""
-    Session.remove()
+    global Session, _initialized
+    if Session is not None:
+        if hasattr(Session, 'remove'):
+            Session.remove()  # type: ignore
+        Session = None
+        _initialized = False
+
+
+def execute_statement(db, statement: str) -> None:
+    """Execute a single SQL statement with error handling."""
+    try:
+        db.execute(text(statement))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise e
 
 
 def init_db() -> None:
@@ -57,14 +77,35 @@ def init_db() -> None:
     try:
         with db_session() as db:
             with current_app.open_resource("schema.sql") as f:
-                # Execute each statement separately to handle SQLAlchemy
-                from sqlalchemy import text
+                sql_content = f.read().decode("utf8")
 
-                for statement in f.read().decode("utf8").split(";"):
-                    if statement.strip():
-                        db.execute(text(statement))
-                db.commit()
-                logger.info("Database initialized successfully")
+                # Split scripts by semicolon and filter out empty statements
+                statements = [stmt.strip() for stmt in sql_content.split(";") if stmt.strip()]
+
+                # Execute CREATE TABLE statements first
+                for statement in statements:
+                    if "CREATE TABLE" in statement.upper():
+                        try:
+                            db.execute(text(statement))
+                            db.commit()
+                            logger.info(f"Created table from statement: {statement[:50]}...")
+                        except Exception as e:
+                            logger.error(f"Error creating table: {e}")
+                            raise
+
+                # Then execute CREATE INDEX statements
+                for statement in statements:
+                    if "CREATE INDEX" in statement.upper():
+                        try:
+                            db.execute(text(statement))
+                            db.commit()
+                            logger.info(f"Created index from statement: {statement[:50]}...")
+                        except Exception as e:
+                            logger.warning(f"Warning creating index: {e}")
+                            # Don't raise here, as index creation failures are not fatal
+
+                logger.info("Database initialization completed successfully")
+
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise RuntimeError(
@@ -84,7 +125,12 @@ def init_app(app: Flask) -> None:
     """
     Register database functions with Flask app and initialize PostgreSQL connection.
     """
-    global engine, Session
+    logger.info("Initializing database with init_app(app)")
+    if not app.config.get("DATABASE_URI"):
+        logger.error("DATABASE_URI is not set in app configuration.")
+    logger.info("Database engine and session initialized successfully.")
+    logger.info("Database functions registered with Flask app.")
+    global engine, Session, _initialized
 
     # Configure PostgreSQL connection
     engine = create_engine(
@@ -97,6 +143,7 @@ def init_app(app: Flask) -> None:
 
     # Create a scoped session for PostgreSQL
     Session = scoped_session(sessionmaker(bind=engine))
+    _initialized = True
 
     # Register cleanup function
     app.teardown_appcontext(close_db)

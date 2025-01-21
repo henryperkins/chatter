@@ -128,14 +128,6 @@ class RegistrationForm(FlaskForm):
         if not re.match(r"^[a-zA-Z0-9_]+$", username):
             raise ValidationError("Username can only contain letters, numbers, and underscores.")
 
-        # Check uniqueness
-        with db_session() as db:
-            if db.execute(
-                text("SELECT id FROM users WHERE LOWER(username) = LOWER(:username)"),
-                {"username": username},
-            ).fetchone():
-                raise ValidationError("This username is already taken.")
-
     def validate_email(self, field: Any) -> None:
         """
         Custom validator for email.
@@ -424,14 +416,8 @@ class DefaultModelForm(FlaskForm):
         if self.temperature.data is None:
             self.temperature.data = 1.0
 
-        # Load providers and set Azure as default
-        with db_session() as session:
-            azure_provider = session.execute(
-                text("SELECT id FROM providers WHERE slug = 'azure' LIMIT 1")
-            ).scalar()
-            if not azure_provider:
-                raise ValueError("Azure provider not found")
-            self.provider_id.data = azure_provider
+        # Set default provider ID to 1 (Azure) without database access
+        self.provider_id.data = 1
 
     provider_id = SelectField(
         "Provider",

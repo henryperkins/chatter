@@ -257,6 +257,25 @@ def register():
                             )
                             return redirect(url_for("auth.edit_default_model"))
 
+                    # Check username uniqueness after form validation
+                    existing_username = db.execute(
+                        text("SELECT id FROM users WHERE LOWER(username) = LOWER(:username)"),
+                        {"username": username},
+                    ).scalar()
+
+                    if existing_username:
+                        log_failed_attempt(ip, failed_registrations)
+                        logger.warning(
+                            "Registration failed: username already exists",
+                            extra={
+                                "ip_address": ip,
+                                "route": request.path,
+                                "username": username,
+                            },
+                        )
+                        form.username.errors = ['This username is already taken']
+                        return render_template("register.html", form=form)
+
                     # Create regular user
                     hashed_pw = generate_password_hash(password)
                     if isinstance(hashed_pw, bytes):
@@ -530,6 +549,12 @@ def reset_password(token: str):
 @bp.route("/edit_default_model", methods=["GET", "POST"])
 def edit_default_model():
     """Handle editing of the default model configuration."""
+    # Debugging logs to verify application context and initialization
+    from flask import current_app
+    from database import is_initialized
+    if not current_app:
+        logger.error("Flask application context is not active.")
+    logger.debug(f"Database initialized: {is_initialized()}")
     form = DefaultModelForm()
     registration_data = session.get("registration_data", {})
     is_existing_admin = registration_data.get("password") is None
@@ -570,9 +595,11 @@ def edit_default_model():
                     Model.update(default_model["id"], model_data)
                 else:
                     model_id = Model.create(model_data)
+                    if model_id is None:
+                        raise ValueError("Failed to create model")
                     try:
                         created_model = Model.get_by_id(model_id)
-                        if model_id is None or not created_model:
+                        if not created_model:
                             raise ValueError("Failed to retrieve the created model.")
                     except Exception as e:
                         raise ValueError(f"Failed to create and validate model: {str(e)}")

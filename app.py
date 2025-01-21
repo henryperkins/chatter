@@ -31,8 +31,8 @@ from logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Load environment variables
-load_dotenv(dotenv_path=".env")
+# Load environment variables with explicit path
+load_dotenv(dotenv_path="/home/azureuser/chatter/.env")
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -85,6 +85,9 @@ def configure_security() -> None:
 
 def configure_app() -> None:
     """Configure Flask application settings"""
+    # Initialize database first to ensure it's available for all components
+    init_app(app)
+
     # Basic configuration
     app.config["SECRET_KEY"] = Config.SECRET_KEY
     app.config["DATABASE_URI"] = Config.DATABASE_URI
@@ -119,6 +122,8 @@ def configure_app() -> None:
 
 def init_app_components() -> None:
     """Initialize Flask extensions and components"""
+    # Database is already initialized in configure_app()
+
     # Apply proxy fix
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
@@ -139,9 +144,6 @@ def init_app_components() -> None:
     if "auth.register" not in app.view_functions:
         logger.error("Auth routes failed to register properly")
         raise RuntimeError("Auth routes failed to register properly")
-
-    # Initialize database
-    init_app(app)
 
     # Ensure upload directory exists
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)

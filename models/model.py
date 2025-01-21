@@ -305,10 +305,10 @@ class Model:
                     provider_caps = Model.PROVIDER_CAPABILITIES.get(model.model_type, {})
                     if provider_caps.get('fixed_temperature'):
                         model.temperature = 1.0
-                    model.supports_streaming = provider_caps.get('streaming', True)
+                    model.supports_streaming = bool(provider_caps.get('streaming', True))
                     model.max_completion_tokens = min(
                         model.max_completion_tokens,
-                        provider_caps.get('max_tokens', 16384)
+                        provider_caps.get('max_tokens', 16384) or model.max_completion_tokens
                     )
 
                 # Validate the model configuration
@@ -565,7 +565,7 @@ class Model:
             default_model_data["temperature"] = 1.0
         default_model_data["supports_streaming"] = provider_caps.get('streaming', True)
         if "max_completion_tokens" in default_model_data:
-            default_model_data["max_completion_tokens"] = min(
+            default_model_data["max_completion_tokens"] = min(default_model_data["max_completion_tokens"] or provider_caps.get('max_tokens', 16384),
                 default_model_data["max_completion_tokens"],
                 provider_caps.get('max_tokens', 16384)
             )
@@ -714,10 +714,10 @@ class Model:
                 provider_caps = Model.PROVIDER_CAPABILITIES.get(model.model_type, {})
                 if provider_caps.get('fixed_temperature'):
                     model.temperature = 1.0
-                model.supports_streaming = provider_caps.get('streaming', True)
+                model.supports_streaming = bool(provider_caps.get('streaming', True))
                 model.max_completion_tokens = min(
                     model.max_completion_tokens,
-                    provider_caps.get('max_tokens', 16384)
+                    provider_caps.get('max_tokens', 16384) or model.max_completion_tokens
                 )
 
                 # Set all other models to non-default
@@ -817,7 +817,7 @@ class Model:
                     version_data["temperature"] = 1.0
                 version_data["supports_streaming"] = provider_caps.get('streaming', True)
                 if "max_completion_tokens" in version_data:
-                    version_data["max_completion_tokens"] = min(
+                    version_data["max_completion_tokens"] = min(version_data["max_completion_tokens"] or provider_caps.get('max_tokens', 16384),
                         version_data["max_completion_tokens"],
                         provider_caps.get('max_tokens', 16384)
                     )
