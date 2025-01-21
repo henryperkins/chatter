@@ -56,7 +56,7 @@ CREATE TABLE models (
     api_version TEXT,
     version INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE (provider_id, model_identifier)
+    UNIQUE (provider_id, deployment_name)
 );
 
 -- Provider-specific model settings
