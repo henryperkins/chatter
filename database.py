@@ -82,20 +82,14 @@ def db_session() -> Generator[Session, None, None]:
 
 def close_db(e: Optional[BaseException] = None) -> None:
     """Clean up the database session."""
+    logger.debug("Closing database session")
     if current_app:
         db_state = get_db_state()
         session = db_state.get('Session')
-        if session:
+        if session and hasattr(session, 'remove'):
             try:
-                # Get the actual session object from the scoped session
-                if hasattr(session, 'registry'):
-                    actual_session = session()
-                    if actual_session.is_active:
-                        actual_session.rollback()
-                    actual_session.close()
-                # Remove the scoped session
-                if hasattr(session, 'remove'):
-                    session.remove()
+                session.remove()
+                logger.debug("Database session closed successfully")
             except Exception as e:
                 logger.error(f"Error closing database session: {str(e)}", exc_info=True)
 

@@ -367,20 +367,13 @@ def db_health_check():
 # --- User Loader ---
 @login_manager.user_loader
 def load_user(user_id: str) -> Optional[User]:
-    """Load user by ID"""
+    """Load user by ID."""
     try:
         with db_session() as db:
-            result = db.execute(
-                text("SELECT id, username, email, role FROM users WHERE id = :id"),
-                {"id": int(user_id)},
-            ).fetchone()
-            return (
-                User(**dict(zip(["id", "username", "email", "role"], result)))
-                if result
-                else None
-            )
+            user = db.query(User).filter_by(id=user_id).first()
+            return user
     except Exception as e:
-        app.logger.error(f"Error loading user: {e}")
+        logger.error(f"Error loading user: {e}")
         return None
 
 
