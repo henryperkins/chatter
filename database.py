@@ -40,7 +40,10 @@ def db_session() -> Generator[Session, None, None]:
         raise RuntimeError("Cannot access database outside of Flask application context")
 
     if not is_initialized():
-        raise RuntimeError("Database session is not initialized. Call init_app(app) first.")
+        # Try to reinitialize if needed
+        init_app(current_app._get_current_object())
+        if not is_initialized():
+            raise RuntimeError("Database session is not initialized. Call init_app(app) first.")
 
     if Session is None:
         raise RuntimeError("Session is not initialized")
@@ -54,7 +57,7 @@ def db_session() -> Generator[Session, None, None]:
         logger.error(f"Session rollback due to exception: {e}")
         raise
     finally:
-        session.close()
+        Session.remove()  # Properly remove session from registry
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
@@ -138,21 +141,23 @@ def init_app(app: Flask) -> None:
         
     global engine, Session, _initialized
 
-    if not is_initialized():
-        # Configure PostgreSQL connection
-        engine = create_engine(
-            app.config["DATABASE_URI"],
-            pool_size=POOL_SIZE,
-            max_overflow=MAX_OVERFLOW,
-            pool_recycle=POOL_RECYCLE,
-            pool_timeout=POOL_TIMEOUT,
-        )
+    # Configure PostgreSQL connection
+    engine = create_engine(
+        app.config["DATABASE_URI"],
+        pool_size=POOL_SIZE,
+        max_overflow=MAX_OVERFLOW,
+        pool_recycle=POOL_RECYCLE,
+        pool_timeout=POOL_TIMEOUT,
+    )
 
-        # Create a scoped session for PostgreSQL
-        Session = scoped_session(sessionmaker(bind=engine))
-        _initialized = True
+    # Create a scoped session factory bound to the application context
+    Session = scoped_session(
+        sessionmaker(bind=engine),
+        scopefunc=lambda: str(id(current_app.app_context))
+    )
+    _initialized = True
 
-        logger.info("Database engine and session initialized successfully")
+    logger.info("Database engine and session initialized successfully")
 
     # Register cleanup function
     app.teardown_appcontext(close_db)
