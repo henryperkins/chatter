@@ -61,11 +61,11 @@ def add_provider() -> Response:
                 query: TextClause = text(
                     """
                     INSERT INTO providers (
-                        name, slug, api_base_url, requires_authentication,
-                        created_at
+                        name, slug, api_base_url, capabilities, requires_authentication,
+                        api_version_format, created_at
                     ) VALUES (
-                        :name, :slug, :api_base_url, :requires_authentication,
-                        NOW()
+                        :name, :slug, :api_base_url, :capabilities, :requires_authentication,
+                        :api_version_format, NOW()
                     )
                     RETURNING id
                 """
