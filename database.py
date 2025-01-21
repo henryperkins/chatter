@@ -332,7 +332,7 @@ def init_app(app: Flask) -> None:
                 max_overflow=MAX_OVERFLOW,
                 pool_recycle=POOL_RECYCLE,
                 pool_timeout=POOL_TIMEOUT,
-                pool_pre_ping=True,  # Add connection health checks
+                pool_pre_ping=POOL_PRE_PING,  # Add connection health checks
                 connect_args=connect_args
             )
 
