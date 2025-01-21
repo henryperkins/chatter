@@ -203,9 +203,10 @@ def create_default_model(db) -> None:
         
         Model.create(default_model)
         logger.info("Default provider and model created successfully")
-except Exception as e:
-    logger.error(f"Failed to create default provider and model: {e}", exc_info=True)
-    raise
+        
+    except Exception as e:
+        logger.error(f"Failed to create default provider and model: {e}", exc_info=True)
+        raise
 
 def init_app(app: Flask) -> None:
     """Register database functions with Flask app and initialize PostgreSQL connection."""
