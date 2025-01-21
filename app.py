@@ -301,17 +301,31 @@ def log_request_info():
 @app.before_request
 def validate_user_session():
     """Clear invalid user sessions and handle authentication cleanup."""
+    if request.endpoint and 'static' in request.endpoint:
+        return
+        
     try:
         if current_user.is_authenticated:
-            user = User.get_by_id(current_user.id)
+            user_id = getattr(current_user, 'id', None)
+            if not user_id:
+                logger.warning("Authenticated user has no ID")
+                logout_user()
+                session.clear()
+                return redirect(url_for('auth.login'))
+                
+            user = User.get_by_id(user_id)
             if not user:
                 logger.info(
                     "Clearing invalid session for non-existent user ID: %s",
-                    current_user.id
+                    user_id
                 )
                 logout_user()
                 session.clear()
                 return redirect(url_for('auth.login'))
+                
+            # Update session timestamp
+            session['last_active'] = datetime.now().isoformat()
+            
     except Exception as e:
         logger.error("Error validating user session: %s", str(e))
         logout_user()

@@ -51,13 +51,16 @@ class User(UserMixin):
     @staticmethod
     def get_by_id(user_id: int) -> Optional["User"]:
         """Retrieve a user by their ID with proper session handling"""
+        if not user_id:
+            return None
+            
         try:
             with db_session() as db:
                 query = text("""
                     SELECT id, username, email, password_hash, role, 
                            created_at, reset_token, reset_token_expiry
                     FROM users 
-                    WHERE id = :user_id
+                    WHERE id = :user_id AND is_active = TRUE
                 """)
                 result = db.execute(query, {"user_id": user_id})
                 row = result.mappings().first()
@@ -66,11 +69,9 @@ class User(UserMixin):
                     logger.info(f"No user found with ID: {user_id}")
                     return None
                     
-                # Convert row to dictionary
+                # Convert row to dictionary and create User instance
                 user_data = dict(row)
-                
-                # Create User instance
-                return User(
+                user = User(
                     id=user_data["id"],
                     username=user_data["username"],
                     email=user_data["email"],
@@ -81,6 +82,8 @@ class User(UserMixin):
                     reset_token_expiry=user_data.get("reset_token_expiry"),
                     is_active=True
                 )
+                
+                return user
                 
         except Exception as e:
             logger.error(f"Error retrieving user by ID {user_id}: {e}")

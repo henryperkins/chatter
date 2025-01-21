@@ -87,30 +87,25 @@ def db_session() -> Generator[Session, None, None]:
 
     session = db_state['Session']()
     try:
-        # Set reasonable timeouts BEFORE starting the transaction
-        with session.begin():
-            # Set session parameters
-            session.execute(text("SET lock_timeout = '5s'"))
-            session.execute(text("SET statement_timeout = '30s'"))
-            
-            yield session
-            
-            # Commit happens automatically at the end of the with block
+        # Set session parameters before beginning transaction
+        session.execute(text("SET lock_timeout = '5s'"))
+        session.execute(text("SET statement_timeout = '30s'"))
+        
+        yield session
+        
+        # Only commit if there are actual changes
+        if session.in_transaction():
+            session.commit()
             
     except Exception as e:
+        if session.in_transaction():
+            session.rollback()
         logger.error(f"Database operation failed: {str(e)}")
         raise
     finally:
-        # Close session properly
-        try:
-            if session.is_active:
-                session.close()
-        except Exception as e:
-            logger.warning(f"Error closing session: {str(e)}")
-        finally:
-            # Remove session from registry
-            if 'Session' in db_state and hasattr(db_state['Session'], 'remove'):
-                db_state['Session'].remove()
+        session.close()
+        if 'Session' in db_state and hasattr(db_state['Session'], 'remove'):
+            db_state['Session'].remove()
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
