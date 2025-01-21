@@ -5,6 +5,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker, Session as SessionType
 from sqlalchemy.orm.session import Session
 from sqlalchemy.orm.scoping import scoped_session as ScopedSession
 import logging
+import json
 from typing import Optional, Generator
 from flask import g, current_app, Flask
 import click
