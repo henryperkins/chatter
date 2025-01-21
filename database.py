@@ -84,22 +84,32 @@ def execute_statement(db, statement: str) -> None:
 
 def init_db(db_uri: str = None) -> None:
     """Initialize database tables."""
-    if db_uri is None:
-        # Use a default SQLite database if no URI provided
-        db_uri = 'sqlite:///instance/chatter.db'
-    
-    engine = create_engine(db_uri)
-    Session = sessionmaker(bind=engine)
+    if not current_app:
+        raise RuntimeError("Cannot initialize database outside of Flask application context")
+        
+    db_uri = db_uri or current_app.config["DATABASE_URI"]
+    if not db_uri:
+        raise ValueError("DATABASE_URI must be provided either directly or in app config")
     
     try:
         # Import all models to ensure they're registered with the metadata
         from models.user import User
+        from models.chat import Chat
         from models.model import Model
-        
-        # Import Base from your models
+        from models.provider import Provider
+        from models.uploaded_file import UploadedFile
         from models.base import Base
         
-        # Create all tables
+        # Create engine with proper PostgreSQL settings
+        engine = create_engine(
+            db_uri,
+            pool_size=POOL_SIZE,
+            max_overflow=MAX_OVERFLOW,
+            pool_recycle=POOL_RECYCLE,
+            pool_timeout=POOL_TIMEOUT
+        )
+        
+        # Drop and recreate all tables
         Base.metadata.drop_all(bind=engine)
         Base.metadata.create_all(bind=engine)
         
@@ -108,7 +118,7 @@ def init_db(db_uri: str = None) -> None:
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise RuntimeError(
-            "Failed to initialize the database. Please check the models and try again."
+            "Failed to initialize the database. Please check the database connection and try again."
         )
 
 
