@@ -94,12 +94,18 @@ def init_db(db_uri: str = None) -> None:
     
     try:
         # Create engine with proper PostgreSQL settings
+        # Create engine with proper PostgreSQL settings including SSL
+        connect_args = {
+            'sslmode': 'verify-full',
+            'sslcert': '/etc/ssl/certs/ca-certificates.crt'
+        }
         engine = create_engine(
             db_uri,
             pool_size=POOL_SIZE,
             max_overflow=MAX_OVERFLOW,
             pool_recycle=POOL_RECYCLE,
-            pool_timeout=POOL_TIMEOUT
+            pool_timeout=POOL_TIMEOUT,
+            connect_args=connect_args
         )
         
         # Read and execute schema.sql
@@ -222,13 +228,18 @@ def init_app(app: Flask) -> None:
     # Only initialize if not already initialized
     if not is_initialized():
         try:
-            # Configure PostgreSQL connection
+            # Configure PostgreSQL connection with SSL settings
+            connect_args = {
+                'sslmode': 'verify-full',
+                'sslcert': '/etc/ssl/certs/ca-certificates.crt'
+            }
             db_state['engine'] = create_engine(
                 app.config["DATABASE_URI"],
                 pool_size=POOL_SIZE,
                 max_overflow=MAX_OVERFLOW,
                 pool_recycle=POOL_RECYCLE,
                 pool_timeout=POOL_TIMEOUT,
+                connect_args=connect_args
             )
 
             # Create a scoped session factory bound to the application context
