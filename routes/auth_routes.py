@@ -566,7 +566,17 @@ def edit_default_model():
     if not current_app:
         logger.error("Flask application context is not active.")
     logger.debug(f"Database initialized: {is_initialized()}")
+    # Define valid model types
+    MODEL_TYPES = [
+        ('azure', 'Azure OpenAI'),
+        ('o1-preview', 'O1 Preview'),
+        ('openai', 'OpenAI'),
+        ('anthropic', 'Anthropic')
+    ]
+
     form = DefaultModelForm()
+    form.model_type.choices = MODEL_TYPES  # Set choices for model_type field
+    
     registration_data = session.get("registration_data", {})
     is_existing_admin = registration_data.get("password") is None
 
