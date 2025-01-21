@@ -26,9 +26,10 @@ _initialized = False
 
 def is_initialized() -> bool:
     """Check if database is properly initialized."""
-    global Session, engine
-    return (_initialized and 
-            Session is not None and 
+    global Session, engine, _initialized
+    # Only check if Session exists and has remove method
+    # Don't rely on _initialized flag which can get reset
+    return (Session is not None and 
             engine is not None and
             hasattr(Session, 'remove'))
 @contextmanager
@@ -39,8 +40,14 @@ def db_session() -> Generator[Session, None, None]:
     if not current_app:
         raise RuntimeError("Cannot access database outside of Flask application context")
 
-    if not is_initialized() or Session is None:
-        raise RuntimeError("Database is not initialized. Application startup may have failed.")
+    if not is_initialized():
+        # Re-initialize if needed
+        init_app(current_app._get_current_object())
+        if not is_initialized():
+            raise RuntimeError("Database initialization failed")
+
+    if Session is None:
+        raise RuntimeError("Session factory is not initialized")
 
     session = Session()  # type: ignore
     try:
@@ -48,10 +55,11 @@ def db_session() -> Generator[Session, None, None]:
         session.commit()
     except Exception as e:
         session.rollback()
-        logger.error(f"Session rollback due to exception: {e}")
+        logger.error(f"Session rollback due to exception: {e}", exc_info=True)
         raise
     finally:
-        Session.remove()  # Properly remove session from registry
+        if Session is not None:
+            Session.remove()  # Only remove if Session exists
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
@@ -133,30 +141,31 @@ def init_app(app: Flask) -> None:
         logger.error("DATABASE_URI is not set in app configuration.")
         raise ValueError("DATABASE_URI must be set in app configuration")
         
-    global engine, Session, _initialized
+    global engine, Session
 
-    # Configure PostgreSQL connection
-    engine = create_engine(
-        app.config["DATABASE_URI"],
-        pool_size=POOL_SIZE,
-        max_overflow=MAX_OVERFLOW,
-        pool_recycle=POOL_RECYCLE,
-        pool_timeout=POOL_TIMEOUT,
-    )
+    # Only initialize if not already initialized
+    if not is_initialized():
+        # Configure PostgreSQL connection
+        engine = create_engine(
+            app.config["DATABASE_URI"],
+            pool_size=POOL_SIZE,
+            max_overflow=MAX_OVERFLOW,
+            pool_recycle=POOL_RECYCLE,
+            pool_timeout=POOL_TIMEOUT,
+        )
 
-    # Create a scoped session factory bound to the application context
-    Session = scoped_session(
-        sessionmaker(bind=engine),
-        scopefunc=lambda: str(id(current_app.app_context))
-    )
-    _initialized = True
+        # Create a scoped session factory bound to the application context
+        Session = scoped_session(
+            sessionmaker(bind=engine),
+            scopefunc=lambda: id(g) if hasattr(g, '_get_current_object') else None
+        )
 
-    logger.info("Database engine and session initialized successfully")
+        logger.info("Database engine and session initialized successfully")
 
-    # Register cleanup function
-    app.teardown_appcontext(close_db)
+        # Register cleanup function
+        app.teardown_appcontext(close_db)
 
-    # Add CLI command for database initialization
-    app.cli.add_command(init_db_command)
-    
-    logger.info("Database functions registered with Flask app")
+        # Add CLI command for database initialization
+        app.cli.add_command(init_db_command)
+        
+        logger.info("Database functions registered with Flask app")
