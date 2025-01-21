@@ -95,6 +95,7 @@ def create_default_user():
             db.execute(text("""
                 INSERT INTO users (username, email, password_hash, role)
                 VALUES ('admin', 'admin@example.com', :hash, 'admin')
+                RETURNING id
             """), {"hash": generate_password_hash("admin")})
             db.commit()
             logger.info("Created default admin user")

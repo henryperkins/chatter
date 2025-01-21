@@ -87,7 +87,7 @@ def db_session() -> Generator[Session, None, None]:
 
     session = db_state['Session']()
     try:
-        # Start transaction
+        # Start transaction with proper isolation
         session.begin()
         
         # Set reasonable timeouts
@@ -117,9 +117,6 @@ def db_session() -> Generator[Session, None, None]:
             # Remove session from registry
             if 'Session' in db_state and hasattr(db_state['Session'], 'remove'):
                 db_state['Session'].remove()
-                
-            # Log session metrics
-            logger.debug(f"Session closed - active: {session.is_active}, in_transaction: {session.in_transaction()}")
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
