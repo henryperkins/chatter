@@ -19,19 +19,24 @@ MAX_OVERFLOW = 10  # Maximum number of connections to create beyond the pool siz
 POOL_RECYCLE = 3600  # Recycle connections after 1 hour (PostgreSQL default is 1 hour)
 POOL_TIMEOUT = 30  # Timeout for acquiring a connection from the pool
 
-# Global engine and Session objects
-engine = None
-Session: Optional[ScopedSession[SessionType]] = None
-_initialized = False
+def get_db_state():
+    """Get database state from application context"""
+    if not hasattr(current_app, 'db_state'):
+        current_app.db_state = {
+            'engine': None,
+            'Session': None,
+            'initialized': False
+        }
+    return current_app.db_state
 
 def is_initialized() -> bool:
     """Check if database is properly initialized."""
-    global Session, engine, _initialized
-    # Only check if Session exists and has remove method
-    # Don't rely on _initialized flag which can get reset
-    return (Session is not None and 
-            engine is not None and
-            hasattr(Session, 'remove'))
+    if not current_app:
+        return False
+    db_state = get_db_state()
+    return (db_state['Session'] is not None and 
+            db_state['engine'] is not None and
+            hasattr(db_state['Session'], 'remove'))
 @contextmanager
 def db_session() -> Generator[Session, None, None]:
     """
@@ -61,12 +66,11 @@ def db_session() -> Generator[Session, None, None]:
 
 def close_db(e: Optional[BaseException] = None) -> None:
     """Clean up the database session."""
-    global Session, _initialized
-    if Session is not None:
-        if hasattr(Session, 'remove'):
-            Session.remove()  # type: ignore
-        Session = None
-        _initialized = False
+    if current_app:
+        db_state = get_db_state()
+        if db_state['Session'] is not None:
+            if hasattr(db_state['Session'], 'remove'):
+                db_state['Session'].remove()
 
 
 def execute_statement(db, statement: str) -> None:
@@ -129,21 +133,19 @@ def init_db_command():
 
 
 def init_app(app: Flask) -> None:
-    """
-    Register database functions with Flask app and initialize PostgreSQL connection.
-    """
+    """Register database functions with Flask app and initialize PostgreSQL connection."""
     logger.info("Initializing database with init_app(app)")
     
     if not app.config.get("DATABASE_URI"):
         logger.error("DATABASE_URI is not set in app configuration.")
         raise ValueError("DATABASE_URI must be set in app configuration")
         
-    global engine, Session
+    db_state = get_db_state()
 
     # Only initialize if not already initialized
     if not is_initialized():
         # Configure PostgreSQL connection
-        engine = create_engine(
+        db_state['engine'] = create_engine(
             app.config["DATABASE_URI"],
             pool_size=POOL_SIZE,
             max_overflow=MAX_OVERFLOW,
@@ -152,8 +154,8 @@ def init_app(app: Flask) -> None:
         )
 
         # Create a scoped session factory bound to the application context
-        Session = scoped_session(
-            sessionmaker(bind=engine),
+        db_state['Session'] = scoped_session(
+            sessionmaker(bind=db_state['engine']),
             scopefunc=lambda: id(g) if hasattr(g, '_get_current_object') else None
         )
 

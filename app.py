@@ -95,11 +95,12 @@ def configure_app() -> None:
     if not is_initialized():
         try:
             logger.info("Starting database initialization...")
-            init_app(app)
-            if not is_initialized():
-                logger.error("Database initialization completed but is_initialized() still returns False")
-                raise RuntimeError("Database failed to initialize properly - initialization state inconsistent")
-            logger.info("Database initialization completed and verified successfully")
+            with app.app_context():
+                init_app(app)
+                if not is_initialized():
+                    logger.error("Database initialization completed but is_initialized() still returns False")
+                    raise RuntimeError("Database failed to initialize properly - initialization state inconsistent")
+                logger.info("Database initialization completed and verified successfully")
         except Exception as e:
             logger.error("Database initialization failed with exception", exc_info=True)
             logger.error("Current app config: %s", {k: v for k, v in app.config.items() if k != 'SECRET_KEY'})
@@ -312,6 +313,25 @@ def health_check() -> Union[WerkzeugResponse, Tuple[WerkzeugResponse, Literal[50
                 "memory_usage": psutil.Process().memory_info().rss
             }
         })
+
+@app.route("/health/db")
+def db_health_check():
+    """Database health check endpoint"""
+    try:
+        with db_session() as db:
+            db.execute(text("SELECT 1"))
+        return jsonify({
+            "status": "healthy",
+            "database": "connected",
+            "initialized": is_initialized()
+        })
+    except Exception as e:
+        logger.error("Database health check failed", exc_info=True)
+        return jsonify({
+            "status": "unhealthy",
+            "error": str(e),
+            "initialized": is_initialized()
+        }), 500
     except Exception as e:
         logger.error(
             "Health check failed",
