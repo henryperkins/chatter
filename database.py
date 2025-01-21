@@ -239,7 +239,10 @@ def init_app(app: Flask) -> None:
 
             logger.info("Database engine and session initialized successfully")
 
-            # Create default model if it doesn't exist
+            # Initialize database schema first
+            init_db(app.config["DATABASE_URI"])
+
+            # Then create default model
             with db_session() as db:
                 create_default_model(db)
 
