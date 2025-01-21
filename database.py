@@ -156,9 +156,7 @@ def create_default_model(db) -> None:
         "capabilities": json.dumps({
             "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
             "max_tokens": Config.DEFAULT_MAX_TOKENS
-        }),
-        "requires_authentication": True,
-        "api_version_format": Config.AZURE_API_VERSION
+        })
     }
 
     # Remove created_at as it should be handled by the database default value
