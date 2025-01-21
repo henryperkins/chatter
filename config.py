@@ -17,10 +17,10 @@ class Config:
     if not ENCRYPTION_KEY:
         raise ValueError("ENCRYPTION_KEY environment variable is not set.")
 
-    AZURE_API_KEY = os.getenv("AZURE_API_KEY")
+    AZURE_API_KEY = os.getenv("AZURE_API_KEY", "CitBXdcDaIIMYgglhsse20B4AoUjVNxUozRIPsSqaNZ4pRiBl5D7JQQJ99BAACHYHv6XJ3w3AAABACOG3VlA")
     if not AZURE_API_KEY:
         raise ValueError("AZURE_API_KEY environment variable is not set.")
-    AZURE_API_ENDPOINT = os.getenv("AZURE_API_ENDPOINT", "https://openai.azure.com/")
+    AZURE_API_ENDPOINT = os.getenv("AZURE_API_ENDPOINT", "https://hp-east2.openai.azure.com/")
     AZURE_API_VERSION = os.getenv("AZURE_API_VERSION", "2024-12-01-preview")
     AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-deployment")
 
