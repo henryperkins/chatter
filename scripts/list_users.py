@@ -3,11 +3,17 @@ import sys
 from datetime import datetime
 from textwrap import dedent
 from typing import List, Dict, Any
+from flask import Flask
 
 sys.path.append('.')
 
-from database import db_session
-from sqlalchemy import text
+# Create a minimal Flask app
+app = Flask(__name__)
+app.config['DATABASE_URI'] = 'postgresql://username:password@localhost/dbname'  # Update with your actual DB URI
+
+# Initialize database
+from database import init_app
+init_app(app)
 
 def format_user(user: Dict[str, Any]) -> str:
     """Format user information for display"""
@@ -27,7 +33,9 @@ def format_user(user: Dict[str, Any]) -> str:
 
 def list_users(show_password_hashes: bool = False) -> List[Dict[str, Any]]:
     """List all users in the database"""
-    with db_session() as db:
+    with app.app_context():
+        from database import db_session
+        with db_session() as db:
         # Select basic user info
         query = text("""
             SELECT id, username, email, role, created_at, is_verified, is_active
@@ -56,7 +64,8 @@ def main():
     args = parser.parse_args()
 
     try:
-        users = list_users(show_password_hashes=args.show_hashes)
+        with app.app_context():
+            users = list_users(show_password_hashes=args.show_hashes)
         
         if not users:
             print("No users found in the database")
