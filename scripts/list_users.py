@@ -36,24 +36,24 @@ def list_users(show_password_hashes: bool = False) -> List[Dict[str, Any]]:
     with app.app_context():
         from database import db_session
         with db_session() as db:
-        # Select basic user info
-        query = text("""
-            SELECT id, username, email, role, created_at, is_verified, is_active
-            FROM users
-            ORDER BY created_at DESC
-        """)
-        
-        if show_password_hashes:
-            # Include password hashes if requested
+            # Select basic user info
             query = text("""
-                SELECT id, username, email, role, created_at, 
-                       is_verified, is_active, password_hash
+                SELECT id, username, email, role, created_at, is_verified, is_active
                 FROM users
                 ORDER BY created_at DESC
             """)
         
-        users = db.execute(query).mappings().all()
-        return users
+            if show_password_hashes:
+                # Include password hashes if requested
+                query = text("""
+                    SELECT id, username, email, role, created_at, 
+                           is_verified, is_active, password_hash
+                    FROM users
+                    ORDER BY created_at DESC
+                """)
+        
+            users = db.execute(query).mappings().all()
+            return users
 
 def main():
     import argparse
