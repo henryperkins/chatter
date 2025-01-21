@@ -442,6 +442,18 @@ configure_app()
 configure_security()
 init_app_components()
 
+# --- CLI Commands ---
+@app.cli.command("init-db")
+def init_db_command():
+    """Clear existing data and create new tables."""
+    try:
+        logger.info("Starting database initialization...")
+        init_app(app)
+        logger.info("Database initialization completed successfully")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}", exc_info=True)
+        raise
+
 # --- Application Entry Point ---
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
