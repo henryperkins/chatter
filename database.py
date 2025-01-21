@@ -55,23 +55,41 @@ def db_session() -> Generator[Session, None, None]:
     session = db_state['Session']()
     try:
         yield session
-        session.commit()
+        if session.is_active:
+            try:
+                session.commit()
+            except Exception as commit_error:
+                logger.error(f"Commit failed: {str(commit_error)}")
+                session.rollback()
+                raise
     except Exception as e:
-        session.rollback()
-        logger.error(f"Session rollback due to exception: {e}", exc_info=True)
+        if session.is_active:
+            session.rollback()
+        logger.error(f"Session rollback due to exception: {str(e)}", exc_info=True)
         raise
     finally:
-        if db_state['Session'] is not None:
-            db_state['Session'].remove()
+        try:
+            if session.is_active:
+                session.close()
+            if db_state['Session'] is not None:
+                db_state['Session'].remove()
+        except Exception as e:
+            logger.error(f"Error cleaning up session: {str(e)}")
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
     """Clean up the database session."""
     if current_app:
         db_state = get_db_state()
-        if db_state['Session'] is not None:
-            if hasattr(db_state['Session'], 'remove'):
-                db_state['Session'].remove()
+        session = db_state.get('Session')
+        if session:
+            try:
+                if session.is_active:  # Check if the session is active
+                    session.rollback()  # Rollback any pending transactions
+                if hasattr(session, 'remove'):
+                    session.remove()  # Safely remove the session
+            except Exception as e:
+                logger.error(f"Error closing database session: {str(e)}")
 
 
 def execute_statement(db, statement: str) -> None:
@@ -309,8 +327,14 @@ def init_app(app: Flask) -> None:
             )
 
             # Create a scoped session factory bound to the application context
+            # Configure session with proper isolation level and expiration
             db_state['Session'] = scoped_session(
-                sessionmaker(bind=db_state['engine']),
+                sessionmaker(
+                    bind=db_state['engine'],
+                    autocommit=False,
+                    autoflush=False,
+                    expire_on_commit=True
+                ),
                 scopefunc=lambda: id(g) if hasattr(g, '_get_current_object') else None
             )
 
