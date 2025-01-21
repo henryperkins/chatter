@@ -156,7 +156,9 @@ def create_default_model(db) -> None:
         "capabilities": {
             "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
             "max_tokens": Config.DEFAULT_MAX_TOKENS
-        }
+        },
+        "api_version_format": Config.AZURE_API_VERSION,
+        "created_at": "NOW()"
     }
     
     try:
