@@ -572,10 +572,26 @@ def edit_default_model():
     if not registration_data and not is_existing_admin:
         return redirect(url_for("auth.register"))
 
-    if request.method == "POST" and form.validate_on_submit():
+    if request.method == "POST":
+        if not form.validate_on_submit():
+            logger.warning(
+                "Form validation failed",
+                extra={
+                    "errors": form.errors,
+                    "user_id": current_user.id if current_user.is_authenticated else None
+                }
+            )
+            return render_template(
+                "edit_default_model.html",
+                form=form,
+                model_error="Please correct the form errors.",
+                is_existing_admin=is_existing_admin,
+                allow_skip=True
+            )
+
         try:
             if not Config.ENCRYPTION_KEY:
-                raise ValueError("ENCRYPTION_KEY environment variable must be set")
+                logger.warning("ENCRYPTION_KEY environment variable not set")
 
             model_data = {
                 "name": form.name.data,
@@ -663,15 +679,27 @@ def edit_default_model():
 
         except Exception as e:
             logger.error(
-                f"Error handling model configuration: {e}",
+                "Error handling model configuration: %s",
+                str(e),
                 exc_info=True,
-                extra={"ip_address": request.remote_addr, "route": request.path},
+                extra={
+                    "ip_address": request.remote_addr,
+                    "route": request.path,
+                    "user_id": current_user.id if current_user.is_authenticated else None
+                }
             )
+            error_message = "Failed to save model configuration. "
+            if "duplicate key value violates unique constraint" in str(e):
+                error_message += "A model with these details already exists."
+            else:
+                error_message += "Please verify your settings and try again."
+            
             return render_template(
                 "edit_default_model.html",
                 form=form,
-                model_error=str(e),
+                model_error=error_message,
                 is_existing_admin=is_existing_admin,
+                allow_skip=True
             )
 
     model_error = None
@@ -737,3 +765,38 @@ def logout():
     )
     logout_user()
     return redirect(url_for("auth.login"))
+@bp.route("/skip_model_config", methods=["POST"])
+@login_required
+def skip_model_config():
+    """Handle skipping the initial model configuration."""
+    try:
+        # Verify CSRF token
+        csrf_token = request.form.get("csrf_token")
+        try:
+            validate_csrf(csrf_token)
+        except Exception:
+            logger.warning("CSRF validation failed during skip_model_config")
+            return redirect(url_for("auth.edit_default_model"))
+
+        # Clear any pending registration data
+        session.pop("registration_data", None)
+        
+        # Log the skip
+        logger.info(
+            "Model configuration skipped by user",
+            extra={
+                "user_id": current_user.id,
+                "username": current_user.username
+            }
+        )
+        
+        # Add flash message
+        flash("Model configuration skipped. You can configure it later through the admin panel.", "warning")
+        
+        # Redirect to chat interface
+        return redirect(url_for("chat.chat_interface"))
+        
+    except Exception as e:
+        logger.error("Error during skip_model_config: %s", str(e), exc_info=True)
+        flash("An error occurred while skipping model configuration.", "error")
+        return redirect(url_for("auth.edit_default_model"))

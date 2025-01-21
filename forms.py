@@ -411,13 +411,35 @@ class DefaultModelForm(FlaskForm):
         # Check for encryption key before form validation
         from config import Config
         if not Config.ENCRYPTION_KEY:
-            raise ValueError("ENCRYPTION_KEY environment variable must be set")
-        # Ensure temperature is set to 1.0
+            logger.warning("ENCRYPTION_KEY environment variable not set")
+        
+        # Set default values
         if self.temperature.data is None:
             self.temperature.data = 1.0
-
-        # Set default provider ID to 1 (Azure) without database access
-        self.provider_id.data = 1
+        
+        try:
+            with db_session() as db:
+                # Try to get Azure provider ID
+                provider = db.execute(
+                    text("SELECT id FROM providers WHERE name = 'Azure' OR slug = 'azure' LIMIT 1")
+                ).scalar()
+                if provider:
+                    self.provider_id.data = provider
+                else:
+                    # Create Azure provider if it doesn't exist
+                    result = db.execute(
+                        text("""
+                            INSERT INTO providers (name, slug, api_base_url, requires_authentication)
+                            VALUES ('Azure', 'azure', 'https://api.openai.azure.com', true)
+                            RETURNING id
+                        """)
+                    )
+                    self.provider_id.data = result.scalar()
+                    db.commit()
+        except Exception as e:
+            logger.error("Error setting up provider: %s", str(e))
+            # Default to 1 if database operations fail
+            self.provider_id.data = 1
 
     provider_id = SelectField(
         "Provider",
