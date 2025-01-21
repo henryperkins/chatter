@@ -152,15 +152,6 @@ def init_db(db_uri: str = None) -> None:
                 })
                 db.commit()
         
-        # Read and execute schema.sql
-        with current_app.open_resource('schema.sql') as f:
-            with engine.connect() as conn:
-                # Split on semicolon and execute each statement
-                for statement in f.read().decode('utf8').split(';'):
-                    if statement.strip():
-                        conn.execute(text(statement))
-                conn.commit()
-        
         logger.info("Database initialization completed successfully")
         
     except Exception as e:
