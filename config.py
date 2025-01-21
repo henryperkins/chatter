@@ -11,7 +11,7 @@ class Config:
 
     DATABASE_URI = os.getenv("DATABASE_URI")
     if not DATABASE_URI:
-        raise ValueError("DATABASE_URI environment variable is not set.")
+        DATABASE_URI = "postgresql://username:password@localhost/dbname"  # Default fallback
 
     ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY", "I_bNh30H5SiGBreBGP7jKHPvb5SfGRl9e1WRAn1_3bw=")
     if not ENCRYPTION_KEY:
