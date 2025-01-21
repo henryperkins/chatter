@@ -41,10 +41,7 @@ def db_session() -> Generator[Session, None, None]:
         raise RuntimeError("Cannot access database outside of Flask application context")
 
     if not is_initialized():
-        # Re-initialize if needed
-        init_app(current_app._get_current_object())
-        if not is_initialized():
-            raise RuntimeError("Database initialization failed")
+        raise RuntimeError("Database not initialized. Make sure init_app() is called during application setup")
 
     if Session is None:
         raise RuntimeError("Session factory is not initialized")
