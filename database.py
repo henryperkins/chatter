@@ -148,9 +148,16 @@ def init_db(db_uri: str = None) -> None:
         raise ValueError("DATABASE_URI must be provided either directly or in app config")
     
     try:
+        # Create fresh engine
         engine = create_db_engine(db_uri)
         
-        # Configure session factory with proper isolation
+        # Drop and recreate schema
+        with engine.connect() as conn:
+            conn.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
+            conn.commit()
+
+        # Configure session factory
         global SessionLocal
         SessionLocal = scoped_session(
             sessionmaker(
@@ -162,104 +169,80 @@ def init_db(db_uri: str = None) -> None:
             scopefunc=lambda: id(g) if hasattr(g, '_get_current_object') else None
         )
         
+        # Set up database state
+        db_state = get_db_state()
+        db_state['engine'] = engine
+        db_state['Session'] = SessionLocal
+        
         # Add connection health check
         @event.listens_for(engine, "engine_connect")
         def ping_connection(connection, branch):
             if branch:
                 return
-                
-            # Run a simple query to check connection
             try:
                 connection.scalar(text("SELECT 1"))
             except Exception:
                 connection.invalidate()
                 raise
 
-        # Drop all existing tables
-        with engine.connect() as conn:
-            conn.execute(text("DROP SCHEMA public CASCADE"))
-            conn.execute(text("CREATE SCHEMA public"))
-            conn.commit()
-
-        # Set up database state
-        db_state = get_db_state()
-        db_state['engine'] = engine
-        db_state['Session'] = scoped_session(
-            sessionmaker(bind=engine),
-            scopefunc=lambda: id(g) if hasattr(g, '_get_current_object') else None
-        )
-
-        # Read and execute schema.sql
+        # Execute schema.sql
         with current_app.open_resource('schema.sql') as f:
             schema_sql = f.read().decode('utf8')
             with engine.connect() as conn:
-                # Execute schema as a single transaction
                 conn.execute(text(schema_sql))
                 conn.commit()
 
-        # Create default provider and model
+        # Create default provider
         with db_session() as db:
-            # Create default provider if it doesn't exist
-            provider_exists = db.execute(text(
-                "SELECT id FROM providers WHERE slug = 'azure-openai'"
-            )).scalar()
-            
-            if not provider_exists:
-                provider_id = db.execute(text("""
-                    INSERT INTO providers (
-                        name, slug, api_base_url, capabilities, 
-                        requires_authentication, api_version_format
-                    ) VALUES (
-                        'Azure OpenAI', 'azure-openai', :api_base_url,
-                        :capabilities, TRUE, :api_version
-                    )
-                    RETURNING id
-                """), {
-                    "api_base_url": os.getenv("AZURE_API_ENDPOINT", "").rstrip("/"),
-                    "capabilities": json.dumps({
-                        "supports_streaming": True,
-                        "max_tokens": 4000
-                    }),
-                    "api_version": os.getenv("AZURE_API_VERSION", "2023-05-15")
-                }).scalar()
-            else:
-                provider_id = provider_exists
-
-            # Create default model if it doesn't exist
-            default_model = db.execute(text(
-                "SELECT id FROM models WHERE is_default = TRUE"
-            )).scalar()
-            
-            if not default_model:
-                db.execute(text("""
-                    INSERT INTO models (
-                        provider_id, name, deployment_name, description,
-                        api_endpoint, api_key, model_type, temperature,
-                        max_tokens, max_completion_tokens, requires_o1_handling,
-                        supports_streaming, is_default, api_version, version
-                    ) VALUES (
-                        :provider_id, :name, :deployment_name, :description,
-                        :api_endpoint, :api_key, :model_type, :temperature,
-                        :max_tokens, :max_completion_tokens, :requires_o1_handling,
-                        :supports_streaming, TRUE, :api_version, 1
-                    )
-                """), {
-                    "provider_id": provider_id,
-                    "name": os.getenv("DEFAULT_MODEL_NAME", "GPT-4"),
-                    "deployment_name": os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-deployment"),
-                    "description": os.getenv("DEFAULT_MODEL_DESCRIPTION", "Azure GPT-4 Model"),
-                    "api_endpoint": os.getenv("AZURE_API_ENDPOINT", "https://hp-east2.openai.azure.com/openai/deployments/gpt-deployment?api-version=2024-12-01-preview"),
-                    "api_key": os.getenv("AZURE_API_KEY"),
-                    "model_type": "azure",
-                    "temperature": float(os.getenv("DEFAULT_TEMPERATURE", "0.7")),
-                    "max_tokens": int(os.getenv("DEFAULT_MAX_TOKENS", "4000")),
-                    "max_completion_tokens": int(os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "4000")),
-                    "requires_o1_handling": True,
+            provider_id = db.execute(text("""
+                INSERT INTO providers (
+                    name, slug, api_base_url, capabilities, 
+                    requires_authentication, api_version_format
+                ) VALUES (
+                    'Azure OpenAI', 'azure-openai', :api_base_url,
+                    :capabilities, TRUE, :api_version
+                )
+                RETURNING id
+            """), {
+                "api_base_url": os.getenv("AZURE_API_ENDPOINT", "").rstrip("/"),
+                "capabilities": json.dumps({
                     "supports_streaming": True,
-                    "api_version": os.getenv("AZURE_API_VERSION", "2023-05-15")
-                })
-                db.commit()
-                logger.info("Default model configuration created successfully")
+                    "max_tokens": 16384,
+                    "api_version": "2024-12-01-preview"
+                }),
+                "api_version": "2024-12-01-preview"
+            }).scalar()
+
+            # Create default model
+            db.execute(text("""
+                INSERT INTO models (
+                    provider_id, name, deployment_name, description,
+                    api_endpoint, api_key, model_type, temperature,
+                    max_tokens, max_completion_tokens, requires_o1_handling,
+                    supports_streaming, is_default, api_version, version
+                ) VALUES (
+                    :provider_id, :name, :deployment_name, :description,
+                    :api_endpoint, :api_key, :model_type, :temperature,
+                    :max_tokens, :max_completion_tokens, :requires_o1_handling,
+                    :supports_streaming, TRUE, :api_version, 1
+                )
+            """), {
+                "provider_id": provider_id,
+                "name": os.getenv("DEFAULT_MODEL_NAME", "GPT-4"),
+                "deployment_name": os.getenv("AZURE_DEPLOYMENT_NAME", "gpt-deployment"),
+                "description": os.getenv("DEFAULT_MODEL_DESCRIPTION", "Azure GPT-4 Model"),
+                "api_endpoint": os.getenv("AZURE_API_ENDPOINT"),
+                "api_key": os.getenv("AZURE_API_KEY"),
+                "model_type": "azure",
+                "temperature": float(os.getenv("DEFAULT_TEMPERATURE", "0.7")),
+                "max_tokens": int(os.getenv("DEFAULT_MAX_TOKENS", "16384")),
+                "max_completion_tokens": int(os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "16384")),
+                "requires_o1_handling": True,
+                "supports_streaming": True,
+                "api_version": "2024-12-01-preview"
+            })
+            db.commit()
+            logger.info("Default model configuration created successfully")
         
         logger.info("Database initialization completed successfully")
         
