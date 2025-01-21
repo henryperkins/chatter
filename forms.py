@@ -410,6 +410,8 @@ class DefaultModelForm(FlaskForm):
         super().__init__(*args, **kwargs)
         # Check for encryption key before form validation
         from config import Config
+        import logging
+        logger = logging.getLogger(__name__)
         if not Config.ENCRYPTION_KEY:
             logger.warning("ENCRYPTION_KEY environment variable not set")
         
@@ -437,6 +439,8 @@ class DefaultModelForm(FlaskForm):
                     self.provider_id.data = result.scalar()
                     db.commit()
         except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
             logger.error("Error setting up provider: %s", str(e))
             # Default to 1 if database operations fail
             self.provider_id.data = 1

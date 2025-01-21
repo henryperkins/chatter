@@ -9,6 +9,7 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import (
     Blueprint,
+    flash,
     jsonify,
     redirect,
     render_template,
