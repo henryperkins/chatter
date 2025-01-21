@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold mb-4 text-gray-800 dark:text-gray-100">Manage Users</h1>
+    <div class="overflow-x-auto">
+        <table class="min-w-full bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-sm">
+            <thead class="bg-gray-100 dark:bg-gray-700">
+                <tr>
+                    <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Username</th>
+                    <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Email</th>
+                    <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Role</th>
+                    <th class="py-3 px-4 text-left text-sm font-medium text-gray-700 dark:text-gray-300">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for user in users %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <td class="py-3 px-4 text-sm text-gray-800 dark:text-gray-200">{{ user.username }}</td>
+                    <td class="py-3 px-4 text-sm text-gray-800 dark:text-gray-200">{{ user.email }}</td>
+                    <td class="py-3 px-4 text-sm text-gray-800 dark:text-gray-200">{{ user.role }}</td>
+                    <td class="py-3 px-4">
+                        <select class="role-select border rounded px-2 py-1 text-sm bg-white dark:bg-gray-800 dark:border-gray-700 dark:text-gray-200" 
+                                data-user-id="{{ user.id }}"
+                                aria-label="Select role for {{ user.username }}">
+                            <option value="user" {% if user.role == 'user' %}selected{% endif %}>User</option>
+                            <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+                        </select>
+                        <div id="role-feedback-{{ user.id }}" class="text-xs mt-1 hidden"></div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.role-select').forEach(select => {
+        select.addEventListener('change', async function() {
+            const userId = this.dataset.userId;
+            const newRole = this.value;
+            const feedbackElement = document.getElementById(`role-feedback-${userId}`);
+            const originalValue = this.querySelector(`option[selected]`).value;
+
+            // Show loading state
+            this.disabled = true;
+            feedbackElement.textContent = 'Updating role...';
+            feedbackElement.classList.remove('hidden', 'text-red-500', 'text-green-500');
+            feedbackElement.classList.add('text-gray-500');
+
+            try {
+                const response = await fetch(`/api/users/${userId}/role`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCSRFToken()
+                    },
+                    body: JSON.stringify({role: newRole})
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    feedbackElement.textContent = 'Role updated successfully';
+                    feedbackElement.classList.remove('text-gray-500');
+                    feedbackElement.classList.add('text-green-500');
+                    showFeedback('Role updated successfully', 'success');
+                } else {
+                    // Revert to original value on error
+                    this.value = originalValue;
+                    feedbackElement.textContent = data.error || 'Failed to update role';
+                    feedbackElement.classList.remove('text-gray-500');
+                    feedbackElement.classList.add('text-red-500');
+                    showFeedback(data.error || 'Failed to update role', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                this.value = originalValue;
+                feedbackElement.textContent = 'Error updating role';
+                feedbackElement.classList.remove('text-gray-500');
+                feedbackElement.classList.add('text-red-500');
+                showFeedback('Error updating role', 'error');
+            } finally {
+                this.disabled = false;
+                // Hide feedback after 3 seconds
+                setTimeout(() => {
+                    feedbackElement.classList.add('hidden');
+                }, 3000);
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

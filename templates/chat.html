@@ -1,0 +1,722 @@
+{% extends "base.html" %}
+
+{% block title %}Chat - Azure OpenAI{% endblock %}
+
+{% block main_classes %}h-[calc(100vh-4rem)] flex{% endblock %}
+
+{% block content %}
+<div class="flex flex-col md:flex-row h-[100dvh] w-full overflow-hidden bg-white dark:bg-gray-900 safe-area-inset touch-manipulation">
+    <!-- Sidebar -->
+    <nav id="mobile-menu"
+        class="fixed inset-y-0 left-0 top-16 z-modal w-[85%] max-w-[320px] bg-gray-50 dark:bg-gray-800 transform transition-transform duration-300 ease-in-out -translate-x-full md:relative md:top-0 md:translate-x-0 overflow-y-auto border-r border-gray-200 dark:border-gray-700"
+        aria-label="Mobile menu">
+        <div class="flex flex-col h-full p-4">
+            <!-- New Chat Button -->
+            <div class="flex-none mb-6">
+                <button id="new-chat-btn"
+                    class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-4 py-4 rounded-lg transition-colors duration-200 text-base font-medium touch-manipulation"
+                    aria-label="Start new chat">
+                    <i class="fas fa-plus mr-2"></i>
+                    <span>New Chat</span>
+                </button>
+            </div>
+
+            <!-- Model Selection -->
+<!-- Removed duplicate model selection dropdown -->
+
+            <!-- Admin Buttons -->
+            {% if current_user.role == 'admin' %}
+            <div class="space-y-2">
+                <a href="{{ url_for('model.add_model_page') }}"
+                    class="block w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-center transition-colors duration-200">
+                    <i class="fas fa-plus-circle mr-2"></i>
+                    Add Model
+                </a>
+                <button id="edit-model-btn"
+                    class="block w-full bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg text-center transition-colors duration-200"
+                    aria-label="Edit current model settings">
+                    <i class="fas fa-edit mr-2"></i>
+                    Edit Model
+                </button>
+            </div>
+            {% endif %}
+
+            <!-- Chat List -->
+            <div class="flex-1 overflow-y-auto space-y-4">
+                {% set ns = namespace(current_date=None) %}
+                {% for conversation in conversations|sort(attribute='timestamp', reverse=True) %}
+                {% set chat_date = conversation.timestamp.strftime('%Y-%m-%d') %}
+
+                {% if chat_date != ns.current_date %}
+                {% set ns.current_date = chat_date %}
+                <div
+                    class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider pt-4 first:pt-0 px-2">
+                    {% if chat_date == today %}
+                    Today
+                    {% elif chat_date == yesterday %}
+                    Yesterday
+                    {% else %}
+                    {{ conversation.timestamp.strftime('%B %d, %Y') }}
+                    {% endif %}
+                </div>
+                {% endif %}
+
+                <div class="relative group touch-manipulation">
+                    <a href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}" class="block p-4 rounded-lg hover:bg-gray-200 active:bg-gray-300 dark:hover:bg-gray-700 dark:active:bg-gray-600 focus:ring-2 focus:ring-blue-500 text-base transition-colors duration-150 touch-manipulation
+                              {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-gray-900 dark:text-gray-100 truncate max-w-[180px]">
+                                {{ conversation.title | e }}
+                            </span>
+                            <span class="text-sm text-gray-500 dark:text-gray-400 ml-2 flex-shrink-0">
+                                {{ conversation.timestamp.strftime('%I:%M %p') }}
+                            </span>
+                        </div>
+                        <div class="text-sm text-gray-500 dark:text-gray-400 truncate mt-1">
+                            {{ conversation.model_name }}
+                        </div>
+                    </a>
+                    <button
+                        class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center w-10 h-10 rounded-full hover:bg-red-100 active:bg-red-200 dark:hover:bg-red-900 dark:active:bg-red-800 text-red-600 dark:text-red-400 transition-colors duration-200 delete-chat-btn"
+                        data-chat-id="{{ conversation.id }}" title="Delete chat" aria-label="Delete chat">
+                        <i class="fas fa-trash-alt text-lg"></i>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu Backdrop -->
+    <div id="mobile-menu-backdrop"
+        class="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-40 hidden transition-opacity duration-300">
+    </div>
+
+    <!-- Main Chat Area -->
+    <div class="flex-1 flex flex-col overflow-hidden relative h-full">
+        <!-- Chat Header -->
+        <div
+            class="chat-header px-4 py-3 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between backdrop-filter backdrop-blur sticky top-0 z-10">
+            <div class="flex items-center space-x-4">
+                <!-- Mobile Menu Button -->
+                <button id="mobile-menu-toggle"
+                    class="md:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors duration-200"
+                    aria-label="Toggle menu" aria-expanded="false">
+                    <i class="fas fa-bars text-2xl"></i>
+                </button>
+
+                <!-- Chat Title -->
+                <h2 id="chat-title"
+                    class="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate max-w-[200px] sm:max-w-none">
+                    {{ chat_title }} - {{ model_name }}
+                </h2>
+
+                <!-- Edit Title Button -->
+                <button id="edit-title-btn"
+                    class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200"
+                    aria-label="Edit chat title">
+                    <i class="fas fa-edit text-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Model Selection -->
+        {% if models %}
+        <div class="mb-6 model-select-container">
+            <label for="model-select"
+                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model:</label>
+            <div class="relative mb-4">
+                <select id="model-select" data-original-value="{{ model_id }}"
+                    class="w-full h-12 px-4 pr-8 border border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 text-base appearance-none cursor-pointer touch-manipulation bg-white dark:bg-gray-700">
+                    {% for model in models %}
+                    <option value="{{ model.id }}"
+                        data-requires-o1-handling="{{ model.requires_o1_handling|lower }}"
+                        data-supports-streaming="{{ model.supports_streaming|lower }}"
+                        data-max-completion-tokens="{{ model.max_completion_tokens }}"
+                        {% if model.is_default %}selected{% endif %}>
+                        {{ model.name }}{% if model.is_default %} (Default){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                    <i class="fas fa-chevron-down text-gray-400"></i>
+                </div>
+            </div>
+            <!-- Hidden input to store the current model's requires_o1_handling status -->
+            <input type="hidden" id="requires-o1-handling"
+                value="{{ current_model.requires_o1_handling|lower if current_model else 'false' }}">
+        </div>
+        {% endif %}
+
+        <!-- Token Usage Display -->
+        <div id="token-usage"
+            class="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    Token Usage
+                </h3>
+                <button id="refresh-stats"
+                    class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200"
+                    aria-label="Refresh token usage">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div id="token-progress" class="bg-blue-600 h-2 rounded-full" style="width: 0%"
+                    role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+            </div>
+            <div class="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                <span id="tokens-used" aria-label="Tokens used">0 tokens used</span>
+                <span id="tokens-limit" aria-label="Token limit">/ 0 max</span>
+            </div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                <span class="token-breakdown">
+                    User: <span id="user-tokens" aria-label="User tokens">0</span>,
+                    Assistant: <span id="assistant-tokens" aria-label="Assistant tokens">0</span>,
+                    System: <span id="system-tokens" aria-label="System tokens">0</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Messages Area -->
+        <div id="chat-box" class="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-4 min-h-[200px] pb-[120px]"
+            role="log" aria-live="polite">
+            {% if messages %}
+            {% for message in messages %}
+            {% if message.role == 'user' %}
+            <!-- User message -->
+            <div class="flex w-full mt-2 space-x-2 max-w-[85%] sm:max-w-md md:max-w-2xl ml-auto justify-end">
+                <div>
+                    <div class="relative bg-blue-600 text-white p-2.5 rounded-l-lg rounded-br-lg">
+                        <p class="text-[15px] leading-normal break-words overflow-x-auto">{{ message.content }}</p>
+                        {% if loop.last %}
+                        <button class="edit-message-button absolute top-2 right-2 text-white hover:text-gray-200"
+                            title="Edit message">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                    <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                        {{ message.timestamp.strftime('%I:%M %p') if message.timestamp else now().strftime('%I:%M %p')
+                        }}
+                    </span>
+                </div>
+            </div>
+            {% else %}
+            <!-- Assistant message template -->
+            <div class="flex w-full mt-2 space-x-2 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl">
+                <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-700" role="img"
+                    aria-label="Assistant avatar"></div>
+                <div class="relative flex-1">
+                    <!-- Action Buttons - Positioned absolutely to the right -->
+                    <div class="absolute right-2 top-2 flex items-center space-x-1 z-10">
+                        <button
+                            class="copy-button p-1.5 rounded-md bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200 shadow-sm"
+                            title="Copy to clipboard"
+                            data-raw-content="{{ message.raw_content|default(message.content)|e }}"
+                            aria-label="Copy message to clipboard">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                        {% if loop.last %}
+                        <button
+                            class="regenerate-button p-1.5 rounded-md bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200 shadow-sm"
+                            title="Regenerate response" aria-label="Regenerate response">
+                            <i class="fas fa-redo-alt"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+
+                    <!-- Message Content - With padding to prevent overlap -->
+                    <div class="bg-gray-100 dark:bg-gray-800 p-3 pr-16 rounded-r-lg rounded-bl-lg">
+                        <div class="prose dark:prose-invert prose-sm max-w-none overflow-x-auto"
+                            data-role="assistant-message"
+                            data-content="{{ message.content | e }}">
+                            <!-- Content will be rendered by client-side JavaScript -->
+                        </div>
+                    </div>
+                    <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                        {{ message.timestamp.strftime('%I:%M %p') if message.timestamp else now().strftime('%I:%M %p')
+                        }}
+                    </span>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+            {% else %}
+            <div class="text-center text-gray-500">
+                <p>This is a new chat. Start typing to begin!</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- File Upload Area -->
+        <div id="uploaded-files"
+            class="hidden px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                    Uploaded Files
+                </h3>
+                <div id="total-size" class="text-sm text-gray-500 dark:text-gray-400"></div>
+            </div>
+            <div id="file-list" class="space-y-2"></div>
+            <div id="file-errors" class="space-y-1 mt-2"></div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area fixed bottom-0 inset-x-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-3 py-2 z-50 safe-area-inset">
+            <div class="max-w-[1200px] mx-auto px-2 py-1">
+                <div class="flex items-end gap-3">
+                    <!-- Upload Button -->
+                    <button id="mobile-upload-button"
+                        class="flex items-center justify-center p-3 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors min-w-[44px] min-h-[44px]"
+                        aria-label="Upload files">
+                        <i class="fas fa-upload text-xl"></i>
+                    </button>
+
+                    <!-- Message Input Container -->
+                    <div class="flex-1 relative">
+                        <textarea id="message-input"
+                            class="w-full px-4 py-3 resize-none border border-gray-200 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 text-[16px] leading-5 shadow-sm"
+                            placeholder="Type your message..."
+                            rows="1"
+                            style="min-height: 44px; max-height: 120px;"
+                            enterkeyhint="send"></textarea>
+                    </div>
+
+                    <!-- Send Button -->
+                    <button id="send-button"
+                        class="flex items-center justify-center p-3 rounded-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white transition-colors min-w-[44px] min-h-[44px]"
+                        aria-label="Send message">
+                        <i class="fas fa-paper-plane text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Drop Zone -->
+<div id="drop-zone"
+    class="fixed inset-0 bg-black/50 backdrop-blur-sm z-modal items-center justify-center transition-opacity duration-300 hidden"
+    role="dialog" aria-label="File drop zone">
+    <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl text-center max-w-md mx-auto mt-20">
+        <div class="text-blue-500 text-6xl mb-4">
+            <i class="fas fa-file-upload"></i>
+        </div>
+        <p class="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2">Drop files to upload</p>
+        <p class="text-gray-500 dark:text-gray-400">or click to select files</p>
+        <div class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+            Supported formats: PDF, Images, Text
+        </div>
+        <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+            Max file size: 10MB, Total: 50MB
+        </div>
+    </div>
+</div>
+
+<!-- Mobile upload controls -->
+<div id="mobile-upload-controls" class="md:hidden fixed bottom-24 right-4" style="z-index: 1000; display: none;">
+    <button class="p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-colors"
+        onclick="fileUploadManager.showMobileUploadMenu()" aria-label="Upload files">
+        <i class="fas fa-upload text-xl"></i>
+    </button>
+</div>
+
+<!-- Mobile upload menu -->
+<div id="mobile-upload-menu"
+    class="hidden fixed bottom-0 left-0 w-full bg-white dark:bg-gray-800 shadow-lg transform translate-y-full transition-transform duration-300"
+    style="z-index: 1000; display: none;">
+    <div class="p-4">
+        <h3 class="text-lg font-semibold mb-4">Upload Files</h3>
+        <div class="grid grid-cols-2 gap-4">
+            <button class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg"
+                onclick="fileUploadManager.triggerFileInput('camera')">
+                <i class="fas fa-camera text-2xl mb-2"></i>
+                <span>Take Photo</span>
+            </button>
+            <button class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg"
+                onclick="fileUploadManager.triggerFileInput('gallery')">
+                <i class="fas fa-images text-2xl mb-2"></i>
+                <span>From Gallery</span>
+            </button>
+            <button class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg"
+                onclick="fileUploadManager.triggerFileInput('files')">
+                <i class="fas fa-file text-2xl mb-2"></i>
+                <span>Files</span>
+            </button>
+            <button class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg"
+                onclick="fileUploadManager.showCloudProviders()">
+                <i class="fas fa-cloud text-2xl mb-2"></i>
+                <span>Cloud</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Progress -->
+<div id="upload-progress"
+    class="hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 w-64 transition-all duration-300 transform translate-y-0"
+    role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <div class="text-sm mb-2 text-gray-800 dark:text-gray-100">Uploading files...</div>
+    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+        <div id="upload-progress-bar" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+    </div>
+</div>
+
+<!-- Feedback Message -->
+<div id="feedback-message"
+    class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center">
+</div>
+
+<style>
+    /* Existing styles remain unchanged */
+    /* Mobile touch optimizations */
+    @media (max-width: 767px) {
+
+        /* Improve touch targets */
+        .touch-manipulation {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Larger touch targets */
+        button,
+        a,
+        select,
+        input[type="button"],
+        input[type="submit"] {
+            min-height: 48px;
+            min-width: 48px;
+            padding: 12px;
+            touch-action: manipulation;
+        }
+
+        /* Prevent double-tap zoom */
+        * {
+            touch-action: manipulation;
+        }
+
+        /* Better tap states */
+        .active\:bg-gray-300:active {
+            background-color: rgba(209, 213, 219, var(--tw-bg-opacity));
+        }
+
+        .dark .dark\:active\:bg-gray-600:active {
+            background-color: rgba(75, 85, 99, var(--tw-bg-opacity));
+        }
+
+        /* Improve button spacing */
+        .group button {
+            margin: 4px;
+        }
+
+        /* Prevent text selection while scrolling */
+        .overflow-y-auto {
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: contain;
+        }
+
+        /* Add gap between items */
+        .space-y-2>*+* {
+            margin-top: 0.75rem;
+        }
+
+        /* Input area adjustments */
+        .input-area {
+            padding-bottom: max(8px, env(safe-area-inset-bottom));
+        }
+
+        #message-input {
+            padding-right: 40px;
+        }
+
+        #send-button, #mobile-upload-button {
+            transform: scale(1);
+            transition: transform 0.2s ease;
+        }
+
+        #send-button:active, #mobile-upload-button:active {
+            transform: scale(0.95);
+        }
+
+        #chat-box {
+            padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+        }
+    }
+
+    /* Input area styles */
+    .input-area {
+        background-color: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1), 0 -2px 4px -1px rgba(0, 0, 0, 0.06);
+        margin-top: 1rem;
+    }
+
+    .dark .input-area {
+        background-color: rgba(17, 24, 39, 0.95);
+    }
+
+    /* Message input styles */
+    #message-input {
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        transition: all 0.2s ease;
+    }
+
+    #message-input:focus {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Ensure buttons maintain good touch targets */
+    #send-button, #mobile-upload-button {
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+    }
+
+    /* Improve input accessibility */
+    #message-input::placeholder {
+        color: #9CA3AF;
+    }
+
+    .dark #message-input::placeholder {
+        color: #4B5563;
+    }
+
+    /* Prevent input zoom on iOS */
+    @supports (-webkit-touch-callout: none) {
+        #message-input {
+            font-size: 16px !important;
+        }
+    }
+
+    /* Improved focus states */
+    .focus\:ring-2:focus {
+        --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+        --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+        box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+        outline: 2px solid transparent;
+        outline-offset: 2px;
+    }
+
+    /* Active states for buttons */
+    .active\:scale-95:active {
+        transform: scale(0.95);
+    }
+
+    /* Transition improvements */
+    .transition-all {
+        transition-property: all;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 150ms;
+    }
+
+    /* Better hover states */
+    @media (hover: hover) {
+        .hover\:bg-gray-200:hover {
+            background-color: rgba(229, 231, 235, var(--tw-bg-opacity));
+        }
+
+        .dark .dark\:hover\:bg-gray-700:hover {
+            background-color: rgba(55, 65, 81, var(--tw-bg-opacity));
+        }
+    }
+
+    /* Improved button visibility */
+    .group:hover .group-hover\:flex,
+    .group:focus-within .group-hover\:flex {
+        display: flex !important;
+    }
+
+    /* Better spacing for mobile */
+    @media (max-width: 767px) {
+        .p-4 {
+            padding: 1rem 0.75rem;
+        }
+
+        .space-x-4>*+* {
+            margin-left: 0.75rem;
+        }
+    }
+
+    /* Standardized text sizes */
+    .text-base {
+        font-size: 1rem;
+        line-height: 1.5rem;
+    }
+
+    .text-lg {
+        font-size: 1.125rem;
+        line-height: 1.75rem;
+    }
+
+    .text-xl {
+        font-size: 1.25rem;
+        line-height: 1.75rem;
+    }
+
+    .text-2xl {
+        font-size: 1.5rem;
+        line-height: 2rem;
+    }
+
+    /* Consistent spacing */
+    .p-4 {
+        padding: 1rem;
+    }
+
+    .px-4 {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .py-3 {
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
+
+    .space-y-2>*+* {
+        margin-top: 0.5rem;
+    }
+
+    .space-y-4>*+* {
+        margin-top: 1rem;
+    }
+
+    .space-x-4>*+* {
+        margin-left: 1rem;
+    }
+
+    /* Improved mobile menu transitions */
+    #mobile-menu {
+        transition: transform 0.3s ease-in-out;
+    }
+
+    #mobile-menu-backdrop {
+        transition: opacity 0.3s ease-in-out;
+    }
+
+    /* Consistent button styles */
+    button {
+        min-height: 40px;
+        min-width: 40px;
+    }
+
+    /* Improved touch targets on mobile */
+    @media (max-width: 767px) {
+
+        button,
+        a {
+            min-height: 44px;
+            min-width: 44px;
+        }
+
+        select {
+            height: 44px;
+        }
+    }
+
+    .button-loading {
+        position: relative;
+        color: transparent !important;
+    }
+
+    .button-loading::after {
+        content: "";
+        position: absolute;
+        width: 1em;
+        height: 1em;
+        border: 2px solid #ffffff;
+        border-radius: 50%;
+        border-right-color: transparent;
+        animation: button-loading-spinner 0.75s linear infinite;
+    }
+
+    @keyframes button-loading-spinner {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    /* Mobile menu styles */
+    @media (max-width: 767px) {
+        #mobile-menu {
+            position: fixed;
+            height: 100vh;
+            top: 0;
+            left: 0;
+            bottom: 0;
+        }
+
+        #mobile-menu.hidden {
+            display: none;
+        }
+    }
+
+    @media (min-width: 768px) {
+        #mobile-menu {
+            position: relative;
+            transform: none !important;
+        }
+
+        #mobile-menu-backdrop {
+            display: none !important;
+        }
+    }
+
+    /* Ensure new chat button is always visible */
+    #new-chat-btn {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
+    /* Ensure proper model select positioning */
+    #model-select {
+        position: relative;
+        z-index: 20;
+    }
+
+    /* Fix mobile menu overlap */
+    @media (max-width: 767px) {
+        .model-select-container {
+            position: relative;
+            z-index: 25;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+
+<!-- Configuration -->
+<script>
+    console.log('Initializing CHAT_CONFIG');
+    window.CHAT_CONFIG = {
+        chatId: "{{ chat_id }}",
+        editModelUrl: "{{ url_for('model.edit_model', model_id=0) }}".replace('0', ''),
+        maxFileSize: parseInt("{{ config.get('MAX_FILE_SIZE', 10 * 1024 * 1024) }}"),
+        maxFiles: parseInt("{{ config.get('MAX_FILES', 5) }}"),
+        maxMessageLength: parseInt("{{ config.get('MAX_MESSAGE_LENGTH', 1000) }}"),
+        allowedFileTypes: JSON.parse('{{ config.get("ALLOWED_FILE_TYPES", ["text/plain", "application/pdf", "image/jpeg", "image/png"]) | tojson | safe }}'),
+        csrfToken: "{{ csrf_token() }}",
+        userId: "{{ current_user.id }}",
+        userRole: "{{ current_user.role }}",
+        models: JSON.parse('{{ models|tojson|safe }}')
+    };
+    console.log('CHAT_CONFIG initialized:', window.CHAT_CONFIG);
+</script>
+
+<!-- Load managers -->
+<script src="{{ url_for('static', filename='js/token-usage.js') }}"></script>
+<script src="{{ url_for('static', filename='js/fileUpload.js') }}"></script>
+
+<!-- Initialize markdown-it -->
+<script>
+    window.md = window.markdownit({
+        html: true,
+        linkify: true,
+        typographer: true
+    });
+</script>
+
+{% endblock %}

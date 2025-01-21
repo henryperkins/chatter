@@ -1,0 +1,26 @@
+{% extends "error.html" %}
+
+{% block title %}500 Server Error - Azure OpenAI Chat{% endblock %}
+
+{% block error_title %}Server Error{% endblock %}
+
+{% block error_message %}
+Something went wrong on our end. Our team has been notified and we're working to fix it.
+{% endblock %}
+
+{% block error_actions %}
+{{ super() }}
+<div class="mt-4 text-center">
+    <p class="text-gray-600 dark:text-gray-400 mb-2">You can try:</p>
+    <div class="space-y-2">
+        <a href="{{ url_for('chat.chat_interface') }}"
+           class="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors duration-200">
+            Return to Chat
+        </a>
+        <button onclick="window.location.reload()"
+           class="block w-full text-center bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg transition-colors duration-200">
+            Reload Page
+        </button>
+    </div>
+</div>
+{% endblock %}
