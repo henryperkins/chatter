@@ -191,10 +191,10 @@ def create_default_model(db) -> None:
                 "name": Config.DEFAULT_MODEL_NAME,
                 "deployment_name": Config.DEFAULT_DEPLOYMENT_NAME,
                 "description": Config.DEFAULT_MODEL_DESCRIPTION,
-                "model_type": "gpt",  # Default type
                 "provider_id": provider_id,  # Link to the provider we just created
                 "api_endpoint": Config.DEFAULT_API_ENDPOINT,
                 "api_key": Config.AZURE_API_KEY,
+                "model_type": "gpt",
                 "temperature": Config.DEFAULT_TEMPERATURE,
                 "max_tokens": Config.DEFAULT_MAX_TOKENS,
                 "max_completion_tokens": Config.DEFAULT_MAX_COMPLETION_TOKENS,
@@ -202,7 +202,7 @@ def create_default_model(db) -> None:
                 "requires_o1_handling": Config.DEFAULT_REQUIRES_O1_HANDLING,
                 "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
                 "api_version": Config.DEFAULT_API_VERSION,
-                "version": 1,
+                "version": 1
             }
             
             Model.create(default_model)
