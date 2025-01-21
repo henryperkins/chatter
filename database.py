@@ -194,6 +194,7 @@ def init_db(db_uri: str = None) -> None:
 
         # Create default provider
         with db_session() as db:
+            # Create provider without requiring Azure credentials
             provider_id = db.execute(text("""
                 INSERT INTO providers (
                     name, slug, api_base_url, capabilities, 
@@ -204,7 +205,7 @@ def init_db(db_uri: str = None) -> None:
                 )
                 RETURNING id
             """), {
-                "api_base_url": os.getenv("AZURE_API_ENDPOINT", "").rstrip("/"),
+                "api_base_url": os.getenv("AZURE_API_ENDPOINT", "https://your-resource.openai.azure.com").rstrip("/"),
                 "capabilities": json.dumps({
                     "supports_streaming": True,
                     "max_tokens": 16384,
@@ -213,14 +214,14 @@ def init_db(db_uri: str = None) -> None:
                 "api_version": "2024-12-01-preview"
             }).scalar()
 
-            # Validate required environment variables
-            api_endpoint = os.getenv("AZURE_API_ENDPOINT")
-            api_key = os.getenv("AZURE_API_KEY")
-                
-            if not api_endpoint or not api_key:
-                raise ValueError("AZURE_API_ENDPOINT and AZURE_API_KEY must be set in environment")
+            # Create placeholder model with dummy values if env vars not set
+            api_endpoint = os.getenv("AZURE_API_ENDPOINT", "https://your-resource.openai.azure.com")
+            api_key = os.getenv("AZURE_API_KEY", "dummy-key-please-configure")
+            
+            if not api_endpoint.startswith("https://") or api_key == "dummy-key-please-configure":
+                logger.warning("Using placeholder Azure credentials - please configure AZURE_API_ENDPOINT and AZURE_API_KEY")
 
-            # Create default model
+            # Create default model with available or placeholder values
             db.execute(text("""
                 INSERT INTO models (
                     provider_id, name, deployment_name, description,
