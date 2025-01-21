@@ -19,7 +19,7 @@ from flask import (
     render_template,
     session,
     make_response,
-    Response,
+    Response as FlaskResponse,
     stream_with_context,
 )
 from flask.wrappers import Response
@@ -249,18 +249,18 @@ def process_uploaded_files(
 
 @chat_routes.route("/")
 @login_required
-def index() -> Union[Response, Tuple[Response, int]]:
+def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Redirect to the chat interface."""
     try:
-        return redirect(url_for("chat.chat_interface"))
+        return cast(FlaskResponse, redirect(url_for("chat.chat_interface")))
     except Exception as e:
         logger.error("Error redirecting to chat interface: %s", str(e))
-        return make_response("Internal server error", 500)
+        return make_response(jsonify({"error": "Internal server error"}), 500)
 
 
 @chat_routes.route("/new_chat", methods=["GET", "POST"])
 @login_required
-def new_chat_route() -> Union[Response, Tuple[Response, int]]:
+def new_chat_route() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Create a new chat and return success JSON."""
     logger.debug("New chat request from user %s", current_user.id)
     try:
@@ -284,7 +284,7 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
 
         if request.method == "POST":
             return jsonify({"success": True, "chat_id": chat_id})
-        return render_template("new_chat.html")
+        return cast(FlaskResponse, render_template("new_chat.html"))
     except Exception as e:
         logger.error(
             "Failed to create new chat",
@@ -303,7 +303,7 @@ def new_chat_route() -> Union[Response, Tuple[Response, int]]:
 
 @chat_routes.route("/chat_interface", methods=["GET"])
 @login_required
-def chat_interface() -> Union[Response, Tuple[Response, int]]:
+def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Render the chat interface."""
     logger.debug("Current user: id=%s, role=%s", current_user.id, current_user.role)
 
@@ -331,33 +331,33 @@ def chat_interface() -> Union[Response, Tuple[Response, int]]:
             session["chat_id"] = chat_id
             logger.info("Created new chat %s for user %s", chat_id, user_id)
 
-            return redirect(url_for("chat.chat_interface", chat_id=chat_id))
+            return cast(FlaskResponse, redirect(url_for("chat.chat_interface", chat_id=chat_id)))
 
         except Exception as e:
             logger.error("Error creating chat: %s", e)
             # Show error page instead of infinite redirect
             return (
-                render_template(
+                cast(FlaskResponse, render_template(
                     "error.html",
                     error="Could not initialize chat. Please contact an administrator.",
-                ),
+                )),
                 500,
             )
 
     chat = Chat.get_by_id(chat_id)
     if not chat:
         logger.error("Chat %s not found", chat_id)
-        return redirect(url_for("chat.chat_interface"))
+        return cast(FlaskResponse, redirect(url_for("chat.chat_interface")))
 
     try:
         model_obj = Chat.get_model(chat_id) if chat.model_id else None
         if not model_obj and chat.model_id:
             logger.error("Failed to retrieve model for chat %s.", chat_id)
             return (
-                render_template(
+                cast(FlaskResponse, render_template(
                     "error.html",
                     error="The model configuration is invalid. Please contact an administrator.",
-                ),
+                )),
                 500,
             )
 
@@ -367,10 +367,10 @@ def chat_interface() -> Union[Response, Tuple[Response, int]]:
     except Exception as e:
         logger.error("Error retrieving model for chat %s: %s", chat_id, str(e))
         return (
-            render_template(
+            cast(FlaskResponse, render_template(
                 "error.html",
                 error="An error occurred while retrieving the model configuration. Please contact an administrator.",
-            ),
+            )),
             500,
         )
 
@@ -409,7 +409,7 @@ def chat_interface() -> Union[Response, Tuple[Response, int]]:
     today = datetime.now().strftime("%Y-%m-%d")
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    return render_template(
+    return cast(FlaskResponse, render_template(
         "chat.html",
         chat_id=chat_id,
         chat_title=chat_title,
@@ -426,7 +426,7 @@ def chat_interface() -> Union[Response, Tuple[Response, int]]:
 
 @chat_routes.route("/get_chat_context/<chat_id>")
 @login_required
-def get_chat_context(chat_id: str) -> Union[Response, Tuple[Response, int]]:
+def get_chat_context(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Get the conversation context for a chat."""
     if not validate_chat_access(chat_id):
         logger.warning("Unauthorized access attempt to chat %s", chat_id)
@@ -444,7 +444,7 @@ def get_chat_context(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 
 @chat_routes.route("/delete_chat/<chat_id>", methods=["DELETE"])
 @login_required
-def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
+def delete_chat(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Delete a chat and its associated messages."""
     logger.debug("Received request to delete chat_id: %s", chat_id)
     if not validate_chat_access(chat_id):
@@ -467,7 +467,7 @@ def delete_chat(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 @chat_routes.route("/scrape", methods=["POST"])
 @login_required
 @limiter.limit(SCRAPE_RATE_LIMIT)
-def scrape() -> Union[Response, Tuple[Response, int]]:
+def scrape() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Handle web scraping requests."""
     data = request.get_json()
     query = bleach.clean(data.get("query", "").strip())
@@ -487,7 +487,7 @@ def scrape() -> Union[Response, Tuple[Response, int]]:
 
 @chat_routes.route("/update_chat_title/<chat_id>", methods=["POST"])
 @login_required
-def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
+def update_chat_title(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Update the title of a chat."""
     logger.debug("Received request to update title for chat_id: %s", chat_id)
     if not validate_chat_access(chat_id):
@@ -512,7 +512,7 @@ def update_chat_title(chat_id: str) -> Union[Response, Tuple[Response, int]]:
 
 @chat_routes.route("/stats/<chat_id>", methods=["GET"])
 @login_required
-def get_chat_stats(chat_id: str) -> Union[Response, Tuple[Response, int]]:
+def get_chat_stats(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Get detailed chat usage statistics."""
     try:
         if not validate_chat_access(chat_id):
@@ -541,9 +541,9 @@ def get_chat_stats(chat_id: str) -> Union[Response, Tuple[Response, int]]:
         # Calculate token usage
         token_breakdown = usage_stats.get("token_breakdown", {})
         total_tokens = (
-            (token_breakdown.get("user", 0) or 0) +
-            (token_breakdown.get("assistant", 0) or 0) +
-            (token_breakdown.get("system", 0) or 0)
+            (token_breakdown.get("user", 0) if isinstance(token_breakdown, dict) else 0) +
+            (token_breakdown.get("assistant", 0) if isinstance(token_breakdown, dict) else 0) +
+            (token_breakdown.get("system", 0) if isinstance(token_breakdown, dict) else 0)
         )
 
         token_usage_percentage = 0
@@ -616,7 +616,7 @@ def validate_chat_request(request_data) -> Dict[str, Any]:
 @chat_routes.route("/", methods=["POST"])
 @login_required
 @limiter.limit(CHAT_RATE_LIMIT)
-def handle_chat() -> Union[Response, Tuple[Response, int]]:
+def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Handle both regular and SSE chat requests"""
     try:
         # Log request details
@@ -785,7 +785,7 @@ def handle_chat() -> Union[Response, Tuple[Response, int]]:
 
 @chat_routes.route("/update_model", methods=["POST"])
 @login_required
-def update_model():
+def update_model() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Update the model for a chat with proper transaction handling."""
     data = request.get_json()
     chat_id: Optional[str] = data.get("chat_id") or session.get("chat_id")
