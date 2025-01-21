@@ -85,12 +85,12 @@ def configure_security() -> None:
 
 def configure_app() -> None:
     """Configure Flask application settings"""
-    # Initialize database first to ensure it's available for all components
-    init_app(app)
-
-    # Basic configuration
+    # Basic configuration first
     app.config["SECRET_KEY"] = Config.SECRET_KEY
     app.config["DATABASE_URI"] = Config.DATABASE_URI
+
+    # Initialize database after setting DATABASE_URI
+    init_app(app)
 
     # File upload settings
     app.config.update(
