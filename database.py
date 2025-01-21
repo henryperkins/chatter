@@ -2,7 +2,7 @@
 
 import os
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import scoped_session, sessionmaker, Session as SessionType
+from sqlalchemy.orm import scoped_session, sessionmaker, Session as SessionType, sessionmaker
 from sqlalchemy.orm.session import Session
 from sqlalchemy.orm.scoping import scoped_session as ScopedSession
 import logging
@@ -20,6 +20,9 @@ POOL_SIZE = 5  # Number of connections to keep in the pool
 MAX_OVERFLOW = 10  # Maximum number of connections to create beyond the pool size
 POOL_RECYCLE = 3600  # Recycle connections after 1 hour (PostgreSQL default is 1 hour)
 POOL_TIMEOUT = 30  # Timeout for acquiring a connection from the pool
+
+# Add this line to define SessionLocal
+SessionLocal = sessionmaker(autocommit=False, autoflush=False)
 
 def get_db_state():
     """Get database state from application context"""

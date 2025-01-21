@@ -18,7 +18,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.wrappers import Response as WerkzeugResponse
 from sqlalchemy import text
 
-from database import init_app, db_session, is_initialized, init_db
+from database import init_app, db_session, is_initialized, init_db, SessionLocal
 from extensions import limiter, login_manager, csrf
 from models import User
 from routes.auth_routes import bp as auth_bp
@@ -365,27 +365,29 @@ def db_health_check():
 
 
 # --- User Loader ---
-@login_manager.user_loader
 def load_user(user_id: str) -> Optional[User]:
-    """Load user by ID."""
+    """Load user by ID"""
     try:
-        with db_session() as db:
-            result = db.execute(
-                text("SELECT id, username, email, role FROM users WHERE id = :id"),
-                {"id": int(user_id)},
-            ).fetchone()
-            if result:
-                return User(
-                    id=result.id,
-                    username=result.username,
-                    email=result.email,
-                    role=result.role
-                )
-            else:
-                return None
+        # Use a separate session for load_user
+        db = SessionLocal()
+        result = db.execute(
+            text("SELECT id, username, email, role FROM users WHERE id = :id"),
+            {"id": int(user_id)},
+        ).fetchone()
+        if result:
+            return User(
+                id=result.id,
+                username=result.username,
+                email=result.email,
+                role=result.role
+            )
+        else:
+            return None
     except Exception as e:
         logger.error(f"Error loading user: {e}")
         return None
+    finally:
+        db.close()
 
 
 # --- Application Initialization ---
