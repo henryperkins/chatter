@@ -94,7 +94,6 @@ def init_db(db_uri: str = None) -> None:
     
     try:
         # Create engine with proper PostgreSQL settings
-        # Create engine with proper PostgreSQL settings
         connect_args = {}
         engine = create_engine(
             db_uri,
@@ -104,6 +103,12 @@ def init_db(db_uri: str = None) -> None:
             pool_timeout=POOL_TIMEOUT,
             connect_args=connect_args
         )
+
+        # Drop all existing tables
+        with engine.connect() as conn:
+            conn.execute(text("DROP SCHEMA public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
+            conn.commit()
         
         # Read and execute schema.sql
         with current_app.open_resource('schema.sql') as f:
