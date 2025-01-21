@@ -16,10 +16,10 @@ from contextlib import contextmanager
 logger = logging.getLogger(__name__)
 
 # Connection pool settings for PostgreSQL
-POOL_SIZE = 5  # Number of connections to keep in the pool
-MAX_OVERFLOW = 10  # Maximum number of connections to create beyond the pool size
-POOL_RECYCLE = 3600  # Recycle connections after 1 hour (PostgreSQL default is 1 hour)
-POOL_TIMEOUT = 30  # Timeout for acquiring a connection from the pool
+POOL_SIZE = 10  # Increased from 5
+MAX_OVERFLOW = 20  # Increased from 10
+POOL_RECYCLE = 1800  # 30 minutes instead of 1 hour
+POOL_TIMEOUT = 10  # Reduced from 30 seconds
 
 # Add this line to define SessionLocal
 SessionLocal = sessionmaker(autocommit=False, autoflush=False)
@@ -56,18 +56,25 @@ def db_session() -> Generator[Session, None, None]:
     try:
         yield session
         # Only commit if no errors and session is active
-        if session.is_active and not session.in_transaction():
-            session.commit()
-    except Exception as e:
-        # Only rollback if session is active
         if session.is_active:
-            session.rollback()
+            try:
+                session.commit()
+            except Exception as commit_error:
+                logger.error(f"Commit failed: {commit_error}")
+                session.rollback()
+                raise
+    except Exception as e:
         logger.error(f"Database operation failed: {e}")
+        if session.is_active:
+            try:
+                session.rollback()
+            except Exception as rollback_error:
+                logger.error(f"Rollback failed: {rollback_error}")
         raise
     finally:
-        # Always close the session
         try:
-            session.close()
+            if session.is_active:
+                session.close()
         except Exception as e:
             logger.error(f"Error closing session: {e}")
 
@@ -323,6 +330,7 @@ def init_app(app: Flask) -> None:
                 max_overflow=MAX_OVERFLOW,
                 pool_recycle=POOL_RECYCLE,
                 pool_timeout=POOL_TIMEOUT,
+                pool_pre_ping=True,  # Add connection health checks
                 connect_args=connect_args
             )
 

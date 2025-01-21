@@ -50,10 +50,11 @@ class User(UserMixin):
                 query = text("SELECT * FROM users WHERE id = :user_id")
                 result = db.execute(query, {"user_id": user_id})
                 if result:
-                    user_dict = row_to_dict(
-                        result.fetchone(),
-                        ["id", "username", "email", "password_hash", "role", "created_at"]
-                    )
+                    row = result.fetchone()
+                    user_dict = row_to_dict(row, [
+                        "id", "username", "email", "password_hash", 
+                        "role", "created_at"
+                    ])
                     return User(**user_dict)
                 logger.info(f"No user found with ID: {user_id}")
                 return None
