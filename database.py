@@ -16,10 +16,11 @@ from contextlib import contextmanager
 logger = logging.getLogger(__name__)
 
 # Connection pool settings for PostgreSQL
-POOL_SIZE = 10  # Increased from 5
-MAX_OVERFLOW = 20  # Increased from 10
-POOL_RECYCLE = 1800  # 30 minutes instead of 1 hour
-POOL_TIMEOUT = 10  # Reduced from 30 seconds
+POOL_SIZE = 20  # Increased from 10
+MAX_OVERFLOW = 30  # Increased from 20
+POOL_RECYCLE = 900  # 15 minutes instead of 30
+POOL_TIMEOUT = 5  # Reduced from 10 seconds
+POOL_PRE_PING = True  # Add connection health checks
 
 # Add this line to define SessionLocal
 SessionLocal = sessionmaker(autocommit=False, autoflush=False)
@@ -56,16 +57,17 @@ def db_session() -> Generator[Session, None, None]:
     try:
         yield session
         # Only commit if no errors and session is active
-        if session.is_active:
+        if session.is_active and not session.in_transaction():
             try:
                 session.commit()
             except Exception as commit_error:
                 logger.error(f"Commit failed: {commit_error}")
-                session.rollback()
+                if session.is_active:
+                    session.rollback()
                 raise
     except Exception as e:
         logger.error(f"Database operation failed: {e}")
-        if session.is_active:
+        if session.is_active and session.in_transaction():
             try:
                 session.rollback()
             except Exception as rollback_error:

@@ -53,7 +53,8 @@ class User(UserMixin):
                     row = result.fetchone()
                     user_dict = row_to_dict(row, [
                         "id", "username", "email", "password_hash", 
-                        "role", "created_at"
+                        "role", "created_at", "reset_token",
+                        "reset_token_expiry"
                     ])
                     return User(**user_dict)
                 logger.info(f"No user found with ID: {user_id}")
