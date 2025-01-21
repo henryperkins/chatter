@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- MODELS TABLE
 CREATE TABLE IF NOT EXISTS models (
     id SERIAL PRIMARY KEY,
-    provider_id INTEGER NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+    provider_id INTEGER REFERENCES providers(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     model_identifier TEXT NOT NULL,
     description TEXT,
