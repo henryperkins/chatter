@@ -22,7 +22,7 @@ class Config:
         raise ValueError("AZURE_API_KEY environment variable is not set.")
     AZURE_API_ENDPOINT = os.getenv("AZURE_API_ENDPOINT", "https://openai.azure.com/")
     AZURE_API_VERSION = os.getenv("AZURE_API_VERSION", "2024-12-01-preview")
-    AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "o1-preview")
+    AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-deployment")
 
     # Added missing default model configurations
     DEFAULT_MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "Default Model")

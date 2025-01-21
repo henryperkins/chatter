@@ -149,7 +149,7 @@ def create_default_model(db) -> None:
         "name": Config.DEFAULT_MODEL_NAME,
         "deployment_name": Config.DEFAULT_DEPLOYMENT_NAME,
         "description": Config.DEFAULT_MODEL_DESCRIPTION,
-        "model_type": "o1-preview",  # Default type
+        "model_type": "gpt",  # Default type
         "api_endpoint": Config.DEFAULT_API_ENDPOINT,
         "api_key": Config.AZURE_API_KEY,
         "temperature": Config.DEFAULT_TEMPERATURE,
