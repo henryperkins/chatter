@@ -12,9 +12,10 @@ sys.path.append('.')
 app = Flask(__name__)
 app.config['DATABASE_URI'] = 'postgresql://username:password@localhost/dbname'  # Update with your actual DB URI
 
-# Initialize database
+# Initialize database within app context
 from database import init_app
-init_app(app)
+with app.app_context():
+    init_app(app)
 
 def format_user(user: Dict[str, Any]) -> str:
     """Format user information for display"""
@@ -65,8 +66,20 @@ def main():
     args = parser.parse_args()
 
     try:
+        # Create a new app context for the main execution
         with app.app_context():
             users = list_users(show_password_hashes=args.show_hashes)
+            
+            if not users:
+                print("No users found in the database")
+                return
+
+            print(f"Found {len(users)} users:\n")
+            for user in users:
+                print(format_user(user))
+                if args.show_hashes:
+                    print(f"Password Hash: {user['password_hash']}")
+                print("-" * 60)
         
         if not users:
             print("No users found in the database")
