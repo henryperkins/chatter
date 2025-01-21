@@ -109,6 +109,14 @@ def init_db(db_uri: str = None) -> None:
             conn.execute(text("DROP SCHEMA public CASCADE"))
             conn.execute(text("CREATE SCHEMA public"))
             conn.commit()
+
+        # Set up database state
+        db_state = get_db_state()
+        db_state['engine'] = engine
+        db_state['Session'] = scoped_session(
+            sessionmaker(bind=engine),
+            scopefunc=lambda: id(g) if hasattr(g, '_get_current_object') else None
+        )
         
         # Read and execute schema.sql
         with current_app.open_resource('schema.sql') as f:
