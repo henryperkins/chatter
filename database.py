@@ -230,7 +230,7 @@ def init_app(app: Flask) -> None:
         try:
             # Configure PostgreSQL connection with SSL settings
             connect_args = {}
-            if 'sslmode=disable' not in db_uri:
+            if 'sslmode=disable' not in app.config["DATABASE_URI"]:
                 connect_args = {
                     'sslmode': 'verify-ca',
                     'sslcert': '/etc/ssl/certs/ca-certificates.crt'
