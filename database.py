@@ -90,30 +90,33 @@ def db_session() -> Generator[Session, None, None]:
         # Create new session
         session = db_state['Session']()
         
-        # Set session parameters BEFORE starting transaction
-        with session.begin():
-            # Execute session configuration within transaction scope
-            session.execute(text("SET LOCAL lock_timeout = '5s'"))
-            session.execute(text("SET LOCAL statement_timeout = '30s'"))
-            yield session
-            # Transaction will be automatically committed if no exception occurs
-            
+        # Set session parameters before any operations
+        session.execute(text("SET lock_timeout = '5s'"))
+        session.execute(text("SET statement_timeout = '30s'"))
+        
+        # Start transaction
+        session.begin()
+        
+        yield session
+        
+        # Commit if no exception occurred
+        session.commit()
     except Exception as e:
+        # Rollback on error
         if session and session.in_transaction():
-            session.rollback()
+            try:
+                session.rollback()
+            except Exception as rollback_error:
+                logger.error(f"Error during rollback: {rollback_error}")
         logger.error(f"Database operation failed: {str(e)}")
         raise
     finally:
+        # Clean up
         if session:
             try:
                 session.close()
-            except Exception as e:
-                logger.error(f"Error closing session: {str(e)}")
-            if hasattr(db_state['Session'], 'remove'):
-                try:
-                    db_state['Session'].remove()
-                except Exception as e:
-                    logger.error(f"Error removing session: {str(e)}")
+            except Exception as close_error:
+                logger.error(f"Error closing session: {close_error}")
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
