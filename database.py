@@ -88,10 +88,14 @@ def db_session() -> Generator[Session, None, None]:
     session = None
     try:
         session = db_state['Session']()
-        # Set session parameters before any operations
-        session.execute(text("SET lock_timeout = '5s'"))
-        session.execute(text("SET statement_timeout = '30s'"))
+        session.begin()  # Explicitly start transaction
+        
+        # Set session parameters within transaction
+        session.execute(text("SET LOCAL lock_timeout = '5s'"))
+        session.execute(text("SET LOCAL statement_timeout = '30s'"))
+        
         yield session
+        
         if session.in_transaction():
             session.commit()
     except Exception as e:
@@ -374,22 +378,26 @@ def init_app(app: Flask) -> None:
     # Only initialize if not already initialized
     if not is_initialized():
         try:
-            # Configure PostgreSQL connection
+            # Configure PostgreSQL connection with explicit transaction control
             db_state['engine'] = create_engine(
                 app.config["DATABASE_URI"],
                 pool_size=POOL_SIZE,
                 max_overflow=MAX_OVERFLOW,
                 pool_timeout=POOL_TIMEOUT,
                 pool_pre_ping=True,
-                isolation_level='READ COMMITTED'  # Add this line
+                isolation_level='READ COMMITTED',
+                execution_options={
+                    "isolation_level": "READ COMMITTED"
+                }
             )
 
-            # Create a scoped session factory
+            # Create a scoped session factory with explicit transaction settings
             db_state['Session'] = scoped_session(
                 sessionmaker(
                     bind=db_state['engine'],
                     autocommit=False,
-                    autoflush=False
+                    autoflush=False,
+                    expire_on_commit=False
                 )
             )
 
