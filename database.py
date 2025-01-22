@@ -85,27 +85,23 @@ def db_session() -> Generator[Session, None, None]:
     if db_state['Session'] is None:
         raise RuntimeError("Session factory is not initialized")
 
-    session = db_state['Session']()
+    session = None
     try:
-        # Set session parameters before beginning transaction
+        session = db_state['Session']()
+        # Set session parameters before any operations
         session.execute(text("SET lock_timeout = '5s'"))
         session.execute(text("SET statement_timeout = '30s'"))
-        
         yield session
-        
-        # Only commit if there are actual changes
         if session.in_transaction():
             session.commit()
-            
     except Exception as e:
-        if session.in_transaction():
+        if session and session.in_transaction():
             session.rollback()
         logger.error(f"Database operation failed: {str(e)}")
         raise
     finally:
-        session.close()
-        if 'Session' in db_state and hasattr(db_state['Session'], 'remove'):
-            db_state['Session'].remove()
+        if session:
+            session.close()
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
@@ -379,41 +375,31 @@ def init_app(app: Flask) -> None:
     if not is_initialized():
         try:
             # Configure PostgreSQL connection
-            connect_args = {}
             db_state['engine'] = create_engine(
                 app.config["DATABASE_URI"],
                 pool_size=POOL_SIZE,
                 max_overflow=MAX_OVERFLOW,
-                # Removed pool_recycle since it wasn't used consistently
                 pool_timeout=POOL_TIMEOUT,
-                pool_pre_ping=POOL_PRE_PING,  # Add connection health checks
-                connect_args=connect_args
+                pool_pre_ping=True,
+                isolation_level='READ COMMITTED'  # Add this line
             )
 
-            # Create a scoped session factory bound to the application context
-            # Configure session with proper isolation level and expiration
+            # Create a scoped session factory
             db_state['Session'] = scoped_session(
                 sessionmaker(
                     bind=db_state['engine'],
                     autocommit=False,
-                    autoflush=False,
-                    expire_on_commit=True
-                ),
-                scopefunc=lambda: id(g) if hasattr(g, '_get_current_object') else None
+                    autoflush=False
+                )
             )
 
-            logger.info("Database engine and session initialized successfully")
-
-            # Initialize database schema only
+            # Initialize database schema
             init_db(app.config["DATABASE_URI"])
 
             # Register cleanup function
             app.teardown_appcontext(close_db)
 
-            # Add CLI command for database initialization
-            app.cli.add_command(init_db_command)
-            
-            logger.info("Database functions registered with Flask app")
+            logger.info("Database initialization completed successfully")
         except Exception as e:
             logger.error(f"Database initialization failed: {e}", exc_info=True)
             raise

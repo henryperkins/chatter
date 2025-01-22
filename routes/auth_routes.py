@@ -61,7 +61,6 @@ def manage_users():
 
 @bp.route("/login", methods=["GET", "POST"])
 @limiter.limit("5 per minute", key_func=limiter_key)
-@limiter.limit("50 per hour", key_func=lambda: request.remote_addr or "unknown")  # Add hourly limit
 def login():
     """Handle user login requests."""
     if current_user.is_authenticated:
@@ -70,99 +69,49 @@ def login():
     form = LoginForm()
     if request.method == "POST":
         username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
 
-        if not check_attempts(username, failed_logins):
-            logger.warning(
-                "Rate limit exceeded for login attempts",
-                extra={
-                    "ip_address": request.remote_addr,
-                    "route": request.path,
-                    "username": username,
-                },
-            )
-            form.errors['username'] = ['Too many login attempts. Please try again later.']
+        if not username or not password:
+            flash("Username and password are required", "error")
             return render_template("login.html", form=form)
 
         try:
-            csrf_token = (
-                request.form.get("csrf_token") or
-                request.headers.get('X-CSRFToken') or
-                request.headers.get('X-Csrf-Token')
-            )
-            try:
-                validate_csrf(csrf_token)
-            except Exception:
-                logger.warning(
-                    "CSRF token validation failed",
-                    extra={"ip_address": request.remote_addr, "route": request.path},
+            with db_session() as db:
+                # Get user with a single query
+                query = text("""
+                    SELECT id, username, email, password_hash, role 
+                    FROM users 
+                    WHERE username = :username
+                """)
+                result = db.execute(query, {"username": username}).mappings().first()
+
+                if not result:
+                    flash("Invalid username or password", "error")
+                    return render_template("login.html", form=form)
+
+                password_hash = result["password_hash"]
+                if isinstance(password_hash, bytes):
+                    password_hash = password_hash.decode('utf-8')
+
+                if not check_password_hash(password_hash, password):
+                    flash("Invalid username or password", "error")
+                    return render_template("login.html", form=form)
+
+                # Create user object and login
+                user = User(
+                    id=result["id"],
+                    username=result["username"],
+                    email=result["email"],
+                    role=result["role"]
                 )
-                form.errors['csrf_token'] = ['Invalid CSRF token. Please refresh the page and try again.']
-                return render_template("login.html", form=form)
-
-            if form.validate_on_submit():
-                with db_session() as db:
-                    user = (
-                        db.execute(
-                            text("SELECT * FROM users WHERE username = :username"),
-                            {"username": username},
-                        )
-                        .mappings()
-                        .first()
-                    )
-
-                    if not user or not user.get("password_hash"):
-                        log_failed_attempt(username, failed_logins)
-                        form.password.errors = ['Invalid username or password']
-                        return render_template("login.html", form=form)
-
-                    password_hash = user["password_hash"].decode("utf-8") if isinstance(user["password_hash"], bytes) else user["password_hash"]
-                    if not password_hash or not check_password_hash(
-                        pwhash=password_hash,
-                        password=form.password.data.strip() if form.password.data else ""
-                    ):
-
-                        log_failed_attempt(username, failed_logins)
-                        logger.warning(
-                            "Invalid login attempt",
-                            extra={
-                                "ip_address": request.remote_addr,
-                                "route": request.path,
-                                "username": username,
-                            },
-                        )
-                        form.password.errors = ['Invalid username or password']
-                        return render_template("login.html", form=form)
-
-                    user_obj = User(
-                        user["id"], user["username"], user["email"], user["role"]
-                    )
-                    login_user(user_obj)
-                    logger.info(
-                        f"User {username} logged in successfully",
-                        extra={
-                            "ip_address": request.remote_addr,
-                            "user_agent": request.headers.get('User-Agent'),
-                            "route": request.path,
-                            "user_id": user_obj.id,
-                            "login_duration": (datetime.now() - session.get('login_time', datetime.now())).total_seconds(),
-                        },
-                    )
-                    session['login_time'] = datetime.now()  # Track login time for session duration
-                    return redirect(url_for("chat.chat_interface"))
-
-            return render_template("login.html", form=form)
+                login_user(user)
+                
+                return redirect(url_for("chat.chat_interface"))
 
         except Exception as e:
-            logger.error(
-                f"Error during login process: {e}",
-                exc_info=True,
-                extra={
-                    "ip_address": request.remote_addr,
-                    "route": request.path,
-                    "username": username,
-                },
-            )
-            return handle_error(e, "Error during login process")
+            logger.error(f"Login error: {str(e)}", exc_info=True)
+            flash("An error occurred during login. Please try again.", "error")
+            return render_template("login.html", form=form)
 
     return render_template("login.html", form=form)
 
@@ -173,186 +122,60 @@ def register():
     if current_user.is_authenticated:
         return redirect(url_for("chat.chat_interface"))
 
-    # Check if there are any existing users
-    with db_session() as db:
-        user_count = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
-        is_first_user = user_count == 0
-
     form = RegistrationForm()
     if request.method == "POST":
         try:
-            csrf_token = (
-                request.form.get("csrf_token") or
-                request.headers.get('X-CSRFToken') or
-                request.headers.get('X-Csrf-Token')
-            )
-            try:
-                validate_csrf(csrf_token)
-            except (CSRFError, ValidationError) as e:
-                logger.warning(
-                    f"CSRF token validation failed during registration: {e}",
-                    extra={"ip_address": request.remote_addr, "route": request.path},
-                )
-                form.errors['csrf_token'] = ['Invalid CSRF token. Please refresh the page and try again.']
-                return render_template("register.html", form=form)
-
-            ip = request.remote_addr or "unknown"
-            if not check_attempts(ip, failed_registrations):
-                logger.warning(
-                    "Rate limit exceeded for registration attempts",
-                    extra={"ip_address": ip, "route": request.path},
-                )
-                form.errors['username'] = ['Too many registration attempts. Please try again later.']
-                return render_template("register.html", form=form)
-
             if form.validate_on_submit():
-                start_time = datetime.now()
-                username = form.username.data.strip() if form.username.data else ""
-                email = form.email.data.lower().strip() if form.email.data else ""
-                password = form.password.data if form.password.data else ""
-
-                # Hash password before any database operations
-                hashed_pw = generate_password_hash(password)
-                if isinstance(hashed_pw, bytes):
-                    hashed_pw = hashed_pw.decode("utf-8")
+                username = form.username.data.strip()
+                email = form.email.data.lower().strip()
+                password = form.password.data
 
                 with db_session() as db:
                     # Check for existing user
-                    existing_user = (
-                        db.execute(
-                            text(
-                                "SELECT id FROM users WHERE LOWER(username) = LOWER(:username) OR LOWER(email) = LOWER(:email)"
-                            ),
-                            {"username": username, "email": email},
-                        )
-                        .mappings()
-                        .first()
-                    )
+                    query = text("""
+                        SELECT COUNT(*) as count 
+                        FROM users 
+                        WHERE username = :username OR email = :email
+                    """)
+                    result = db.execute(query, {
+                        "username": username,
+                        "email": email
+                    }).scalar()
 
-                    if existing_user:
-                        log_failed_attempt(ip, failed_registrations)
-                        logger.warning(
-                            "Registration failed: username or email already exists",
-                            extra={
-                                "ip_address": ip,
-                                "route": request.path,
-                                "username": username,
-                                "email": email,
-                            },
-                        )
-                        form.email.errors = ['Username or email already exists']
+                    if result > 0:
+                        flash("Username or email already exists", "error")
                         return render_template("register.html", form=form)
 
-                    # Create first user as admin
-                    if is_first_user:
-                        logger.info("Creating first admin user")
-                        result = db.execute(
-                            text(
-                                """
-                                INSERT INTO users (username, email, password_hash, role, is_verified)
-                                VALUES (:username, :email, :password_hash, 'admin', TRUE)
-                                RETURNING id, username, email, role
-                            """
-                            ),
-                            {
-                                "username": username,
-                                "email": email,
-                                "password_hash": hashed_pw,
-                            },
-                        ).fetchone()
+                    # Create new user
+                    password_hash = generate_password_hash(password)
+                    if isinstance(password_hash, bytes):
+                        password_hash = password_hash.decode('utf-8')
 
-                        # Create User object and log them in
-                        user_obj = User(result[0], result[1], result[2], result[3])
-                        login_user(user_obj)
+                    query = text("""
+                        INSERT INTO users (username, email, password_hash, role)
+                        VALUES (:username, :email, :password_hash, 'user')
+                        RETURNING id, username, email, role
+                    """)
+                    result = db.execute(query, {
+                        "username": username,
+                        "email": email,
+                        "password_hash": password_hash
+                    }).mappings().first()
 
-                        logger.info(
-                            "First admin user created successfully",
-                            extra={
-                                "ip_address": ip,
-                                "route": request.path,
-                                "email_hash": hashlib.sha256(email.encode()).hexdigest(),
-                                "duration_ms": (datetime.now() - start_time).total_seconds() * 1000
-                            }
-                        )
-
-                        return redirect(url_for('chat.chat_interface'))
-
-                    # For non-first users, check username uniqueness
-                    existing_username = db.execute(
-                        text("SELECT id FROM users WHERE LOWER(username) = LOWER(:username)"),
-                        {"username": username},
-                    ).scalar()
-
-                    if existing_username:
-                        log_failed_attempt(ip, failed_registrations)
-                        logger.warning(
-                            "Registration failed: username already exists",
-                            extra={
-                                "ip_address": ip,
-                                "route": request.path,
-                                "username": username,
-                            },
-                        )
-                        form.username.errors = ['This username is already taken']
-                        return render_template("register.html", form=form)
-
-                    # Create regular user
-                    logger.info(
-                        "Creating new regular user",
-                        extra={
-                            "username": username,
-                            "email": email,
-                        }
+                    # Log the user in
+                    user = User(
+                        id=result["id"],
+                        username=result["username"],
+                        email=result["email"],
+                        role=result["role"]
                     )
-                    hashed_pw = generate_password_hash(password)
-                    if isinstance(hashed_pw, bytes):
-                        hashed_pw = hashed_pw.decode("utf-8")
+                    login_user(user)
 
-                    result = db.execute(
-                        text(
-                            """
-                            INSERT INTO users (username, email, password_hash, role, is_verified)
-                            VALUES (:username, :email, :password_hash, 'user', TRUE)
-                            RETURNING id, username, email, role
-                        """
-                        ),
-                        {
-                            "username": username,
-                            "email": email,
-                            "password_hash": hashed_pw,
-                        },
-                    ).fetchone()
-
-                    # Create User object and log them in
-                    user_obj = User(result[0], result[1], result[2], result[3])
-                    login_user(user_obj)
-
-                logger.info(
-                    "User registration successful",
-                    extra={
-                        "ip_address": ip,
-                        "route": request.path,
-                        "email_hash": hashlib.sha256(email.encode()).hexdigest(),
-                        "duration_ms": (datetime.now() - start_time).total_seconds() * 1000
-                    }
-                )
-
-                return redirect(url_for('chat.chat_interface'))
-
-            return render_template("register.html", form=form)
+                    return redirect(url_for("chat.chat_interface"))
 
         except Exception as e:
-            logger.error(
-                f"Registration error: {e}",
-                exc_info=True,
-                extra={
-                    "ip_address": request.remote_addr,
-                    "route": request.path,
-                    "username": form.username.data if form.username.data else None,
-                    "email": form.email.data if form.email.data else None,
-                },
-            )
-            form.errors['non_field_errors'] = ['An unexpected error occurred. Please try again.']
+            logger.error(f"Registration error: {str(e)}", exc_info=True)
+            flash("An error occurred during registration. Please try again.", "error")
             return render_template("register.html", form=form)
 
     return render_template("register.html", form=form)
