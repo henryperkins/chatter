@@ -87,18 +87,17 @@ def db_session() -> Generator[Session, None, None]:
 
     session = None
     try:
+        # Create new session
         session = db_state['Session']()
-        # Start transaction explicitly
-        session.begin()
         
-        # Set session parameters
-        session.execute(text("SET lock_timeout = '5s'"))
-        session.execute(text("SET statement_timeout = '30s'"))
-        
-        yield session
-        
-        # Commit if no exception occurred
-        session.commit()
+        # Set session parameters BEFORE starting transaction
+        with session.begin():
+            # Execute session configuration within transaction scope
+            session.execute(text("SET LOCAL lock_timeout = '5s'"))
+            session.execute(text("SET LOCAL statement_timeout = '30s'"))
+            yield session
+            # Transaction will be automatically committed if no exception occurs
+            
     except Exception as e:
         if session and session.in_transaction():
             session.rollback()
@@ -106,9 +105,15 @@ def db_session() -> Generator[Session, None, None]:
         raise
     finally:
         if session:
-            session.close()
+            try:
+                session.close()
+            except Exception as e:
+                logger.error(f"Error closing session: {str(e)}")
             if hasattr(db_state['Session'], 'remove'):
-                db_state['Session'].remove()
+                try:
+                    db_state['Session'].remove()
+                except Exception as e:
+                    logger.error(f"Error removing session: {str(e)}")
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
@@ -392,6 +397,9 @@ def init_app(app: Flask) -> None:
                 execution_options={
                     "isolation_level": "READ COMMITTED",
                     "autocommit": False
+                },
+                connect_args={
+                    'options': '-c timezone=utc -c statement_timeout=30000'
                 }
             )
 
