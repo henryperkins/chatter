@@ -55,6 +55,7 @@
     "electron-to-chromium": "^1.5.76",
     "emoji-regex": "^9.2.2",
     "escalade": "^3.2.0",
+    "eslintrc": "^1.0.5",
     "fast-glob": "^3.3.2",
     "fastq": "^1.18.0",
     "fill-range": "^7.1.1",
