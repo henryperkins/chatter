@@ -138,12 +138,11 @@ def register():
                 password = form.password.data
 
                 with db_session() as db:
-                    # Check for existing user with proper transaction
+                    # Check for existing user without FOR UPDATE
                     query = text("""
                         SELECT COUNT(*) as count 
                         FROM users 
                         WHERE username = :username OR email = :email
-                        FOR UPDATE
                     """)
                     result = db.execute(query, {
                         "username": username,
@@ -160,12 +159,13 @@ def register():
                         if isinstance(password_hash, bytes):
                             password_hash = password_hash.decode('utf-8')
 
-                        query = text("""
+                        # Use a transaction for the insert
+                        insert_query = text("""
                             INSERT INTO users (username, email, password_hash, role)
                             VALUES (:username, :email, :password_hash, 'user')
                             RETURNING id, username, email, role
                         """)
-                        result = db.execute(query, {
+                        result = db.execute(insert_query, {
                             "username": username,
                             "email": email,
                             "password_hash": password_hash
@@ -183,8 +183,12 @@ def register():
                         )
                         login_user(user)
                         
+                        # Commit the transaction
+                        db.commit()
+                        
                         return redirect(url_for("chat.chat_interface"))
                     except Exception as e:
+                        db.rollback()
                         logger.error(f"Error creating user: {str(e)}")
                         flash("Error creating user account", "error")
                         return render_template("register.html", form=form)
