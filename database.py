@@ -87,17 +87,17 @@ def db_session() -> Generator[Session, None, None]:
 
     session = None
     try:
+        # Create new session
         session = db_state['Session']()
-        session.begin()  # Explicitly start transaction
         
-        # Set session parameters within transaction
-        session.execute(text("SET LOCAL lock_timeout = '5s'"))
-        session.execute(text("SET LOCAL statement_timeout = '30s'"))
-        
-        yield session
-        
-        if session.in_transaction():
-            session.commit()
+        # Set session parameters BEFORE starting transaction
+        with session.begin():
+            # Set session parameters within transaction scope
+            session.execute(text("SET LOCAL lock_timeout = '5s'"))
+            session.execute(text("SET LOCAL statement_timeout = '30s'"))
+            yield session
+            # Transaction will be automatically committed if no exception occurs
+            
     except Exception as e:
         if session and session.in_transaction():
             session.rollback()
@@ -106,6 +106,8 @@ def db_session() -> Generator[Session, None, None]:
     finally:
         if session:
             session.close()
+            if hasattr(db_state['Session'], 'remove'):
+                db_state['Session'].remove()
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
@@ -387,7 +389,8 @@ def init_app(app: Flask) -> None:
                 pool_pre_ping=True,
                 isolation_level='READ COMMITTED',
                 execution_options={
-                    "isolation_level": "READ COMMITTED"
+                    "isolation_level": "READ COMMITTED",
+                    "autocommit": False
                 }
             )
 
@@ -397,7 +400,8 @@ def init_app(app: Flask) -> None:
                     bind=db_state['engine'],
                     autocommit=False,
                     autoflush=False,
-                    expire_on_commit=False
+                    expire_on_commit=False,
+                    twophase=False  # Disable two-phase commit
                 )
             )
 
