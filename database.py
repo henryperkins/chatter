@@ -90,33 +90,35 @@ def db_session() -> Generator[Session, None, None]:
         # Create new session
         session = db_state['Session']()
         
-        # Set session parameters before any operations
-        session.execute(text("SET lock_timeout = '5s'"))
-        session.execute(text("SET statement_timeout = '30s'"))
-        
-        # Start transaction
-        session.begin()
-        
-        yield session
-        
-        # Commit if no exception occurred
-        session.commit()
+        # Start transaction and set session parameters
+        with session.begin():
+            # Set session parameters within transaction scope
+            session.execute(text("SET LOCAL lock_timeout = '5s'"))
+            session.execute(text("SET LOCAL statement_timeout = '30s'"))
+            yield session
+            # Transaction will be automatically committed if no exception occurs
+            
     except Exception as e:
-        # Rollback on error
-        if session and session.in_transaction():
+        logger.error(f"Database operation failed: {str(e)}")
+        if session:
             try:
-                session.rollback()
+                if session.in_transaction():
+                    session.rollback()
             except Exception as rollback_error:
                 logger.error(f"Error during rollback: {rollback_error}")
-        logger.error(f"Database operation failed: {str(e)}")
         raise
     finally:
-        # Clean up
         if session:
             try:
                 session.close()
             except Exception as close_error:
                 logger.error(f"Error closing session: {close_error}")
+            finally:
+                if hasattr(db_state['Session'], 'remove'):
+                    try:
+                        db_state['Session'].remove()
+                    except Exception as remove_error:
+                        logger.error(f"Error removing session: {remove_error}")
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
@@ -389,7 +391,7 @@ def init_app(app: Flask) -> None:
     # Only initialize if not already initialized
     if not is_initialized():
         try:
-            # Configure PostgreSQL connection with explicit transaction control
+            # Configure PostgreSQL connection
             db_state['engine'] = create_engine(
                 app.config["DATABASE_URI"],
                 pool_size=POOL_SIZE,
@@ -399,21 +401,17 @@ def init_app(app: Flask) -> None:
                 isolation_level='READ COMMITTED',
                 execution_options={
                     "isolation_level": "READ COMMITTED",
-                    "autocommit": False
-                },
-                connect_args={
-                    'options': '-c timezone=utc -c statement_timeout=30000'
+                    "autocommit": True  # Changed to True
                 }
             )
 
-            # Create a scoped session factory with explicit transaction settings
+            # Create a scoped session factory
             db_state['Session'] = scoped_session(
                 sessionmaker(
                     bind=db_state['engine'],
-                    autocommit=False,
+                    autocommit=True,  # Changed to True
                     autoflush=False,
-                    expire_on_commit=False,
-                    twophase=False  # Disable two-phase commit
+                    expire_on_commit=False
                 )
             )
 
