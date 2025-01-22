@@ -130,72 +130,117 @@ def register():
         return redirect(url_for("chat.chat_interface"))
 
     form = RegistrationForm()
-    if request.method == "POST" and form.validate_on_submit():
+    if request.method == "POST":
         try:
-            username = form.username.data.strip()
-            email = form.email.data.lower().strip()
-            password = form.password.data
+            if form.validate_on_submit():
+                username = form.username.data.strip()
+                email = form.email.data.lower().strip()
+                password = form.password.data
 
-            with db_session() as db:
-                # Check for existing user
-                check_query = text("""
-                    SELECT 1 FROM users 
-                    WHERE username = :username 
-                    OR email = :email
-                    LIMIT 1
-                """)
-                
-                exists = db.execute(
-                    check_query, 
-                    {"username": username, "email": email}
-                ).first() is not None
+                with db_session() as db:
+                    # Check for existing user with transaction
+                    check_query = text("""
+                        SELECT 1 FROM users 
+                        WHERE LOWER(username) = LOWER(:username) 
+                        OR LOWER(email) = LOWER(:email)
+                        FOR UPDATE
+                    """)
+                    
+                    exists = db.execute(
+                        check_query, 
+                        {"username": username, "email": email}
+                    ).first() is not None
 
-                if exists:
-                    flash("Username or email already exists", "error")
-                    return render_template("register.html", form=form)
+                    if exists:
+                        flash("Username or email already exists", "error")
+                        return render_template("register.html", form=form)
 
-                # Create new user
-                password_hash = generate_password_hash(password)
-                if isinstance(password_hash, bytes):
-                    password_hash = password_hash.decode('utf-8')
+                    # Create new user
+                    password_hash = generate_password_hash(password)
+                    if isinstance(password_hash, bytes):
+                        password_hash = password_hash.decode('utf-8')
 
-                insert_query = text("""
-                    INSERT INTO users (username, email, password_hash, role, is_active)
-                    VALUES (:username, :email, :password_hash, 'user', TRUE)
-                    RETURNING id, username, email, role
-                """)
-                
-                result = db.execute(
-                    insert_query,
-                    {
-                        "username": username,
-                        "email": email,
-                        "password_hash": password_hash
+                    insert_query = text("""
+                        INSERT INTO users (
+                            username, 
+                            email, 
+                            password_hash, 
+                            role, 
+                            is_active,
+                            created_at
+                        )
+                        VALUES (
+                            :username, 
+                            :email, 
+                            :password_hash, 
+                            'user', 
+                            TRUE,
+                            NOW()
+                        )
+                        RETURNING id, username, email, role, created_at
+                    """)
+                    
+                    result = db.execute(
+                        insert_query,
+                        {
+                            "username": username,
+                            "email": email,
+                            "password_hash": password_hash
+                        }
+                    ).mappings().first()
+
+                    if not result:
+                        logger.error("Failed to create user account - no result returned")
+                        raise ValueError("Failed to create user account")
+
+                    # Create user object and login
+                    user = User(
+                        id=result["id"],
+                        username=result["username"],
+                        email=result["email"],
+                        role=result["role"],
+                        created_at=result["created_at"]
+                    )
+                    
+                    login_user(user)
+                    
+                    # Set session data
+                    session.permanent = True
+                    session['user_id'] = user.id
+                    session['last_active'] = datetime.now().isoformat()
+                    
+                    logger.info(
+                        "User registered successfully",
+                        extra={
+                            "user_id": user.id,
+                            "username": username,
+                            "ip_address": request.remote_addr
+                        }
+                    )
+                    
+                    return redirect(url_for("chat.chat_interface"))
+            else:
+                # Log form validation errors
+                logger.warning(
+                    "Registration form validation failed",
+                    extra={
+                        "errors": form.errors,
+                        "ip_address": request.remote_addr
                     }
-                ).mappings().first()
-
-                if not result:
-                    raise ValueError("Failed to create user account")
-
-                # Create user object and login
-                user = User(
-                    id=result["id"],
-                    username=result["username"],
-                    email=result["email"],
-                    role=result["role"]
                 )
-                
-                login_user(user)
-                
-                # Set session data
-                session.permanent = True
-                session['user_id'] = user.id
-                session['last_active'] = datetime.now().isoformat()
-                
-                return redirect(url_for("chat.chat_interface"))
 
         except Exception as e:
-            logger.error(f"Registration error: {str(e)}", exc_info=True)
+            logger.error(
+                f"Registration error: {str(e)}", 
+                exc_info=True,
+                extra={
+                    "ip_address": request.remote_addr,
+                    "form_data": {
+                        "username": form.username.data,
+                        "email": form.email.data
+                    }
+                }
+            )
             flash("An error occurred during registration. Please try again.", "error")
 
     return render_template("register.html", form=form)

@@ -115,6 +115,14 @@ class RegistrationForm(FlaskForm):
         Custom validator for username.
         """
         username = field.data.strip()
+        
+        # Check for existing username using db_session
+        with db_session() as db:
+            if db.execute(
+                text("SELECT username FROM users WHERE LOWER(username) = LOWER(:username)"),
+                {"username": username}
+            ).fetchone():
+                raise ValidationError("This username is already taken.")
 
         # Check for spaces
         if field.data != username:
