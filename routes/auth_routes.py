@@ -77,11 +77,13 @@ def login():
 
         try:
             with db_session() as db:
-                # Get user with a single query
+                # Get user with proper transaction handling
                 query = text("""
                     SELECT id, username, email, password_hash, role 
                     FROM users 
                     WHERE username = :username
+                    AND is_active = TRUE
+                    FOR UPDATE
                 """)
                 result = db.execute(query, {"username": username}).mappings().first()
 
@@ -97,7 +99,7 @@ def login():
                     flash("Invalid username or password", "error")
                     return render_template("login.html", form=form)
 
-                # Create user object and login
+                # Create user object and login with session management
                 user = User(
                     id=result["id"],
                     username=result["username"],
@@ -105,6 +107,11 @@ def login():
                     role=result["role"]
                 )
                 login_user(user)
+                
+                # Set session data
+                session.permanent = True
+                session['user_id'] = user.id
+                session['last_active'] = datetime.now().isoformat()
                 
                 return redirect(url_for("chat.chat_interface"))
 
@@ -131,11 +138,12 @@ def register():
                 password = form.password.data
 
                 with db_session() as db:
-                    # Check for existing user
+                    # Check for existing user with proper transaction
                     query = text("""
                         SELECT COUNT(*) as count 
                         FROM users 
                         WHERE username = :username OR email = :email
+                        FOR UPDATE
                     """)
                     result = db.execute(query, {
                         "username": username,
@@ -146,32 +154,40 @@ def register():
                         flash("Username or email already exists", "error")
                         return render_template("register.html", form=form)
 
-                    # Create new user
-                    password_hash = generate_password_hash(password)
-                    if isinstance(password_hash, bytes):
-                        password_hash = password_hash.decode('utf-8')
+                    # Create new user with proper error handling
+                    try:
+                        password_hash = generate_password_hash(password)
+                        if isinstance(password_hash, bytes):
+                            password_hash = password_hash.decode('utf-8')
 
-                    query = text("""
-                        INSERT INTO users (username, email, password_hash, role)
-                        VALUES (:username, :email, :password_hash, 'user')
-                        RETURNING id, username, email, role
-                    """)
-                    result = db.execute(query, {
-                        "username": username,
-                        "email": email,
-                        "password_hash": password_hash
-                    }).mappings().first()
+                        query = text("""
+                            INSERT INTO users (username, email, password_hash, role)
+                            VALUES (:username, :email, :password_hash, 'user')
+                            RETURNING id, username, email, role
+                        """)
+                        result = db.execute(query, {
+                            "username": username,
+                            "email": email,
+                            "password_hash": password_hash
+                        }).mappings().first()
 
-                    # Log the user in
-                    user = User(
-                        id=result["id"],
-                        username=result["username"],
-                        email=result["email"],
-                        role=result["role"]
-                    )
-                    login_user(user)
+                        if not result:
+                            raise ValueError("Failed to create user")
 
-                    return redirect(url_for("chat.chat_interface"))
+                        # Create user object and login
+                        user = User(
+                            id=result["id"],
+                            username=result["username"],
+                            email=result["email"],
+                            role=result["role"]
+                        )
+                        login_user(user)
+                        
+                        return redirect(url_for("chat.chat_interface"))
+                    except Exception as e:
+                        logger.error(f"Error creating user: {str(e)}")
+                        flash("Error creating user account", "error")
+                        return render_template("register.html", form=form)
 
         except Exception as e:
             logger.error(f"Registration error: {str(e)}", exc_info=True)

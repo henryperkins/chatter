@@ -87,17 +87,18 @@ def db_session() -> Generator[Session, None, None]:
 
     session = None
     try:
-        # Create new session
         session = db_state['Session']()
+        # Start transaction explicitly
+        session.begin()
         
-        # Set session parameters BEFORE starting transaction
-        with session.begin():
-            # Set session parameters within transaction scope
-            session.execute(text("SET LOCAL lock_timeout = '5s'"))
-            session.execute(text("SET LOCAL statement_timeout = '30s'"))
-            yield session
-            # Transaction will be automatically committed if no exception occurs
-            
+        # Set session parameters
+        session.execute(text("SET lock_timeout = '5s'"))
+        session.execute(text("SET statement_timeout = '30s'"))
+        
+        yield session
+        
+        # Commit if no exception occurred
+        session.commit()
     except Exception as e:
         if session and session.in_transaction():
             session.rollback()
