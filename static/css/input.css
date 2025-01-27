@@ -1,6 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@tailwind typography;
 
 @layer components {
     /* Layout components */
@@ -183,8 +184,6 @@ body {
 .flash-messages {
     @apply fixed top-20 left-1/2 transform -translate-x-1/2 w-full max-w-lg z-50;
 }
-/* Mobile optimizations */
-/* Removed custom mobile styles */
 
 /* Safe area adjustments */
 .safe-area-inset {
