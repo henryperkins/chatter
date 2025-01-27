@@ -12,14 +12,15 @@ def make_admin(username: str):
         if not user:
             print(f"Error: User '{username}' not found")
             sys.exit(1)
-            
-        user.is_admin = True
+        
+        # Update the user's role to 'admin'
+        user.role = 'admin'
         session.commit()
         print(f"Successfully made {username} an admin")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python scripts/make_admin.py <username>")
+        print("Usage: python make_admin.py <username>")
         sys.exit(1)
     
     make_admin(sys.argv[1])
