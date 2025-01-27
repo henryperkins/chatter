@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+from sqlalchemy.sql import text  # Import text for raw SQL queries
 sys.path.append('.')
 
 from database import db_session, init_app
@@ -13,11 +14,13 @@ def make_admin(username: str):
         with db_session(app) as session:
             # Use raw SQL to find the user by username
             result = session.execute(
-                """
-                SELECT id, username, email, password_hash, role, created_at, is_active
-                FROM users
-                WHERE LOWER(username) = LOWER(:username)
-                """,
+                text(
+                    """
+                    SELECT id, username, email, password_hash, role, created_at, is_active
+                    FROM users
+                    WHERE LOWER(username) = LOWER(:username)
+                    """
+                ),
                 {"username": username.strip()}
             ).mappings().first()
 
@@ -27,11 +30,13 @@ def make_admin(username: str):
 
             # Update the user's role to 'admin'
             session.execute(
-                """
-                UPDATE users
-                SET role = 'admin'
-                WHERE id = :user_id
-                """,
+                text(
+                    """
+                    UPDATE users
+                    SET role = 'admin'
+                    WHERE id = :user_id
+                    """
+                ),
                 {"user_id": result["id"]}
             )
             session.commit()
