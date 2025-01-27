@@ -1,0 +1,26 @@
+{% extends "error.html" %}
+
+{% block title %}404 Not Found - Azure OpenAI Chat{% endblock %}
+
+{% block error_title %}Page Not Found{% endblock %}
+
+{% block error_message %}
+The page you're looking for doesn't exist or has been moved.
+{% endblock %}
+
+{% block error_actions %}
+{{ super() }}
+<div class="mt-4 text-center">
+    <p class="text-gray-600 dark:text-gray-400 mb-2">Try these options:</p>
+    <div class="space-y-2">
+        <a href="{{ url_for('chat.chat_interface') }}"
+           class="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors duration-200">
+            Go to Chat
+        </a>
+        <a href="{{ url_for('auth.login') }}"
+           class="block w-full text-center bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition-colors duration-200">
+            Log In
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+name: "Python and JavaScript Security Analysis"
+
+disable-default-queries: false
+
+packs:
+  python:
+    - codeql/python-queries
+  javascript:
+    - codeql/javascript-queries
+
+queries:
+  # General security and quality
+  - uses: security-and-quality
+  - uses: security-extended
+
+  # Python-specific security queries
+  - uses: codeql/python-queries/ql/src/Security/CWE-022  # Path Injection
+  - uses: codeql/python-queries/ql/src/Security/CWE-089  # SQL Injection
+  - uses: codeql/python-queries/ql/src/Security/CWE-078  # Command Injection
+  - uses: codeql/python-queries/ql/src/Security/CWE-079  # XSS
+  - uses: codeql/python-queries/ql/src/Security/CWE-094  # Code Injection
+  - uses: codeql/python-queries/ql/src/Security/CWE-601  # URL Redirection
+  - uses: codeql/python-queries/ql/src/flask/Security/CWE-352  # CSRF
+  - uses: codeql/python-queries/ql/src/flask/Security/CWE-200  # Information Exposure
+
+  # JavaScript-specific security queries
+  - uses: codeql/javascript-queries/ql/src/Security/CWE-079  # DOM-based XSS
+  - uses: codeql/javascript-queries/ql/src/Security/CWE-116  # Unsafe Data Encoding
+  - uses: codeql/javascript-queries/ql/src/Security/CWE-200  # Information Exposure
+  - uses: codeql/javascript-queries/ql/src/Security/CWE-346  # Origin Validation
+  - uses: codeql/javascript-queries/ql/src/Security/CWE-918  # SSRF
+  # Client-side specific
+  - uses: codeql/javascript-queries/ql/src/DOM/XSS
+  - uses: codeql/javascript-queries/ql/src/Security/CWE-754  # Unhandled Promise Rejection
+  - uses: codeql/javascript-queries/ql/src/Security/CWE-776  # XML Entity Expansion
+  - uses: codeql/javascript-queries/ql/src/Security/CWE-502  # Unsafe Deserialization
+  # Code quality
+  - uses: codeql/javascript-queries/ql/src/Expressions/UnvalidatedDynamicMethodCall
+  - uses: codeql/javascript-queries/ql/src/Performance/ReDoS
+
+paths:
+  - models
+  - routes
+  - static/js
+  - '*.py'
+  - '*.js'
+
+paths-ignore:
+  - '**/test'
+  - '**/tests'
+  - '**/*.test.js'
+  - '**/*.spec.js'
+  - 'static/js/vendor'
+  - 'static/js/*.min.js'
+  - 'node_modules'
+  - 'uploads'
+  - 'logs'
+
+query-filters:
+  - exclude:
+      problem.severity:
+        - note
+        - recommendation
+  # Focus on security-relevant results
+  - include:
+      tags:
+        - security
+        - correctness
+  # Exclude test code
+  - exclude:
+      source.file.is_test: true
