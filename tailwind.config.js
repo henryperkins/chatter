@@ -11,6 +11,10 @@ module.exports = {
       colors: {
         brandBlue: '#1E40AF',
       },
+      spacing: {
+        '44': '11rem', // For pb-44 class
+        '32': '8rem',  // For pb-32 class
+      },
       screens: {
         '2xl': '1440px',
       },
@@ -51,7 +55,10 @@ module.exports = {
           }
         }
       }
-    }
+    },
+    display: ['responsive', 'group-hover'],
+    opacity: ['responsive', 'hover', 'focus', 'group-hover'],
+    transform: ['responsive', 'hover', 'focus'],
   },
 
   corePlugins: {

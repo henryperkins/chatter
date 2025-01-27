@@ -8,15 +8,19 @@ function initializeMobileMenu() {
 
     if (mobileMenuToggle && mobileMenu && mobileMenuBackdrop) {
         function openMenu() {
-            mobileMenu.classList.add('active');
             mobileMenu.classList.remove('-translate-x-full');
+            mobileMenu.classList.add('translate-x-0');
+            mobileMenuBackdrop.classList.remove('hidden');
+            mobileMenuBackdrop.classList.add('opacity-100');
             mobileMenuToggle.setAttribute('aria-expanded', 'true');
             document.body.classList.add('overflow-hidden');
         }
 
         function closeMenu() {
-            mobileMenu.classList.remove('active');
             mobileMenu.classList.add('-translate-x-full');
+            mobileMenu.classList.remove('translate-x-0');
+            mobileMenuBackdrop.classList.add('hidden');
+            mobileMenuBackdrop.classList.remove('opacity-100');
             mobileMenuToggle.setAttribute('aria-expanded', 'false');
             document.body.classList.remove('overflow-hidden');
         }
