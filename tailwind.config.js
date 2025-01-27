@@ -59,28 +59,7 @@ module.exports = {
     display: ['responsive', 'group-hover'],
     opacity: ['responsive', 'hover', 'focus', 'group-hover'],
     transform: ['responsive', 'hover', 'focus'],
-  },
-
-  corePlugins: {
-    float: false,
-    clear: false,
-    overscroll: false,
-    boxDecorationBreak: false,
-    mixBlendMode: false,
-    isolation: false,
-    tableLayout: false,
-    transform: true,
-  },
-
-  variants: {
-    extend: {
-      backgroundColor: ['hover', 'focus', 'dark'],
-      textColor: ['hover', 'focus', 'dark'],
-      borderColor: ['hover', 'focus'],
-      opacity: ['hover', 'disabled'],
-      scale: ['hover', 'focus'],
-    }
-  },
+  }
 
   darkMode: 'class',
 
