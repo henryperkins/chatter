@@ -2,11 +2,12 @@
 import sys
 sys.path.append('.')
 
-from database import db_session
+from database import db_session, init_db
 from models.user import User
 
 def make_admin(username: str):
     """Make the specified user an admin"""
+    init_db()  # Ensure the database is initialized
     with db_session() as session:
         user = session.query(User).filter(User.username == username).first()
         if not user:
