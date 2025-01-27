@@ -22,7 +22,7 @@
     {% endwith %}
 
     <!-- Form -->
-    <form id="add-provider-form" method="POST" action="{{ url_for('provider.create_provider') }}" class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
+    <form id="add-provider-form" method="POST" action="{{ url_for('provider.add_provider') }}" class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
         {{ form.hidden_tag() }}
 
         <!-- Provider Name -->
