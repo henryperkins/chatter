@@ -73,6 +73,60 @@ async function initializeInterface() {
         });
     }
 
+    // Initialize FileUploadManager if needed
+    const chatId = window.CHAT_CONFIG.chatId;
+    const userId = window.CHAT_CONFIG.userId;
+    const uploadButton = document.getElementById('upload-button');
+    const mobileUploadButton = document.getElementById('mobile-upload-button');
+    const correctUploadBtn = window.innerWidth < 768 ? mobileUploadButton : uploadButton;
+
+    if (!window.fileUploadManager) {
+        window.fileUploadManager = new window.FileUploadManager(chatId, userId, correctUploadBtn);
+    }
+
+    // Initialize TokenUsageManager
+    if (window.TokenUsageManager && window.CHAT_CONFIG.chatId) {
+        console.log('Initializing TokenUsageManager with chatId:', window.CHAT_CONFIG.chatId);
+        window.tokenUsageManager = new window.TokenUsageManager({
+            chatId: window.CHAT_CONFIG.chatId
+        });
+        // Force an immediate update of token usage stats
+        try {
+            await window.tokenUsageManager.updateStats();
+        } catch (error) {
+            console.error('Error updating token stats:', error);
+        }
+    } else {
+        console.error('TokenUsageManager initialization failed - missing dependencies');
+    }
+
+    // New chat button
+    const newChatBtn = document.getElementById('new-chat-btn');
+    if (newChatBtn) {
+        newChatBtn.addEventListener('click', createNewChat);
+    }
+
+    // Edit model button
+    const editModelBtn = document.getElementById('edit-model-btn');
+    const modelSelect = document.getElementById('model-select');
+    if (editModelBtn) {
+        editModelBtn.addEventListener('click', () => {
+            const modelId = modelSelect?.value;
+            if (modelId) {
+                console.debug('Editing model:', modelId);
+                const editUrl = window.CHAT_CONFIG.editModelUrl + modelId;
+                window.location.href = editUrl;
+            } else {
+                utils.showFeedback('No model selected', 'error');
+            }
+        });
+    }
+
+    // Handle model changes
+    if (modelSelect) {
+        modelSelect.addEventListener('change', handleModelChange);
+    }
+
     // Call other setup functions as needed
     attachActionButtonListeners();
     renderInitialAssistantMessages();
@@ -305,7 +359,7 @@ async function handleNormalResponse(formData) {
 /**
  * Message display functions
  */
-function appendAssistantMessage(message, isStreaming = false) {
+async function appendAssistantMessage(message, isStreaming = false) {
     if (!message) return;
 
     const chatBox = document.getElementById('chat-box');
@@ -466,27 +520,6 @@ function appendAssistantMessage(message, isStreaming = false) {
     // New chat button
     const newChatBtn = document.getElementById('new-chat-btn');
     if (newChatBtn) {
-        newChatBtn.addEventListener('click', async () => {
-            try {
-                newChatBtn.disabled = true;
-                const response = await utils.fetchWithCSRF('/new_chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-
-                if (response.success && response.chat_id) {
-                    window.location.href = `/chat_interface?chat_id=${response.chat_id}`;
-                } else {
-                    throw new Error(response.error || 'Failed to create new chat');
-                }
-            } catch (error) {
-                utils.showFeedback(error.message, 'error');
-            } finally {
-                newChatBtn.disabled = false;
-            }
-        });
-    }
-    if (newChatBtn) {
         newChatBtn.addEventListener('click', createNewChat);
     }
 
@@ -521,12 +554,28 @@ function appendAssistantMessage(message, isStreaming = false) {
     hideLoadingIndicator();
 }
 
-window.init = init;
-
 /**
  * Attach event listeners to action buttons within the chat messages
  */
 function attachActionButtonListeners() {
+    const chatBox = document.getElementById('chat-box');
+    if (!chatBox) return;
+
+    chatBox.addEventListener('click', async (event) => {
+        const target = event.target.closest('button');
+        if (!target) return;
+
+        event.preventDefault();
+
+        if (target.classList.contains('copy-button')) {
+            await handleCopyMessage(target);
+        } else if (target.classList.contains('regenerate-button')) {
+            await handleRegenerateMessage(target);
+        }
+    });
+}
+
+window.init = init;
     const chatBox = document.getElementById('chat-box');
     if (!chatBox) return;
 
