@@ -11,15 +11,15 @@ def make_admin(username: str):
     app = create_app()  # Create Flask app instance
     with app.app_context():  # Use Flask app context
         with db_session(app) as session:
-        user = session.query(User).filter(User.username == username).first()
-        if not user:
-            print(f"Error: User '{username}' not found")
-            sys.exit(1)
-        
-        # Update the user's role to 'admin'
-        user.role = 'admin'
-        session.commit()
-        print(f"Successfully made {username} an admin")
+            user = session.query(User).filter(User.username == username).first()
+            if not user:
+                print(f"Error: User '{username}' not found")
+                sys.exit(1)
+            
+            # Update the user's role to 'admin'
+            user.role = 'admin'
+            session.commit()
+            print(f"Successfully made {username} an admin")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
