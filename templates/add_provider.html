@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}Add Provider - Azure OpenAI Chat{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-4xl bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+    <!-- Page Header -->
+    <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6">Add a New Provider</h1>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="mb-6">
+        {% for category, message in messages %}
+        <div class="p-4 rounded-lg {% if category == 'error' %}bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 border border-red-400 dark:border-red-600{% else %}bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-200 border border-green-400 dark:border-green-600{% endif %}">
+            <strong class="font-bold">{{ category | title }}:</strong>
+            <span class="block sm:inline">{{ message }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Form -->
+    <form id="add-provider-form" method="POST" action="{{ url_for('provider.create_provider') }}" class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
+        {{ form.hidden_tag() }}
+
+        <!-- Provider Name -->
+        <div class="mb-6">
+            {{ form.name.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Choose a descriptive name for the provider (e.g., "Azure OpenAI", "OpenAI Direct")</p>
+            {{ form.name(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
+            {% if form.name.errors %}
+            <p class="text-sm text-red-500 dark:text-red-400 mt-1">{{ form.name.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Provider Slug -->
+        <div class="mb-6">
+            {{ form.slug.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">A unique identifier for the provider (e.g., "azure", "openai")</p>
+            {{ form.slug(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
+            {% if form.slug.errors %}
+            <p class="text-sm text-red-500 dark:text-red-400 mt-1">{{ form.slug.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- API Base URL -->
+        <div class="mb-6">
+            {{ form.api_base_url.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">The base URL for the provider's API (e.g., "https://api.openai.com")</p>
+            {{ form.api_base_url(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
+            {% if form.api_base_url.errors %}
+            <p class="text-sm text-red-500 dark:text-red-400 mt-1">{{ form.api_base_url.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Authentication Required -->
+        <div class="mb-6">
+            <label class="inline-flex items-center">
+                {{ form.requires_authentication(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2") }}
+                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
+                    {{ form.requires_authentication.label.text }}
+                </span>
+            </label>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">Enable if the provider requires API key authentication</p>
+        </div>
+
+        <!-- Submit & Cancel -->
+        <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
+            <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg font-medium hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                <span class="inline-flex items-center">
+                    <span>Add Provider</span>
+                </span>
+            </button>
+            <a href="{{ url_for('chat.chat_interface') }}" class="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white rounded-lg shadow-lg font-medium hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 text-center transition duration-150 ease-in-out">
+                Cancel
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock content %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const form = document.getElementById("add-provider-form");
+        if (form) {
+            form.classList.add('provider-form');
+            form.dataset.submitText = "Add Provider";
+        }
+    });
+</script>
+{% endblock scripts %}
