@@ -49,7 +49,7 @@ async function init() {
     } finally {
         button.disabled = false;
         removeTypingIndicator();
-    }
+    } catch (error) {
         console.error('Error during initialization:', error);
         utils.showFeedback(error.message || 'Failed to initialize chat', 'error');
     } finally {
