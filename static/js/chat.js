@@ -56,9 +56,11 @@ async function initializeInterface() {
 
     // Example: Attach event listener to the "Send" button
     const sendButton = document.getElementById('send-button');
-    if (sendButton) {
-        sendButton.addEventListener('click', sendMessage);
+    if (!sendButton) {
+        console.error('Send button not found - check HTML ID');
+        return;
     }
+    sendButton.addEventListener('click', sendMessage);
 
     // Attach event listener for the message input (e.g., for "Enter" key)
     const messageInput = document.getElementById('message-input');
@@ -172,6 +174,7 @@ async function sendMessage() {
     window.fileUploadManager.uploadedFiles.forEach(file => {
         formData.append('files[]', file);
     });
+    formData.append('model_id', modelId);
     formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
 
     try {
@@ -211,18 +214,21 @@ async function sendMessage() {
 }
 
 async function handleStreamingResponse(formData) {
-    const response = await fetch('/chat/', {
+    const response = await fetch('/', {
         method: 'POST',
         body: formData,
         headers: {
             'X-Chat-ID': window.CHAT_CONFIG.chatId,
             'Accept': 'text/event-stream',
-            'X-CSRFToken': utils.getCSRFToken(),
+            'X-CSRFToken': window.CHAT_CONFIG.csrfToken,
             'X-Requested-With': 'XMLHttpRequest'
         }
     });
 
     if (!response.ok) {
+        if (response.status === 403) {
+            throw new Error('Session expired - please refresh the page');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
     }
 
