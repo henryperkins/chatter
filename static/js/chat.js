@@ -44,6 +44,12 @@ async function init() {
 
         console.debug('Chat initialization completed successfully');
     } catch (error) {
+        console.error('Error regenerating response:', error);
+        utils.showFeedback(error.message, 'error');
+    } finally {
+        button.disabled = false;
+        removeTypingIndicator();
+    }
         console.error('Error during initialization:', error);
         utils.showFeedback(error.message || 'Failed to initialize chat', 'error');
     } finally {
@@ -367,9 +373,52 @@ function appendAssistantMessage(message, isStreaming = false) {
         messageDiv = document.createElement('div');
         messageDiv.className = 'flex w-full mt-2 space-x-2 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl';
 
-            }
-        });
+        const renderedHtml = window.DOMPurify.sanitize(
+            window.md.render(message),
+            DOMPurifyOptions
+        );
+
+        messageDiv.innerHTML = `
+            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-700" role="img"
+                aria-label="Assistant avatar"></div>
+            <div class="relative flex-1">
+                <div class="absolute right-2 top-2 flex items-center space-x-1 z-10">
+                    <button
+                        class="copy-button p-1.5 rounded-md bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200 shadow-sm"
+                        title="Copy to clipboard"
+                        data-raw-content="${message.replace(/"/g, '&quot;')}"
+                        aria-label="Copy message to clipboard">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                    ${!isStreaming ? `
+                        <button
+                            class="regenerate-button p-1.5 rounded-md bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200 shadow-sm"
+                            title="Regenerate response"
+                            aria-label="Regenerate response">
+                            <i class="fas fa-redo-alt"></i>
+                        </button>
+                    ` : ''}
+                </div>
+                <div class="bg-gray-100 dark:bg-gray-800 p-3 pr-16 rounded-r-lg rounded-bl-lg">
+                    <div class="prose dark:prose-invert prose-sm max-w-none overflow-x-auto" data-role="assistant-message">
+                        ${renderedHtml}
+                    </div>
+                </div>
+                <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                    ${new Date().toLocaleTimeString()}
+                </span>
+            </div>
+        `;
+        chatBox.appendChild(messageDiv);
+
+        // Apply syntax highlighting
+        if (window.Prism) {
+            window.Prism.highlightAllUnder(messageDiv.querySelector('[data-role="assistant-message"]'));
+        }
     }
+
+    // Auto-scroll
+    chatBox.scrollTop = chatBox.scrollHeight;
 
     // Initialize FileUploadManager if needed
     const chatId = window.CHAT_CONFIG.chatId;

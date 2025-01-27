@@ -126,7 +126,7 @@
             <label for="model-select"
                 class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model:</label>
             <div class="relative mb-4">
-                <select id="model-select" data-original-value="{{ model_id }}"
+                <select id="model-select" data-original-value="{{ current_model.id if current_model else '' }}"
                     class="w-full h-12 px-4 pr-8 border border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 text-base appearance-none cursor-pointer touch-manipulation bg-white dark:bg-gray-700">
                     {% for model in models %}
                     <option value="{{ model.id }}"
