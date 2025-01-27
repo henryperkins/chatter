@@ -1074,4 +1074,3 @@ function handleModelChange() {
     });
 }
 
-document.getElementById('model-select').addEventListener('change', handleModelChange);
