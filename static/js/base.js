@@ -216,8 +216,3 @@ function applyFontSize(fontSize) {
     document.documentElement.style.fontSize = fontSize + 'em';
     localStorage.setItem('fontSize', fontSize);
 }
-
-function applyFontSize(fontSize) {
-    document.documentElement.style.fontSize = fontSize + 'em';
-    localStorage.setItem('fontSize', fontSize);
-}
