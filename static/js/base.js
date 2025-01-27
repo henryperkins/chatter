@@ -9,14 +9,14 @@ function initializeMobileMenu() {
     if (mobileMenuToggle && mobileMenu && mobileMenuBackdrop) {
         function openMenu() {
             mobileMenu.classList.add('active');
-            mobileMenuBackdrop.classList.remove('hidden');
+            mobileMenu.classList.remove('-translate-x-full');
             mobileMenuToggle.setAttribute('aria-expanded', 'true');
             document.body.classList.add('overflow-hidden');
         }
 
         function closeMenu() {
             mobileMenu.classList.remove('active');
-            mobileMenuBackdrop.classList.add('hidden');
+            mobileMenu.classList.add('-translate-x-full');
             mobileMenuToggle.setAttribute('aria-expanded', 'false');
             document.body.classList.remove('overflow-hidden');
         }
