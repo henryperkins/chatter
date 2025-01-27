@@ -2,13 +2,15 @@
 import sys
 sys.path.append('.')
 
-from database import db_session, init_db
+from database import db_session, init_app
+from app import create_app
 from models.user import User
 
 def make_admin(username: str):
     """Make the specified user an admin"""
-    init_db()  # Ensure the database is initialized
-    with db_session() as session:
+    app = create_app()  # Create Flask app instance
+    with app.app_context():  # Use Flask app context
+        with db_session(app) as session:
         user = session.query(User).filter(User.username == username).first()
         if not user:
             print(f"Error: User '{username}' not found")
