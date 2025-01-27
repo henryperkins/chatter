@@ -59,7 +59,7 @@ module.exports = {
     display: ['responsive', 'group-hover'],
     opacity: ['responsive', 'hover', 'focus', 'group-hover'],
     transform: ['responsive', 'hover', 'focus'],
-  }
+  },
 
   darkMode: 'class',
 
