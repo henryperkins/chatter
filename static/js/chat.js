@@ -916,7 +916,10 @@ function adjustTextareaHeight(textarea) {
         console.error('Error regenerating response:', error);
         utils.showFeedback(error.message, 'error');
     } finally {
-        button.disabled = false;
+        const sendButton = document.getElementById('send-button');
+        if (sendButton) {
+            sendButton.disabled = false;
+        }
         removeTypingIndicator();
     }
 }
