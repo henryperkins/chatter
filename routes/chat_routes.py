@@ -280,6 +280,12 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         # Get required template variables
         chat = Chat.get_by_id(chat_id)
         model_obj = Chat.get_model(chat_id) if chat.model_id else None
+
+        if not model_obj:
+            model_obj = Model.get_default()
+            if model_obj:
+                chat.model_id = model_obj.id
+                Chat.update_model_id(chat_id, model_obj.id)
         chat_title = chat.title
         model_name = model_obj.name if model_obj else "Default Model"
         current_model = model_obj
@@ -462,7 +468,10 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             "name": model.name,
             "is_default": model.is_default,
             "model_type": model.model_type,
-            # Include other necessary fields but exclude sensitive ones like 'api_key'
+            "requires_o1_handling": model.requires_o1_handling,
+            "supports_streaming": model.supports_streaming,
+            "max_completion_tokens": model.max_completion_tokens,
+            # Exclude sensitive fields like 'api_key'
         }
         models_serialized.append(model_data)
     models = models_serialized
@@ -929,10 +938,15 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 def update_model() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Update the model for a chat with proper transaction handling."""
     data = request.get_json()
-    chat_id: Optional[str] = data.get("chat_id") or session.get("chat_id")
+    data = request.get_json() or {}
+    chat_id = data.get("chat_id") or session.get("chat_id")
     new_model_id = data.get("model_id")
 
     if not chat_id or not new_model_id:
+        return jsonify({"error": "Chat ID and Model ID are required."}), 400
+
+    if not validate_chat_access(chat_id):
+        return jsonify({"error": "Unauthorized access to chat"}), 403
         return jsonify({"error": "Chat ID and Model ID are required."}), 400
 
     if not validate_chat_access(chat_id):

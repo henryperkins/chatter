@@ -1155,3 +1155,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         );
     }
 });
+function handleModelChange() {
+    const modelSelect = document.getElementById('model-select');
+    const modelId = modelSelect.value;
+
+    fetch('/update_model', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': utils.getCSRFToken(),
+            'X-Chat-ID': window.CHAT_CONFIG.chatId,
+        },
+        body: JSON.stringify({
+            'model_id': modelId,
+            'chat_id': window.CHAT_CONFIG.chatId,
+        }),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            utils.showFeedback('Model updated successfully', 'success');
+            if (window.tokenUsageManager) {
+                window.tokenUsageManager.updateStats();
+            }
+        } else {
+            utils.showFeedback(data.error || 'Failed to update model', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error updating model:', error);
+        utils.showFeedback('Error updating model', 'error');
+    });
+}
+
+document.getElementById('model-select').addEventListener('change', handleModelChange);

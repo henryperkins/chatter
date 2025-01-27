@@ -130,10 +130,10 @@
                     class="w-full h-12 px-4 pr-8 border border-gray-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 text-base appearance-none cursor-pointer touch-manipulation bg-white dark:bg-gray-700">
                     {% for model in models %}
                     <option value="{{ model.id }}"
-                        data-requires-o1-handling="{{ model.requires_o1_handling|lower }}"
-                        data-supports-streaming="{{ model.supports_streaming|lower }}"
+                        data-requires-o1-handling="{{ 'true' if model.requires_o1_handling else 'false' }}"
+                        data-supports-streaming="{{ 'true' if model.supports_streaming else 'false' }}"
                         data-max-completion-tokens="{{ model.max_completion_tokens }}"
-                        {% if model.is_default %}selected{% endif %}>
+                        {% if model.id == current_model.id %}selected{% endif %}>
                         {{ model.name }}{% if model.is_default %} (Default){% endif %}
                     </option>
                     {% endfor %}
@@ -703,7 +703,7 @@
         csrfToken: "{{ csrf_token() }}",
         userId: "{{ current_user.id }}",
         userRole: "{{ current_user.role }}",
-        models: JSON.parse('{{ models|tojson|safe }}')
+        models: {{ models | tojson | safe }}
     };
     console.log('CHAT_CONFIG initialized:', window.CHAT_CONFIG);
 </script>

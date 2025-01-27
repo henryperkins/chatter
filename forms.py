@@ -331,7 +331,7 @@ class ModelForm(FlaskForm):
             providers = session.execute(
                 text("SELECT id, name FROM providers ORDER BY name")
             ).fetchall()
-            self.provider_id.choices = [(p[0], p[1]) for p in providers]
+            self.provider_id.choices = [(p.id, p.name) for p in providers]
 
     provider_id = SelectField(
         "Provider",
