@@ -44,14 +44,37 @@ async function init() {
 
         console.debug('Chat initialization completed successfully');
     } catch (error) {
-        console.error('Error regenerating response:', error);
-        utils.showFeedback(error.message, 'error');
-    } catch (error) {
         console.error('Error during initialization:', error);
         utils.showFeedback(error.message || 'Failed to initialize chat', 'error');
     } finally {
         hideLoadingIndicator();
     }
+}
+
+async function initializeInterface() {
+    // Attach event listeners, initialize components, etc.
+
+    // Example: Attach event listener to the "Send" button
+    const sendButton = document.getElementById('send-button');
+    if (sendButton) {
+        sendButton.addEventListener('click', sendMessage);
+    }
+
+    // Attach event listener for the message input (e.g., for "Enter" key)
+    const messageInput = document.getElementById('message-input');
+    if (messageInput) {
+        messageInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+    }
+
+    // Call other setup functions as needed
+    attachActionButtonListeners();
+    renderInitialAssistantMessages();
+    // ... any other initialization code
 }
 
 /**
@@ -272,69 +295,6 @@ async function handleNormalResponse(formData) {
     }
 }
 
-async function regenerateResponse(button) {
-    button.disabled = true;
-
-    try {
-        const chatId = window.CHAT_CONFIG.chatId;
-        if (!chatId) {
-            utils.showFeedback('Chat ID not found', 'error');
-            return;
-        }
-
-        const messages = Array.from(document.getElementById('chat-box').children);
-        let lastUserMessage = null;
-        for (let i = messages.length - 1; i >= 0; i--) {
-            const messageDiv = messages[i];
-            if (messageDiv.querySelector('.bg-blue-600')) {
-                lastUserMessage = messageDiv.querySelector('.bg-blue-600 p').textContent;
-                break;
-            }
-        }
-
-        if (!lastUserMessage) {
-            utils.showFeedback('No message found to regenerate', 'error');
-            return;
-        }
-
-        // Remove last assistant messages
-        while (document.getElementById('chat-box').lastElementChild &&
-            !document.getElementById('chat-box').lastElementChild.querySelector('.bg-blue-600')) {
-            document.getElementById('chat-box').lastElementChild.remove();
-        }
-        if (document.getElementById('chat-box').lastElementChild) {
-            document.getElementById('chat-box').lastElementChild.remove();
-        }
-
-        const formData = new FormData();
-        formData.append('message', lastUserMessage);
-        formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
-
-        showTypingIndicator();
-
-        const modelSelect = document.getElementById('model-select');
-        const modelId = modelSelect?.value;
-        const model = window.CHAT_CONFIG.models?.find(m => m.id === parseInt(modelId));
-        const useStreaming = model?.supports_streaming && !model?.requires_o1_handling;
-
-        if (useStreaming) {
-            await handleStreamingResponse(formData);
-        } else {
-            const responseData = await handleNormalResponse(formData);
-            if (responseData.response) {
-                appendAssistantMessage(responseData.response);
-            } else {
-                throw new Error(responseData.error || 'Failed to regenerate response');
-            }
-        }
-    } catch (error) {
-        console.error('Error regenerating response:', error);
-        utils.showFeedback(error.message, 'error');
-    } finally {
-        button.disabled = false;
-        removeTypingIndicator();
-    }
-}
 
 /**
  * Message display functions
