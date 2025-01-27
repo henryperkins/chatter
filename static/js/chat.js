@@ -905,9 +905,8 @@ function adjustTextareaHeight(textarea) {
                 }
             });
 
-
-            if (responseData.response) {
-                appendAssistantMessage(responseData.response);
+            if (responseData.message?.content) {
+                appendAssistantMessage(responseData.message.content);
             } else {
                 throw new Error(responseData.error || 'Failed to regenerate response');
             }
