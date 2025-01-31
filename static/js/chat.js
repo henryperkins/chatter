@@ -205,7 +205,10 @@ function removeTypingIndicator() {
 async function sendMessage() {
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
-    if (!messageInput || !sendButton) return;
+    if (!messageInput || !sendButton) {
+        utils.showFeedback('Chat interface not properly initialized', 'error');
+        return;
+    }
 
     const messageText = messageInput.value.trim();
     if (!messageText && window.fileUploadManager.uploadedFiles.length === 0) {
@@ -218,38 +221,47 @@ async function sendMessage() {
     const model = window.CHAT_CONFIG.models?.find(m => m.id === parseInt(modelId));
     const useStreaming = model?.supports_streaming && !model?.requires_o1_handling;
 
-    // Prepare the form data
-    const formData = new FormData();
-    if (messageText) {
-        formData.append('message', messageText);
-        appendUserMessage(messageText);
-    }
-
-    window.fileUploadManager.uploadedFiles.forEach(file => {
-        formData.append('files[]', file);
-    });
-    formData.append('model_id', modelId);
-    formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
-
     try {
-        const chatBox = document.getElementById('chat-box');
-        if (chatBox.lastElementChild?.querySelector('[data-role="assistant-message"]')) {
-            chatBox.lastElementChild.remove();
+        // Clear previous errors
+        document.querySelectorAll('.error-indicator').forEach(el => el.remove());
+
+        const formData = new FormData();
+        if (messageText) {
+            formData.append('message', messageText);
+            appendUserMessage(messageText);
         }
 
+        window.fileUploadManager.uploadedFiles.forEach(file => {
+            formData.append('files[]', file);
+        });
+        formData.append('model_id', modelId);
+        formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
+
         await utils.withLoading(sendButton, async () => {
-            if (useStreaming) {
-                await handleStreamingResponse(formData);
-            } else {
-                await handleNormalResponse(formData);
+            // Add visual feedback when button is pressed
+            sendButton.classList.add('sending');
+
+            try {
+                const chatBox = document.getElementById('chat-box');
+                if (chatBox.lastElementChild?.querySelector('[data-role="assistant-message"]')) {
+                    chatBox.lastElementChild.remove();
+                }
+
+                if (useStreaming) {
+                    await handleStreamingResponse(formData);
+                } else {
+                    await handleNormalResponse(formData);
+                }
+                
+                // Clear inputs only on success
+                messageInput.value = '';
+                messageInput.style.height = 'auto';
+                window.fileUploadManager.uploadedFiles = [];
+                window.fileUploadManager.renderFileList();
+            } finally {
+                sendButton.classList.remove('sending');
             }
         });
-
-        // Clear input and files
-        messageInput.value = '';
-        messageInput.style.height = 'auto';
-        window.fileUploadManager.uploadedFiles = [];
-        window.fileUploadManager.renderFileList();
 
         // Update token usage
         if (window.tokenUsageManager) {
@@ -258,12 +270,28 @@ async function sendMessage() {
     } catch (error) {
         console.error('Error sending message:', error);
         removeTypingIndicator();
-        utils.showFeedback(
-            error.message === 'Failed to fetch' ?
-            'Network error: Please check your internet connection.' :
-            error.message,
-            'error'
-        );
+        
+        // Enhanced error feedback
+        const errorMessage = error instanceof Error 
+            ? error.message 
+            : 'Failed to send message';
+        const sanitizedError = errorMessage.replace(/<\/?[^>]+(>|$)/g, ""); // Basic sanitization
+        
+        // Show persistent error until retry
+        const errorIndicator = document.createElement('div');
+        errorIndicator.className = 'error-indicator bg-red-100 border border-red-400 p-2 mb-2 rounded';
+        errorIndicator.innerHTML = `
+            <span class="text-red-700">${sanitizedError}</span>
+            <button class="ml-2 text-red-700 hover:text-red-900 retry-button">Retry</button>
+        `;
+        
+        messageInput.parentNode.insertBefore(errorIndicator, messageInput);
+        
+        // Add retry functionality
+        errorIndicator.querySelector('.retry-button').addEventListener('click', () => {
+            errorIndicator.remove();
+            sendMessage();
+        });
     }
 }
 
@@ -323,6 +351,9 @@ async function handleStreamingResponse(formData) {
         if (accumulatedResponse) {
             appendAssistantMessage(accumulatedResponse, false);
         }
+    } catch (error) {
+        console.error('Streaming error:', error);
+        throw new Error(`Stream interrupted: ${error.message}`);
     } finally {
         removeTypingIndicator();
     }
@@ -342,14 +373,17 @@ async function handleNormalResponse(formData) {
         });
 
         if (!response.success) {
-            throw new Error(response.error || 'Failed to send message');
+            throw new Error(response.error || 'Server responded with an unspecified error');
         }
 
         if (response.message?.content) {
             appendAssistantMessage(response.message.content);
         } else {
-            throw new Error('No message received from server');
+            throw new Error('Received empty response from server');
         }
+    } catch (error) {
+        console.error('Normal response error:', error);
+        throw error; // Re-throw to be caught in sendMessage
     } finally {
         removeTypingIndicator();
     }
