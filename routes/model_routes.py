@@ -339,6 +339,10 @@ def update_model(model_id: int):
     try:
         with db_session() as db:
             logger.info("Updating model with ID: %d", model_id)
+            # Remove 'provider_id' from data as it is immutable
+            if 'provider_id' in data:
+                data.pop('provider_id', None)
+
             validate_immutable_fields(model_id, data)
 
             # Extract and validate data
