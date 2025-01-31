@@ -493,16 +493,16 @@ class ModelForm(FlaskForm):
         elif field.data in (None, '', 'None'):
             # Accept empty input and set to None
             field.data = None
-            else:
-                try:
-                    value = int(field.data)
-                    if not (1 <= value <= 4000):
-                        raise ValidationError("Max tokens must be between 1 and 4000.")
-                    field.data = value
-                except (TypeError, ValueError):
-                    raise ValidationError(
-                        "Max tokens must be a valid integer between 1 and 4000."
-                    )
+        else:
+            try:
+                value = int(field.data)
+                if not (1 <= value <= 4000):
+                    raise ValidationError("Max tokens must be between 1 and 4000.")
+                field.data = value
+            except (TypeError, ValueError):
+                raise ValidationError(
+                    "Max tokens must be a valid integer between 1 and 4000."
+                )
 
     def validate_requires_o1_handling(self, field: Any) -> None:
         """
