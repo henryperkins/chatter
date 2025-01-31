@@ -25,6 +25,7 @@ from flask_login import login_required
 from flask_wtf.csrf import validate_csrf as flask_validate_csrf
 from werkzeug.exceptions import HTTPException
 from config import Config
+from models.provider import Provider
 
 from decorators import admin_required
 from forms import ModelForm
@@ -419,6 +420,12 @@ def edit_model(model_id):
                 404,
             )
 
+        # Fetch the provider associated with the model
+        provider = Provider.get_by_id(model.provider_id)
+        if not provider:
+            logger.warning("Provider with ID %d not found", model.provider_id)
+            provider = None  # Handle as needed (e.g., set to None or raise an error)
+
         form = ModelForm(obj=model)
 
         if request.method == "POST":
@@ -543,6 +550,7 @@ def edit_model(model_id):
             "edit_model.html",
             form=form,
             model=model,
+            provider=provider,
             DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS,
         )
 
