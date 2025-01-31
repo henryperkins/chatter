@@ -212,6 +212,38 @@ class Model:
         except Exception as e:
             logger.error("Failed to create model: %s", e)
             raise
+        
+    @staticmethod
+    def get_immutable_fields(model_id: int) -> List[str]:
+        """Get list of fields that cannot be modified for an existing model.
+
+        Args:
+            model_id: ID of the model to check
+
+        Returns:
+            List[str]: Names of immutable fields
+        """
+        try:
+            with db_session() as db:
+                # Get model type
+                query = text("SELECT model_type FROM models WHERE id = :id")
+                model_type = db.execute(query, {"id": model_id}).scalar()
+
+                # Default immutable fields
+                immutable_fields = ["provider_id"]
+
+                # Add model-type specific immutable fields
+                if model_type == "o1-preview":
+                    immutable_fields.extend([
+                        "temperature",       # Fixed at 1.0
+                        "supports_streaming" # Always false
+                    ])
+
+                return immutable_fields
+
+        except Exception as e:
+            logger.error(f"Error getting immutable fields for model {model_id}: {str(e)}")
+            return ["provider_id"]  # Default fallback
 
     @staticmethod
     def get_by_id(model_id: int) -> Optional["Model"]:
@@ -242,7 +274,7 @@ class Model:
                     try:
                         import base64
                         from cryptography.fernet import Fernet
-                        
+
                         # Ensure encryption key is properly base64 encoded
                         try:
                             # Try to decode it to verify it's valid base64
@@ -252,7 +284,7 @@ class Model:
                             import hashlib
                             key_bytes = hashlib.sha256(encryption_key.encode()).digest()
                             encryption_key = base64.b64encode(key_bytes).decode()
-                        
+
                         cipher_suite = Fernet(encryption_key.encode())
                         encrypted_key = model_dict.get("api_key", "")
                         if encrypted_key:
@@ -261,7 +293,7 @@ class Model:
                             except Exception as e:
                                 logger.error(f"Failed to decrypt API key: {str(e)}")
                                 model_dict["api_key"] = ""
-                        
+
                     except Exception as e:
                         logger.error(f"Error setting up encryption: {str(e)}")
                         model_dict["api_key"] = ""
@@ -304,8 +336,7 @@ class Model:
                     "api_endpoint", "api_key", "api_version",
                     "temperature", "max_tokens", "max_completion_tokens",
                     "model_type", "requires_o1_handling",
-                    "supports_streaming", "is_default", "version",
-                    "provider_id"
+                    "supports_streaming", "is_default", "provider_id"
                 }
 
                 update_data = {

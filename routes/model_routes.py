@@ -133,9 +133,6 @@ def extract_model_data(form: ModelForm) -> dict:
         "supports_streaming": form.supports_streaming.data,
         "is_default": form.is_default.data,
     }
-    # Include version if it's provided and not None
-    if form.version.data is not None:
-        data["version"] = form.version.data
     return data
 
 
