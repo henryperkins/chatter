@@ -127,6 +127,29 @@ async function initializeInterface() {
         modelSelect.addEventListener('change', handleModelChange);
     }
 
+    // Edit Title Button
+    const editTitleBtn = document.getElementById('edit-title-btn');
+    if (editTitleBtn) {
+        editTitleBtn.addEventListener('click', handleEditTitle);
+    }
+
+    function handleEditTitle() {
+        // Implement the logic to edit chat title
+    }
+
+    // Delete Chat Buttons
+    const deleteChatButtons = document.querySelectorAll('.delete-chat-btn');
+    deleteChatButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const chatId = button.getAttribute('data-chat-id');
+            handleDeleteChat(chatId);
+        });
+    });
+
+    function handleDeleteChat(chatId) {
+        // Implement the logic to delete the chat
+    }
+
     // Call other setup functions as needed
     attachActionButtonListeners();
     renderInitialAssistantMessages();
