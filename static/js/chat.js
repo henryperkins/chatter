@@ -470,6 +470,7 @@ async function appendAssistantMessage(message, isStreaming = false) {
 
     // Auto-scroll
     chatBox.scrollTop = chatBox.scrollHeight;
+} // Closing brace for appendAssistantMessage function
 
     // Initialize FileUploadManager if needed
     const chatId = window.CHAT_CONFIG.chatId;
@@ -591,25 +592,7 @@ async function appendAssistantMessage(message, isStreaming = false) {
 /**
  * Attach event listeners to action buttons within the chat messages
  */
-function attachActionButtonListeners() {
-    const chatBox = document.getElementById('chat-box');
-    if (!chatBox) return;
 
-    chatBox.addEventListener('click', async (event) => {
-        const target = event.target.closest('button');
-        if (!target) return;
-
-        event.preventDefault();
-
-        if (target.classList.contains('copy-button')) {
-            await handleCopyMessage(target);
-        } else if (target.classList.contains('regenerate-button')) {
-            await handleRegenerateMessage(target);
-        }
-    });
-}
-
-window.init = init;
 
 /**
  * Drag-and-drop functionality
