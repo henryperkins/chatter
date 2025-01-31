@@ -438,13 +438,25 @@ def edit_model(model_id):
             if csrf_error:
                 return csrf_error
 
-            # Handle data from form
-            form = ModelForm(request.form)
+            # Handle data from form or JSON
+            if request.is_json:
+                # Data is sent as JSON
+                data = request.get_json()
+                form = ModelForm(data=data)
+            else:
+                # Data is sent as form data
+                data = request.form.to_dict()
+                form = ModelForm(request.form)
             if not form.validate():
                 logger.warning("Form validation failed: %s", form.errors)
-                return render_template(
-                    "edit_model.html", form=form, model=model, provider=provider, errors=form.errors
-                )
+                if request.is_json:
+                    # Return JSON response for AJAX requests
+                    return jsonify({"success": False, "errors": form.errors}), 400
+                else:
+                    # Render template for regular form submissions
+                    return render_template(
+                        "edit_model.html", form=form, model=model, provider=provider, errors=form.errors
+                    )
 
             # Extract and validate data with improved error handling
             data = extract_model_data(form)
@@ -542,13 +554,17 @@ def edit_model(model_id):
                     "redirect": redirect_url,
                 },
             )
-            return jsonify(
-                {
-                    "success": True,
-                    "message": "Model updated successfully",
-                    "redirect": redirect_url,
-                }
-            )
+            if request.is_json:
+                return jsonify(
+                    {
+                        "success": True,
+                        "message": "Model updated successfully",
+                        "redirect": redirect_url,
+                    }
+                )
+            else:
+                flash("Model updated successfully", "success")
+                return redirect(url_for("chat.chat_interface"))
 
         logger.debug("Rendering edit model page for model ID %d", model_id)
         return render_template(
