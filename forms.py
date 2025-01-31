@@ -29,10 +29,11 @@ from wtforms.validators import (
 from typing import Any
 from sqlalchemy import text
 
-from app.extensions import db_session
-from app.models import Provider, Model
-from app.utils.encryption import encrypt_api_key, EncryptionError
-from app.logger import logger
+from models import Provider, Model
+from utils.encryption import encrypt_api_key, EncryptionError
+import logging
+
+logger = logging.getLogger(__name__)
 from database import db_session, db_transaction, is_initialized
 
 logger = logging.getLogger(__name__)
