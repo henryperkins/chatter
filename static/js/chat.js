@@ -1,7 +1,5 @@
 /* static/js/chat.js */
 
-const utils = window.utils;
-
 /**
  * Main initialization function
  */
@@ -86,13 +84,30 @@ async function initializeInterface() {
         window.fileUploadManager = new window.FileUploadManager(chatId, userId, correctUploadBtn);
     }
 
-    // 3. Initialize TokenUsageManager
+    // 3. Initialize TokenUsageManager with full configuration
     if (window.TokenUsageManager && chatId) {
         console.log('Initializing TokenUsageManager with chatId:', chatId);
-        window.tokenUsageManager = new window.TokenUsageManager({ chatId });
+        const model = window.CHAT_CONFIG.models?.find(m => m.id === parseInt(window.CHAT_CONFIG.currentModel?.id));
+        const config = {
+            chatId,
+            model_limits: {
+                max_tokens: model?.max_tokens || 32000
+            }
+        };
+        window.tokenUsageManager = new window.TokenUsageManager(config);
+
         // Force an immediate update of token usage stats
         try {
             await window.tokenUsageManager.updateStats();
+
+            // Start periodic updates
+            window.tokenUsageManager.startPeriodicUpdates();
+
+            // Show token usage panel by default
+            const tokenUsageContainer = document.getElementById('token-usage');
+            if (tokenUsageContainer?.classList.contains('hidden')) {
+                window.tokenUsageManager.toggleDisplay();
+            }
         } catch (error) {
             console.error('Error updating token stats:', error);
         }
@@ -168,8 +183,8 @@ async function initializeInterface() {
                 console.debug('Editing model:', modelId);
                 const editUrl = window.CHAT_CONFIG.editModelUrl + modelId;
                 window.location.href = editUrl;
-            } else {
-                utils.showFeedback('No model selected', 'error');
+            } else if (window.utils) {
+                window.utils.showFeedback('No model selected', 'error');
             }
         });
     }
@@ -259,13 +274,15 @@ function showTypingIndicator() {
 
     indicator = document.createElement('div');
     indicator.id = 'typing-indicator';
-    indicator.className = 'flex w-full mt-2 space-x-3 max-w-3xl';
+    indicator.className = 'flex w-full mt-4 space-x-3 max-w-3xl';
     indicator.setAttribute('role', 'status');
     indicator.setAttribute('aria-label', 'Assistant is typing');
     indicator.innerHTML = `
-        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gray-300 dark:bg-gray-700"></div>
+        <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white">
+            <i class="fas fa-robot text-sm"></i>
+        </div>
         <div class="relative max-w-3xl">
-            <div class="bg-gray-100 dark:bg-gray-800 p-3 rounded-r-lg rounded-bl-lg">
+            <div class="bg-gray-100 dark:bg-gray-800 p-4 rounded-r-lg rounded-bl-lg shadow-sm">
                 <div class="typing-animation">
                     <div class="dot"></div>
                     <div class="dot"></div>
@@ -307,11 +324,18 @@ async function sendMessage() {
         return;
     }
 
+    // Prevent multiple submissions
+    if (sendButton.disabled) {
+        return;
+    }
+    sendButton.disabled = true;
+
     const messageText = messageInput.value.trim();
     const hasUploadedFiles = window.fileUploadManager?.uploadedFiles?.length > 0;
 
     if (!messageText && !hasUploadedFiles) {
         window.utils.showFeedback('Please enter a message or upload files.', 'error');
+        sendButton.disabled = false;
         return;
     }
 
@@ -324,10 +348,35 @@ async function sendMessage() {
         // Clear previous errors
         document.querySelectorAll('.error-indicator').forEach(el => el.remove());
 
+        // Count tokens and check limits
+        const maxTokens = model?.max_tokens || 32000;
+        const tokenCount = await window.tokenUsageManager.countMessageTokens(messageText);
+
+        if (tokenCount > maxTokens) {
+            window.utils.showFeedback(`Message exceeds token limit (${tokenCount}/${maxTokens})`, 'error');
+            sendButton.disabled = false;
+            return;
+        }
+
+        // Prepare message metadata
+        const metadata = {
+            timestamp: new Date().toISOString(),
+            token_count: tokenCount,
+            requires_o1: model?.requires_o1_handling || false,
+            model_max_tokens: maxTokens
+        };
+
+        // Create form data with metadata
         const formData = new FormData();
         if (messageText) {
-            formData.append('message', messageText);
+            // Truncate if needed
+            const truncatedMessage = tokenCount > maxTokens ?
+                await window.tokenUsageManager.truncateContent(messageText, maxTokens) :
+                messageText;
+            formData.append('message', truncatedMessage);
+            formData.append('metadata', JSON.stringify(metadata));
         }
+
         // Add files if available
         if (window.fileUploadManager?.uploadedFiles?.length > 0) {
             window.fileUploadManager.uploadedFiles.forEach(file => {
@@ -338,44 +387,49 @@ async function sendMessage() {
         formData.append('model_id', modelId);
         formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
 
+        // Add user's message to the chat before sending
+        if (messageText) {
+            appendUserMessage(messageText);
+        }
+
+        // Show typing indicator before the request
+        showTypingIndicator();
+
         try {
-            if (!window.utils) {
-                throw new Error('Utils not initialized');
+            // Only one response handler should be used
+            if (useStreaming) {
+                await handleStreamingResponse(formData);
+            } else {
+                await handleNormalResponse(formData);
             }
 
-            await window.utils.withLoading(sendButton, async () => {
-                // Add user's message to the chat
-                if (messageText) {
-                    appendUserMessage(messageText);
-                }
+            // Clear inputs on success
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            window.fileUploadManager.uploadedFiles = [];
+            window.fileUploadManager.renderFileList();
 
-                // Only one response handler should be used
-                if (useStreaming) {
-                    await handleStreamingResponse(formData);
-                } else {
-                    await handleNormalResponse(formData);
-                }
-
-                // Clear inputs on success
-                messageInput.value = '';
-                messageInput.style.height = 'auto';
-                window.fileUploadManager.uploadedFiles = [];
-                window.fileUploadManager.renderFileList();
-
-                // Show success feedback
-                window.utils.showFeedback('Message sent successfully', 'success');
-            });
-
-            // Update token usage
+            // Update token usage and handle new message
             if (window.tokenUsageManager) {
+                await window.tokenUsageManager.handleNewMessage();
                 await window.tokenUsageManager.updateStats();
+
+                // Update model limits if needed
+                const modelLimits = {
+                    max_tokens: model?.max_tokens || 32000
+                };
+                window.tokenUsageManager.updateModelLimits(modelLimits);
+
+                // Show token usage panel if hidden
+                const tokenUsageContainer = document.getElementById('token-usage');
+                if (tokenUsageContainer?.classList.contains('hidden')) {
+                    window.tokenUsageManager.toggleDisplay();
+                }
             }
         } catch (error) {
             console.error('Error sending message:', error);
             const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
-            if (window.utils) {
-                window.utils.showFeedback(errorMessage, 'error', { duration: 0 }); // Duration 0 means it won't auto-hide
-            }
+            window.utils.showFeedback(errorMessage, 'error', { duration: 0 }); // Duration 0 means it won't auto-hide
         }
     } finally {
         removeTypingIndicator();
@@ -385,10 +439,17 @@ async function sendMessage() {
 }
 
 async function handleStreamingResponse(formData) {
-    showTypingIndicator();
     let reader;
+    let messageDiv = null;
 
     try {
+        console.log('Starting streaming response...'); // Debug log
+
+        // Get current model
+        const modelSelect = document.getElementById('model-select');
+        const modelId = modelSelect?.value;
+        const currentModel = window.CHAT_CONFIG.models?.find(m => m.id === parseInt(modelId));
+
         // Use the native fetch for streaming since utils.fetchWithCSRF doesn't support streaming
         const response = await fetch('/chat/', {
             method: 'POST',
@@ -400,6 +461,8 @@ async function handleStreamingResponse(formData) {
                 'X-Requested-With': 'XMLHttpRequest'
             }
         });
+
+        console.log('Stream response status:', response.status); // Debug log
 
         if (!response.ok) {
             const contentType = response.headers.get('content-type');
@@ -425,15 +488,48 @@ async function handleStreamingResponse(formData) {
         let accumulatedResponse = '';
         let lastUpdateTime = Date.now();
         const updateInterval = 100;
-        let messageDiv = null;
+
+        // Create message div once at the start
+        messageDiv = document.createElement('div');
+        messageDiv.className = 'flex w-full mt-2 space-x-2 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl';
+        const chatBox = document.getElementById('chat-box');
+        chatBox.appendChild(messageDiv);
+
+        // Initialize the message structure
+        messageDiv.innerHTML = `
+            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white" role="img"
+                aria-label="Assistant avatar">
+                <i class="fas fa-robot text-sm"></i>
+            </div>
+            <div class="relative flex-1">
+                <div class="absolute right-2 top-2 flex items-center space-x-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <button class="copy-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                            title="Copy to clipboard"
+                            aria-label="Copy message to clipboard">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <div class="bg-gray-100 dark:bg-gray-800 p-4 rounded-r-lg rounded-bl-lg shadow-sm group hover:shadow-md transition-all duration-200">
+                    <div class="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto"
+                         data-role="assistant-message">
+                    </div>
+                </div>
+                <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                    ${new Date().toLocaleTimeString()}
+                </span>
+            </div>
+        `;
+
+        console.log('Starting stream reading...'); // Debug log
 
         while (true) {
             const { value, done } = await reader.read();
             if (done) break;
 
             const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
+            console.log('Received chunk:', chunk); // Debug log
 
+            const lines = chunk.split('\n');
             for (const line of lines) {
                 if (line.startsWith('data: ')) {
                     const streamData = line.slice(6);
@@ -441,26 +537,45 @@ async function handleStreamingResponse(formData) {
                     if (streamData.startsWith('[ERROR]')) {
                         throw new Error(streamData.slice(7).trim());
                     }
-                    accumulatedResponse += streamData;
+
+                    try {
+                        // Try to parse as JSON first
+                        const jsonData = JSON.parse(streamData);
+                        accumulatedResponse += jsonData.content || jsonData.message?.content || streamData;
+                    } catch (e) {
+                        // If not JSON, use as plain text
+                        accumulatedResponse += streamData;
+                    }
 
                     const now = Date.now();
                     if (now - lastUpdateTime > updateInterval) {
-                        // Update existing message div or create new one
-                        if (!messageDiv) {
-                            messageDiv = document.createElement('div');
-                            const chatBox = document.getElementById('chat-box');
-                            chatBox.appendChild(messageDiv);
+                        const contentDiv = messageDiv.querySelector('[data-role="assistant-message"]');
+                        if (contentDiv) {
+                            appendAssistantMessage(accumulatedResponse, true, messageDiv);
+                            lastUpdateTime = now;
                         }
-                        appendAssistantMessage(accumulatedResponse, true, messageDiv);
-                        lastUpdateTime = now;
                     }
                 }
             }
         }
 
+        // Final update with complete response
+        if (accumulatedResponse) {
+            console.log('Final response:', accumulatedResponse); // Debug log
+
+            // Lint the message before final display
+            const lintedResponse = await window.tokenUsageManager.lintMessage(accumulatedResponse);
+
+            // Display final linted response
+            appendAssistantMessage(lintedResponse, true, messageDiv);
+        }
+
     } catch (error) {
         console.error('Streaming error:', error);
-        // Re-throw the original error without wrapping it
+        // Clean up the message div if there was an error
+        if (messageDiv) {
+            messageDiv.remove();
+        }
         throw error instanceof Error ? error : new Error(error.toString());
     } finally {
         if (reader) {
@@ -470,14 +585,16 @@ async function handleStreamingResponse(formData) {
                 console.error('Error canceling stream:', e);
             }
         }
-        removeTypingIndicator();
     }
 }
 
 async function handleNormalResponse(formData) {
-    showTypingIndicator();
     try {
-        const data = await utils.fetchWithCSRF('/chat/', {
+        if (!window.utils) {
+            throw new Error('Utils not initialized');
+        }
+
+        const response = await window.utils.fetchWithCSRF('/chat/', {
             method: 'POST',
             body: formData,
             headers: {
@@ -487,28 +604,34 @@ async function handleNormalResponse(formData) {
             }
         });
 
-        if (!data) {
+        console.log('API Response:', response); // Debug log
+
+        if (!response) {
             throw new Error('Server returned no response');
         }
 
-        if (data.error) {
+        if (response.error) {
             // Handle nested error objects
-            const errorMessage = typeof data.error === 'object'
-                ? data.error.message || JSON.stringify(data.error)
-                : data.error;
+            const errorMessage = typeof response.error === 'object'
+                ? response.error.message || JSON.stringify(response.error)
+                : response.error;
             throw new Error(errorMessage);
         }
 
-        if (!data.message?.content) {
+        // Check both possible response formats
+        const content = response.message?.content || response.content;
+        if (!content) {
             throw new Error('Server response missing message content');
         }
 
-        appendAssistantMessage(data.message.content);
+        // Lint and process the message
+        const lintedContent = await window.tokenUsageManager.lintMessage(content);
+
+        // Display final linted response
+        appendAssistantMessage(lintedContent);
     } catch (error) {
         console.error('Normal response error:', error);
         throw error; // Re-throw to be caught in sendMessage
-    } finally {
-        removeTypingIndicator();
     }
 }
 
@@ -518,8 +641,28 @@ async function handleNormalResponse(formData) {
 async function appendAssistantMessage(message, isStreaming = false, existingDiv = null) {
     if (!message) return;
 
+    console.log('Appending message:', { message, isStreaming, hasExistingDiv: !!existingDiv }); // Debug log
+
     const chatBox = document.getElementById('chat-box');
-    if (!chatBox) return;
+    if (!chatBox) {
+        console.error('Chat box not found');
+        return;
+    }
+
+    // Wait for dependencies to be available
+    let attempts = 0;
+    while ((!window.md || !window.DOMPurify) && attempts < 50) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+    }
+
+    if (!window.md || !window.DOMPurify) {
+        console.error('Required dependencies not available after 5 seconds');
+        const errorDiv = document.createElement('div');
+        errorDiv.innerHTML = `<p class="text-red-500">Error: Required dependencies not available. Please refresh the page.</p>`;
+        chatBox.appendChild(errorDiv);
+        return;
+    }
 
     // Process message content consistently
     let processedMessage = message;
@@ -531,82 +674,116 @@ async function appendAssistantMessage(message, isStreaming = false, existingDiv 
             } else if (choice.text) {
                 processedMessage = choice.text;
             }
+        } else if (message.content) {
+            processedMessage = message.content;
         }
     }
 
+    console.log('Processed message:', processedMessage); // Debug log
+
     const DOMPurifyOptions = {
-        ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'a', 'span'],
+        ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'a', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'br', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
         ALLOWED_ATTRS: {
-            'a': ['href', 'title', 'target', 'rel'],
+            'a': ['href', 'title', 'target', 'rel', 'class'],
             'span': ['class'],
             'code': ['class'],
-            'pre': ['class']
+            'pre': ['class'],
+            'table': ['class'],
+            'th': ['class'],
+            'td': ['class']
+        },
+        ADD_ATTR: ['target'],
+        ADD_CLASS: {
+            'blockquote': 'border-l-4 border-gray-300 dark:border-gray-600 pl-4 my-4 italic',
+            'a': 'text-blue-600 dark:text-blue-400 hover:underline',
+            'table': 'min-w-full border border-gray-300 dark:border-gray-600',
+            'th': 'border border-gray-300 dark:border-gray-600 px-4 py-2 bg-gray-50 dark:bg-gray-700',
+            'td': 'border border-gray-300 dark:border-gray-600 px-4 py-2'
         }
     };
 
-    // For streaming updates, use the provided div or reuse the last assistant message div
+    // For streaming updates, use the provided div
     let messageDiv = existingDiv;
-    if (!messageDiv && isStreaming && chatBox.lastElementChild?.querySelector('[data-role="assistant-message"]')) {
-        messageDiv = chatBox.lastElementChild;
+    if (messageDiv) {
         const contentDiv = messageDiv.querySelector('[data-role="assistant-message"]');
         if (contentDiv) {
-            // First decode any HTML entities
-            const decodedContent = window.he.decode(message);
-            // Then render markdown
-            const renderedHtml = window.md.render(decodedContent);
-            // Finally sanitize
-            contentDiv.innerHTML = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
-            if (window.Prism) {
-                window.Prism.highlightAllUnder(contentDiv);
+            try {
+                // Render markdown and sanitize
+                const renderedHtml = window.md.render(processedMessage);
+                const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
+                contentDiv.innerHTML = sanitizedHtml;
+
+                // Update copy button raw content
+                const copyButton = messageDiv.querySelector('.copy-button');
+                if (copyButton) {
+                    copyButton.setAttribute('data-raw-content', processedMessage);
+                }
+
+                if (window.Prism) {
+                    window.Prism.highlightAllUnder(contentDiv);
+                }
+            } catch (error) {
+                console.error('Error updating message content:', error);
+                contentDiv.innerHTML = `<p class="text-red-500">Error rendering message: ${error.message}</p>`;
             }
         }
     } else {
-        messageDiv = document.createElement('div');
-        messageDiv.className = 'flex w-full mt-2 space-x-2 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl';
+        try {
+            messageDiv = document.createElement('div');
+            messageDiv.className = 'flex w-full mt-4 space-x-3 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl';
 
-        const renderedHtml = window.md.render(message);
-        const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
+            const renderedHtml = window.md.render(processedMessage);
+            const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
 
-        messageDiv.innerHTML = `
-            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-700" role="img"
-                aria-label="Assistant avatar"></div>
-            <div class="relative flex-1">
-                <div class="absolute right-2 top-2 flex items-center space-x-1 z-10">
-                    <button
-                        class="copy-button p-1.5 rounded-md bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200 shadow-sm"
-                        title="Copy to clipboard"
-                        data-raw-content="${message.replace(/"/g, '&quot;')}"
-                        aria-label="Copy message to clipboard">
-                        <i class="fas fa-copy"></i>
-                    </button>
-                    ${
-                      !isStreaming
-                        ? `<button
-                            class="regenerate-button p-1.5 rounded-md bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200 shadow-sm"
-                            title="Regenerate response"
-                            aria-label="Regenerate response">
-                            <i class="fas fa-redo-alt"></i>
-                           </button>`
-                        : ''
-                    }
+            messageDiv.innerHTML = `
+                <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white" role="img"
+                    aria-label="Assistant avatar">
+                    <i class="fas fa-robot text-sm"></i>
                 </div>
-                <div class="bg-gray-100 dark:bg-gray-800 p-3 pr-16 rounded-r-lg rounded-bl-lg">
-                    <div class="prose dark:prose-invert prose-sm max-w-none overflow-x-auto" data-role="assistant-message">
-                        ${renderedHtml}
+                <div class="relative flex-1">
+                    <div class="absolute right-2 top-2 flex items-center space-x-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <button
+                            class="copy-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                            title="Copy to clipboard"
+                            data-raw-content="${processedMessage.replace(/"/g, '&quot;')}"
+                            aria-label="Copy message to clipboard">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                        ${
+                          !isStreaming
+                            ? `<button
+                                class="regenerate-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                                title="Regenerate response"
+                                aria-label="Regenerate response">
+                                <i class="fas fa-redo-alt"></i>
+                               </button>`
+                            : ''
+                        }
                     </div>
+                    <div class="bg-gray-100 dark:bg-gray-800 p-5 rounded-r-lg rounded-bl-lg shadow-sm group hover:shadow-md transition-all duration-200">
+                        <div class="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto [&_pre]:my-4 [&_pre]:p-4 [&_pre]:bg-gray-50 dark:[&_pre]:bg-gray-900 [&_pre]:rounded-lg [&_code]:text-sm [&_code]:bg-gray-50 dark:[&_code]:bg-gray-900 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_p]:leading-relaxed [&_ul]:my-4 [&_ol]:my-4 [&_li]:my-1"
+                             data-role="assistant-message">
+                            ${sanitizedHtml}
+                        </div>
+                    </div>
+                    <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                        ${new Date().toLocaleTimeString()}
+                    </span>
                 </div>
-                <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
-                    ${new Date().toLocaleTimeString()}
-                </span>
-            </div>
-        `;
-        chatBox.appendChild(messageDiv);
+            `;
+            chatBox.appendChild(messageDiv);
 
-        // Apply syntax highlighting
-        if (window.Prism) {
-            window.Prism.highlightAllUnder(
-                messageDiv.querySelector('[data-role="assistant-message"]')
-            );
+            // Apply syntax highlighting
+            if (window.Prism) {
+                window.Prism.highlightAllUnder(
+                    messageDiv.querySelector('[data-role="assistant-message"]')
+                );
+            }
+        } catch (error) {
+            console.error('Error creating message element:', error);
+            const errorDiv = document.createElement('div');
+            errorDiv.innerHTML = `<p class="text-red-500">Error creating message: ${error.message}</p>`;
+            chatBox.appendChild(errorDiv);
         }
     }
 
@@ -624,11 +801,11 @@ function appendUserMessage(message) {
     }
 
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'flex w-full mt-2 space-x-2 max-w-[85%] sm:max-w-md md:max-w-2xl ml-auto justify-end';
+    messageDiv.className = 'flex w-full mt-4 space-x-3 max-w-[85%] sm:max-w-md md:max-w-2xl ml-auto justify-end';
     messageDiv.innerHTML = `
         <div>
-            <div class="relative bg-blue-600 text-white p-2.5 rounded-l-lg rounded-br-lg">
-                <p class="text-[15px] leading-normal break-words overflow-x-auto text-sm">${message}</p>
+            <div class="relative bg-blue-600 text-white p-4 rounded-l-lg rounded-br-lg shadow-sm">
+                <p class="text-[15px] leading-relaxed break-words overflow-x-auto whitespace-pre-wrap">${message}</p>
             </div>
             <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
                 ${new Date().toLocaleTimeString()}
@@ -642,29 +819,46 @@ function appendUserMessage(message) {
 /**
  * Renders all assistant messages present in the DOM on initial load (server-side or static).
  */
-function renderInitialAssistantMessages() {
+async function renderInitialAssistantMessages() {
     const assistantMessageDivs = document.querySelectorAll('[data-role="assistant-message"]');
+
+    // Wait for dependencies to be available
+    let attempts = 0;
+    while ((!window.md || !window.DOMPurify || !window.he) && attempts < 50) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+    }
+
+    if (!window.md || !window.DOMPurify || !window.he) {
+        console.error('Required dependencies not available after 5 seconds');
+        assistantMessageDivs.forEach(div => {
+            div.innerHTML = `<p class="text-red-500">Error: Required dependencies not available. Please refresh the page.</p>`;
+        });
+        return;
+    }
+
+    const sanitizeOptions = {
+        ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'a', 'span'],
+        ALLOWED_ATTRS: {
+            'a': ['href', 'title', 'target', 'rel'],
+            'span': ['class'],
+            'code': ['class'],
+            'pre': ['class']
+        }
+    };
 
     assistantMessageDivs.forEach(div => {
         const rawContent = div.getAttribute('data-content');
         if (rawContent) {
             try {
                 // First decode any HTML entities in the content
-                const decodedContent = he.decode(rawContent);
+                const decodedContent = window.he.decode(rawContent);
 
                 // Render markdown
                 const renderedHtml = window.md.render(decodedContent);
 
                 // Sanitize the rendered HTML
-                const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, {
-                    ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'a', 'span'],
-                    ALLOWED_ATTRS: {
-                        'a': ['href', 'title', 'target', 'rel'],
-                        'span': ['class'],
-                        'code': ['class'],
-                        'pre': ['class']
-                    }
-                });
+                const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, sanitizeOptions);
 
                 // Update the content
                 div.innerHTML = sanitizedHtml;
@@ -714,13 +908,18 @@ function attachActionButtonListeners() {
 }
 
 async function handleCopyMessage(button) {
+    if (!window.utils) {
+        console.error('Utils not initialized');
+        return;
+    }
+
     try {
         const rawContent = button.dataset.rawContent || '';
         await navigator.clipboard.writeText(rawContent);
-        utils.showFeedback('Message copied to clipboard!', 'success');
+        window.utils.showFeedback('Message copied to clipboard!', 'success');
     } catch (err) {
         console.error('Clipboard copy failed:', err);
-        utils.showFeedback('Failed to copy message', 'error');
+        window.utils.showFeedback('Failed to copy message', 'error');
     }
 }
 
@@ -754,19 +953,24 @@ function setupDragAndDrop() {
     dropZone.addEventListener('drop', (e) => {
         try {
             dropZone.classList.add('hidden');
+            if (!window.utils) {
+                console.error('Utils not initialized');
+                return;
+            }
+
             if (!e.dataTransfer?.files) {
-                utils.showFeedback('No files dropped', 'error');
+                window.utils.showFeedback('No files dropped', 'error');
                 return;
             }
             const files = Array.from(e.dataTransfer.files);
             if (files.length === 0) {
-                utils.showFeedback('No files dropped', 'error');
+                window.utils.showFeedback('No files dropped', 'error');
                 return;
             }
             if (window.fileUploadManager) {
                 const { validFiles, errors } = window.fileUploadManager.processFiles(files);
                 if (errors.length > 0) {
-                    errors.forEach(error => utils.showFeedback(error.errors.join(', '), 'error'));
+                    errors.forEach(error => window.utils.showFeedback(error.errors.join(', '), 'error'));
                 }
                 if (validFiles.length > 0) {
                     window.fileUploadManager.uploadedFiles.push(...validFiles);
@@ -775,7 +979,9 @@ function setupDragAndDrop() {
             }
         } catch (error) {
             console.error('Error handling file drop:', error);
-            utils.showFeedback('Failed to process dropped files', 'error');
+            if (window.utils) {
+                window.utils.showFeedback('Failed to process dropped files', 'error');
+            }
         } finally {
             dropZone.classList.add('hidden');
         }
@@ -801,6 +1007,24 @@ function cleanup() {
             modelSelect.previousHandler = null;
         }
 
+        // Stop TokenUsageManager periodic updates
+        if (window.tokenUsageManager) {
+            window.tokenUsageManager.stopPeriodicUpdates();
+
+            // Update final stats before cleanup
+            try {
+                window.tokenUsageManager.updateStats();
+            } catch (error) {
+                console.error('Error updating final token stats:', error);
+            }
+        }
+
+        // Clean up any remaining event listeners
+        const chatBox = document.getElementById('chat-box');
+        if (chatBox) {
+            chatBox.removeEventListener('click', attachActionButtonListeners);
+        }
+
         console.debug('Chat cleanup completed successfully');
     } catch (error) {
         console.error('Error during cleanup:', error);
@@ -812,13 +1036,18 @@ window.addEventListener('beforeunload', cleanup);
  * Creates a new chat
  */
 async function createNewChat() {
+    if (!window.utils) {
+        console.error('Utils not initialized');
+        return;
+    }
+
     try {
         const newChatBtn = document.getElementById('new-chat-btn');
         if (newChatBtn) {
             newChatBtn.disabled = true;
         }
 
-        const response = await utils.fetchWithCSRF('/chat/new_chat', {
+        const response = await window.utils.fetchWithCSRF('/chat/new_chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -830,7 +1059,7 @@ async function createNewChat() {
         }
     } catch (error) {
         console.error('Error creating new chat:', error);
-        utils.showFeedback(error.message || 'Failed to create new chat', 'error');
+        window.utils.showFeedback(error.message || 'Failed to create new chat', 'error');
     } finally {
         const newChatBtn = document.getElementById('new-chat-btn');
         if (newChatBtn) {

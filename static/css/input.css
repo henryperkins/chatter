@@ -100,6 +100,40 @@
         @apply prose dark:prose-invert max-w-none overflow-x-auto;
     }
 
+    /* Enhanced code block styling */
+    .code-block-wrapper {
+        @apply relative my-4 rounded-lg overflow-hidden;
+    }
+
+    .code-block-wrapper pre {
+        @apply my-0 p-6 bg-gray-50 dark:bg-gray-900 overflow-x-auto font-mono text-sm leading-relaxed;
+    }
+
+    .code-block-wrapper code {
+        @apply font-mono text-sm bg-transparent p-0 border-0 rounded-none;
+    }
+
+    .code-language {
+        @apply absolute right-2 top-2 text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100/90 dark:bg-gray-800/90 px-2 py-1 rounded backdrop-blur-sm;
+    }
+
+    .copy-code-button {
+        @apply absolute right-2 top-8 p-1.5 rounded-md bg-gray-100/90 hover:bg-gray-200/90 dark:bg-gray-800/90 dark:hover:bg-gray-700/90 text-gray-600 dark:text-gray-400 transition-all duration-200 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900;
+    }
+
+    .copy-code-button.text-green-500 {
+        @apply bg-green-100/90 dark:bg-green-900/90;
+    }
+
+    .copy-code-button.text-red-500 {
+        @apply bg-red-100/90 dark:bg-red-900/90;
+    }
+
+    /* Inline code styling */
+    :not(pre) > code {
+        @apply px-1.5 py-0.5 rounded text-sm bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 font-mono;
+    }
+
     .markdown-content pre {
         @apply my-0 p-0 bg-transparent;
     }

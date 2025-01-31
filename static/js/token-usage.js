@@ -118,6 +118,51 @@ class TokenUsageManager {
     }
 
     /**
+     * Estimate token count for a message (simplified version)
+     */
+    async countMessageTokens(message) {
+        // Simple estimation: ~4 characters per token
+        return Math.ceil(message.length / 4);
+    }
+
+    /**
+     * Truncate content to fit within token limit
+     */
+    async truncateContent(content, maxTokens) {
+        // Simple truncation based on character length
+        const estimatedCharsPerToken = 4;
+        const maxChars = maxTokens * estimatedCharsPerToken;
+        return content.slice(0, maxChars);
+    }
+
+    /**
+     * Process and lint a message before display
+     */
+    async lintMessage(message) {
+        // Basic message cleanup
+        if (typeof message !== 'string') {
+            return message?.toString() || '';
+        }
+
+        // Remove excessive newlines
+        message = message.replace(/\n{3,}/g, '\n\n');
+
+        // Ensure code blocks have language specified
+        message = message.replace(/```(\s*\n)/g, '```javascript\n');
+
+        // Fix common markdown issues
+        message = message
+            // Ensure proper spacing around headers
+            .replace(/^(#{1,6}[^#\n]+)$/gm, '\n$1\n')
+            // Fix list item spacing
+            .replace(/^([*-])\s*([^\n]+)$/gm, '$1 $2')
+            // Ensure proper code block closure
+            .replace(/```[a-zA-Z]*\n((?:(?!```)[\s\S])*)\n?$/gm, '```$1\n```');
+
+        return message;
+    }
+
+    /**
      * Fetch the latest stats from the server and update the UI.
      * Only runs if the panel is visible.
      */
