@@ -5,7 +5,7 @@ try {
         throw new Error('markdown-it library not found');
     }
 
-    const md = markdownit({
+    const md = window.markdownit({
         html: true,
         linkify: true,
         breaks: true,  // Enable line breaks
@@ -67,21 +67,55 @@ try {
             return defaultRender(tokens, idx, options, env, self);
         };
 
-        // Add support for task lists
+        // Enhanced list handling
+        const defaultListRender = md.renderer.rules.list_item_open || function(tokens, idx, options, env, self) {
+            return self.renderToken(tokens, idx, options);
+        };
+
         md.renderer.rules.list_item_open = function (tokens, idx) {
+            const token = tokens[idx];
+            
+            // Handle task lists
             if (tokens[idx + 2] && tokens[idx + 2].content.startsWith('[ ] ')) {
                 return '<li class="task-list-item"><input type="checkbox" disabled> ';
             }
             if (tokens[idx + 2] && tokens[idx + 2].content.startsWith('[x] ')) {
                 return '<li class="task-list-item"><input type="checkbox" checked disabled> ';
             }
-            return '<li>';
+
+            // Add proper nesting classes
+            let classes = ['list-item'];
+            let nesting = 0;
+            for (let i = idx - 1; i >= 0; i--) {
+                if (tokens[i].type === 'bullet_list_open') nesting++;
+            }
+            if (nesting > 0) {
+                classes.push(`nested-${nesting}`);
+            }
+
+            return `<li class="${classes.join(' ')}">`;
+        };
+
+        // Enhance table rendering
+        md.renderer.rules.table_open = function() {
+            return '<div class="table-wrapper"><table>';
+        };
+        
+        md.renderer.rules.table_close = function() {
+            return '</table></div>';
+        };
+
+        // Add horizontal rule styling
+        md.renderer.rules.hr = function() {
+            return '<hr class="markdown-hr">';
         };
     });
 
     // Add HTML entity decoding to markdown-it
     const originalRender = md.render.bind(md);
     md.render = function(src) {
+        if (!src) return '';
+        
         // Clean up the source text
         src = src.replace(/\n{3,}/g, '\n\n');  // Replace multiple newlines with double newlines
         
@@ -98,6 +132,8 @@ try {
         // Add proper spacing around elements
         html = html.replace(/<\/pre>\s*<pre/g, '</pre>\n<pre');  // Add newline between code blocks
         html = html.replace(/<\/h([1-6])>\s*<p/g, '</h$1>\n<p');  // Add newline after headers
+        html = html.replace(/<\/table>\s*<p/g, '</table>\n<p');   // Add newline after tables
+        html = html.replace(/<\/blockquote>\s*<p/g, '</blockquote>\n<p'); // Add newline after blockquotes
         
         return html;
     };
@@ -131,7 +167,12 @@ try {
     });
 
     window.md = md;
-    window.he = { decode: function(text) { return md.render(text).replace(/<[^>]*>/g, ''); } };
+    window.he = { decode: function(text) { 
+        if (!text) return '';
+        const textarea = document.createElement('textarea');
+        textarea.innerHTML = text;
+        return textarea.value;
+    }};
 } catch (error) {
     console.error('Failed to initialize markdown-it:', error);
     // Don't throw here - let the chat.js handle the error

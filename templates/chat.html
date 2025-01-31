@@ -313,7 +313,7 @@
                 {% for message in messages %}
                     {% if message.role == 'assistant' %}
                     <!-- Assistant message -->
-                    <div class="flex w-full mt-2 space-x-2 sm:space-x-3 max-w-[95%] sm:max-w-2xl lg:max-w-3xl mx-auto">
+                    <div class="flex w-full mt-2 space-x-2 sm:space-x-3 px-2 sm:px-0 max-w-full sm:max-w-2xl lg:max-w-3xl mx-auto">
                         <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white" role="img"
                              aria-label="Assistant avatar">
                             <i class="fas fa-robot text-sm"></i>
@@ -339,8 +339,8 @@
                             </div>
 
                             <!-- Message Content -->
-                            <div class="bg-gray-100/95 dark:bg-gray-800/95 p-4 rounded-r-lg rounded-bl-lg shadow-soft group hover:shadow-lg transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:-translate-y-0.5 dark-mode-transition">
-                                <div class="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto"
+                            <div class="bg-gray-100/95 dark:bg-gray-800/95 p-3 sm:p-4 rounded-r-lg rounded-bl-lg shadow-soft group hover:shadow-lg transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:-translate-y-0.5 dark-mode-transition">
+                                <div class="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto !w-full md:!max-w-[95%] lg:!max-w-[90%] !break-words"
                                      data-role="assistant-message"
                                      data-content="{{ message.content | e }}">
                                     <!-- Content will be rendered by client-side JavaScript -->

@@ -928,68 +928,109 @@ function appendUserMessage(message) {
  */
 async function renderInitialAssistantMessages() {
     const assistantMessageDivs = document.querySelectorAll('[data-role="assistant-message"]');
+    if (!assistantMessageDivs.length) return;
 
-    // Wait for dependencies to be available
+    console.log('Re-rendering existing messages:', assistantMessageDivs.length);
+
+    // Wait for markdown-it to be available
     let attempts = 0;
-    while ((!window.md || !window.DOMPurify || !window.he) && attempts < 50) {
+    while (!window.md && attempts < 50) {
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
     }
 
-    if (!window.md || !window.DOMPurify || !window.he) {
-        console.error('Required dependencies not available after 5 seconds');
+    if (!window.md) {
+        console.error('markdown-it not available after 5 seconds');
         assistantMessageDivs.forEach(div => {
-            div.innerHTML = `<p class="text-error-500 dark:text-error-400 font-medium">Error: Required dependencies not available. Please refresh the page.</p>`;
+            div.innerHTML = `<p class="text-red-500">Error: Markdown renderer not available. Please refresh the page.</p>`;
         });
         return;
     }
 
-    const sanitizeOptions = {
-        ALLOWED_TAGS: [
-            'p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote',
-            'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'br',
-            'table', 'thead', 'tbody', 'tr', 'th', 'td'
-        ],
-        ALLOWED_ATTRS: {
-            'a': ['href', 'title', 'target', 'rel', 'class'],
-            'span': ['class'],
-            'code': ['class'],
-            'pre': ['class'],
-            'div': ['class', 'style'],
-            'table': ['class'],
-            'th': ['class'],
-            'td': ['class']
-        },
-        ADD_ATTR: ['target'],
-    };
+    // Process each message
+    for (const div of assistantMessageDivs) {
+        try {
+            const rawContent = div.getAttribute('data-content');
+            if (!rawContent) continue;
 
-    assistantMessageDivs.forEach(div => {
-        const rawContent = div.getAttribute('data-content');
-        if (rawContent) {
-            try {
-                // First decode any HTML entities in the content
-                const decodedContent = window.he.decode(rawContent);
+            // First decode any HTML entities in the content
+            const decodedContent = window.he ? window.he.decode(rawContent) : rawContent;
 
-                // Render markdown
-                const renderedHtml = window.md.render(decodedContent);
+            // Render markdown
+            const renderedHtml = window.md.render(decodedContent);
 
-                // Sanitize the rendered HTML
-                const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, sanitizeOptions);
+            // Sanitize the rendered HTML
+            const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, {
+                ALLOWED_TAGS: [
+                    'p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote',
+                    'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'br',
+                    'table', 'thead', 'tbody', 'tr', 'th', 'td', 'del', 'input'
+                ],
+                ALLOWED_ATTRS: {
+                    'a': ['href', 'title', 'target', 'rel', 'class'],
+                    'span': ['class'],
+                    'code': ['class'],
+                    'pre': ['class'],
+                    'div': ['class', 'style'],
+                    'table': ['class'],
+                    'th': ['class'],
+                    'td': ['class'],
+                    'input': ['type', 'checked', 'disabled'],
+                    'li': ['class']
+                },
+                ADD_ATTR: ['target'],
+                FORCE_BODY: true
+            });
 
-                // Update the content
-                div.innerHTML = sanitizedHtml;
+            // Update the content
+            div.innerHTML = sanitizedHtml;
 
-                // Apply syntax highlighting
-                if (window.Prism) {
-                    window.Prism.highlightAllUnder(div);
-                }
-            } catch (error) {
-                console.error('Error rendering message:', error);
-                // Show a fallback message if rendering fails
-                div.innerHTML = `<p class="text-error-500 dark:text-error-400 font-medium">Error rendering message: ${error.message}</p>`;
+            // Apply syntax highlighting
+            if (window.Prism) {
+                const codeBlocks = div.querySelectorAll('pre code');
+                codeBlocks.forEach(block => {
+                    // Get the language class
+                    const langClass = Array.from(block.classList)
+                        .find(className => className.startsWith('language-'));
+                    
+                    if (langClass) {
+                        const language = langClass.replace('language-', '');
+                        if (Prism.languages[language]) {
+                            block.innerHTML = Prism.highlight(
+                                block.textContent,
+                                Prism.languages[language],
+                                language
+                            );
+                        }
+                    }
+                });
             }
+
+            // Add copy buttons to code blocks
+            div.querySelectorAll('pre').forEach(pre => {
+                if (!pre.parentElement.classList.contains('code-block-wrapper')) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'code-block-wrapper relative group';
+                    const button = document.createElement('button');
+                    button.className = 'copy-code-button absolute right-2 top-2 p-2 rounded-lg bg-gray-800/50 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity duration-200';
+                    button.innerHTML = `
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                        </svg>
+                    `;
+                    pre.parentNode.insertBefore(wrapper, pre);
+                    wrapper.appendChild(button);
+                    wrapper.appendChild(pre);
+                }
+            });
+
+        } catch (error) {
+            console.error('Error rendering message:', error);
+            div.innerHTML = `<p class="text-red-500">Error rendering message: ${error.message}</p>`;
         }
-    });
+    }
+
+    console.log('Finished re-rendering messages');
 }
 
 /**
