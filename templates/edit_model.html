@@ -106,7 +106,7 @@
                         <span id="max-completion-tokens-value" class="text-sm font-semibold text-blue-600 dark:text-blue-400">
                             {{ model.max_completion_tokens }}
                         </span>
-                        <span class="text-sm text-gray-600 dark:text-gray-400">16384</span>
+                        <span id="max-completion-tokens-max" class="text-sm text-gray-600 dark:text-gray-400">16384</span>
                     </div>
                     {{ form.max_completion_tokens(
                         class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600",
@@ -115,7 +115,8 @@
                         max="16384",
                         step="100",
                         value=model.max_completion_tokens,
-                        oninput="validateMaxTokens(this)"
+                        oninput="validateMaxTokens(this)",
+                        id="max_completion_tokens"
                     ) }}
                 </div>
                 {% if form.max_completion_tokens.errors %}
@@ -235,16 +236,43 @@
         }
     });
 
-    function validateMaxTokens(input) {
-        const value = parseInt(input.value);
-        const requiresO1Handling = document.getElementById('requires-o1-handling').checked;
-        const maxValue = requiresO1Handling ? 8300 : 16384;
-
-        if (value > maxValue) {
-            input.value = maxValue;
+    document.addEventListener("DOMContentLoaded", function() {
+        // Initialize validation on page load
+        const requiresO1Checkbox = document.getElementById('requires-o1-handling');
+        const maxCompletionInput = document.getElementById('max_completion_tokens');
+        
+        function updateMaxTokens() {
+            const requiresO1 = requiresO1Checkbox.checked;
+            const maxValue = requiresO1 ? 8300 : 16384;
+            
+            // Update input constraints
+            maxCompletionInput.max = maxValue;
+            document.getElementById('max-completion-tokens-max').textContent = maxValue;
+            
+            // Clamp current value to new max
+            if (parseInt(maxCompletionInput.value) > maxValue) {
+                maxCompletionInput.value = maxValue;
+                document.getElementById('max-completion-tokens-value').textContent = maxValue;
+            }
         }
 
-        document.getElementById('max-completion-tokens-value').textContent = input.value;
+        // Initial validation
+        updateMaxTokens();
+        
+        // Add event listeners
+        requiresO1Checkbox.addEventListener('change', updateMaxTokens);
+        maxCompletionInput.addEventListener('input', function() {
+            validateMaxTokens(this);
+        });
+    });
+
+    function validateMaxTokens(input) {
+        const requiresO1 = document.getElementById('requires-o1-handling').checked;
+        const maxValue = requiresO1 ? 8300 : 16384;
+        const value = Math.min(Math.max(parseInt(input.value), 1), maxValue);
+        
+        input.value = value;
+        document.getElementById('max-completion-tokens-value').textContent = value;
     }
 </script>
 {% endblock scripts %}
