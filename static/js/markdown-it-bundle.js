@@ -10,35 +10,18 @@ try {
         linkify: true,
         typographer: true,
         highlight: function (str, lang) {
-            // Default to javascript if language is not specified
-            const language = lang || 'javascript';
+            // Use the specified language or default to 'plaintext'
+            const language = lang && Prism.languages[lang] ? lang : 'plaintext';
+            const className = 'language-' + language;
 
-            // Try to find the language in Prism
-            let prismLang = window.Prism.languages[language];
-            if (!prismLang) {
-                // Try lowercase version
-                prismLang = window.Prism.languages[language.toLowerCase()];
+            try {
+                const highlighted = Prism.highlight(str, Prism.languages[language], language);
+                // Return the formatted code block
+                return `<pre class="${className}"><code class="${className}">${highlighted}</code></pre>`;
+            } catch (__) {
+                // Fallback for unknown languages
+                return `<pre class="${className}"><code class="${className}">${md.utils.escapeHtml(str)}</code></pre>`;
             }
-
-            if (window.Prism && prismLang) {
-                try {
-                    const highlighted = window.Prism.highlight(str, prismLang, language);
-                    // Add copy button and language indicator
-                    return `<div class="code-block-wrapper relative">
-                        <div class="code-language absolute right-2 top-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">${language}</div>
-                        <button class="copy-code-button absolute right-2 top-8 p-1.5 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 transition-all duration-200" title="Copy code">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                            </svg>
-                        </button>
-                        <pre class="!mt-0 !mb-0"><code class="language-${language}">${highlighted}</code></pre>
-                    </div>`;
-                } catch (error) {
-                    console.error('Prism highlighting error:', error);
-                }
-            }
-            // Fallback with basic formatting
-            return `<pre><code>${md.utils.escapeHtml(str)}</code></pre>`;
         }
     });
 

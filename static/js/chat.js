@@ -790,24 +790,22 @@ async function appendAssistantMessage(message, isStreaming = false, existingDiv 
     console.log('Processed message:', processedMessage); // Debug log
 
     const DOMPurifyOptions = {
-        ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'a', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'br', 'table', 'thead', 'tbody', 'tr', 'th', 'td'],
+        ALLOWED_TAGS: [
+            'p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote',
+            'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'br',
+            'table', 'thead', 'tbody', 'tr', 'th', 'td'
+        ],
         ALLOWED_ATTRS: {
             'a': ['href', 'title', 'target', 'rel', 'class'],
             'span': ['class'],
             'code': ['class'],
             'pre': ['class'],
+            'div': ['class', 'style'],
             'table': ['class'],
             'th': ['class'],
             'td': ['class']
         },
         ADD_ATTR: ['target'],
-        ADD_CLASS: {
-            'blockquote': 'border-l-4 border-gray-300 dark:border-gray-600 pl-4 my-4 italic',
-            'a': 'text-blue-600 dark:text-blue-400 hover:underline',
-            'table': 'min-w-full border border-gray-300 dark:border-gray-600',
-            'th': 'border border-gray-300 dark:border-gray-600 px-4 py-2 bg-gray-50 dark:bg-gray-700',
-            'td': 'border border-gray-300 dark:border-gray-600 px-4 py-2'
-        }
     };
 
     // For streaming updates, use the provided div
@@ -947,13 +945,22 @@ async function renderInitialAssistantMessages() {
     }
 
     const sanitizeOptions = {
-        ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'a', 'span'],
+        ALLOWED_TAGS: [
+            'p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote',
+            'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'br',
+            'table', 'thead', 'tbody', 'tr', 'th', 'td'
+        ],
         ALLOWED_ATTRS: {
-            'a': ['href', 'title', 'target', 'rel'],
+            'a': ['href', 'title', 'target', 'rel', 'class'],
             'span': ['class'],
             'code': ['class'],
-            'pre': ['class']
-        }
+            'pre': ['class'],
+            'div': ['class', 'style'],
+            'table': ['class'],
+            'th': ['class'],
+            'td': ['class']
+        },
+        ADD_ATTR: ['target'],
     };
 
     assistantMessageDivs.forEach(div => {
