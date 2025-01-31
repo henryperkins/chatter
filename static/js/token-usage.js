@@ -5,7 +5,6 @@ class TokenUsageManager {
             console.error('TokenUsageManager: Missing configuration');
             return;
         }
-    }
 
         this.chatId = typeof config === 'object' ? config.chatId : config;
         if (!this.chatId) {
@@ -26,7 +25,6 @@ class TokenUsageManager {
             console.error('TokenUsageManager: Failed to initialize - missing elements');
         }
     }
-}
 
     /**
      * Collect references to all DOM elements TokenUsageManager depends on.
@@ -215,7 +213,6 @@ class TokenUsageManager {
             }, 5000);
         }
     }
-    }
 
     /**
      * Update the display: progress bar width, token usage numbers, etc.
@@ -279,7 +276,6 @@ class TokenUsageManager {
 
         console.log('TokenUsageManager: Display update complete');
     }
-    }
 
     /**
      * Dynamically update the progress bar color based on usage percentage.
@@ -303,11 +299,13 @@ class TokenUsageManager {
      */
     startPeriodicUpdates() {
         this.updateInterval = setInterval(() => {
-            if (this.elements.container && !this.elements.container.classList.contains('hidden')) {
+            if (
+                this.elements.container &&
+                !this.elements.container.classList.contains('hidden')
+            ) {
                 this.updateStats();
             }
         }, 30000);
-}
     }
 
     /**
@@ -317,7 +315,6 @@ class TokenUsageManager {
         if (this.updateInterval) {
             clearInterval(this.updateInterval);
             this.updateInterval = null;
-        }
         }
     }
 

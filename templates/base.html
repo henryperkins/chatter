@@ -19,7 +19,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
 
     <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
+          integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA=="
+          crossorigin="anonymous" referrerpolicy="no-referrer" />
 
     <!-- Custom Styles -->
     <style>
@@ -28,7 +30,7 @@
             position: relative;
             opacity: 0.7;
         }
-        
+
         #send-button.sending::after {
             content: "";
             position: absolute;
@@ -144,8 +146,10 @@
         </button>
     </div>
 
-    <!-- Mobile Menu Backdrop -->
-    <div id="mobile-menu-backdrop" class="fixed inset-0 z-modal-backdrop hidden menu-backdrop transition-opacity duration-300 opacity-0"></div>
+    <!-- Mobile Menu Backdrop (merged classes) -->
+    <div id="mobile-menu-backdrop"
+         class="fixed inset-0 z-modal-backdrop hidden menu-backdrop bg-black bg-opacity-50 backdrop-blur-sm transition-opacity duration-300 opacity-0"
+         aria-hidden="true"></div>
 
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -158,9 +162,12 @@
                     <strong class="font-bold">{{ category | title }}:</strong>
                     <span class="block sm:inline">{{ message }}</span>
                 </div>
-                <button onclick="this.parentElement.remove()" class="ml-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none transition-all duration-300" aria-label="Dismiss">
+                <button onclick="this.parentElement.remove()"
+                        class="ml-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none transition-all duration-300"
+                        aria-label="Dismiss">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M6 18L18 6M6 6l12 12"/>
                     </svg>
                 </button>
             </div>
@@ -175,7 +182,6 @@
     </main>
 
     <!-- Feedback Message -->
-    <!-- Replace the existing feedback message div with: -->
     <div
         id="feedback-message"
         class="hidden fixed top-20 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-[9999] max-w-md w-full text-center transition-all duration-300"
@@ -195,16 +201,12 @@
 
     <!-- Base Application Script -->
     <script src="{{ url_for('static', filename='js/base.js') }}"></script>
-    
+
     <!-- Dark Mode Script -->
     <script src="{{ url_for('static', filename='js/dark-mode.js') }}"></script>
 
     {% block scripts %}
     <script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>
     {% endblock %}
-<!-- Mobile Menu Backdrop -->
-<div id="mobile-menu-backdrop"
-     class="fixed inset-0 z-modal-backdrop hidden bg-black bg-opacity-50 backdrop-blur-sm transition-opacity duration-300"
-     aria-hidden="true"></div>
 </body>
 </html>
