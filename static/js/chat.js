@@ -1094,7 +1094,7 @@ function handleModelChange() {
         }),
     })
     .then(response => response.json())
-    .then(data => {
+    .then(async data => {
         if (data.success) {
             utils.showFeedback('Model updated successfully', 'success');
             if (window.tokenUsageManager) {
