@@ -19,6 +19,7 @@ from flask import (
     render_template,
     url_for,
     redirect,
+    flash,
 )
 from flask_login import current_user
 from flask_login import login_required
