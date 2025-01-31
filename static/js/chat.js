@@ -593,7 +593,7 @@ function attachActionButtonListeners() {
         if (target.classList.contains('copy-button')) {
             await handleCopyMessage(target);
         } else if (target.classList.contains('regenerate-button')) {
-            await handleRegenerateMessage(target);
+            await regenerateResponse();
         }
     });
 }
@@ -999,6 +999,11 @@ function adjustTextareaHeight(textarea) {
         }
         removeTypingIndicator();
     }
+}
+
+async function handleRegenerateMessage(target) {
+    // Implement the logic to handle regenerate message
+    console.log('Regenerate message logic goes here');
 }
 
 
