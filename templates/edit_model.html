@@ -8,187 +8,178 @@
 <form id="edit-model-form"
     class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 model-form"
     method="POST"
-    action="{{ url_for('model.edit_model', model_id=model.id) }}">
+    action="{{ url_for('model.edit_model', model_id=model.id) }}"
+    data-submit-text="Update Model"
+    data-is-edit="true">
         {{ form.hidden_tag() }}
-        {{ form.version }}
+        <input type="hidden" name="version" value="{{ model.version }}">
 
         <!-- Provider -->
-        <div class="mb-6">
-            {{ form.provider_id(type="hidden", value=model.provider_id) }}
-            <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1">
-                Provider (cannot be changed)
-            </label>
-            <p class="text-sm text-gray-500 dark:text-gray-400">{{ provider.name }}</p>
+        <div class="mb-4">
+            {{ form.provider_id.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            <select id="provider_id" name="provider_id"
+                    class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200"
+                    disabled>
+                {% for choice in form.provider_id.choices %}
+                    <option value="{{ choice[0] }}" {% if choice[0] == model.provider_id %}selected{% endif %}>
+                        {{ choice[1] }}
+                    </option>
+                {% endfor %}
+            </select>
+            {% if form.provider_id.errors %}
+                <p class="text-sm text-red-500 mt-1">{{ form.provider_id.errors[0] }}</p>
+            {% endif %}
         </div>
 
         <!-- Model Name -->
-        <div class="mb-6">
+        <div class="mb-4">
             {{ form.name.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            {{ form.name(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.name) }}
+            {{ form.name(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
             {% if form.name.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.name.errors[0] }}</p>
-            {% endif %}
-        </div>
-
-        <!-- Deployment Name -->
-        <div class="mb-6">
-            {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            {{ form.deployment_name(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.deployment_name)
-            }}
-            {% if form.deployment_name.errors %}
-            <p class="text-sm text-red-500 mt-1">{{ form.deployment_name.errors[0] }}</p>
-            {% endif %}
-        </div>
-
-        <!-- Description -->
-        <div class="mb-6">
-            {{ form.description.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            {{ form.description(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 h-24 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.description) }}
-            {% if form.description.errors %}
-            <p class="text-sm text-red-500 mt-1">{{ form.description.errors[0] }}</p>
-            {% endif %}
-        </div>
-
-        <!-- API Endpoint -->
-        <div class="mb-6">
-            {{ form.api_endpoint.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            {{ form.api_endpoint(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.api_endpoint) }}
-            {% if form.api_endpoint.errors %}
-            <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
             {% endif %}
         </div>
 
         <!-- API Key -->
         <div class="mb-6">
             {{ form.api_key.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            {{ form.api_key(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", type="password",
-            placeholder="Enter API key") }}
+            {{ form.api_key(
+                class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200",
+                type="password",
+                placeholder="Leave blank to keep existing key",
+                **{'data-original-value': model.api_key},
+                id="api_key"
+            ) }}
             {% if form.api_key.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.api_key.errors[0] }}</p>
             {% endif %}
         </div>
 
         <!-- Model Type -->
-        <div class="mb-6">
+        <div class="mb-4">
             {{ form.model_type.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            {{ form.model_type(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.model_type) }}
+            {{ form.model_type(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
             {% if form.model_type.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.model_type.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Max Completion Tokens -->
+        <div class="mb-6">
+            <div class="flex justify-between items-center mb-2">
+                {{ form.max_completion_tokens.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300") }}
+                <span class="text-sm text-gray-500 dark:text-gray-400" id="max-completion-tokens-value">{{ model.max_completion_tokens }}</span>
+            </div>
+            <input type="range"
+                   class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+                   id="max_completion_tokens"
+                   name="max_completion_tokens"
+                   min="1"
+                   max="16384"
+                   value="{{ model.max_completion_tokens }}"
+                   step="100">
+            <div class="flex justify-between items-center mt-1">
+                <span class="text-xs text-gray-500 dark:text-gray-400">1</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400" id="max-completion-tokens-max">16384</span>
+            </div>
+            {% if form.max_completion_tokens.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
             {% endif %}
         </div>
 
         <!-- Temperature -->
         <div class="mb-6">
             {{ form.temperature.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Controls randomness (0.0 for focused, up to 2.0 for more creative
-                responses). Note: For o1-preview models, temperature is automatically set to 1.0.</p>
-            {{ form.temperature(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.temperature) }}
+            {{ form.temperature(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", step="0.1", id="temperature") }}
             {% if form.temperature.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.temperature.errors[0] }}</p>
             {% endif %}
         </div>
 
-        <!-- Max Tokens and Max Completion Tokens -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-                {{ form.max_tokens.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-                {{ form.max_tokens(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.max_tokens)
-                }}
-                {% if form.max_tokens.errors %}
-                <p class="text-sm text-red-500 mt-1">{{ form.max_tokens.errors[0] }}</p>
-                {% endif %}
-            </div>
-            <div>
-                {{ form.max_completion_tokens.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-                <div class="flex flex-col space-y-2">
-                    <div class="flex justify-between">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">1</span>
-                        <span id="max-completion-tokens-value" class="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                            {{ model.max_completion_tokens }}
-                        </span>
-                        <span id="max-completion-tokens-max" class="text-sm text-gray-600 dark:text-gray-400">16384</span>
-                    </div>
-                    {{ form.max_completion_tokens(
-                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600",
-                        type="range",
-                        min="1",
-                        max="16384",
-                        step="1",
-                        value=model.max_completion_tokens,
-                        oninput="validateMaxTokens(this)",
-                        id="max_completion_tokens"
-                    ) }}
-                </div>
-                {% if form.max_completion_tokens.errors %}
-                <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
-                {% endif %}
-            </div>
-        </div>
-
-        <!-- API Version -->
+        <!-- Top P -->
         <div class="mb-6">
-            {{ form.api_version.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            {{ form.api_version(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.api_version) }}
-            {% if form.api_version.errors %}
-            <p class="text-sm text-red-500 mt-1">{{ form.api_version.errors[0] }}</p>
+            {{ form.top_p.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.top_p(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", step="0.01") }}
+            {% if form.top_p.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.top_p.errors[0] }}</p>
             {% endif %}
         </div>
 
-        <!-- Advanced Settings Section -->
-        <div class="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-            <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Advanced Settings</h3>
-
-            <!-- Requires o1-preview Handling -->
-            <div class="mb-4">
-                <label class="inline-flex items-center">
-                    {{ form.requires_o1_handling(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500
-                    focus:ring-2", checked=model.requires_o1_handling) }}
-                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
-                        {{ form.requires_o1_handling.label.text }}
-                    </span>
-                </label>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">Enable this for o1-preview models (sets temperature to 1.0
-                    and disables max tokens and streaming settings)</p>
-            </div>
-
-            <!-- Streaming Support -->
-            <div class="mb-4">
-                <label class="inline-flex items-center">
-                    {{ form.supports_streaming(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500
-                    focus:ring-2", checked=model.supports_streaming) }}
-                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
-                        {{ form.supports_streaming.label.text }}
-                    </span>
-                </label>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">Enable streaming responses (not available for o1-preview models)</p>
-            </div>
-
-            <!-- Default Model Option -->
-            <div>
-                <label class="inline-flex items-center">
-                    {{ form.is_default(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2",
-                    checked=model.is_default) }}
-                    <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
-                        {{ form.is_default.label.text }}
-                    </span>
-                </label>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">Make this the default model for new conversations</p>
-            </div>
+        <!-- Frequency Penalty -->
+        <div class="mb-6">
+            {{ form.frequency_penalty.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.frequency_penalty(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", step="0.01") }}
+            {% if form.frequency_penalty.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.frequency_penalty.errors[0] }}</p>
+            {% endif %}
         </div>
 
-        <!-- Submit & Cancel -->
-        <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
-            <button type="submit"
-                class="w-full sm:w-auto px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg font-medium hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed"
-                id="submit-button">
-                <span class="inline-flex items-center">
-                    <span>Update Model</span>
+        <!-- Presence Penalty -->
+        <div class="mb-6">
+            {{ form.presence_penalty.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.presence_penalty(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", step="0.01") }}
+            {% if form.presence_penalty.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.presence_penalty.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Advanced Settings Header -->
+        <div class="mb-4 mt-6">
+            <h3 class="text-lg font-semibold text-gray-700 dark:text-gray-300">Advanced Settings</h3>
+            <hr class="mt-2 border-gray-200 dark:border-gray-700">
+        </div>
+
+        <!-- Requires o1-preview Handling -->
+        <div class="mb-4">
+            <label class="inline-flex items-center">
+                <input type="checkbox" name="requires_o1_handling" id="requires_o1_handling"
+                       class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2"
+                       {% if model.requires_o1_handling %}checked{% endif %}>
+                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
+                    {{ form.requires_o1_handling.label.text }}
                 </span>
+            </label>
+        </div>
+
+        <!-- Streaming Support -->
+        <div class="mb-4">
+            <label class="inline-flex items-center">
+                <input type="checkbox" name="supports_streaming" id="supports_streaming"
+                       class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2"
+                       {% if model.supports_streaming %}checked{% endif %}
+                       {% if model.requires_o1_handling %}disabled{% endif %}>
+                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
+                    {{ form.supports_streaming.label.text }}
+                </span>
+            </label>
+        </div>
+
+        <!-- Is Default -->
+        <div class="mb-4">
+            <label class="inline-flex items-center">
+                <input type="checkbox" name="is_default" id="is_default"
+                       class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2"
+                       {% if model.is_default %}checked{% endif %}>
+                <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
+                    {{ form.is_default.label.text }}
+                </span>
+            </label>
+        </div>
+
+        <!-- Model Family -->
+        <div class="mb-6">
+            {{ form.model_family.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.model_family(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
+            {% if form.model_family.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.model_family.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+
+        <div class="flex justify-end mt-8">
+            <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                Update Model
             </button>
-            <a href="{{ url_for('chat.chat_interface') }}"
-                class="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white rounded-lg shadow-lg font-medium hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 text-center transition duration-150 ease-in-out">
-                Cancel
-            </a>
         </div>
     </form>
 
@@ -210,83 +201,52 @@
     </div>
 </div>
 
-<script>
-    document.addEventListener("DOMContentLoaded", function() {
-        // Display form data
-        const form = document.getElementById('edit-model-form');
-        const formDataDebug = document.getElementById('form-data-debug');
-
-        if (form && formDataDebug) {
-            const formData = new FormData(form);
-            formDataDebug.textContent = JSON.stringify(Object.fromEntries(formData), null, 2);
-        }
-    });
-</script>
-
 {% endblock content %}
 
 {% block scripts %}
 {{ super() }}
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const form = document.getElementById("edit-model-form");
-        if (form) {
-            form.classList.add('model-form');
-            form.dataset.submitText = "Update Model";
-        }
+document.addEventListener("DOMContentLoaded", function() {
+    // Initialize o1-preview constraints
+    const requiresO1Checkbox = document.getElementById('requires_o1_handling');
+    const maxCompletionInput = document.getElementById('max_completion_tokens');
+    const maxCompletionValue = document.getElementById('max-completion-tokens-value');
+    const temperatureInput = document.getElementById('temperature');
+
+    function updateConstraints() {
+        const isO1Model = requiresO1Checkbox.checked;
+        const maxValue = isO1Model ? 8300 : 16384;
+
+        // Update slider constraints
+        maxCompletionInput.max = maxValue;
+        document.getElementById('max-completion-tokens-max').textContent = maxValue;
+
+        // Clamp current value
+        let currentValue = parseInt(maxCompletionInput.value) || 1;
+        currentValue = Math.min(Math.max(currentValue, 1), maxValue);
+        maxCompletionInput.value = currentValue;
+        maxCompletionValue.textContent = currentValue;
+
+        // Handle temperature locking
+        temperatureInput.disabled = isO1Model;
+        if (isO1Model) temperatureInput.value = 1.0;
+    }
+
+    // Initial setup
+    updateConstraints();
+
+    // Event listeners
+    requiresO1Checkbox.addEventListener('change', updateConstraints);
+    maxCompletionInput.addEventListener('input', function() {
+        maxCompletionValue.textContent = this.value;
+        updateConstraints(); // Re-run updateConstraints to clamp value if needed
     });
 
-    document.addEventListener("DOMContentLoaded", function() {
-        // Initialize validation on page load
-        const requiresO1Checkbox = document.getElementById('requires-o1-handling');
-        const maxCompletionInput = document.getElementById('max_completion_tokens');
-        
-           function updateMaxTokens() {
-               const requiresO1 = requiresO1Checkbox.checked;
-               const maxValue = requiresO1 ? 8300 : 16384;
 
-               // Update input constraints
-               maxCompletionInput.max = maxValue;
-               document.getElementById('max-completion-tokens-max').textContent = maxValue;
-
-               // Clamp current value to new max and update display
-               let currentValue = parseInt(maxCompletionInput.value) || 1;
-               if (currentValue > maxValue) {
-                   currentValue = maxValue;
-               }
-               if (currentValue < 1) {
-                   currentValue = 1;
-               }
-               maxCompletionInput.value = currentValue;
-               document.getElementById('max-completion-tokens-value').textContent = currentValue;
-           }
-
-           // Initial validation
-           updateMaxTokens();
-
-           // Add event listeners
-           requiresO1Checkbox.addEventListener('change', function() {
-               updateMaxTokens();
-               validateMaxTokens(maxCompletionInput);
-           });
-
-           maxCompletionInput.addEventListener('input', function() {
-               validateMaxTokens(this);
-           });
-       });
-
-       function validateMaxTokens(input) {
-           const requiresO1 = document.getElementById('requires-o1-handling').checked;
-           const maxValue = requiresO1 ? 8300 : 16384;
-           let value = parseInt(input.value) || 1;
-           if (value > maxValue) {
-               value = maxValue;
-           }
-           if (value < 1) {
-               value = 1;
-           }
-           input.value = value;
-           document.getElementById('max-completion-tokens-value').textContent = value;
-       }
+    // API key field handling
+    const apiKeyField = document.getElementById('api_key');
+    apiKeyField.placeholder = "Leave blank to keep existing key";
+    apiKeyField.removeAttribute('required');
+});
 </script>
 {% endblock scripts %}

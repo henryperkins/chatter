@@ -14,6 +14,7 @@ from wtforms import (
     URLField,
     ValidationError,
     SubmitField,
+    HiddenField,
 )
 from wtforms.validators import (
     DataRequired,
@@ -28,6 +29,10 @@ from wtforms.validators import (
 from typing import Any
 from sqlalchemy import text
 
+from app.extensions import db_session
+from app.models import Provider, Model
+from app.utils.encryption import encrypt_api_key, EncryptionError
+from app.logger import logger
 from database import db_session, db_transaction, is_initialized
 
 logger = logging.getLogger(__name__)
@@ -314,207 +319,118 @@ class ProviderForm(FlaskForm):
 
 
 class ModelForm(FlaskForm):
-    """
-    Form for creating or updating AI model configurations.
-    """
+    name = StringField('Model Name', validators=[DataRequired(), Length(max=255)])
+    provider_id = SelectField('Provider', coerce=int, validators=[DataRequired()])
+    api_key = PasswordField('API Key', validators=[DataRequired(), Length(min=32, message="API key must be at least 32 characters.")])
+    model_type = StringField('Model Type', validators=[DataRequired(), Length(max=255)])
+    max_completion_tokens = IntegerField('Max Completion Tokens', validators=[DataRequired(), NumberRange(min=1)])
+    temperature = FloatField('Temperature', validators=[Optional(), NumberRange(min=0.0, max=2.0)])
+    top_p = FloatField('Top P', validators=[Optional(), NumberRange(min=0.0, max=1.0)])
+    frequency_penalty = FloatField('Frequency Penalty', validators=[Optional(), NumberRange(min=-2.0, max=2.0)])
+    presence_penalty = FloatField('Presence Penalty', validators=[Optional(), NumberRange(min=-2.0, max=2.0)])
+    is_default = BooleanField('Default Model')
+    supports_streaming = BooleanField('Streaming Support')
+    requires_o1_handling = BooleanField('Requires o1-preview Handling')
+    model_family = StringField('Model Family', validators=[Optional(), Length(max=255)])
+    version = HiddenField('Version')
 
     def __init__(self, *args, **kwargs):
+        self.is_edit = kwargs.pop('is_edit', False)
         super().__init__(*args, **kwargs)
-        # Check for encryption key before form validation
-        from config import Config
+        self.setup_edit_mode()
+        self.load_providers()
 
-        if not getattr(Config, "ENCRYPTION_KEY", None):
-            logger.warning("ENCRYPTION_KEY environment variable not set")
+    def setup_edit_mode(self):
+        """Modify form behavior for edit mode"""
+        if self.is_edit:
+            # Make API key optional for edits
+            self.api_key.validators = [
+                Optional(),
+                Length(min=32, message="API key must be at least 32 characters if provided.")
+            ]
+            self.api_key.description = "Leave blank to keep existing key"
+            self.api_key.flags.required = False
 
-        # Load providers for the select field
-        with db_session() as session:
-            providers = session.execute(
-                text("SELECT id, name FROM providers ORDER BY name")
-            ).fetchall()
-            self.provider_id.choices = [(p.id, p.name) for p in providers]
-
-    provider_id = SelectField(
-        "Provider",
-        validators=[Optional()],
-        coerce=int,
-        description="Select the provider for this model",
-    )
-
-    name = StringField(
-        "Model Name",
-        validators=[
-            DataRequired(message="Model name is required."),
-            Length(max=50, message="Model name cannot exceed 50 characters."),
-            Regexp(
-                r"^[a-zA-Z0-9_\-\s]+$",
-                message="Model name can only contain letters, numbers, spaces, underscores, and hyphens.",
-            ),
-        ],
-    )
-    deployment_name = StringField(
-        "Deployment Name",
-        validators=[
-            DataRequired(message="Deployment name is required."),
-            Length(max=50, message="Deployment name cannot exceed 50 characters."),
-            Regexp(
-                r"^[a-zA-Z0-9_\-]+$",
-                message="Deployment name can only contain letters, numbers, underscores, and hyphens.",
-            ),
-        ],
-    )
-    description = TextAreaField(
-        "Description (Optional)",
-        validators=[
-            Optional(),
-            Length(max=500, message="Description cannot exceed 500 characters."),
-        ],
-    )
-    api_endpoint = URLField(
-        "API Endpoint",
-        validators=[
-            DataRequired(message="API endpoint is required."),
-            URL(message="Must be a valid URL."),
-        ],
-    )
-    api_key = StringField(
-        "API Key",
-        validators=[
-            DataRequired(message="API key is required."),
-            Length(min=32, message="API key must be at least 32 characters long."),
-        ],
-    )
-
-    temperature = NullableFloatField(
-        "Temperature (Creativity Level)",
-        validators=[
-            Optional(),
-            NumberRange(min=0, max=2, message="Temperature must be between 0 and 2."),
-        ],
-    )
-    max_tokens = NullableIntegerField(
-        "Max Tokens (Input)",
-        validators=[Optional()],
-        default=None,
-        render_kw={"placeholder": "Leave blank for no limit"},
-    )
-    max_completion_tokens = NullableIntegerField(
-        "Max Completion Tokens (Output)",
-        validators=[
-            DataRequired(message="Max completion tokens is required.")
-        ],
-    )
-
-    model_type = SelectField(
-        "Model Type",
-        choices=[("azure", "Azure"), ("o1-preview", "o1-preview")],
-        validators=[DataRequired(message="Model type is required.")],
-        default="azure",
-    )
-    api_version = StringField(
-        "API Version",
-        validators=[
-            DataRequired(message="API version is required."),
-            Length(max=20, message="API version cannot exceed 20 characters."),
-        ],
-        default="2024-12-01-preview",
-    )
-    requires_o1_handling = BooleanField("Special Handling for o1-preview Models")
-    supports_streaming = BooleanField("Enable Response Streaming")
-    is_default = BooleanField("Set as Default Model")
-
-    # ------------------------ Custom Validators --------------------------
-
-    def validate_api_endpoint(self, field: Any) -> None:
-        """
-        Remove trailing slashes in the submitted URL
-        """
-        field.data = field.data.rstrip("/")
-
-    def validate_max_completion_tokens(self, field: Any) -> None:
-        """Ensure max_completion_tokens is valid and within range."""
+    def load_providers(self):
+        """Dynamic provider loading with error handling"""
         try:
-            if field.data in (None, '', 'None'):
-                raise ValidationError("Max completion tokens is required.")
+            with db_session() as session:
+                providers = session.execute(
+                    text("SELECT id, name FROM providers WHERE is_active = TRUE ORDER BY name")
+                ).fetchall()
+                self.provider_id.choices = [(p.id, p.name) for p in providers]
+        except Exception as e:
+            logger.error(f"Error loading providers: {str(e)}")
+            self.provider_id.choices = []
+
+    def validate_max_completion_tokens(self, field):
+        """Enhanced validation with provider constraints"""
+        try:
             value = int(field.data)
-
-            # Base validation for all models
-            if not (1 <= value <= 16384):
-                raise ValidationError("Max completion tokens must be between 1 and 16384")
-
-            # o1-preview model validation
-            if self.requires_o1_handling.data and value > 8300:
-                raise ValidationError("Max completion tokens must be between 1 and 8300 for o1-preview models")
-
-            field.data = value
-
         except (TypeError, ValueError):
-            raise ValidationError("Max completion tokens must be a valid integer")
+            raise ValidationError("Must be a valid integer")
 
-    def validate_provider_id(self, field: Any) -> None:
-        """
-        Validate that the chosen provider exists in the database.
-        """
-        with db_session() as session:
-            provider = session.execute(
-                text("SELECT id FROM providers WHERE id = :id"),
-                {"id": field.data},
-            ).scalar()
-            if not provider:
-                raise ValidationError("Invalid provider selected")
+        provider = Provider.get_by_id(self.provider_id.data)
+        provider_max = provider.capabilities.get('max_tokens', 16384) if provider else 16384
 
-    def validate_temperature(self, field: Any) -> None:
-        """
-        Validate temperature based on whether special handling is required.
-        """
-        if field.data in ("", None, "None"):
-            field.data = None
+        if self.requires_o1_handling.data:
+            if not (1 <= value <= 8300):
+                raise ValidationError("Must be between 1-8300 for o1-preview models")
+        else:
+            if not (1 <= value <= provider_max):
+                raise ValidationError(f"Must be between 1-{provider_max} for this provider")
+
+    def validate_temperature(self, field):
+        """Temperature validation with o1-preview locking"""
+        if self.requires_o1_handling.data:
+            field.data = 1.0  # Force value for o1-preview
+            return
+
+        if field.data is None:
             return
 
         try:
             temp = float(field.data)
-            if self.requires_o1_handling.data:
-                if temp != 1.0:
-                    raise ValidationError(
-                        "For o1 models, temperature must be exactly 1.0."
-                    )
-                field.data = 1.0
-            elif not (0 <= temp <= 2):
-                raise ValidationError("Temperature must be between 0 and 2.")
-            field.data = temp
-        except (ValueError, TypeError):
-            raise ValidationError("Temperature must be a valid number between 0 and 2.")
+            if not (0 <= temp <= 2):
+                raise ValidationError("Must be between 0.0 and 2.0")
+        except ValueError:
+            raise ValidationError("Must be a valid number")
 
-    def validate_max_tokens(self, field: Any) -> None:
-        """
-        Validate max_tokens based on whether special handling is required.
-        """
-        if self.requires_o1_handling.data:
-            # Automatically set max_tokens to None for o1-preview
-            field.data = None
-        elif field.data in (None, '', 'None'):
-            # Accept empty input and set to None
-            field.data = None
-        else:
+    def validate_supports_streaming(self, field):
+        """Streaming validation with o1-preview constraint"""
+        if self.requires_o1_handling.data and field.data:
+            raise ValidationError("Streaming not supported for o1-preview models")
+
+    def process_api_key(self):
+        """Handle API key encryption and preservation"""
+        if self.is_edit and not self.api_key.data:
+            # Preserve existing encrypted key
+            original_model = Model.get_by_id(self._obj.id) if self._obj else None
+            if original_model:
+                self.api_key.data = original_model.api_key
+        elif self.api_key.data:
+            # Encrypt new key
             try:
-                value = int(field.data)
-                if not (1 <= value <= 4000):
-                    raise ValidationError("Max tokens must be between 1 and 4000.")
-                field.data = value
-            except (TypeError, ValueError):
-                raise ValidationError(
-                    "Max tokens must be a valid integer between 1 and 4000."
-                )
+                self.api_key.data = encrypt_api_key(self.api_key.data)
+            except EncryptionError as e:
+                logger.error(f"API key encryption failed: {str(e)}")
+                raise ValidationError("Failed to secure API key")
 
-    def validate_requires_o1_handling(self, field: Any) -> None:
-        """
-        Additional validation logic when special handling is required.
-        """
-        if field.data:
-            # For o1-preview, we override certain fields
-            self.temperature.data = 1.0
-            self.max_tokens.data = None
-            self.supports_streaming.data = False
-            self.max_completion_tokens.data = 8300
+    def validate_version(self, field):
+        """Optimistic concurrency control"""
+        if self.is_edit and self._obj:
+            current_version = Model.get_by_id(self._obj.id).version
+            if int(field.data) != current_version:
+                raise ValidationError("This model was modified by another user. Please refresh.")
+
+    def process_formdata(self, valuelist):
+        """Ensure proper boolean handling for checkboxes"""
+        super().process_formdata(valuelist)
+
+        # Set default False for unchecked booleans
+        for field in ['requires_o1_handling', 'supports_streaming', 'is_default']:
+            if field not in self.data:
+                setattr(self, field, False)
 
 
 # ------------------------------------------------------------------------
