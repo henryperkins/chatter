@@ -439,7 +439,7 @@ def edit_model(model_id):
             if not form.validate():
                 logger.warning("Form validation failed: %s", form.errors)
                 return render_template(
-                    "edit_model.html", form=form, model=model, errors=form.errors
+                    "edit_model.html", form=form, model=model, provider=provider, errors=form.errors
                 )
 
             # Extract and validate data with improved error handling

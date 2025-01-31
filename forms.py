@@ -335,7 +335,7 @@ class ModelForm(FlaskForm):
 
     provider_id = SelectField(
         "Provider",
-        validators=[DataRequired(message="Provider is required.")],
+        validators=[Optional()],
         coerce=int,
         description="Select the provider for this model",
     )

@@ -14,7 +14,7 @@
 
         <!-- Provider -->
         <div class="mb-6">
-            <!-- Disable or remove the provider selector so it will not be changed or submitted -->
+            {{ form.provider_id(type="hidden", value=model.provider_id) }}
             <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1">
                 Provider (cannot be changed)
             </label>
