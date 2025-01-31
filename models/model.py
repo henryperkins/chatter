@@ -317,13 +317,14 @@ class Model:
             return None
 
 
-    def update(self, data: Dict[str, Any], model_id: int) -> None:
+    @staticmethod
+    def update(model_id: int, data: Dict[str, Any]) -> None:
         """
         Update model with validated data.
 
         Args:
-            data: Dictionary of fields to update
             model_id: ID of model to update
+            data: Dictionary of fields to update
         """
         try:
             if not model_id:
@@ -348,9 +349,14 @@ class Model:
                     logger.info("No valid fields to update for model ID %d", model_id)
                     return
 
+                # Get existing model data
+                existing_model = Model.get_by_id(model_id)
+                if not existing_model:
+                    raise ValueError(f"Model with ID {model_id} not found")
+
                 # Apply provider constraints
                 model_type = data.get("model_type", "")
-                provider_caps = self.PROVIDER_CAPABILITIES.get(model_type, {})
+                provider_caps = Model.PROVIDER_CAPABILITIES.get(model_type, {})
 
                 # Handle temperature constraint
                 if provider_caps.get('fixed_temperature'):
@@ -371,7 +377,8 @@ class Model:
                         )
 
                 # Handle o1-preview settings
-                if update_data.get("requires_o1_handling", False) or self.requires_o1_handling:
+                requires_o1_handling = update_data.get("requires_o1_handling", existing_model.requires_o1_handling)
+                if requires_o1_handling:
                     # Force disable streaming for o1-preview models
                     update_data["supports_streaming"] = False
                     # Force temperature to 1.0 for o1-preview models
