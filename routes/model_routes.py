@@ -453,13 +453,13 @@ def edit_model(model_id):
             if 'provider_id' in data:
                 data.pop('provider_id', None)
 
-           # Handle numeric fields with proper validation
-           numeric_fields = {
-               "max_tokens": int,
-               "max_completion_tokens": int,
-               "temperature": float,
-               "version": int,
-           }
+            # Handle numeric fields with proper validation
+            numeric_fields = {
+                "max_tokens": int,
+                "max_completion_tokens": int,
+                "temperature": float,
+                "version": int,
+            }
 
            for field, converter in numeric_fields.items():
                value = data.get(field)
