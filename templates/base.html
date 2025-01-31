@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#1f2937" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#ffffff">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="csrf-param" content="csrf_token">
     <title>{% block title %}Azure OpenAI Chat{% endblock %}</title>
@@ -12,6 +11,10 @@
     <!-- Favicon -->
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+
+    <!-- Fonts -->
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jetbrains-mono@1.0.6/css/jetbrains-mono.min.css">
 
     <!-- Tailwind CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
@@ -30,64 +33,64 @@
 
 <body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased flex flex-col safe-area-inset transition-colors duration-300">
     <!-- Navbar -->
-    <nav class="bg-white dark:bg-gray-800 shadow-lg fixed w-full top-0 z-sticky transition-all duration-300 ease-in-out backdrop-blur-sm bg-white/95 dark:bg-gray-800/95 border-b border-gray-200 dark:border-gray-700" role="navigation">
+    <nav class="fixed w-full top-0 z-sticky transition-all duration-300 ease-in-out backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border-b border-gray-200/80 dark:border-gray-700/80 shadow-soft" role="navigation">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <!-- Left side (Brand + Mobile toggle) -->
                 <div class="flex items-center space-x-4">
                     <!-- Mobile Menu Toggle Button -->
                     <button id="mobile-menu-toggle"
-                            class="md:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                            class="md:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
                             aria-label="Toggle menu" aria-expanded="false">
                         <i class="fas fa-bars text-2xl"></i>
                     </button>
 
                     <!-- Brand -->
                     <a href="{{ url_for('chat.chat_interface') }}"
-                       class="flex items-center space-x-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200">
+                       class="flex items-center space-x-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors duration-200">
                         <i class="fas fa-robot text-2xl"></i>
-                        <span class="text-xl font-bold">Azure OpenAI Chat</span>
+                        <span class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-secondary-600 dark:from-primary-400 dark:to-secondary-400">Azure OpenAI Chat</span>
                     </a>
                 </div>
 
                 <!-- Desktop navigation -->
                 <div class="hidden md:flex md:items-center md:space-x-4">
                     <a href="{{ url_for('chat.chat_interface') }}"
-                       class="nav-link {% if request.endpoint == 'chat.chat_interface' %}nav-link-active{% else %}nav-link-default{% endif %}">
+                       class="nav-link {% if request.endpoint == 'chat.chat_interface' %}bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800{% endif %} px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 hover:scale-105">
                         <i class="fas fa-home mr-2"></i>
                         Home
                     </a>
                     {% if current_user.is_authenticated %}
                         {% if current_user.role == 'admin' %}
                         <a href="{{ url_for('model.add_model_page') }}"
-                           class="nav-link {% if request.endpoint == 'model.add_model_page' %}nav-link-active{% else %}nav-link-default{% endif %}">
+                           class="nav-link {% if request.endpoint == 'model.add_model_page' %}bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800{% endif %} px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 hover:scale-105">
                             <i class="fas fa-plus-circle mr-2"></i>
                             Add Model
                         </a>
                         <a href="{{ url_for('provider.list_providers') }}"
-                           class="nav-link {% if request.endpoint == 'provider.list_providers' %}nav-link-active{% else %}nav-link-default{% endif %}">
+                           class="nav-link {% if request.endpoint == 'provider.list_providers' %}bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800{% endif %} px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 hover:scale-105">
                             <i class="fas fa-server mr-2"></i>
                             Providers
                         </a>
                         <a href="{{ url_for('auth.manage_users') }}"
-                           class="nav-link {% if request.endpoint == 'auth.manage_users' %}nav-link-active{% else %}nav-link-default{% endif %}">
+                           class="nav-link {% if request.endpoint == 'auth.manage_users' %}bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800{% endif %} px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 hover:scale-105">
                             <i class="fas fa-users mr-2"></i>
                             Manage Users
                         </a>
                         {% endif %}
                         <a href="{{ url_for('auth.logout') }}"
-                           class="nav-link nav-link-default">
+                           class="nav-link text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 hover:scale-105">
                             <i class="fas fa-sign-out-alt mr-2"></i>
                             Logout
                         </a>
                     {% else %}
                         <a href="{{ url_for('auth.login') }}"
-                           class="nav-link nav-link-default">
+                           class="nav-link text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 hover:scale-105">
                             <i class="fas fa-sign-in-alt mr-2"></i>
                             Login
                         </a>
                         <a href="{{ url_for('auth.register') }}"
-                           class="nav-link nav-link-default">
+                           class="nav-link bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-all duration-300 hover:scale-105 shadow-soft hover:shadow-lg">
                             <i class="fas fa-user-plus mr-2"></i>
                             Register
                         </a>
@@ -99,7 +102,7 @@
 
     <!-- Dark Mode Toggle -->
     <button id="dark-mode-toggle"
-            class="fixed top-20 right-4 z-fixed p-3 bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 opacity-0 shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95 border border-gray-200 dark:border-gray-700 backdrop-blur-sm"
+            class="fixed top-20 right-4 z-fixed p-3 bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 opacity-0 shadow-soft transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95 border border-gray-200/80 dark:border-gray-700/80 backdrop-blur-sm dark-mode-transition"
             aria-label="Toggle dark mode">
         <svg class="w-6 h-6 dark:hidden" fill="currentColor" viewBox="0 0 20 20">
             <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
@@ -111,19 +114,19 @@
 
     <!-- Font Size Adjuster -->
     <div id="font-size-adjuster"
-         class="fixed bottom-20 right-4 z-fixed flex flex-col space-y-2 bg-white dark:bg-gray-800 p-2 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 transition-transform duration-300 transform hover:scale-105">
+         class="fixed bottom-20 right-4 z-fixed flex flex-col space-y-2 bg-white/90 dark:bg-gray-800/90 p-2 rounded-lg shadow-soft border border-gray-200/80 dark:border-gray-700/80 transition-transform duration-300 transform hover:scale-105 backdrop-blur-sm">
         <button id="increase-font-size"
-                class="p-2 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                class="p-2 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
                 aria-label="Increase font size">
             <i class="fas fa-plus"></i>
         </button>
         <button id="reset-font-size"
-                class="p-2 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                class="p-2 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
                 aria-label="Reset font size">
             <i class="fas fa-font"></i>
         </button>
         <button id="decrease-font-size"
-                class="p-2 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                class="p-2 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
                 aria-label="Decrease font size">
             <i class="fas fa-minus"></i>
         </button>
@@ -131,57 +134,57 @@
 
     <!-- Mobile Menu Backdrop -->
     <div id="mobile-menu-backdrop"
-         class="fixed inset-0 z-modal-backdrop hidden bg-black bg-opacity-50 backdrop-blur-sm transition-opacity duration-300 opacity-0"
+         class="fixed inset-0 z-modal-backdrop hidden bg-gray-900/60 backdrop-blur-[2px] transition-all duration-300 ease-in-out opacity-0"
          aria-hidden="true"></div>
 
     <!-- Mobile Menu -->
     <div id="mobile-menu"
-         class="fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-800 shadow-lg transform -translate-x-full transition-transform duration-300 ease-in-out z-modal md:hidden"
+         class="fixed inset-y-0 left-0 w-64 bg-white/95 dark:bg-gray-800/95 shadow-soft transform -translate-x-full transition-transform duration-300 ease-in-out z-modal md:hidden backdrop-blur-md"
          role="dialog" aria-modal="true" aria-label="Mobile navigation">
         <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-700">
             <span class="text-lg font-semibold text-gray-900 dark:text-gray-100">Menu</span>
-            <button class="mobile-menu-close p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <button class="mobile-menu-close p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 hover:scale-105 active:scale-95"
                     aria-label="Close menu">
                 <i class="fas fa-times text-xl"></i>
             </button>
         </div>
         <nav class="px-4 pt-4 space-y-2">
             <a href="{{ url_for('chat.chat_interface') }}"
-               class="mobile-menu-link {% if request.endpoint == 'chat.chat_interface' %}mobile-menu-active{% else %}mobile-menu-default{% endif %}">
+               class="mobile-menu-link {% if request.endpoint == 'chat.chat_interface' %}bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800{% endif %} block px-3 py-2 rounded-md text-base font-medium transition-all duration-300">
                 <i class="fas fa-home mr-2"></i>
                 Home
             </a>
             {% if current_user.is_authenticated %}
                 {% if current_user.role == 'admin' %}
                 <a href="{{ url_for('model.add_model_page') }}"
-                   class="mobile-menu-link {% if request.endpoint == 'model.add_model_page' %}mobile-menu-active{% else %}mobile-menu-default{% endif %}">
+                   class="mobile-menu-link {% if request.endpoint == 'model.add_model_page' %}bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800{% endif %} block px-3 py-2 rounded-md text-base font-medium transition-all duration-300">
                     <i class="fas fa-plus-circle mr-2"></i>
                     Add Model
                 </a>
                 <a href="{{ url_for('provider.list_providers') }}"
-                   class="mobile-menu-link {% if request.endpoint == 'provider.list_providers' %}mobile-menu-active{% else %}mobile-menu-default{% endif %}">
+                   class="mobile-menu-link {% if request.endpoint == 'provider.list_providers' %}bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800{% endif %} block px-3 py-2 rounded-md text-base font-medium transition-all duration-300">
                     <i class="fas fa-server mr-2"></i>
                     Providers
                 </a>
                 <a href="{{ url_for('auth.manage_users') }}"
-                   class="mobile-menu-link {% if request.endpoint == 'auth.manage_users' %}mobile-menu-active{% else %}mobile-menu-default{% endif %}">
+                   class="mobile-menu-link {% if request.endpoint == 'auth.manage_users' %}bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300{% else %}text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800{% endif %} block px-3 py-2 rounded-md text-base font-medium transition-all duration-300">
                     <i class="fas fa-users mr-2"></i>
                     Manage Users
                 </a>
                 {% endif %}
                 <a href="{{ url_for('auth.logout') }}"
-                   class="mobile-menu-link mobile-menu-default">
+                   class="mobile-menu-link text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 block px-3 py-2 rounded-md text-base font-medium transition-all duration-300">
                     <i class="fas fa-sign-out-alt mr-2"></i>
                     Logout
                 </a>
             {% else %}
                 <a href="{{ url_for('auth.login') }}"
-                   class="mobile-menu-link mobile-menu-default">
+                   class="mobile-menu-link text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 block px-3 py-2 rounded-md text-base font-medium transition-all duration-300">
                     <i class="fas fa-sign-in-alt mr-2"></i>
                     Login
                 </a>
                 <a href="{{ url_for('auth.register') }}"
-                   class="mobile-menu-link mobile-menu-default">
+                   class="mobile-menu-link bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600 block px-3 py-2 rounded-md text-base font-medium transition-all duration-300 shadow-soft">
                     <i class="fas fa-user-plus mr-2"></i>
                     Register
                 </a>
@@ -194,11 +197,11 @@
         {% if messages %}
         <div class="fixed top-20 left-1/2 transform -translate-x-1/2 w-full max-w-lg z-tooltip px-4 space-y-2">
             {% for category, message in messages %}
-            <div class="rounded-lg p-4 flex items-center justify-between transition-all duration-300 shadow-lg backdrop-blur-sm
+            <div class="rounded-xl p-4 flex items-center justify-between transition-all duration-300 shadow-soft backdrop-blur-sm animate-slide-up transform hover:scale-[1.02]
                         {% if category == 'error' %}
-                        bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-200
+                        bg-error-50/90 dark:bg-error-900/50 border border-error-200/50 dark:border-error-800/50 text-error-700 dark:text-error-200
                         {% else %}
-                        bg-green-100 dark:bg-green-900/50 border border-green-400 dark:border-green-800 text-green-700 dark:text-green-200
+                        bg-success-50/90 dark:bg-success-900/50 border border-success-200/50 dark:border-success-800/50 text-success-700 dark:text-success-200
                         {% endif %}"
                  role="alert">
                 <div class="flex-1 flex items-center">
@@ -209,7 +212,7 @@
                     </div>
                 </div>
                 <button onclick="this.parentElement.remove()"
-                        class="ml-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 rounded-full p-1 transition-all duration-200"
+                        class="ml-4 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 rounded-full p-1.5 transition-all duration-200 hover:scale-110 active:scale-95 hover:bg-gray-100/50 dark:hover:bg-gray-800/50"
                         aria-label="Dismiss">
                     <i class="fas fa-times"></i>
                 </button>
@@ -226,7 +229,7 @@
 
     <!-- Feedback Message -->
     <div id="feedback-message"
-         class="hidden fixed top-20 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-[9999] max-w-md w-full text-center transition-all duration-300 backdrop-blur-sm"
+         class="hidden fixed top-20 left-1/2 transform -translate-x-1/2 p-4 rounded-xl shadow-soft z-[9999] max-w-md w-full text-center transition-all duration-300 backdrop-blur-sm animate-slide-up bg-white/90 dark:bg-gray-800/90 border border-gray-200/50 dark:border-gray-700/50 text-gray-900 dark:text-gray-100"
          role="alert"
          aria-live="assertive">
     </div>
@@ -238,6 +241,9 @@
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
 
     <!-- Base Application Script -->
+    <script src="{{ url_for('static', filename='js/fileUpload.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/token-usage.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dark-mode.js') }}"></script>
     <script src="{{ url_for('static', filename='js/base.js') }}"></script>
 
     <!-- Dark Mode Script -->
@@ -245,6 +251,7 @@
 
     {% block scripts %}
     <script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
     {% endblock %}
 </body>
 </html>

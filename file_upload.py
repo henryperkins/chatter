@@ -33,17 +33,17 @@ class FileUploadHandler:
             Tuple[bool, List[str]]: (True, []) if allowed, (False, errors) if not
         """
         errors = []
-        
+
         # Check filename security
         if not filename or filename.strip() == "":
             errors.append("Empty filename")
             return False, errors
-            
+
         # Check extension
         if "." not in filename:
             errors.append("Missing file extension")
             return False, errors
-            
+
         ext = filename.rsplit(".", 1)[1].lower()
         if ext not in self.ALLOWED_EXTENSIONS:
             errors.append(f"File extension .{ext} not allowed")
@@ -55,17 +55,17 @@ class FileUploadHandler:
             file.seek(0)
             mime_type = magic.from_buffer(file.read(1024), mime=True)
             file.seek(0)
-            
+
             if mime_type not in Config.ALLOWED_MIME_TYPES:
                 errors.append(f"MIME type {mime_type} not allowed")
                 return False, errors
-                
+
             # Verify MIME type matches extension
             expected_mime = Config.MIME_TYPE_MAP.get(ext)
             if expected_mime and not mime_type.startswith(expected_mime):
                 errors.append(f"MIME type {mime_type} doesn't match extension .{ext}")
                 return False, errors
-                
+
         except Exception as e:
             errors.append(f"Could not verify file type: {str(e)}")
             return False, errors
@@ -98,7 +98,7 @@ class FileUploadHandler:
             file.seek(0)
 
             # Basic validation
-            if not self.allowed_file(file.filename):
+            if not self.allowed_file(file.filename, file)[0]:
                 errors.append(f"File type not allowed: {file.filename}")
                 continue
 
@@ -119,7 +119,7 @@ class FileUploadHandler:
             file_hashes.add(file_hash)
 
             # Verify file content matches extension
-            if not self.validate_file_content(file):
+            if not self.validate_file_content(file) and file.filename.split('.')[-1].lower() not in ['txt', 'md']:
                 errors.append(f"File content doesn't match extension: {file.filename}")
                 continue
 
@@ -155,7 +155,7 @@ class FileUploadHandler:
 
     def validate_file_content(self, file) -> bool:
         """
-        Verify file content matches its extension.
+        Verify file content matches its extension with more lenient text file handling.
 
         Args:
             file: The file object.
@@ -173,8 +173,14 @@ class FileUploadHandler:
         mime_map = Config.MIME_TYPE_MAP
 
         ext = file.filename.split(".")[-1].lower()
+
+        # Special handling for text files
+        if ext in ['txt', 'md'] and mime.startswith('text/'):
+            return True
+
         expected_mime = mime_map.get(ext, "")
-        return mime.startswith(expected_mime)
+        return mime.startswith(expected_mime) if expected_mime else False
+
 
     def scan_for_viruses(self, file) -> str:
         """

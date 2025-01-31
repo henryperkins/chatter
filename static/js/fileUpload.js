@@ -1,4 +1,4 @@
-class FileUploadManager {
+window.FileUploadManager = class {
     constructor(chatId, userId, uploadButton) {
         // Basic properties
         this.chatId = chatId;
@@ -27,11 +27,36 @@ class FileUploadManager {
         this.uploadButton = uploadButton || document.getElementById('upload-button');
         this.dropZone = document.getElementById('drop-zone');
         this.fileInput = document.getElementById('file-input');
+        this.mobileUploadMenu = document.getElementById('mobile-upload-controls');
         this.uploadedFilesDiv = document.getElementById('uploaded-files');
+
+        // Create file input if it doesn't exist
+        if (!this.fileInput) {
+            this.fileInput = document.createElement('input');
+            this.fileInput.type = 'file';
+            this.fileInput.id = 'file-input';
+            this.fileInput.multiple = true;
+            this.fileInput.accept = this.ALLOWED_FILE_TYPES.join(',');
+            this.fileInput.style.display = 'none';
+            document.body.appendChild(this.fileInput);
+        }
 
         // Initialize
         this.setupDragAndDrop();
         this.setupEventListeners();
+        this.setupMobileUpload();
+    }
+
+    setupMobileUpload() {
+        if (!this.mobileUploadMenu) return;
+
+        // Show mobile upload controls on small screens
+        if (window.innerWidth <= 640) {
+            this.mobileUploadMenu.style.display = 'block';
+        }
+
+        // Update visibility on resize
+        window.addEventListener('resize', () => this.updateMobileMenuVisibility());
     }
 
     /**
@@ -39,10 +64,15 @@ class FileUploadManager {
      */
     validateFile(file) {
         const errors = [];
-        
+
         // File type validation
-        if (!this.ALLOWED_FILE_TYPES.includes(file.type)) {
-            errors.push(`Unsupported file type: ${file.type}`);
+        const fileType = file.type || this.getMimeType(file.name);
+        if (!fileType) {
+            errors.push(`Could not determine file type for: ${file.name}`);
+        } else if (!this.ALLOWED_FILE_TYPES.includes(fileType)) {
+            errors.push(`Unsupported file type: ${fileType}`);
+        } else if (fileType.startsWith('text/') && file.size > 1024 * 1024) {
+            errors.push(`Text file too large: ${file.name}`);
         }
 
         // File size validation
@@ -59,7 +89,7 @@ class FileUploadManager {
         if (file.size > 0) {
             const estimatedTokens = this.estimateFileTokens(file);
             file.tokenCount = estimatedTokens;
-            
+
             // Check against token limits
             const currentTotal = this.uploadedFiles.reduce((sum, f) => sum + (f.tokenCount || 0), 0);
             if (currentTotal + estimatedTokens > this.MAX_TOKENS) {
@@ -70,11 +100,29 @@ class FileUploadManager {
         return errors;
     }
 
+    getMimeType(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const mimeTypes = {
+            'txt': 'text/plain',
+            'md': 'text/markdown',
+            'js': 'application/javascript',
+            'py': 'text/x-python',
+            'json': 'application/json',
+            'pdf': 'application/pdf',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'csv': 'text/csv'
+        };
+        return mimeTypes[ext];
+    }
+
+
     estimateFileTokens(file) {
         // Estimate tokens based on file size and type
         const charsPerToken = 4; // Conservative estimate
         const baseTokens = Math.ceil(file.size / charsPerToken);
-        
+
         // Add overhead for file metadata
         return baseTokens + 10;
     }
@@ -329,6 +377,7 @@ class FileUploadManager {
     setupEventListeners() {
         // If the file input is present, handle change events (with debouncing).
         if (this.fileInput) {
+            this.fileInput.style.display = 'none';
             this.fileInput.addEventListener('change', window.utils.debounce((e) => {
                 const files = Array.from(e.target.files);
                 const { validFiles, errors } = this.processFiles(files);
@@ -347,7 +396,7 @@ class FileUploadManager {
         // If the upload button is present, wire it to open the file dialog
         if (this.uploadButton) {
             this.uploadButton.addEventListener('click', () => {
-                if (this.fileInput) {
+                if (this.fileInput && window.innerWidth > 640) {
                     this.fileInput.click();
                 }
             });
@@ -364,6 +413,36 @@ class FileUploadManager {
                 previewModal.classList.add('hidden');
             }
         });
+
+        // Handle mobile upload menu
+        this.setupMobileUploadMenu();
+    }
+
+    setupMobileUploadMenu() {
+        const mobileMenu = document.getElementById('mobile-upload-menu');
+        if (!mobileMenu) return;
+
+        // Handle camera capture
+        const cameraBtn = mobileMenu.querySelector('[onclick*="camera"]');
+        if (cameraBtn) {
+            cameraBtn.onclick = () => this.triggerFileInput('image/*;capture=camera');
+        }
+
+        // Handle gallery selection
+        const galleryBtn = mobileMenu.querySelector('[onclick*="gallery"]');
+        if (galleryBtn) {
+            galleryBtn.onclick = () => this.triggerFileInput('image/*');
+        }
+
+        // Handle file selection
+        const filesBtn = mobileMenu.querySelector('[onclick*="files"]');
+        if (filesBtn) {
+            filesBtn.onclick = () => this.triggerFileInput(this.ALLOWED_FILE_TYPES.join(','));
+        }
+    }
+
+    updateMobileMenuVisibility() {
+        this.mobileUploadMenu?.style.display = window.innerWidth <= 640 ? 'block' : 'none';
     }
 
     /**
@@ -455,6 +534,17 @@ class FileUploadManager {
             }
         }
     }
+
+    triggerFileInput(accept) {
+        if (!this.fileInput) return;
+
+        // Update accept attribute for specific file types
+        this.fileInput.accept = accept;
+
+        // Trigger click
+        this.fileInput.click();
+    }
+
 }
 
 // Expose globally if needed

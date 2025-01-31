@@ -2,7 +2,7 @@ import logging
 import os
 import uuid
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Optional, List, Dict
 from werkzeug.utils import secure_filename
 
 from sqlalchemy import text
@@ -21,6 +21,8 @@ class UploadedFile:
     chat_id: str
     filename: str
     filepath: str
+    uuid: str
+    size: int
 
     @staticmethod
     def create(chat_id: str, filename: str, filepath: str) -> str:
@@ -38,16 +40,21 @@ class UploadedFile:
                 # Move file to unique path
                 os.rename(filepath, unique_filepath)
 
+                # Get file size
+                file_size = os.path.getsize(unique_filepath)
+
                 query = text("""
-                    INSERT INTO uploaded_files (chat_id, filename, filepath, uuid)
-                    VALUES (:chat_id, :filename, :filepath, :uuid)
+                    INSERT INTO uploaded_files (chat_id, filename, filepath, uuid, size)
+                    VALUES (:chat_id, :filename, :filepath, :uuid, :size)
                     RETURNING id
                 """)
                 result = db.execute(query, {
                     "chat_id": chat_id,
                     "filename": filename,
                     "filepath": unique_filepath,
-                    "uuid": file_uuid
+                    "uuid": file_uuid,
+                    "size": file_size,
+                    "created_at": datetime.utcnow()
                 })
                 file_id = result.scalar()
                 db.commit()
@@ -84,19 +91,43 @@ class UploadedFile:
                 raise
 
     @staticmethod
-    def delete_by_chat_ids(chat_ids: List[str]) -> None:
+    def delete_by_chat_ids(chat_ids: List[str]) -> Dict[str, int]:
         """
         Delete all uploaded files associated with specific chat IDs.
+        Returns a dict with deletion stats.
         """
         if not chat_ids:
-            return
+            return {"deleted_files": 0, "deleted_bytes": 0}
+
         with db_session() as db:
             try:
-                query = text("DELETE FROM uploaded_files WHERE chat_id = ANY(:chat_ids)")
-                db.execute(query, {"chat_ids": chat_ids})
+                # First get file info for cleanup
+                query = text("""
+                    SELECT filepath, size FROM uploaded_files
+                    WHERE chat_id = ANY(:chat_ids)
+                """)
+                files = db.execute(query, {"chat_ids": chat_ids}).fetchall()
+
+                # Delete database records
+                delete_query = text("DELETE FROM uploaded_files WHERE chat_id = ANY(:chat_ids)")
+                db.execute(delete_query, {"chat_ids": chat_ids})
                 db.commit()
-                logger.info("Deleted uploaded files for chats: %s", ", ".join(map(str, chat_ids)))
+
+                # Clean up files from disk
+                deleted_bytes = 0
+                for filepath, size in files:
+                    try:
+                        if os.path.exists(filepath):
+                            os.remove(filepath)
+                            deleted_bytes += size
+                    except Exception as e:
+                        logger.error(f"Failed to delete file {filepath}: {e}")
+
+                logger.info(f"Deleted {len(files)} files ({deleted_bytes} bytes) for chats: {', '.join(chat_ids)}")
+                return {"deleted_files": len(files), "deleted_bytes": deleted_bytes}
+
             except Exception as e:
                 db.rollback()
                 logger.error(f"Error deleting uploaded files: {e}")
                 raise
+

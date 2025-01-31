@@ -329,7 +329,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             logger.warning("No message or files provided")
             return jsonify({"error": "Message or files are required."}), 400
 
-        combined_message = message
+        combined_message = ""
         included_files, excluded_files, file_contents, total_tokens = [], [], [], 0
         if request.files:
             included_files, excluded_files, file_contents, file_tokens = process_uploaded_files(
@@ -346,18 +346,32 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                 message_tokens = len(encoding.encode(message))
             total_tokens += message_tokens
 
+        # Build the combined message with proper formatting
+        if message:
+            combined_message = message
+
+        # Add file content with proper formatting
+        if file_contents:
+            if combined_message:
+                combined_message += "\n\n"
+            combined_message += "Attached files:\n"
+            for i, content in enumerate(file_contents):
+                filename = included_files[i]["filename"]
+                combined_message += f"\n[{filename}]:\n{content}\n"
+
         # If total tokens > max, truncate
         if total_tokens > MAX_INPUT_TOKENS:
             combined_message = truncate_content(
                 combined_message,
                 MAX_INPUT_TOKENS,
-                "\n\n[Note: Message truncated due to token limit.]",
+                "\n\n[Note: Content truncated due to token limit.]",
             )
             logger.info("Input content truncated due to token limit")
 
-        # Add file content
-        if file_contents:
-            combined_message = message + "\n" + "".join(file_contents)
+        # Log file processing results
+        if included_files:
+            logger.info("Processed files: %s", [f["filename"] for f in included_files])
+            logger.info("File tokens: %d", file_tokens)
 
         combined_message = bleach.clean(combined_message)
         logger.info(

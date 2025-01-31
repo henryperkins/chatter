@@ -27,14 +27,27 @@ async function init() {
         };
         window.addEventListener('popstate', handleNavigation);
 
-        // Set up mobile viewport height
+        // Set up mobile viewport height and safe areas
         function updateVH() {
             let vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', `${vh}px`);
+
+            // Handle safe areas
+            const safeAreaBottom = getComputedStyle(document.documentElement).getPropertyValue('--sab') || '0px';
+            const safeAreaTop = getComputedStyle(document.documentElement).getPropertyValue('--sat') || '0px';
+
+            // Apply safe areas to chat elements
+            const chatBox = document.getElementById('chat-box');
+            const inputArea = document.querySelector('.input-area');
+
+            if (chatBox && inputArea) {
+                chatBox.style.paddingBottom = `calc(80px + ${safeAreaBottom})`;
+                inputArea.style.paddingBottom = safeAreaBottom;
+            }
         }
 
         updateVH();
-        window.addEventListener('resize', updateVH);
+        window.addEventListener('resize', window.utils?.debounce(updateVH, 100));
 
         // Initialize interface components
         await initializeInterface();
@@ -77,11 +90,17 @@ async function initializeInterface() {
     const chatId = window.CHAT_CONFIG.chatId;
     const userId = window.CHAT_CONFIG.userId;
     const uploadButton = document.getElementById('upload-button');
-    const mobileUploadButton = document.getElementById('mobile-upload-button');
-    const correctUploadBtn = window.innerWidth < 768 ? mobileUploadButton : uploadButton;
+    const correctUploadBtn = uploadButton;
 
     if (!window.fileUploadManager) {
-        window.fileUploadManager = new window.FileUploadManager(chatId, userId, correctUploadBtn);
+        try {
+            window.fileUploadManager = new FileUploadManager(chatId, userId, correctUploadBtn);
+            logger.debug("FileUploadManager initialized successfully");
+        } catch (error) {
+            logger.error("Failed to initialize FileUploadManager:", error);
+            window.utils.showFeedback("Failed to initialize file upload functionality", "error");
+            throw error;
+        }
     }
 
     // 3. Initialize TokenUsageManager with full configuration
@@ -120,22 +139,26 @@ async function initializeInterface() {
     const messageInputContainer = document.getElementById('message-input-container');
     if (chatBox && messageInputContainer) {
         // Adjust chat box height based on keyboard visibility
-        const updateChatBoxHeight = () => {
-            if (window.innerHeight < 500) {
-                // Keyboard is likely open
-                chatBox.style.maxHeight = 'calc(100vh - 300px)';
+        const updateLayout = () => {
+            const isMobile = window.innerWidth <= 640;
+            const isKeyboardOpen = window.innerHeight < 500;
+
+            if (isMobile) {
+                if (isKeyboardOpen) {
+                    chatBox.style.maxHeight = 'calc(100vh - 280px)';
+                    chatBox.style.paddingBottom = '80px';
+                } else {
+                    chatBox.style.maxHeight = 'calc(100vh - 180px)';
+                    chatBox.style.paddingBottom = '120px';
+                }
             } else {
-                chatBox.style.maxHeight = 'calc(100vh - 120px)';
+                chatBox.style.maxHeight = 'calc(100vh - 160px)';
+                chatBox.style.paddingBottom = '80px';
             }
         };
 
-        chatBox.style.cssText = `
-            padding-bottom: 120px !important;
-            margin-bottom: 0 !important;
-            max-height: calc(100vh - 120px);
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-        `;
+        updateLayout();
+        window.addEventListener('resize', window.utils?.debounce(updateLayout, 100));
 
         messageInputContainer.style.cssText = `
             position: sticky !important;
@@ -148,23 +171,20 @@ async function initializeInterface() {
             margin-top: auto !important;
         `;
 
-        // Dark mode overrides
-        const styleSheet = document.createElement('style');
-        styleSheet.textContent = `
-            .dark #message-input-container {
-                background-color: #1a202c;
-                border-color: #4a5568;
-            }
-            #message-input-container {
-                position: sticky !important;
-                bottom: 0 !important;
-                z-index: 10 !important;
-            }
-        `;
-        document.head.appendChild(styleSheet);
+        // Add touch-action manipulation for better mobile handling
+        chatBox.style.touchAction = 'manipulation';
 
-        window.addEventListener('resize', updateChatBoxHeight);
-        updateChatBoxHeight();
+        // Handle mobile keyboard
+        const messageInput = document.getElementById('message-input');
+        if (messageInput) {
+            messageInput.addEventListener('focus', () => {
+                if (window.innerWidth <= 640) {
+                    setTimeout(() => {
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }, 300);
+                }
+            });
+        }
     }
 
     // 5. New chat button
@@ -216,7 +236,79 @@ async function initializeInterface() {
         editTitleBtn.addEventListener('click', handleEditTitle);
     }
     function handleEditTitle() {
-        // Implement the logic to edit chat title
+        if (!window.utils) {
+            console.error('Utils not initialized');
+            return;
+        }
+
+        const chatTitle = document.getElementById('chat-title');
+        if (!chatTitle) {
+            console.error('Chat title element not found');
+            return;
+        }
+
+        const currentTitle = chatTitle.textContent.split(' - ')[0].trim();
+        const modelName = chatTitle.textContent.split(' - ')[1]?.trim() || '';
+
+        // Create input element
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentTitle;
+        input.className = 'px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-gray-100 text-lg font-semibold w-full max-w-[200px] sm:max-w-none';
+
+        // Replace title with input
+        const originalContent = chatTitle.innerHTML;
+        chatTitle.innerHTML = '';
+        chatTitle.appendChild(input);
+        input.focus();
+        input.select();
+
+        const saveTitle = async () => {
+            const newTitle = input.value.trim();
+            if (!newTitle) {
+                window.utils.showFeedback('Title cannot be empty', 'error');
+                chatTitle.innerHTML = originalContent;
+                return;
+            }
+
+            try {
+                const response = await window.utils.fetchWithCSRF('/chat/update_title', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Chat-ID': window.CHAT_CONFIG.chatId
+                    },
+                    body: JSON.stringify({
+                        title: newTitle,
+                        chat_id: window.CHAT_CONFIG.chatId
+                    })
+                });
+
+                if (response.success) {
+                    chatTitle.innerHTML = `${newTitle}${modelName ? ` - ${modelName}` : ''}`;
+                    window.utils.showFeedback('Title updated successfully', 'success');
+                } else {
+                    throw new Error(response.error || 'Failed to update title');
+                }
+            } catch (error) {
+                console.error('Error updating title:', error);
+                window.utils.showFeedback(error.message || 'Failed to update title', 'error');
+                chatTitle.innerHTML = originalContent;
+            }
+        };
+
+        // Handle save on Enter and cancel on Escape
+        input.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                await saveTitle();
+            } else if (e.key === 'Escape') {
+                chatTitle.innerHTML = originalContent;
+            }
+        });
+
+        // Handle save on blur
+        input.addEventListener('blur', saveTitle);
     }
 
     // 9. Delete chat buttons
@@ -246,7 +338,7 @@ async function initializeInterface() {
 function showLoadingIndicator() {
     const loadingDiv = document.createElement('div');
     loadingDiv.id = 'loading-indicator';
-    loadingDiv.className = 'fixed inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center';
+    loadingDiv.className = 'fixed inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center transition-colors duration-300';
     loadingDiv.innerHTML = `
         <div class="flex items-center space-x-2">
             <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -282,7 +374,7 @@ function showTypingIndicator() {
             <i class="fas fa-robot text-sm"></i>
         </div>
         <div class="relative max-w-3xl">
-            <div class="bg-gray-100 dark:bg-gray-800 p-4 rounded-r-lg rounded-bl-lg shadow-sm">
+            <div class="bg-gray-100/95 dark:bg-gray-800/95 p-4 rounded-r-lg rounded-bl-lg shadow-sm backdrop-blur-sm transition-all duration-300">
                 <div class="typing-animation">
                     <div class="dot"></div>
                     <div class="dot"></div>
@@ -804,7 +896,7 @@ function appendUserMessage(message) {
     messageDiv.className = 'flex w-full mt-4 space-x-3 max-w-[85%] sm:max-w-md md:max-w-2xl ml-auto justify-end';
     messageDiv.innerHTML = `
         <div>
-            <div class="relative bg-blue-600 text-white p-4 rounded-l-lg rounded-br-lg shadow-sm">
+            <div class="relative bg-gradient-to-r from-primary-600/95 to-secondary-600/95 dark:from-primary-500/95 dark:to-secondary-500/95 text-white p-4 rounded-l-lg rounded-br-lg shadow-sm backdrop-blur-sm transition-all duration-300">
                 <p class="text-[15px] leading-relaxed break-words overflow-x-auto whitespace-pre-wrap">${message}</p>
             </div>
             <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
@@ -1166,5 +1258,12 @@ async function handleModelChange() {
  * DOM readiness -> Start the chat
  */
 document.addEventListener('DOMContentLoaded', async () => {
-    await init();
+    try {
+        await init();
+    } catch (error) {
+        console.error("Failed to initialize chat:", error);
+        window.utils?.showFeedback("Failed to initialize chat interface", "error");
+    }
 });
+
+window.FileUploadManager = FileUploadManager;

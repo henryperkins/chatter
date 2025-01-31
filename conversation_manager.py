@@ -91,6 +91,33 @@ class ConversationManager:
             requires_o1_handling: Flag for special handling (e.g., O1 transformations).
             streaming_stats: Optional dict containing streaming statistics.
         """
+        # Extract file attachments if present in content
+        file_attachments = []
+        if "Attached files:" in content:
+            parts = content.split("Attached files:", 1)
+            main_content = parts[0].strip()
+            attachments_text = parts[1].strip()
+
+            # Parse file attachments
+            current_file = {"name": "", "content": ""}
+            for line in attachments_text.split('\n'):
+                if line.startswith('[') and line.endswith(']:'):
+                    # Save previous file if exists
+                    if current_file["name"] and current_file["content"]:
+                        file_attachments.append(current_file.copy())
+                    # Start new file
+                    current_file["name"] = line[1:-2]
+                    current_file["content"] = ""
+                else:
+                    current_file["content"] += line + "\n"
+
+            # Add last file
+            if current_file["name"] and current_file["content"]:
+                file_attachments.append(current_file)
+
+            # Use main content for the message
+            content = main_content
+
         message_obj = {"role": role, "content": content}
         tokens = count_message_tokens(message_obj)
         logger.debug("Calculated %d tokens for message: %s", tokens, message_obj)
@@ -100,7 +127,13 @@ class ConversationManager:
             "token_count": tokens,
             "requires_o1": requires_o1_handling,
             "model_max_tokens": model_max_tokens,
+            "has_attachments": bool(file_attachments)
         }
+
+        # Add file attachments to metadata if present
+        if file_attachments:
+            metadata["attachments"] = file_attachments
+            logger.debug("Added %d file attachments to metadata", len(file_attachments))
 
         # Add streaming stats if provided
         if streaming_stats:
@@ -156,6 +189,7 @@ class ConversationManager:
         """
         try:
             messages = Chat.get_messages(chat_id)
+            logger.debug("Retrieved %d messages for chat %s", len(messages), chat_id)
 
             # Attempt to get an optimized context from context_manager
             if hasattr(self.context_manager, "get_context"):
@@ -165,6 +199,25 @@ class ConversationManager:
                 logger.warning(
                     "ContextManager.get_context not available, using full context"
                 )
+
+            # Process messages with attachments
+            for msg in optimized_context:
+                metadata = msg.get("metadata", {})
+                if metadata.get("has_attachments"):
+                    attachments = metadata.get("attachments", [])
+                    if attachments:
+                        # Reconstruct content with attachments
+                        original_content = msg["content"]
+                        attachment_text = "\n\nAttached files:\n"
+                        for attachment in attachments:
+                            attachment_text += f"\n[{attachment['name']}]:\n{attachment['content']}"
+
+                        # Update message content
+                        msg["content"] = original_content + attachment_text
+                        logger.debug(
+                            "Reconstructed message content with %d attachments",
+                            len(attachments)
+                        )
 
             current_tokens = count_conversation_tokens(optimized_context)
 

@@ -104,17 +104,14 @@ const DarkMode = {
     updateToggleButton(isDark) {
         if (!this.darkModeToggle) return;
 
-        const moonIcon = this.darkModeToggle.querySelector('.dark\\:hidden');
-        const sunIcon = this.darkModeToggle.querySelector('.hidden.dark\\:block');
+        const [moonIcon, sunIcon] = this.darkModeToggle.querySelectorAll('svg');
 
-        if (moonIcon && sunIcon) {
-            if (isDark) {
-                moonIcon.classList.add('hidden');
-                sunIcon.classList.remove('hidden');
-            } else {
-                moonIcon.classList.remove('hidden');
-                sunIcon.classList.add('hidden');
-            }
+        if (isDark) {
+            moonIcon.classList.add('hidden');
+            sunIcon.classList.remove('hidden');
+        } else {
+            moonIcon.classList.remove('hidden');
+            sunIcon.classList.add('hidden');
         }
     },
 
@@ -141,6 +138,7 @@ const DarkMode = {
             const isDark = this.html.classList.contains('dark');
             this.darkModeToggle.setAttribute('aria-checked', isDark.toString());
             this.darkModeToggle.setAttribute('aria-label', `${isDark ? 'Dark' : 'Light'} mode enabled. Click to toggle theme.`);
+            this.darkModeToggle.setAttribute('aria-pressed', isDark.toString());
         }
     },
 

@@ -144,7 +144,7 @@
 {% block main_classes %}h-[calc(100vh-4rem)] flex{% endblock %}
 
 {% block content %}
-<div class="flex flex-col md:flex-row h-[100dvh] w-full overflow-hidden bg-white dark:bg-gray-900 safe-area-inset touch-manipulation">
+<div class="flex flex-col md:flex-row h-[100dvh] w-full overflow-hidden bg-white/95 dark:bg-gray-950/95 safe-area-inset touch-manipulation dark-mode-transition backdrop-blur-sm relative">
     <!-- Sidebar -->
     <nav id="mobile-menu"
          class="fixed inset-y-0 left-0 top-16 z-modal w-[85%] max-w-[320px] bg-gray-50 dark:bg-gray-800 transform transition-transform duration-300 ease-in-out -translate-x-full md:relative md:top-0 md:translate-x-0 md:w-80 overflow-y-auto border-r border-gray-200 dark:border-gray-700 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95"
@@ -153,8 +153,8 @@
             <!-- New Chat Button -->
             <div class="flex-none">
                 <button id="new-chat-btn"
-                        class="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white px-4 py-3 rounded-lg transition-all duration-200 text-base font-medium touch-manipulation focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                        aria-label="Start new chat">
+                        class="w-full flex items-center justify-center bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 active:from-primary-800 active:to-secondary-800 text-white px-4 py-3 rounded-lg transition-all duration-300 text-base font-medium touch-manipulation focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 shadow-soft hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98]"
+                        aria-label="Start new chat" role="button">
                     <i class="fas fa-plus mr-2"></i>
                     <span>New Chat</span>
                 </button>
@@ -167,7 +167,7 @@
                        class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model:</label>
                 <div class="relative">
                     <select id="model-select" data-original-value="{{ current_model.id if current_model else '' }}"
-                            class="w-full h-12 px-4 pr-8 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-gray-200 text-base appearance-none cursor-pointer touch-manipulation bg-white dark:bg-gray-700">
+                            class="w-full h-12 px-4 pr-8 border border-gray-300/50 dark:border-gray-600/50 rounded-lg shadow-soft focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:bg-gray-800/90 dark:text-gray-200 text-base appearance-none cursor-pointer touch-manipulation bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm transition-all duration-300 hover:border-primary-500 dark:hover:border-primary-400">
                         {% for model in models %}
                         <option value="{{ model.id }}"
                                 data-requires-o1-handling="{{ 'true' if model.requires_o1_handling else 'false' }}"
@@ -249,9 +249,9 @@
     </nav>
 
     <!-- Main Chat Area -->
-    <div class="flex-1 flex flex-col overflow-hidden relative h-full pb-safe">
+    <div class="flex-1 flex flex-col overflow-hidden h-full pb-safe dark-mode-transition bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
         <!-- Chat Header -->
-        <div class="chat-header sticky top-0 px-4 py-3 bg-white/95 dark:bg-gray-800/95 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between backdrop-blur-sm z-sticky">
+        <div class="chat-header sticky top-0 px-4 py-3 bg-white/80 dark:bg-gray-800/80 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center justify-between backdrop-blur-md z-sticky">
             <div class="flex items-center space-x-4">
                 <!-- Mobile Menu Button -->
                 <button id="mobile-menu-toggle"
@@ -277,7 +277,7 @@
 
         <!-- Token Usage Display -->
         <div id="token-usage"
-             class="px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+             class="px-4 py-2 bg-gray-50/90 dark:bg-gray-800/90 border-b border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
             <div class="flex justify-between items-center mb-2">
                 <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
                     Token Usage
@@ -307,7 +307,7 @@
 
         <!-- Messages Area -->
         <div id="chat-box"
-             class="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-4 min-h-[200px] pb-44 md:pb-32 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent"
+             class="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-4 min-h-[200px] pb-32 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm"
              role="log" aria-live="polite">
             {% if messages %}
                 {% for message in messages %}
@@ -339,7 +339,7 @@
                             </div>
 
                             <!-- Message Content -->
-                            <div class="bg-gray-100 dark:bg-gray-800 p-4 rounded-r-lg rounded-bl-lg shadow-sm group hover:shadow-md transition-all duration-200">
+                            <div class="bg-gray-100/95 dark:bg-gray-800/95 p-4 rounded-r-lg rounded-bl-lg shadow-soft group hover:shadow-lg transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:-translate-y-0.5 dark-mode-transition">
                                 <div class="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto"
                                      data-role="assistant-message"
                                      data-content="{{ message.content | e }}">
@@ -355,7 +355,7 @@
                     <!-- User message -->
                     <div class="flex w-full mt-2 space-x-3 max-w-[85%] sm:max-w-xl lg:max-w-2xl ml-auto justify-end">
                         <div class="relative order-2">
-                            <div class="bg-blue-600 text-white p-3 rounded-l-lg rounded-br-lg shadow-sm hover:shadow-md transition-all duration-200">
+                            <div class="bg-gradient-to-r from-primary-600/95 to-secondary-600/95 dark:from-primary-500/95 dark:to-secondary-500/95 text-white p-3 rounded-l-lg rounded-br-lg shadow-soft hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5 dark-mode-transition backdrop-blur-sm">
                                 <p class="text-[15px] leading-relaxed break-words overflow-x-auto">{{ message.content }}</p>
                             </div>
                             <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1 text-right">
@@ -389,11 +389,11 @@
         </div>
 
         <!-- Input Area -->
-        <div class="input-area fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 px-3 py-2 sm:px-4 sm:py-3 z-50 safe-area-inset transition-transform duration-300">
+        <div class="input-area fixed md:absolute bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-950/95 border-t border-gray-200/50 dark:border-gray-700/50 px-3 py-2 sm:px-4 sm:py-3 z-50 safe-area-inset transition-all duration-300 shadow-soft dark-mode-transition backdrop-blur-sm">
             <div class="max-w-3xl mx-auto flex items-center gap-3">
                 <!-- Upload Button -->
                 <button id="upload-button"
-                        class="flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                        class="flex items-center justify-center w-12 h-12 rounded-full bg-gray-100/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 hover:bg-gray-200/80 dark:hover:bg-gray-700/80 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 backdrop-blur-sm hover:scale-105 active:scale-95 dark-mode-transition"
                         aria-label="Upload files">
                     <i class="fas fa-upload text-xl"></i>
                 </button>
@@ -401,7 +401,7 @@
                 <!-- Message Input Container -->
                 <div class="flex-1 relative">
                     <textarea id="message-input"
-                              class="w-full px-4 py-3 resize-none border border-gray-200 dark:border-gray-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 text-base md:text-sm leading-5 shadow-sm transition-all duration-200"
+                              class="w-full px-4 py-3 resize-none border border-gray-200/50 dark:border-gray-700/50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white/90 dark:bg-gray-900/90 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 text-sm leading-5 shadow-soft transition-all duration-300 hover:border-primary-500 dark:hover:border-primary-400 dark-mode-transition backdrop-blur-sm"
                               placeholder="Type your message..."
                               rows="1"
                               style="min-height: 48px; max-height: 120px;"
@@ -410,7 +410,7 @@
 
                 <!-- Send Button -->
                 <button id="send-button"
-                        class="flex items-center justify-center w-12 h-12 min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 rounded-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95"
+                        class="flex items-center justify-center w-12 h-12 min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 rounded-full bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 active:from-primary-800 active:to-secondary-800 dark:from-primary-500 dark:to-secondary-500 dark:hover:from-primary-600 dark:hover:to-secondary-600 dark:active:from-primary-700 dark:active:to-secondary-700 text-white transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95 shadow-soft hover:shadow-lg dark-mode-transition"
                         aria-label="Send message">
                     <i class="fas fa-paper-plane text-xl"></i>
                 </button>
@@ -421,9 +421,9 @@
 
 <!-- Drop Zone -->
 <div id="drop-zone"
-     class="fixed inset-0 bg-black/50 backdrop-blur-sm z-modal items-center justify-center transition-all duration-300 hidden"
+     class="fixed inset-0 bg-gray-900/60 dark:bg-black/60 backdrop-blur-md z-modal items-center justify-center transition-all duration-300 ease-in-out hidden dark-mode-transition"
      role="dialog" aria-label="File drop zone">
-    <div class="bg-white dark:bg-gray-800 p-8 rounded-lg shadow-xl text-center max-w-md mx-auto mt-20 transform transition-all duration-300">
+    <div class="bg-white/90 dark:bg-gray-800/90 p-8 rounded-xl shadow-soft text-center max-w-md mx-auto mt-20 transform transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:shadow-lg dark-mode-transition">
         <div class="text-blue-500 text-6xl mb-4">
             <i class="fas fa-file-upload"></i>
         </div>
@@ -440,9 +440,9 @@
 
 <!-- Mobile upload controls -->
 <div id="mobile-upload-controls"
-     class="md:hidden fixed bottom-24 right-4 z-[1000] transition-transform duration-300 transform hover:scale-105"
+     class="md:hidden fixed bottom-20 right-4 z-[1000] transition-transform duration-300 transform hover:scale-105"
      style="display: none;">
-    <button class="p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 active:bg-blue-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+    <button class="p-3 bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 active:from-primary-800 active:to-secondary-800 dark:from-primary-500 dark:to-secondary-500 dark:hover:from-primary-600 dark:hover:to-secondary-600 dark:active:from-primary-700 dark:active:to-secondary-700 text-white rounded-full shadow-soft hover:shadow-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transform hover:scale-105 active:scale-95 dark-mode-transition"
             onclick="fileUploadManager.showMobileUploadMenu()"
             aria-label="Upload files">
         <i class="fas fa-upload text-xl"></i>
@@ -451,9 +451,9 @@
 
 <!-- Mobile upload menu -->
 <div id="mobile-upload-menu"
-     class="fixed bottom-0 left-0 w-full bg-white dark:bg-gray-800 shadow-lg transform translate-y-full transition-all duration-300 rounded-t-xl z-[1000]"
+     class="fixed bottom-0 left-0 w-full bg-white/90 dark:bg-gray-800/90 shadow-soft transform translate-y-full transition-all duration-300 ease-in-out rounded-t-xl z-[1000] backdrop-blur-md border-t border-gray-200/50 dark:border-gray-700/50 dark-mode-transition"
      style="display: none;">
-    <div class="p-4 safe-area-inset">
+    <div class="p-4 safe-area-inset space-y-4 dark-mode-transition">
         <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Upload Files</h3>
             <button onclick="fileUploadManager.hideMobileUploadMenu()"
@@ -463,22 +463,22 @@
             </button>
         </div>
         <div class="grid grid-cols-2 gap-4">
-            <button class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+            <button class="p-4 bg-gray-100/80 dark:bg-gray-700/80 rounded-lg hover:bg-gray-200/80 dark:hover:bg-gray-600/80 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 backdrop-blur-sm hover:scale-[1.02] active:scale-[0.98] shadow-soft hover:shadow-md group dark-mode-transition"
                     onclick="fileUploadManager.triggerFileInput('camera')">
-                <i class="fas fa-camera text-2xl mb-2 text-blue-500"></i>
+                <i class="fas fa-camera text-2xl mb-2 text-primary-500 group-hover:text-primary-600 transition-colors"></i>
                 <span class="block text-sm text-gray-900 dark:text-gray-100">Take Photo</span>
             </button>
-            <button class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+            <button class="p-4 bg-gray-100/80 dark:bg-gray-700/80 rounded-lg hover:bg-gray-200/80 dark:hover:bg-gray-600/80 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 backdrop-blur-sm hover:scale-[1.02] active:scale-[0.98] shadow-soft hover:shadow-md group dark-mode-transition"
                     onclick="fileUploadManager.triggerFileInput('gallery')">
-                <i class="fas fa-images text-2xl mb-2 text-green-500"></i>
+                <i class="fas fa-images text-2xl mb-2 text-success-500 group-hover:text-success-600 transition-colors"></i>
                 <span class="block text-sm text-gray-900 dark:text-gray-100">From Gallery</span>
             </button>
-            <button class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+            <button class="p-4 bg-gray-100/80 dark:bg-gray-700/80 rounded-lg hover:bg-gray-200/80 dark:hover:bg-gray-600/80 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 backdrop-blur-sm hover:scale-[1.02] active:scale-[0.98] shadow-soft hover:shadow-md group dark-mode-transition"
                     onclick="fileUploadManager.triggerFileInput('files')">
-                <i class="fas fa-file text-2xl mb-2 text-purple-500"></i>
+                <i class="fas fa-file text-2xl mb-2 text-secondary-500 group-hover:text-secondary-600 transition-colors"></i>
                 <span class="block text-sm text-gray-900 dark:text-gray-100">Files</span>
             </button>
-            <button class="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+            <button class="p-4 bg-gray-100/80 dark:bg-gray-700/80 rounded-lg hover:bg-gray-200/80 dark:hover:bg-gray-600/80 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 backdrop-blur-sm hover:scale-[1.02] active:scale-[0.98] shadow-soft hover:shadow-md group dark-mode-transition"
                     onclick="fileUploadManager.showCloudProviders()">
                 <i class="fas fa-cloud text-2xl mb-2 text-blue-400"></i>
                 <span class="block text-sm text-gray-900 dark:text-gray-100">Cloud</span>
@@ -489,9 +489,9 @@
 
 <!-- Upload Progress -->
 <div id="upload-progress"
-     class="hidden fixed bottom-20 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 w-64 transition-all duration-300 transform translate-y-0 z-[1000]"
+     class="hidden fixed bottom-20 right-4 bg-white/90 dark:bg-gray-800/90 rounded-lg shadow-soft hover:shadow-lg p-4 w-64 transition-all duration-300 transform translate-y-0 z-[1000] backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 dark-mode-transition"
      role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-    <div class="text-sm mb-2 text-gray-800 dark:text-gray-100 flex items-center justify-between">
+    <div class="text-sm mb-3 text-gray-800 dark:text-gray-100 flex items-center justify-between">
         <span>Uploading files...</span>
         <span class="text-xs text-gray-500 dark:text-gray-400" id="upload-percentage">0%</span>
     </div>
@@ -504,7 +504,7 @@
 
 <!-- Feedback Message -->
 <div id="feedback-message"
-     class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-[1000] max-w-md w-full text-center transition-all duration-300">
+     class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-soft hover:shadow-lg z-[1000] max-w-md w-full text-center transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 dark-mode-transition">
 </div>
 
 <!-- Store current model data -->
