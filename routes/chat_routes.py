@@ -93,42 +93,28 @@ def validate_model(model: Optional[Any]) -> Optional[str]:
     if not model:
         return "No model configured for this chat."
 
-    required_attrs = {
-        "deployment_name": "Deployment name",
-        "api_endpoint": "API endpoint",
-        "api_key": "API key",
-        "max_tokens": "Maximum tokens",
-        "model_type": "Model type",
-        "api_version": "API version",
-    }
-    for attr, display_name in required_attrs.items():
-        value = getattr(model, attr, None)
-        if not value:
-            return f"Invalid model configuration: missing {display_name}"
-        if attr == "max_tokens" and not isinstance(value, int):
-            return "max_tokens must be an integer"
+    try:
+        # Validate max_completion_tokens
+        max_completion_tokens = getattr(model, "max_completion_tokens", None)
+        if not isinstance(max_completion_tokens, int):
+            try:
+                max_completion_tokens = int(max_completion_tokens)
+            except (TypeError, ValueError):
+                return "max_completion_tokens must be a valid integer"
 
-    # Check API version format
-    api_version = getattr(model, "api_version", "")
-    if not re.match(r"^\d{4}-\d{2}-\d{2}(-preview)?$", api_version):
-        logger.warning(
-            "Invalid API version format: %s (expected YYYY-MM-DD or YYYY-MM-DD-preview)",
-            api_version,
-        )
+        # Base validation
+        if not (1 <= max_completion_tokens <= 16384):
+            return "max_completion_tokens must be between 1 and 16384"
 
-    # Must be https:
-    if not model.api_endpoint.startswith("https://"):
-        return "API endpoint must be a valid HTTPS URL"
+        # o1-preview model validation
+        if getattr(model, "requires_o1_handling", False) and max_completion_tokens > 8300:
+            return "max_completion_tokens must be between 1 and 8300 for o1-preview models"
 
-    # Minimum API key length
-    if len(model.api_key) < 32:
-        return "API key must be at least 32 characters"
+        return None
 
-    # max_completion_tokens range
-    if model.max_completion_tokens < 1 or model.max_completion_tokens > 16384:
-        return "max_completion_tokens must be between 1 and 16384"
-
-    return None
+    except Exception as e:
+        logger.error(f"Model validation error: {str(e)}")
+        return f"Invalid model configuration: {str(e)}"
 
 
 def get_model_token_limit(model_obj: Any) -> int:

@@ -432,20 +432,23 @@ class ModelForm(FlaskForm):
         field.data = field.data.rstrip("/")
 
     def validate_max_completion_tokens(self, field: Any) -> None:
-        """
-        Ensure max_completion_tokens is valid and within range.
-        """
+        """Ensure max_completion_tokens is valid and within range."""
         try:
-            value = int(field.data)
-            if not (1 <= value <= 16384):
-                raise ValidationError(
-                    "Max completion tokens must be between 1 and 16384."
-                )
+            value = int(field.data) if field.data not in (None, '', 'None') else 0
+
+            # Base validation for all models
+            base_validation = (1 <= value <= 16384)
+            if not base_validation:
+                raise ValidationError("Max completion tokens must be between 1 and 16384")
+
+            # o1-preview model validation
+            if self.requires_o1_handling.data and value > 8300:
+                raise ValidationError("Max completion tokens must be between 1 and 8300 for o1-preview models")
+
             field.data = value
-        except (TypeError, ValueError) as e:
-            raise ValidationError(
-                "Max completion tokens must be a valid integer."
-            ) from e
+
+        except (TypeError, ValueError):
+            raise ValidationError("Max completion tokens must be a valid integer")
 
     def validate_provider_id(self, field: Any) -> None:
         """

@@ -103,20 +103,20 @@
                 {{ form.max_completion_tokens.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
                 <div class="flex flex-col space-y-2">
                     <div class="flex justify-between">
-                        <span class="text-sm text-gray-600 dark:text-gray-400">500</span>
-                        <span id="max-completion-tokens-value" class="text-sm font-semibold text-blue-600 dark:text-blue-400">{{
-                            model.max_completion_tokens }}</span>
+                        <span class="text-sm text-gray-600 dark:text-gray-400">1</span>
+                        <span id="max-completion-tokens-value" class="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                            {{ model.max_completion_tokens }}
+                        </span>
                         <span class="text-sm text-gray-600 dark:text-gray-400">16384</span>
                     </div>
                     {{ form.max_completion_tokens(
-                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700
-                    accent-blue-600",
-                    type="range",
-                    min="500",
-                    max="{{ DEFAULT_MAX_COMPLETION_TOKENS }}",
-                    step="100",
-                    value=model.max_completion_tokens,
-                    oninput="document.getElementById('max-completion-tokens-value').textContent = this.value"
+                        class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600",
+                        type="range",
+                        min="1",
+                        max="16384",
+                        step="100",
+                        value=model.max_completion_tokens,
+                        oninput="validateMaxTokens(this)"
                     ) }}
                 </div>
                 {% if form.max_completion_tokens.errors %}
@@ -235,5 +235,17 @@
             form.dataset.submitText = "Update Model";
         }
     });
+
+    function validateMaxTokens(input) {
+        const value = parseInt(input.value);
+        const requiresO1Handling = document.getElementById('requires-o1-handling').checked;
+        const maxValue = requiresO1Handling ? 8300 : 16384;
+
+        if (value > maxValue) {
+            input.value = maxValue;
+        }
+
+        document.getElementById('max-completion-tokens-value').textContent = input.value;
+    }
 </script>
 {% endblock scripts %}
