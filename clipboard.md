@@ -1,3 +1,123 @@
+@bp.route("/edit/<int:model_id>", methods=["GET", "POST"])
+@login_required
+@admin_required
+def edit_model(model_id):
+    """Edit model route handler with comprehensive validation and error handling."""
+    try:
+        model = Model.get_by_id(model_id)
+        if not model:
+            flash(f"Model with ID {model_id} not found", "error")
+            return redirect(url_for('model.list_models'))
+
+        provider = Provider.get_by_id(model.provider_id)
+        form = ModelForm(request.form, obj=model)
+        form.provider_id.choices = [(p.id, p.name) for p in Provider.get_all()]
+
+        if request.method == "POST":
+            # CSRF protection
+            csrf_error = validate_csrf_token()
+            if csrf_error:
+                return csrf_error
+
+            # Handle form data from both JSON and form submissions
+            form_data = request.form.to_dict() if not request.is_json else request.get_json()
+            form = ModelForm(form_data, obj=model)
+            form.provider_id.choices = [(p.id, p.name) for p in Provider.get_all()]
+
+            if not form.validate():
+                error_messages = [f"{field}: {', '.join(errors)}" for field, errors in form.errors.items()]
+                flash(f"Validation errors: {'. '.join(error_messages)}", "error")
+                return render_template("edit_model.html", form=form, model=model, provider=provider)
+
+            # Prepare update data with proper type conversions
+            update_data = {
+                'provider_id': form.provider_id.data,
+                'name': form.name.data.strip(),
+                'deployment_name': form.deployment_name.data.strip(),
+                'description': form.description.data.strip(),
+                'api_endpoint': form.api_endpoint.data.rstrip('/'),
+                'model_type': form.model_type.data,
+                'api_version': form.api_version.data,
+                'temperature': float(form.temperature.data) if form.temperature.data not in [None, ''] else None,
+                'max_tokens': int(form.max_tokens.data) if form.max_tokens.data not in [None, ''] else None,
+                'max_completion_tokens': int(form.max_completion_tokens.data),
+                'requires_o1_handling': bool(form.requires_o1_handling.data),
+                'supports_streaming': bool(form.supports_streaming.data),
+                'is_default': bool(form.is_default.data)
+            }
+
+            # Handle API key preservation
+            if form.api_key.data.strip() == '':
+                # Preserve existing encrypted key if field is empty
+                update_data['api_key'] = model.api_key
+            else:
+                # Encrypt new key if provided
+                update_data['api_key'] = encrypt_api_key(form.api_key.data)
+
+            # Enforce o1-preview constraints
+            if update_data['requires_o1_handling']:
+                update_data.update({
+                    'temperature': 1.0,
+                    'supports_streaming': False,
+                    'max_completion_tokens': min(update_data['max_completion_tokens'], 8300)
+                })
+
+            # Handle default model switching
+            if update_data['is_default'] and not model.is_default:
+                # Clear previous default
+                current_default = Model.get_default()
+                if current_default:
+                    Model.update(current_default.id, {'is_default': False})
+
+            try:
+                # Perform the update with version tracking
+                with db_session() as db:
+                    # Create version snapshot
+                    db.execute(
+                        text("""
+                            INSERT INTO model_versions 
+                            (model_id, version_data, created_at)
+                            VALUES (:model_id, :version_data, NOW())
+                        """),
+                        {
+                            'model_id': model_id,
+                            'version_data': json.dumps(model.__dict__)
+                        }
+                    )
+                    
+                    # Update main model record
+                    Model.update(model_id, update_data)
+                    db.commit()
+
+                flash("Model updated successfully", "success")
+                return redirect(url_for('model.list_models'))
+
+            except ValueError as ve:
+                db.rollback()
+                flash(f"Validation error: {str(ve)}", "error")
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error updating model {model_id}: {str(e)}", exc_info=True)
+                flash("Failed to update model due to a server error", "error")
+
+        return render_template(
+            "edit_model.html",
+            form=form,
+            model=model,
+            provider=provider,
+            DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS
+        )
+
+    except Exception as e:
+        logger.error(f"Critical error in edit_model: {str(e)}", exc_info=True)
+        flash("A system error occurred while processing your request", "error")
+        return redirect(url_for('model.list_models'))
+
+
+        
+
+
+
 Certainly! Let's go through the proposed changes step-by-step to ensure that everything is aligned and correctly implemented. This will help resolve the issues with form submission, data handling, field alignment, validation, type conversion, API key encryption, and special handling for `o1-preview` models.
 
 ### Step-by-Step Analysis and Fixes
