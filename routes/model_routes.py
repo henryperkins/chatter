@@ -410,174 +410,116 @@ def add_model_page():
 @login_required
 @admin_required
 def edit_model(model_id):
-    """Edit model route handler."""
+    """Edit model route handler with comprehensive validation and error handling."""
     try:
         model = Model.get_by_id(model_id)
         if not model:
-            logger.warning("Model with ID %d not found in database", model_id)
-            return (
-                jsonify(
-                    {
-                        "error": "Model not found",
-                        "message": f"No model found with ID {model_id}",
-                    }
-                ),
-                404,
-            )
+            flash(f"Model with ID {model_id} not found", "error")
+            return redirect(url_for('model.list_models'))
 
-        # Fetch the provider associated with the model
         provider = Provider.get_by_id(model.provider_id)
-        if not provider:
-            logger.warning("Provider with ID %d not found", model.provider_id)
-            provider = None  # Handle as needed (e.g., set to None or raise an error)
-
-        form = ModelForm(obj=model)
+        form = ModelForm(request.form, obj=model)
+        form.provider_id.choices = [(p.id, p.name) for p in Provider.get_all()]
 
         if request.method == "POST":
-            # Validate CSRF first
+            # CSRF protection
             csrf_error = validate_csrf_token()
             if csrf_error:
                 return csrf_error
 
-            # Handle data from form or JSON
-            if request.is_json:
-                # Data is sent as JSON
-                data = request.get_json()
-                form = ModelForm(data=data)
-            else:
-                # Data is sent as form data
-                data = request.form.to_dict()
-                form = ModelForm(request.form)
+            # Handle form data from both JSON and form submissions
+            form_data = request.form.to_dict() if not request.is_json else request.get_json()
+            form = ModelForm(form_data, obj=model)
+            form.provider_id.choices = [(p.id, p.name) for p in Provider.get_all()]
+
             if not form.validate():
-                logger.warning("Form validation failed: %s", form.errors)
-                if request.is_json:
-                    # Return JSON response for AJAX requests
-                    return jsonify({"success": False, "errors": form.errors}), 400
-                else:
-                    # Render template for regular form submissions
-                    return render_template(
-                        "edit_model.html", form=form, model=model, provider=provider, errors=form.errors
-                    )
+                error_messages = [f"{field}: {', '.join(errors)}" for field, errors in form.errors.items()]
+                flash(f"Validation errors: {'. '.join(error_messages)}", "error")
+                return render_template("edit_model.html", form=form, model=model, provider=provider)
 
-            # Extract and validate data with improved error handling
-            data = extract_model_data(form)
-
-            # Remove 'provider_id' from data as it is immutable
-            if 'provider_id' in data:
-                data.pop('provider_id', None)
-
-            # Handle numeric fields with proper validation
-            numeric_fields = {
-                "max_tokens": int,
-                "max_completion_tokens": int,
-                "temperature": float,
-                "version": int,
+            # Prepare update data with proper type conversions
+            update_data = {
+                'provider_id': form.provider_id.data,
+                'name': form.name.data.strip(),
+                'deployment_name': form.deployment_name.data.strip(),
+                'description': form.description.data.strip(),
+                'api_endpoint': form.api_endpoint.data.rstrip('/'),
+                'model_type': form.model_type.data,
+                'api_version': form.api_version.data,
+                'temperature': float(form.temperature.data) if form.temperature.data not in [None, ''] else None,
+                'max_tokens': int(form.max_tokens.data) if form.max_tokens.data not in [None, ''] else None,
+                'max_completion_tokens': int(form.max_completion_tokens.data),
+                'requires_o1_handling': bool(form.requires_o1_handling.data),
+                'supports_streaming': bool(form.supports_streaming.data),
+                'is_default': bool(form.is_default.data)
             }
 
-            for field, converter in numeric_fields.items():
-                value = data.get(field)
-                if value in (None, '', 'None'):
-                    data[field] = None
-                else:
-                    try:
-                        data[field] = converter(value)
-                    except (ValueError, TypeError):
-                        data[field] = None
-
-            # Correctly handle boolean fields
-            boolean_fields = ["requires_o1_handling", "is_default", "supports_streaming"]
-            for field in boolean_fields:
-                value = data.get(field)
-                data[field] = value in (True, 'true', 'on', '1')
-
-            logger.debug(
-                "Extracted model data: %s",
-                {k: v if k != "api_key" else "****" for k, v in data.items()},
-            )
-            validate_immutable_fields(model_id, data)
-
-            # Handle o1-preview model constraints
-            if data.get("requires_o1_handling"):
-                if data.get("supports_streaming", False):
-                    if not hasattr(form.supports_streaming, "errors"):
-                        form.supports_streaming.errors = []
-                    form.supports_streaming.errors.append(
-                        "o1-preview models do not support streaming"
-                    )
-                    return render_template(
-                        "edit_model.html", form=form, model=model, provider=provider, errors=form.errors
-                    )
-                data["temperature"] = 1.0  # Force temperature for o1-preview
-                data["supports_streaming"] = False  # Force disable streaming
-                logger.info("Enforcing o1-preview constraints for model %d", model_id)
-
-            # Validate model configuration
-            validation_errors = validate_model_data(data)
-            if validation_errors:
-                return render_template(
-                    "edit_model.html",
-                    form=form,
-                    model=model,
-                    provider=provider,
-                    error=validation_errors[0],
-                )
-
-            # Update model within transaction
-            with db_session() as db:
-                # Handle is_default setting
-                if data.get("is_default"):
-                    if model_id is not None:
-                        Model.set_default(model_id)
-                        logger.info("Set model %d as default", model_id)
-                    else:
-                        # If unsetting default, ensure another model is set as default
-                        current_default = Model.get_default()
-                    if current_default and current_default.id == model_id:
-                        # Find another model to set as default
-                        other_models = Model.get_all(limit=1, exclude_id=model_id)
-                        if other_models:
-                            Model.set_default(other_models[0].id)
-                        else:
-                            raise ValueError(
-                                "Cannot unset default model - no other models exist"
-                            )
-
-                Model.update(model_id, data)
-                logger.info("Model updated successfully: %d", model_id)
-                db.commit()
-
-            redirect_url = url_for("chat.chat_interface", _external=True)
-            logger.debug(
-                "Sending response with redirect: %s",
-                {
-                    "success": True,
-                    "message": "Model updated successfully",
-                    "redirect": redirect_url,
-                },
-            )
-            if request.is_json:
-                return jsonify(
-                    {
-                        "success": True,
-                        "message": "Model updated successfully",
-                        "redirect": redirect_url,
-                    }
-                )
+            # Handle API key preservation
+            if form.api_key.data.strip() == '':
+                # Preserve existing encrypted key if field is empty
+                update_data['api_key'] = model.api_key
             else:
-                flash("Model updated successfully", "success")
-                return redirect(url_for("chat.chat_interface"))
+                # Encrypt new key if provided
+                update_data['api_key'] = encrypt_api_key(form.api_key.data)
 
-        logger.debug("Rendering edit model page for model ID %d", model_id)
+            # Enforce o1-preview constraints
+            if update_data['requires_o1_handling']:
+                update_data.update({
+                    'temperature': 1.0,
+                    'supports_streaming': False,
+                    'max_completion_tokens': min(update_data['max_completion_tokens'], 8300)
+                })
+
+            # Handle default model switching
+            if update_data['is_default'] and not model.is_default:
+                # Clear previous default
+                current_default = Model.get_default()
+                if current_default:
+                    Model.update(current_default.id, {'is_default': False})
+
+            try:
+                # Perform the update with version tracking
+                with db_session() as db:
+                    # Create version snapshot
+                    db.execute(
+                        text("""
+                            INSERT INTO model_versions 
+                            (model_id, version_data, created_at)
+                            VALUES (:model_id, :version_data, NOW())
+                        """),
+                        {
+                            'model_id': model_id,
+                            'version_data': json.dumps(model.__dict__)
+                        }
+                    )
+                    
+                    # Update main model record
+                    Model.update(model_id, update_data)
+                    db.commit()
+
+                flash("Model updated successfully", "success")
+                return redirect(url_for('model.list_models'))
+
+            except ValueError as ve:
+                db.rollback()
+                flash(f"Validation error: {str(ve)}", "error")
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error updating model {model_id}: {str(e)}", exc_info=True)
+                flash("Failed to update model due to a server error", "error")
+
         return render_template(
             "edit_model.html",
             form=form,
             model=model,
             provider=provider,
-            DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS,
+            DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS
         )
 
     except Exception as e:
-        return handle_error(e, "Error in edit_model")
+        logger.error(f"Critical error in edit_model: {str(e)}", exc_info=True)
+        flash("A system error occurred while processing your request", "error")
+        return redirect(url_for('model.list_models'))
 
 
 @bp.route("/models/default/<int:model_id>", methods=["POST"])
