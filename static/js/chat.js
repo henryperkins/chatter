@@ -610,22 +610,6 @@ function attachActionButtonListeners() {
 }
 
 window.init = init;
-    const chatBox = document.getElementById('chat-box');
-    if (!chatBox) return;
-
-    chatBox.addEventListener('click', async (event) => {
-        const target = event.target.closest('button');
-        if (!target) return;
-
-        event.preventDefault();
-
-        if (target.classList.contains('copy-button')) {
-            await handleCopyMessage(target);
-        } else if (target.classList.contains('regenerate-button')) {
-            await handleRegenerateMessage(target);
-        }
-    });
-}
 
 /**
  * Drag-and-drop functionality
