@@ -31,7 +31,7 @@ from decorators import admin_required
 from extensions import limiter
 from forms import LoginForm, RegistrationForm, ResetPasswordForm
 from models import User
-from scripts.email import send_email
+from scripts.send_email import send_email
 
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 

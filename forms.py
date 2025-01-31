@@ -321,10 +321,13 @@ class ProviderForm(FlaskForm):
 
 class ModelForm(FlaskForm):
     name = StringField('Model Name', validators=[DataRequired(), Length(max=255)])
+    deployment_name = StringField('Deployment Name', validators=[DataRequired(), Length(max=255)])
+    description = TextAreaField('Description', validators=[Optional(), Length(max=500)])
     provider_id = SelectField('Provider', coerce=int, validators=[DataRequired()])
     api_key = PasswordField('API Key', validators=[DataRequired(), Length(min=32, message="API key must be at least 32 characters.")])
     model_type = StringField('Model Type', validators=[DataRequired(), Length(max=255)])
     max_completion_tokens = IntegerField('Max Completion Tokens', validators=[DataRequired(), NumberRange(min=1)])
+    max_tokens = IntegerField('Max Tokens', validators=[Optional(), NumberRange(min=1)])
     temperature = FloatField('Temperature', validators=[Optional(), NumberRange(min=0.0, max=2.0)])
     top_p = FloatField('Top P', validators=[Optional(), NumberRange(min=0.0, max=1.0)])
     frequency_penalty = FloatField('Frequency Penalty', validators=[Optional(), NumberRange(min=-2.0, max=2.0)])
@@ -334,12 +337,43 @@ class ModelForm(FlaskForm):
     requires_o1_handling = BooleanField('Requires o1-preview Handling')
     model_family = StringField('Model Family', validators=[Optional(), Length(max=255)])
     version = HiddenField('Version')
+    api_endpoint = URLField('API Endpoint', validators=[
+        DataRequired(message="API endpoint is required."),
+        URL(message="Must be a valid URL."),
+    ])
 
     def __init__(self, *args, **kwargs):
         self.is_edit = kwargs.pop('is_edit', False)
+
+        # Handle both dict and MultiDict inputs
+        if args and isinstance(args[0], (dict, list)):
+            from werkzeug.datastructures import MultiDict
+            if isinstance(args[0], dict):
+                # Convert dict to MultiDict
+                args = (MultiDict(args[0]),) + args[1:]
+            elif isinstance(args[0], list):
+                # Convert list of tuples to MultiDict
+                args = (MultiDict(args[0]),) + args[1:]
+
         super().__init__(*args, **kwargs)
         self.setup_edit_mode()
         self.load_providers()
+
+    def process_formdata(self, valuelist):
+        """Handle both form and JSON data processing"""
+        if valuelist:
+            from werkzeug.datastructures import MultiDict
+            if isinstance(valuelist, dict):
+                # Convert dict to MultiDict
+                valuelist = MultiDict(valuelist)
+            elif isinstance(valuelist, list):
+                # Convert list of tuples to MultiDict
+                valuelist = MultiDict(valuelist)
+            elif not isinstance(valuelist, MultiDict):
+                # Handle other cases
+                valuelist = MultiDict(valuelist)
+
+        super().process_formdata(valuelist)
 
     def setup_edit_mode(self):
         """Modify form behavior for edit mode"""
@@ -416,6 +450,37 @@ class ModelForm(FlaskForm):
             except EncryptionError as e:
                 logger.error(f"API key encryption failed: {str(e)}")
                 raise ValidationError("Failed to secure API key")
+
+    def validate_api_endpoint(self, field):
+        """Validate the complete Azure OpenAI endpoint URL structure"""
+        if not field.data:
+            return
+
+        # Parse URL to validate structure
+        try:
+            from urllib.parse import urlparse, parse_qs
+            parsed = urlparse(field.data)
+
+            # Validate domain
+            if not re.match(r"^[^/]+\.(openai\.azure\.com|azure-api\.net)$", parsed.netloc):
+                raise ValidationError("Must use a valid Azure OpenAI domain (*.openai.azure.com or *.azure-api.net)")
+
+            # Validate path structure
+            path_parts = parsed.path.strip('/').split('/')
+            if len(path_parts) < 4 or path_parts[0] != 'openai' or path_parts[1] != 'deployments' or path_parts[-1] != 'completions' or path_parts[-2] != 'chat':
+                raise ValidationError("URL must follow format: /openai/deployments/{deployment-name}/chat/completions")
+
+            # Validate api-version query parameter
+            query_params = parse_qs(parsed.query)
+            if 'api-version' not in query_params:
+                raise ValidationError("URL must include api-version query parameter")
+
+            api_version = query_params['api-version'][0]
+            if not re.match(r'^\d{4}-\d{2}-\d{2}(?:-preview)?$', api_version):
+                raise ValidationError("api-version must be in format YYYY-MM-DD or YYYY-MM-DD-preview")
+
+        except ValueError as e:
+            raise ValidationError(str(e))
 
     def validate_version(self, field):
         """Optimistic concurrency control"""
@@ -713,7 +778,6 @@ def validate_password_strength(password: str) -> None:
             raise ValidationError(
                 "Password must not contain three or more repeated characters in a row."
             )
-
 
 # ------------------------------------------------------------------------
 # ResetPasswordForm

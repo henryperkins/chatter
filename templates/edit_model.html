@@ -40,6 +40,26 @@
             {% endif %}
         </div>
 
+        <!-- Deployment Name -->
+        <div class="mb-4">
+            {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.deployment_name(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
+            {% if form.deployment_name.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.deployment_name.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- API Endpoint -->
+        <div class="mb-4">
+            {{ form.api_endpoint.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.api_endpoint(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
+            {% if form.api_endpoint.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
+            {% endif %}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Format: https://instance-name.openai.azure.com/openai/deployments/{deployment-name}/chat/completions?api-version=YYYY-MM-DD-preview</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Example: https://hp-east2.openai.azure.com/openai/deployments/gpt-deployment/chat/completions?api-version=2025-01-01-preview</p>
+        </div>
+
         <!-- API Key -->
         <div class="mb-6">
             {{ form.api_key.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
@@ -85,6 +105,16 @@
             {% if form.max_completion_tokens.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
             {% endif %}
+        </div>
+
+        <!-- Max Tokens -->
+        <div class="mb-6">
+            {{ form.max_tokens.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+            {{ form.max_tokens(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", type="number", min="1", step="1") }}
+            {% if form.max_tokens.errors %}
+            <p class="text-sm text-red-500 mt-1">{{ form.max_tokens.errors[0] }}</p>
+            {% endif %}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Optional. Leave empty for no limit.</p>
         </div>
 
         <!-- Temperature -->

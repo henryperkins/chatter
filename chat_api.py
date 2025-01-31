@@ -39,23 +39,48 @@ def get_azure_response(
         if not api_endpoint.endswith('/'):
             api_endpoint += '/'
 
-        # Construct the endpoint URL including api_version
-        endpoint = (
-            f"{api_endpoint}openai/deployments/{deployment_name}/chat/completions"
-            f"?api-version={api_version}"
-        )
+        # Log incoming parameters
+        logger.debug("API call parameters - endpoint: %s, deployment: %s, version: %s",
+                    api_endpoint, deployment_name, api_version)
+
+        # Parse the endpoint URL to handle various formats
+        from urllib.parse import urlparse
+
+        # Log detailed debugging information
+        logger.debug("Initial API endpoint: %s", api_endpoint)
+        logger.debug("Deployment name: %s", deployment_name)
+        logger.debug("API version: %s", api_version)
+
+        # Parse the base endpoint URL (should be like https://xxx.openai.azure.com)
+        parsed = urlparse(api_endpoint)
+
+        # Extract the base endpoint (just the scheme and netloc)
+        base_endpoint = f"{parsed.scheme}://{parsed.netloc}"
+        logger.debug("Base endpoint: %s", base_endpoint)
+
+        # Construct the endpoint URL following Azure OpenAI API format
+        endpoint = (f"{base_endpoint}/openai/deployments/{deployment_name}/chat/completions"
+                   f"?api-version={api_version}")
+
+        logger.debug("Final endpoint URL: %s", endpoint)
         headers = {
             "Content-Type": "application/json",
             "api-key": api_key,
         }
 
-        # Prepare the payload
+        # Prepare the payload based on model requirements
         payload = {
             "messages": messages,
-            "temperature": 1.0,  # o1-preview models require temperature to be fixed at 1
-            "max_tokens": max_completion_tokens or 256,
-            "stream": stream,  # Add stream parameter
+            "stream": stream,
         }
+
+        # Handle o1-preview specific requirements
+        if requires_o1_handling:
+            payload["temperature"] = 1.0  # Must be fixed at 1.0 for o1-preview
+            payload["max_tokens"] = min(max_completion_tokens or 8300, 8300)  # Max 8300 for o1-preview
+        else:
+            payload["temperature"] = 1.0  # Default temperature
+            payload["max_tokens"] = max_completion_tokens or 256  # Default max tokens
 
         logger.debug("Making API call to %s with parameters: %s", endpoint, payload)
 
@@ -72,9 +97,36 @@ def get_azure_response(
             # Check for HTTP errors
             response.raise_for_status()
         except requests.exceptions.HTTPError as http_err:
-            logger.error("HTTP error occurred: %s", str(http_err))
-            logger.error("Response content: %s", response.text)
-            raise Exception(f"HTTP error occurred: {response.text}")
+            error_content = response.text
+            try:
+                error_json = response.json()
+                error_details = error_json.get('error', {})
+                error_code = error_details.get('code', '')
+                error_message = error_details.get('message', '')
+
+                logger.error("Azure OpenAI API error: %s - %s", error_code, error_message)
+                logger.error("Full response: %s", error_content)
+
+                if error_code == '404':
+                    raise Exception(
+                        f"Resource not found. Please verify the deployment name '{deployment_name}' "
+                        f"exists and the endpoint URL is correct: {base_endpoint}"
+                    )
+                elif error_code == '401':
+                    raise Exception(
+                        "Authentication failed. Please verify your API key is correct and not expired."
+                    )
+                elif error_code == '429':
+                    raise Exception(
+                        "Rate limit exceeded. Please try again later or reduce your request frequency."
+                    )
+                else:
+                    raise Exception(f"Azure OpenAI API error: {error_message}")
+
+            except ValueError as json_err:
+                logger.error("Failed to parse error response: %s", str(json_err))
+                logger.error("Raw response: %s", error_content)
+                raise Exception(f"Invalid response from Azure OpenAI API: {error_content}")
         except Exception as err:
             logger.error("Error occurred during API request: %s", str(err))
             raise Exception(f"Error occurred during API request: {str(err)}")

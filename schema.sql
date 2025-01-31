@@ -65,7 +65,16 @@ CREATE TABLE models (
     supports_streaming BOOLEAN NOT NULL DEFAULT FALSE,
     api_version TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    version INTEGER NOT NULL DEFAULT 1,
     UNIQUE (provider_id, name)
+);
+
+-- MODEL VERSIONS TABLE
+CREATE TABLE model_versions (
+    id SERIAL PRIMARY KEY,
+    model_id INTEGER NOT NULL REFERENCES models(id) ON DELETE CASCADE,
+    version_data JSONB NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
 -- CHATS TABLE
@@ -132,6 +141,9 @@ CREATE INDEX idx_users_created_at ON users (created_at);
 CREATE INDEX idx_providers_name ON providers (name);
 CREATE UNIQUE INDEX idx_providers_slug ON providers (slug);
 CREATE INDEX idx_models_provider_id ON models (provider_id);
+CREATE INDEX idx_models_version ON models (version);
+CREATE INDEX idx_model_versions_model_id ON model_versions (model_id);
+CREATE INDEX idx_model_versions_created_at ON model_versions (created_at);
 CREATE UNIQUE INDEX unique_lower_username ON users ((LOWER(username)));
 CREATE UNIQUE INDEX unique_lower_email ON users ((LOWER(email)));
 COMMIT;

@@ -10,7 +10,7 @@ This module provides routes for managing AI model configurations, including:
 
 import logging
 from typing import Optional, Dict, Any, List
-
+from urllib.parse import urlparse, parse_qs
 from datetime import datetime
 from flask import (
     Blueprint,
@@ -28,7 +28,7 @@ from werkzeug.exceptions import HTTPException
 import json
 from config import Config
 from models.provider import Provider
-
+from utils.encryption import encrypt_api_key, EncryptionError
 from decorators import admin_required
 from forms import ModelForm
 from database import db_session
@@ -132,7 +132,6 @@ def extract_model_data(form: ModelForm) -> dict:
         "max_tokens": form.max_tokens.data,
         "max_completion_tokens": form.max_completion_tokens.data,
         "model_type": form.model_type.data,
-        "api_version": form.api_version.data,
         "requires_o1_handling": form.requires_o1_handling.data,
         "supports_streaming": form.supports_streaming.data,
         "is_default": form.is_default.data,
@@ -193,12 +192,6 @@ def check_model_exists(db, name: str, deployment_name: str, provider_id: int) ->
     ).scalar()
     return existing_model > 0
 
-
-def encrypt_api_key(api_key: str) -> str:
-    """Encrypt the API key (placeholder function)."""
-    # Implement your encryption logic here
-    # For the purpose of this example, we'll return the original key
-    return api_key
 
 
 # Routes
@@ -281,8 +274,8 @@ def create_model():
             # Encrypt API key
             try:
                 data["api_key"] = encrypt_api_key(data["api_key"])
-            except Exception as e:
-                logger.error(f"API key encryption failed: {e}")
+            except EncryptionError as e:
+                logger.error(str(e))
                 return render_template(
                     "add_model.html", form=form, error="Failed to secure API key"
                 )
@@ -430,7 +423,13 @@ def edit_model(model_id):
                 return csrf_error
 
             # Handle form data from both JSON and form submissions
-            form_data = request.form.to_dict() if not request.is_json else request.get_json()
+            if request.is_json:
+                form_data = request.get_json()
+                # Convert JSON data to MultiDict format
+                from werkzeug.datastructures import MultiDict
+                form_data = MultiDict((k, v) for k, v in form_data.items())
+            else:
+                form_data = request.form
             form = ModelForm(form_data, obj=model)
             form.provider_id.choices = [(p.id, p.name) for p in Provider.get_all()]
 
@@ -447,7 +446,10 @@ def edit_model(model_id):
                 'description': form.description.data.strip(),
                 'api_endpoint': form.api_endpoint.data.rstrip('/'),
                 'model_type': form.model_type.data,
-                'api_version': form.api_version.data,
+                # Extract api_version from api_endpoint URL
+                'api_version': (lambda url:
+                    parse_qs(urlparse(url).query).get('api-version', [''])[0] if url else ''
+                )(form.api_endpoint.data) or '2025-01-01-preview',  # Default if not found
                 'temperature': float(form.temperature.data) if form.temperature.data not in [None, ''] else None,
                 'max_tokens': int(form.max_tokens.data) if form.max_tokens.data not in [None, ''] else None,
                 'max_completion_tokens': int(form.max_completion_tokens.data),
@@ -461,16 +463,41 @@ def edit_model(model_id):
                 # Preserve existing encrypted key if field is empty
                 update_data['api_key'] = model.api_key
             else:
-                # Encrypt new key if provided
-                update_data['api_key'] = encrypt_api_key(form.api_key.data)
+                try:
+                    # Encrypt new key if provided
+                    update_data['api_key'] = encrypt_api_key(form.api_key.data)
+                except EncryptionError as e:
+                    logger.error(str(e))
+                    flash("Failed to secure API key", "error")
+                    return render_template(
+                        "edit_model.html",
+                        form=form,
+                        model=model,
+                        provider=provider,
+                        DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS
+                    )
 
-            # Enforce o1-preview constraints
-            if update_data['requires_o1_handling']:
+            # Get provider capabilities
+            provider = Provider.get_by_id(form.provider_id.data)
+            provider_max = provider.capabilities.get('max_tokens', 16384) if provider else 16384
+
+            # Check if this is an o1-preview model
+            model_type = update_data.get('model_type', '').lower()
+            requires_o1 = update_data.get('requires_o1_handling', False)
+            is_o1_preview = model_type == 'o1-preview' and requires_o1
+
+            # Apply appropriate constraints
+            if is_o1_preview:
                 update_data.update({
                     'temperature': 1.0,
                     'supports_streaming': False,
                     'max_completion_tokens': min(update_data['max_completion_tokens'], 8300)
                 })
+            else:
+                update_data['max_completion_tokens'] = min(
+                    update_data['max_completion_tokens'],
+                    provider_max
+                )
 
             # Handle default model switching
             if update_data['is_default'] and not model.is_default:
@@ -479,36 +506,51 @@ def edit_model(model_id):
                 if current_default:
                     Model.update(current_default.id, {'is_default': False})
 
-            try:
-                # Perform the update with version tracking
-                with db_session() as db:
+            # Perform the update with version tracking
+            with db_session() as db:
+                try:
                     # Create version snapshot
                     db.execute(
                         text("""
-                            INSERT INTO model_versions 
+                            INSERT INTO model_versions
                             (model_id, version_data, created_at)
                             VALUES (:model_id, :version_data, NOW())
                         """),
                         {
                             'model_id': model_id,
-                            'version_data': json.dumps(model.__dict__)
+                            'version_data': json.dumps(model.__dict__, default=str)
                         }
                     )
-                    
+
                     # Update main model record
                     Model.update(model_id, update_data)
                     db.commit()
 
-                flash("Model updated successfully", "success")
-                return redirect(url_for('model.list_models'))
+                    flash("Model configuration updated successfully", "success")
+                    return redirect(url_for('chat.chat_interface'))
 
-            except ValueError as ve:
-                db.rollback()
-                flash(f"Validation error: {str(ve)}", "error")
-            except Exception as e:
-                db.rollback()
-                logger.error(f"Error updating model {model_id}: {str(e)}", exc_info=True)
-                flash("Failed to update model due to a server error", "error")
+                except ValueError as ve:
+                    db.rollback()
+                    if "Model was modified by another user" in str(ve):
+                        # Handle version conflict
+                        flash("This model was modified by another user. Please refresh the page and try again.", "error")
+                        # Reload the model with fresh data
+                        model = Model.get_by_id(model_id)
+                        form = ModelForm(obj=model)
+                        form.provider_id.choices = [(p.id, p.name) for p in Provider.get_all()]
+                        return render_template(
+                            "edit_model.html",
+                            form=form,
+                            model=model,
+                            provider=provider,
+                            DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS
+                        )
+                    else:
+                        flash(f"Validation error: {str(ve)}", "error")
+                except Exception as e:
+                    db.rollback()
+                    logger.error(f"Error updating model {model_id}: {str(e)}", exc_info=True)
+                    flash("Failed to update model due to a server error", "error")
 
         return render_template(
             "edit_model.html",
@@ -521,7 +563,7 @@ def edit_model(model_id):
     except Exception as e:
         logger.error(f"Critical error in edit_model: {str(e)}", exc_info=True)
         flash("A system error occurred while processing your request", "error")
-        return redirect(url_for('model.list_models'))
+        return redirect(url_for('model.get_models'))
 
 
 @bp.route("/models/default/<int:model_id>", methods=["POST"])
@@ -560,7 +602,3 @@ def get_immutable_fields(model_id: int):
         return jsonify(immutable_fields)
     except Exception as e:
         return handle_error(e, "Error retrieving immutable fields")
-
-
-
-

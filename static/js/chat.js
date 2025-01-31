@@ -1,17 +1,5 @@
 /* static/js/chat.js */
 
-/**
- * @typedef {Object} Utils
- * @property {() => string} getCSRFToken
- * @property {(url: string, options?: object) => Promise<any>} fetchWithCSRF
- * @property {(message: string, type?: string, options?: object) => void} showFeedback
- * @property {(formData: FormData) => object} formDataToObject
- * @property {(dateString: string) => string} formatDate
- * @property {(func: Function, wait: number) => Function} debounce
- * @property {(func: Function, limit: number) => Function} throttle
- * @property {(element: HTMLElement, callback: Function, options?: object) => Promise<any>} withLoading
- */
-
 const utils = window.utils;
 
 /**
@@ -286,7 +274,9 @@ async function sendMessage() {
     }
 
     const messageText = messageInput.value.trim();
-    if (!messageText && window.fileUploadManager.uploadedFiles.length === 0) {
+    const hasUploadedFiles = window.fileUploadManager?.uploadedFiles?.length > 0;
+
+    if (!messageText && !hasUploadedFiles) {
         utils.showFeedback('Please enter a message or upload files.', 'error');
         return;
     }
@@ -305,19 +295,20 @@ async function sendMessage() {
             formData.append('message', messageText);
             appendUserMessage(messageText);
         }
-
-        // Add files
-        window.fileUploadManager.uploadedFiles.forEach(file => {
-            formData.append('files[]', file);
-        });
+        // Add files if available
+        if (window.fileUploadManager?.uploadedFiles?.length > 0) {
+            window.fileUploadManager.uploadedFiles.forEach(file => {
+                formData.append('files[]', file);
+            });
+        }
 
         formData.append('model_id', modelId);
         formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
+        sendButton.disabled = true;
+        sendButton.classList.add('sending');
 
-        await utils.withLoading(sendButton, async () => {
-            sendButton.classList.add('sending');
-
-            try {
+        try {
+            await utils.withLoading(sendButton, async () => {
                 const chatBox = document.getElementById('chat-box');
                 if (chatBox.lastElementChild?.querySelector('[data-role="assistant-message"]')) {
                     chatBox.lastElementChild.remove();
@@ -334,10 +325,11 @@ async function sendMessage() {
                 messageInput.style.height = 'auto';
                 window.fileUploadManager.uploadedFiles = [];
                 window.fileUploadManager.renderFileList();
-            } finally {
-                sendButton.classList.remove('sending');
-            }
-        });
+            });
+        } finally {
+            sendButton.disabled = false;
+            sendButton.classList.remove('sending');
+        }
 
         // Update token usage
         if (window.tokenUsageManager) {
@@ -345,7 +337,6 @@ async function sendMessage() {
         }
     } catch (error) {
         console.error('Error sending message:', error);
-        removeTypingIndicator();
 
         // Show persistent error with retry
         const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
@@ -363,37 +354,53 @@ async function sendMessage() {
             errorIndicator.remove();
             sendMessage();
         });
+    } finally {
+        removeTypingIndicator();
     }
 }
 
 async function handleStreamingResponse(formData) {
-    const response = await fetch('/', {
-        method: 'POST',
-        body: formData,
-        headers: {
-            'X-Chat-ID': window.CHAT_CONFIG.chatId,
-            'Accept': 'text/event-stream',
-            'X-CSRFToken': window.CHAT_CONFIG.csrfToken,
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    });
-
-    if (!response.ok) {
-        if (response.status === 403) {
-            throw new Error('Session expired - please refresh the page');
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let accumulatedResponse = '';
-    let lastUpdateTime = Date.now();
-    const updateInterval = 100;
-
     showTypingIndicator();
+    let reader;
 
     try {
+        // Use the native fetch for streaming since utils.fetchWithCSRF doesn't support streaming
+        const response = await fetch('/chat/', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                'Accept': 'text/event-stream',
+                'X-CSRFToken': window.CHAT_CONFIG.csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        if (!response.ok) {
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const errorData = await response.json();
+                if (errorData.error) {
+                    // Handle nested error objects
+                    const errorMessage = typeof errorData.error === 'object'
+                        ? errorData.error.message || JSON.stringify(errorData.error)
+                        : errorData.error;
+                    throw new Error(errorMessage);
+                }
+            }
+
+            if (response.status === 403) {
+                throw new Error('Session expired - please refresh the page');
+            }
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedResponse = '';
+        let lastUpdateTime = Date.now();
+        const updateInterval = 100;
+
         while (true) {
             const { value, done } = await reader.read();
             if (done) break;
@@ -425,17 +432,24 @@ async function handleStreamingResponse(formData) {
         }
     } catch (error) {
         console.error('Streaming error:', error);
-        throw new Error(`Stream interrupted: ${error.message}`);
+        // Re-throw the original error without wrapping it
+        throw error instanceof Error ? error : new Error(error.toString());
     } finally {
+        if (reader) {
+            try {
+                await reader.cancel();
+            } catch (e) {
+                console.error('Error canceling stream:', e);
+            }
+        }
         removeTypingIndicator();
     }
 }
 
 async function handleNormalResponse(formData) {
     showTypingIndicator();
-
     try {
-        const response = await utils.fetchWithCSRF('/chat/', {
+        const data = await utils.fetchWithCSRF('/chat/', {
             method: 'POST',
             body: formData,
             headers: {
@@ -444,15 +458,23 @@ async function handleNormalResponse(formData) {
             }
         });
 
-        if (!response.success) {
-            throw new Error(response.error || 'Server responded with an unspecified error');
+        if (!data) {
+            throw new Error('Server returned no response');
         }
 
-        if (response.message?.content) {
-            appendAssistantMessage(response.message.content);
-        } else {
-            throw new Error('Received empty response from server');
+        if (data.error) {
+            // Handle nested error objects
+            const errorMessage = typeof data.error === 'object'
+                ? data.error.message || JSON.stringify(data.error)
+                : data.error;
+            throw new Error(errorMessage);
         }
+
+        if (!data.message?.content) {
+            throw new Error('Server response missing message content');
+        }
+
+        appendAssistantMessage(data.message.content);
     } catch (error) {
         console.error('Normal response error:', error);
         throw error; // Re-throw to be caught in sendMessage
@@ -612,7 +634,7 @@ window.md = window.markdownit({
     breaks: true,
     xhtmlOut: true,
     maxNesting: 100,
-    quotes: '“”‘’',
+    quotes: ["\"\"", "''"],
     highlight: function (str, lang) {
         if (lang && window.Prism && window.Prism.languages[lang]) {
             try {
@@ -780,7 +802,7 @@ function handleModelChange() {
     const modelSelect = document.getElementById('model-select');
     const modelId = modelSelect.value;
 
-    fetch('/update_model', {
+    fetch('/chat/update_model', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

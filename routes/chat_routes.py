@@ -17,6 +17,7 @@ from flask import (
     session,
     make_response,
     Response as FlaskResponse,
+    current_app,
 )
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -33,9 +34,10 @@ from chat_utils import (
     count_tokens,
 )
 from conversation_manager import conversation_manager
-from database import db_session
+from database import db_session, is_initialized
 from models.chat import Chat
 from models.model import Model
+from models.provider import Provider
 
 # Import centralized logging configuration
 from logging_config import get_logger
@@ -102,13 +104,26 @@ def validate_model(model: Optional[Any]) -> Optional[str]:
             except (TypeError, ValueError):
                 return "max_completion_tokens must be a valid integer"
 
-        # Base validation
-        if not (1 <= max_completion_tokens <= 16384):
-            return "max_completion_tokens must be between 1 and 16384"
+        # Base validation - ensure it's at least 1
+        if not isinstance(max_completion_tokens, int) or max_completion_tokens < 1:
+            return "max_completion_tokens must be at least 1"
 
-        # o1-preview model validation
-        if getattr(model, "requires_o1_handling", False) and max_completion_tokens > 8300:
-            return "max_completion_tokens must be between 1 and 8300 for o1-preview models"
+        # Get provider capabilities
+        provider = Provider.get_by_id(model.provider_id)
+        provider_max = provider.capabilities.get('max_tokens', 16384) if provider else 16384
+
+        # Get model type and determine if it's an o1-preview model
+        model_type = getattr(model, "model_type", "").lower()
+        requires_o1 = getattr(model, "requires_o1_handling", False)
+        is_o1_preview = model_type == "o1-preview" and requires_o1
+
+        # Apply appropriate validation based on model type
+        if is_o1_preview:
+            if max_completion_tokens > 8300:
+                return "max_completion_tokens must be between 1 and 8300 for o1-preview models"
+        else:
+            if max_completion_tokens > provider_max:
+                return f"max_completion_tokens must be between 1 and {provider_max}"
 
         return None
 
@@ -388,36 +403,54 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         )
 
         if use_streaming:
+            # Get app instance before entering generator
+            app = current_app._get_current_object()
+
             # SSE streaming response
             def generate():
                 try:
-                    response_generator = get_azure_response(
-                        messages=history,
-                        deployment_name=model_obj.deployment_name,
-                        max_completion_tokens=model_obj.max_completion_tokens,
-                        api_endpoint=model_obj.api_endpoint,
-                        api_key=model_obj.api_key,
-                        api_version=api_version,
-                        requires_o1_handling=model_obj.requires_o1_handling,
-                        timeout_seconds=120,
-                        stream=True,
-                    )
-                    accumulated = ""
-                    for chunk in response_generator:
-                        if "choices" in chunk and len(chunk["choices"]) > 0:
-                            delta = chunk["choices"][0].get("delta", {})
-                            content_chunk = delta.get("content", "")
-                            if content_chunk:
-                                accumulated += content_chunk
-                                yield f"data: {content_chunk}\n\n"
-                    conversation_manager.add_message(
-                        chat_id=chat_id,
-                        role="assistant",
-                        content=accumulated,
-                        model_max_tokens=get_model_token_limit(model_obj),
-                        requires_o1_handling=model_obj.requires_o1_handling,
-                    )
-                    yield "data: [DONE]\n\n"
+                    # Wrap entire generator function in app context
+                    with app.app_context():
+                        # Check database initialization
+                        db_state = get_db_state()
+                        if not db_state.get("initialized"):
+                            logger.error("Database not properly initialized")
+                            raise RuntimeError("Database not initialized. Please try again.")
+
+                        try:
+                            response_generator = get_azure_response(
+                                messages=history,
+                                deployment_name=model_obj.deployment_name,
+                                max_completion_tokens=model_obj.max_completion_tokens,
+                                api_endpoint=model_obj.api_endpoint,
+                                api_key=model_obj.api_key,
+                                api_version=api_version,
+                                requires_o1_handling=model_obj.requires_o1_handling,
+                                timeout_seconds=120,
+                                stream=True,
+                            )
+                        except Exception as api_err:
+                            logger.error("Azure API error: %s", str(api_err))
+                            yield f"data: [ERROR] Failed to get response from Azure API: {str(api_err)}\n\n"
+                            return
+
+                        accumulated = ""
+                        for chunk in response_generator:
+                            if "choices" in chunk and len(chunk["choices"]) > 0:
+                                delta = chunk["choices"][0].get("delta", {})
+                                content_chunk = delta.get("content", "")
+                                if content_chunk:
+                                    accumulated += content_chunk
+                                    yield f"data: {content_chunk}\n\n"
+
+                        conversation_manager.add_message(
+                            chat_id=chat_id,
+                            role="assistant",
+                            content=accumulated,
+                            model_max_tokens=get_model_token_limit(model_obj),
+                            requires_o1_handling=model_obj.requires_o1_handling,
+                        )
+                        yield "data: [DONE]\n\n"
                 except Exception as e:
                     logger.error("Streaming error: %s", str(e))
                     yield f"data: [ERROR] {str(e)}\n\n"
@@ -428,47 +461,71 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
         else:
             # Normal (non-stream) response
-            response = get_azure_response(
-                messages=history,
-                deployment_name=model_obj.deployment_name,
-                max_completion_tokens=model_obj.max_completion_tokens,
-                api_endpoint=model_obj.api_endpoint,
-                api_key=model_obj.api_key,
-                api_version=api_version,
-                requires_o1_handling=model_obj.requires_o1_handling,
-                timeout_seconds=120,
-                stream=False,
-            )
-            if isinstance(response, dict):
-                if "choices" in response and len(response["choices"]) > 0:
-                    content = response["choices"][0]["message"]["content"]
-                else:
-                    content = str(response)
-            elif isinstance(response, str):
-                content = response
-            else:
-                content = str(response)
+            # Get app instance
+            app = current_app._get_current_object()
 
-            # Prevent Jinja2 injection
-            content_processed = content.replace("{%", "&#123;%").replace("%}", "%&#125;")
+            try:
+                # Wrap entire response handling in app context
+                with app.app_context():
+                    # Check database initialization
+                    db_state = get_db_state()
+                    if not db_state.get("initialized"):
+                        logger.error("Database not properly initialized")
+                        return jsonify({
+                            "error": "Database not initialized. Please try again."
+                        }), 503  # Service Unavailable
 
-            conversation_manager.add_message(
-                chat_id=chat_id,
-                role="assistant",
-                content=content_processed,
-                model_max_tokens=get_model_token_limit(model_obj),
-                requires_o1_handling=model_obj.requires_o1_handling,
-            )
+                    # Get Azure response
+                    response = get_azure_response(
+                        messages=history,
+                        deployment_name=model_obj.deployment_name,
+                        max_completion_tokens=model_obj.max_completion_tokens,
+                        api_endpoint=model_obj.api_endpoint,
+                        api_key=model_obj.api_key,
+                        api_version=api_version,
+                        requires_o1_handling=model_obj.requires_o1_handling,
+                        timeout_seconds=120,
+                        stream=False,
+                    )
 
-            return jsonify(
-                {
-                    "message": {
-                        "role": "assistant",
-                        "content": content_processed,
-                        "id": str(uuid.uuid4()),
-                    }
-                }
-            )
+                    # Process response
+                    if isinstance(response, dict):
+                        if "choices" in response and len(response["choices"]) > 0:
+                            content = response["choices"][0]["message"]["content"]
+                        else:
+                            content = str(response)
+                    elif isinstance(response, str):
+                        content = response
+                    else:
+                        content = str(response)
+
+                    # Prevent Jinja2 injection
+                    content_processed = content.replace("{%", "&#123;%").replace("%}", "%&#125;")
+
+                    # Add message to conversation
+                    conversation_manager.add_message(
+                        chat_id=chat_id,
+                        role="assistant",
+                        content=content_processed,
+                        model_max_tokens=get_model_token_limit(model_obj),
+                        requires_o1_handling=model_obj.requires_o1_handling,
+                    )
+
+                    return jsonify(
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": content_processed,
+                                "id": str(uuid.uuid4()),
+                            }
+                        }
+                    )
+
+            except Exception as api_err:
+                logger.error("Azure API error: %s", str(api_err))
+                return jsonify({
+                    "error": f"Failed to get response from Azure API: {str(api_err)}"
+                }), 500
 
     except Exception as e:
         logger.error("Error during chat handling: %s", str(e), exc_info=True)

@@ -15,7 +15,7 @@ def validate_database_uri(uri: str) -> None:
     """Validate that DATABASE_URI is properly formatted."""
     try:
         parsed = urlparse(uri)
-        
+
         # Check if the scheme is valid
         valid_schemes = {"postgresql", "postgres", "postgresql+psycopg2"}
         if parsed.scheme not in valid_schemes:
@@ -23,15 +23,15 @@ def validate_database_uri(uri: str) -> None:
                 f"Invalid DATABASE_URI scheme: {parsed.scheme}. "
                 f"Must be one of: {', '.join(valid_schemes)}"
             )
-        
+
         # Check if the URI has a valid network location
         if not parsed.netloc:
             raise ValueError("Invalid DATABASE_URI: Missing host or port")
-        
+
         # Check if the URI has a valid path (database name)
         if not parsed.path or parsed.path == "/":
             raise ValueError("Invalid DATABASE_URI: Missing database name")
-        
+
     except Exception as e:
         raise ValueError(f"Invalid DATABASE_URI: {str(e)}")
 
@@ -44,30 +44,30 @@ load_dotenv(dotenv_path=env_path)
 
 class Config:
     logger: logging.Logger = logging.getLogger(__name__)
-    
+
     # Load environment variables
     ENV = os.getenv("FLASK_ENV", "production")
-    
+
     # Required configuration
     REQUIRED_CONFIG: Set[str] = {
         "SECRET_KEY",
-        "DATABASE_URI", 
+        "DATABASE_URI",
         "ENCRYPTION_KEY",
         "AZURE_API_KEY"
     }
-    
+
     # Validate required configuration
     for var in REQUIRED_CONFIG:
         value = os.getenv(var)
         if not value:
             raise ValueError(f"{var} environment variable is not set")
-        
+
         # Special validation for sensitive keys
         if var == "SECRET_KEY":
             validate_secret_key(value)
         elif var == "DATABASE_URI":
             validate_database_uri(value)
-            
+
         # Set the attribute directly on the class
         globals()[var] = value
 
@@ -75,7 +75,7 @@ class Config:
     ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
     if not ENCRYPTION_KEY:
         raise ValueError("ENCRYPTION_KEY environment variable is required")
-        
+
     # Ensure encryption key is properly formatted for Fernet
     # Fernet requires a 32-byte key encoded in base64
     import base64
@@ -91,7 +91,7 @@ class Config:
         ENCRYPTION_KEY = base64.b64encode(key_bytes).decode()
         logger.info("Encryption key properly formatted for Fernet usage")
 
-    # Add explicit Azure configuration  
+    # Add explicit Azure configuration
     AZURE_API_KEY = os.getenv("AZURE_API_KEY")
     if not AZURE_API_KEY:
         raise ValueError("AZURE_API_KEY environment variable is required")
@@ -111,7 +111,7 @@ class Config:
     DEFAULT_API_ENDPOINT = os.getenv("DEFAULT_API_ENDPOINT", AZURE_API_ENDPOINT)
     DEFAULT_TEMPERATURE: float = float(os.getenv("DEFAULT_TEMPERATURE", "1.0"))
     try:
-        DEFAULT_MAX_TOKENS: int = int(os.getenv("DEFAULT_MAX_TOKENS", "32000"))
+        DEFAULT_MAX_TOKENS: int = int(os.getenv("DEFAULT_MAX_TOKENS", "16384"))
         if DEFAULT_MAX_TOKENS <= 0:
             raise ValueError("DEFAULT_MAX_TOKENS must be positive")
     except ValueError as e:
@@ -119,7 +119,7 @@ class Config:
 
     try:
         DEFAULT_MAX_COMPLETION_TOKENS: int = int(
-            os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "32000")
+            os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "16384")
         )
         if DEFAULT_MAX_COMPLETION_TOKENS <= 0:
             raise ValueError("DEFAULT_MAX_COMPLETION_TOKENS must be positive")
@@ -162,8 +162,8 @@ class Config:
     }
 
     MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")
-    MAX_TOKENS = int(os.getenv("MAX_TOKENS", 32000))
-    MAX_MESSAGE_TOKENS = int(os.getenv("MAX_MESSAGE_TOKENS", 32000))
+    MAX_TOKENS = int(os.getenv("MAX_TOKENS", 16384))
+    MAX_MESSAGE_TOKENS = int(os.getenv("MAX_MESSAGE_TOKENS", 16384))
 
     PASSWORD_MIN_LENGTH = int(os.getenv("PASSWORD_MIN_LENGTH", 8))
     PASSWORD_REQUIRE_UPPERCASE = bool(os.getenv("PASSWORD_REQUIRE_UPPERCASE", True))

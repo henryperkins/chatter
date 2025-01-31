@@ -67,6 +67,7 @@ class Model:
     supports_streaming: bool = field(default=False, metadata={"sa": mapped_column(Boolean, nullable=False)})
     api_version: str = field(default="2023-07-01-preview", metadata={"sa": mapped_column(String(50), nullable=False)})
     created_at: Optional[str] = field(default=None, metadata={"sa": mapped_column(DateTime, nullable=True)})
+    version: int = field(default=1, metadata={"sa": mapped_column(Integer, nullable=False, server_default=text("1"))})
 
     # Class-level provider capabilities
     PROVIDER_CAPABILITIES: ClassVar[Dict[str, Dict[str, Any]]] = {
@@ -74,6 +75,11 @@ class Model:
             'fixed_temperature': True,
             'streaming': True,
             'max_tokens': 8192
+        },
+        'gpt-4o': {
+            'fixed_temperature': True,
+            'streaming': True,
+            'max_tokens': 16384
         },
         'gpt-3.5-turbo': {
             'fixed_temperature': False,
@@ -212,7 +218,7 @@ class Model:
         except Exception as e:
             logger.error("Failed to create model: %s", e)
             raise
-        
+
     @staticmethod
     def get_immutable_fields(model_id: int) -> List[str]:
         """Get list of fields that cannot be modified for an existing model.
@@ -268,37 +274,17 @@ class Model:
 
                 model_dict = dict(row)
 
-                # Handle API key decryption
-                encryption_key = getattr(Config, 'ENCRYPTION_KEY', None)
-                if encryption_key:
+                # Handle API key decryption using centralized utility
+                from utils.encryption import decrypt_api_key, EncryptionError
+
+                encrypted_key = model_dict.get("api_key", "")
+                if encrypted_key:
                     try:
-                        import base64
-                        from cryptography.fernet import Fernet
-
-                        # Ensure encryption key is properly base64 encoded
-                        try:
-                            # Try to decode it to verify it's valid base64
-                            base64.b64decode(encryption_key)
-                        except Exception:
-                            # If not valid base64, encode it properly
-                            import hashlib
-                            key_bytes = hashlib.sha256(encryption_key.encode()).digest()
-                            encryption_key = base64.b64encode(key_bytes).decode()
-
-                        cipher_suite = Fernet(encryption_key.encode())
-                        encrypted_key = model_dict.get("api_key", "")
-                        if encrypted_key:
-                            try:
-                                model_dict["api_key"] = cipher_suite.decrypt(encrypted_key.encode()).decode()
-                            except Exception as e:
-                                logger.error(f"Failed to decrypt API key: {str(e)}")
-                                model_dict["api_key"] = ""
-
-                    except Exception as e:
-                        logger.error(f"Error setting up encryption: {str(e)}")
+                        model_dict["api_key"] = decrypt_api_key(encrypted_key)
+                    except EncryptionError as e:
+                        logger.error(str(e))
                         model_dict["api_key"] = ""
                 else:
-                    logger.warning("No encryption key found in config")
                     model_dict["api_key"] = ""
 
                 # Normalize boolean fields
@@ -403,22 +389,37 @@ class Model:
                             if default_count == 0:
                                 raise ValueError("Cannot unset default model without setting another as default")
 
-                # Validate configuration before update
-                Model.validate_model_config(update_data)
+                # Validate configuration before update, passing current model_id
+                Model.validate_model_config(update_data, model_id)
 
-                # Build update query
+                # Get current version
+                current_version = db.execute(
+                    text("SELECT version FROM models WHERE id = :model_id"),
+                    {"model_id": model_id}
+                ).scalar()
+
+                if current_version is None:
+                    raise ValueError(f"Model with ID {model_id} not found")
+
+                # Add version increment to update data
+                update_data['version'] = current_version + 1
+
+                # Build update query with version check
                 set_clause = ", ".join(f"{key} = :{key}" for key in update_data)
-                params = cast(Dict[str, Any], {**update_data, "model_id": model_id})
+                params = cast(Dict[str, Any], {**update_data, "model_id": model_id, "current_version": current_version})
 
                 query = text(
                     f"""
                     UPDATE models
                     SET {set_clause}
-                    WHERE id = :model_id
+                    WHERE id = :model_id AND version = :current_version
+                    RETURNING version
                 """
                 ).bindparams(**params)
 
-                db.execute(query)
+                result = db.execute(query)
+                if result.rowcount == 0:
+                    raise ValueError("Model was modified by another user. Please refresh and try again.")
 
                 # Update default status if needed
                 if update_data.get("is_default", False):
@@ -523,7 +524,7 @@ class Model:
                 return None
 
     @staticmethod
-    def validate_model_config(config: ModelDict) -> None:
+    def validate_model_config(config: ModelDict, model_id: Optional[int] = None) -> None:
         """
         Validate model configuration parameters.
         """
@@ -539,10 +540,23 @@ class Model:
             config['temperature'] = 1.0
 
         config['supports_streaming'] = provider_caps.get('streaming', True)
-        config['max_completion_tokens'] = min(
-            config.get('max_completion_tokens', 16384),
-            provider_caps.get('max_tokens', 16384)
-        )
+
+        # Handle max_completion_tokens based on model type
+        model_type = config.get('model_type', '').lower()
+        requires_o1 = config.get('requires_o1_handling', False)
+        is_o1_preview = model_type == 'o1-preview' and requires_o1
+
+        if is_o1_preview:
+            config['max_completion_tokens'] = min(
+                config.get('max_completion_tokens', 8300),
+                8300
+            )
+        else:
+            provider_max = provider_caps.get('max_tokens', 16384)
+            config['max_completion_tokens'] = min(
+                config.get('max_completion_tokens', provider_max),
+                provider_max
+            )
 
         # Validate required fields with strict type checking
         required_fields = {
@@ -565,10 +579,35 @@ class Model:
             if not isinstance(value, expected_type):
                 raise ValueError(f"{field} must be of type {expected_type.__name__}")
 
-        # Additional API endpoint validation
+        # Additional API endpoint validation for Azure OpenAI
         api_endpoint = config["api_endpoint"]
-        if not isinstance(api_endpoint, str) or not api_endpoint.startswith("https://") or "/openai/deployments/" not in api_endpoint:
-            raise ValueError("API endpoint must be a valid HTTPS URL")
+        if not isinstance(api_endpoint, str):
+            raise ValueError("API endpoint must be a string")
+
+        # Validate basic URL structure
+        if not api_endpoint.startswith("https://"):
+            raise ValueError("API endpoint must use HTTPS")
+
+        # Extract and validate instance name
+        instance_parts = api_endpoint.split('.')
+        if len(instance_parts) < 2 or not instance_parts[0].startswith("https://"):
+            raise ValueError("API endpoint must start with https://instancename")
+
+        # Validate domain
+        if not any(domain in api_endpoint for domain in ["openai.azure.com", "azure-api.net"]):
+            raise ValueError("API endpoint must be an Azure OpenAI domain (openai.azure.com or azure-api.net)")
+
+        # Validate deployment path and api-version
+        if "/openai/deployments/" not in api_endpoint:
+            raise ValueError("API endpoint must include /openai/deployments/{deployment-name}")
+
+        # Validate api-version query parameter
+        if "api-version=" not in api_endpoint:
+            raise ValueError("API endpoint must include api-version query parameter")
+
+        # Validate chat completions endpoint
+        if "/chat/completions" not in api_endpoint:
+            raise ValueError("API endpoint must be a chat completions endpoint (/chat/completions)")
 
         # Validate temperature
         temperature = config.get("temperature")
@@ -580,13 +619,16 @@ class Model:
         if max_tokens is not None and max_tokens < 1:
             raise ValueError("Max tokens must be at least 1")
 
-        # Validate only one default model
+        # Validate only one default model, allowing updates to current default
         if config.get('is_default', False):
             with db_session() as session:
-                existing_default = session.execute(
-                    text("SELECT id FROM models WHERE is_default = TRUE")
-                ).scalar()
-                if existing_default:
+                query = text("""
+                    SELECT COUNT(*) FROM models
+                    WHERE is_default = TRUE
+                    AND (:model_id IS NULL OR id != :model_id)
+                """)
+                existing_defaults = session.execute(query, {"model_id": model_id}).scalar()
+                if existing_defaults > 0 and model_id is None:
                     raise ValueError("Only one default model allowed")
 
     @staticmethod
