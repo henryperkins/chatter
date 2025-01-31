@@ -496,7 +496,7 @@ def edit_model(model_id):
                         "o1-preview models do not support streaming"
                     )
                     return render_template(
-                        "edit_model.html", form=form, model=model, errors=form.errors
+                        "edit_model.html", form=form, model=model, provider=provider, errors=form.errors
                     )
                 data["temperature"] = 1.0  # Force temperature for o1-preview
                 data["supports_streaming"] = False  # Force disable streaming
@@ -509,6 +509,7 @@ def edit_model(model_id):
                     "edit_model.html",
                     form=form,
                     model=model,
+                    provider=provider,
                     error=validation_errors[0],
                 )
 
