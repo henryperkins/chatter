@@ -197,7 +197,6 @@ class TokenUsageManager {
         // Store the limits if needed
         this.currentLimits = limits;
     }
-    }
 
     /**
      * Show an error message briefly at the bottom of the token usage container.
