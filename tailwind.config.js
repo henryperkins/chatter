@@ -8,6 +8,9 @@ module.exports = {
   ],
   theme: {
     extend: {
+      padding: {
+        'safe': 'env(safe-area-inset-bottom)',
+      },
       colors: {
         brandBlue: '#1E40AF',
       },
@@ -77,5 +80,6 @@ module.exports = {
   plugins: [
     require('@tailwindcss/forms'),
     require('@tailwindcss/typography'),
+    require('tailwind-scrollbar'),
   ],
 }

@@ -1,93 +1,261 @@
 // static/js/base.js
 
-/*** Mobile Menu Handling ***/
-function initializeMobileMenu() {
-    const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-    const mobileMenu = document.getElementById('mobile-menu');
-    const mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
+class MobileMenuManager {
+    constructor() {
+        this.mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        this.mobileMenu = document.getElementById('mobile-menu');
+        this.mobileMenuBackdrop = document.getElementById('mobile-menu-backdrop');
+        this.isOpen = false;
+        this.touchStartX = 0;
+        this.touchStartY = 0;
+        this.currentTranslateX = 0;
+        this.isDragging = false;
 
-    if (mobileMenuToggle && mobileMenu && mobileMenuBackdrop) {
-        function openMenu() {
-            mobileMenu.classList.remove('-translate-x-full');
-            mobileMenu.classList.add('translate-x-0');
-            mobileMenuBackdrop.classList.remove('hidden');
-            mobileMenuBackdrop.classList.add('opacity-100');
-            mobileMenuToggle.setAttribute('aria-expanded', 'true');
-            document.body.classList.add('overflow-hidden');
+        if (this.mobileMenuToggle && this.mobileMenu && this.mobileMenuBackdrop) {
+            this.initialize();
         }
+    }
 
-        function closeMenu() {
-            mobileMenu.classList.add('-translate-x-full');
-            mobileMenu.classList.remove('translate-x-0');
-            mobileMenuBackdrop.classList.add('hidden');
-            mobileMenuBackdrop.classList.remove('opacity-100');
-            mobileMenuToggle.setAttribute('aria-expanded', 'false');
-            document.body.classList.remove('overflow-hidden');
-        }
+    initialize() {
+        this.setupEventListeners();
+        this.setupAccessibility();
+        this.setupGestureHandling();
+    }
 
-        // Click handler
-        mobileMenuToggle.addEventListener('click', () => {
-            if (mobileMenu.classList.contains('-translate-x-full')) {
-                openMenu();
-            } else {
-                closeMenu();
-            }
-        });
+    setupEventListeners() {
+        // Toggle button click
+        this.mobileMenuToggle.addEventListener('click', () => this.toggleMenu());
 
-        // Touch handler
-        mobileMenuToggle.addEventListener('touchstart', (event) => {
-            event.preventDefault();
-            if (mobileMenu.classList.contains('-translate-x-full')) {
-                openMenu();
-            } else {
-                closeMenu();
-            }
-        });
+        // Backdrop click
+        this.mobileMenuBackdrop.addEventListener('click', () => this.closeMenu());
 
-        // Close on backdrop click
-        mobileMenuBackdrop.addEventListener('click', closeMenu);
-
-        // Close on link click
-        mobileMenu.addEventListener('click', (event) => {
+        // Close on navigation
+        this.mobileMenu.addEventListener('click', (event) => {
             if (event.target.tagName === 'A') {
-                closeMenu();
+                this.closeMenu();
             }
         });
 
-        // Close on Escape key
+        // Keyboard navigation
         document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape' && !mobileMenu.classList.contains('-translate-x-full')) {
-                closeMenu();
+            if (event.key === 'Escape' && this.isOpen) {
+                this.closeMenu();
             }
         });
 
-        // Close if resized to desktop
+        // Resize handling
         window.addEventListener('resize', () => {
-            if (window.innerWidth >= 768) {
-                closeMenu();
+            if (window.innerWidth >= 768 && this.isOpen) {
+                this.closeMenu();
             }
         });
+
+        // Handle safe area changes
+        window.addEventListener('resize', this.updateSafeArea.bind(this));
+    }
+
+    setupAccessibility() {
+        this.mobileMenuToggle.setAttribute('role', 'button');
+        this.mobileMenuToggle.setAttribute('aria-haspopup', 'true');
+        this.mobileMenuToggle.setAttribute('aria-expanded', 'false');
+        this.mobileMenu.setAttribute('role', 'navigation');
+        this.mobileMenu.setAttribute('aria-label', 'Mobile navigation menu');
+    }
+
+    setupGestureHandling() {
+        // Touch start
+        this.mobileMenu.addEventListener('touchstart', (e) => {
+            this.touchStartX = e.touches[0].clientX;
+            this.touchStartY = e.touches[0].clientY;
+            this.isDragging = true;
+            this.mobileMenu.style.transition = 'none';
+        }, { passive: true });
+
+        // Touch move
+        this.mobileMenu.addEventListener('touchmove', (e) => {
+            if (!this.isDragging) return;
+
+            const touchX = e.touches[0].clientX;
+            const touchY = e.touches[0].clientY;
+            const deltaX = touchX - this.touchStartX;
+            const deltaY = Math.abs(touchY - this.touchStartY);
+
+            // Prevent vertical scrolling while dragging horizontally
+            if (Math.abs(deltaX) > deltaY && e.cancelable) {
+                e.preventDefault();
+            }
+
+            if (deltaX < 0) {
+                this.currentTranslateX = deltaX;
+                this.mobileMenu.style.transform = `translateX(${deltaX}px)`;
+
+                // Update backdrop opacity based on drag
+                const opacity = Math.max(0, 0.5 + (deltaX / this.mobileMenu.offsetWidth) * 0.5);
+                this.mobileMenuBackdrop.style.opacity = opacity;
+            }
+        }, { passive: false });
+
+        // Touch end
+        this.mobileMenu.addEventListener('touchend', (e) => {
+            if (!this.isDragging) return;
+
+            this.isDragging = false;
+            this.mobileMenu.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+
+            if (Math.abs(this.currentTranslateX) > this.mobileMenu.offsetWidth * 0.3) {
+                this.closeMenu();
+            } else {
+                this.mobileMenu.style.transform = 'translateX(0)';
+                this.mobileMenuBackdrop.style.opacity = '0.5';
+            }
+
+            this.currentTranslateX = 0;
+        });
+    }
+
+    toggleMenu() {
+        this.isOpen ? this.closeMenu() : this.openMenu();
+    }
+
+    openMenu() {
+        this.isOpen = true;
+        this.mobileMenu.classList.remove('-translate-x-full');
+        this.mobileMenu.classList.add('translate-x-0');
+        this.mobileMenuBackdrop.classList.remove('hidden');
+        this.mobileMenuBackdrop.classList.add('opacity-100');
+        this.mobileMenuToggle.setAttribute('aria-expanded', 'true');
+        document.body.classList.add('overflow-hidden');
+
+        // Announce to screen readers
+        this.announceMenuState('Menu opened');
+    }
+
+    closeMenu() {
+        this.isOpen = false;
+        this.mobileMenu.classList.add('-translate-x-full');
+        this.mobileMenu.classList.remove('translate-x-0');
+        this.mobileMenuBackdrop.classList.add('hidden');
+        this.mobileMenuBackdrop.classList.remove('opacity-100');
+        this.mobileMenuToggle.setAttribute('aria-expanded', 'false');
+        document.body.classList.remove('overflow-hidden');
+
+        // Announce to screen readers
+        this.announceMenuState('Menu closed');
+    }
+
+    updateSafeArea() {
+        const safeAreaTop = getComputedStyle(document.documentElement).getPropertyValue('--sat') || '0px';
+        const safeAreaBottom = getComputedStyle(document.documentElement).getPropertyValue('--sab') || '0px';
+
+        this.mobileMenu.style.paddingTop = `calc(4rem + ${safeAreaTop})`;
+        this.mobileMenu.style.paddingBottom = safeAreaBottom;
+    }
+
+    announceMenuState(message) {
+        let announcer = document.getElementById('menu-announcer');
+        if (!announcer) {
+            announcer = document.createElement('div');
+            announcer.id = 'menu-announcer';
+            announcer.setAttribute('aria-live', 'polite');
+            announcer.className = 'sr-only';
+            document.body.appendChild(announcer);
+        }
+        announcer.textContent = message;
     }
 }
 
+class FontSizeManager {
+    constructor() {
+        this.decreaseBtn = document.getElementById('decrease-font-size');
+        this.increaseBtn = document.getElementById('increase-font-size');
+        this.resetBtn = document.getElementById('reset-font-size');
+        this.currentFontSize = parseFloat(localStorage.getItem('fontSize')) || 1.0;
+
+        this.initialize();
+    }
+
+    initialize() {
+        this.applyFontSize(this.currentFontSize);
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        if (!this.decreaseBtn || !this.increaseBtn || !this.resetBtn) return;
+
+        this.decreaseBtn.addEventListener('click', () => {
+            this.currentFontSize = Math.max(0.8, this.currentFontSize - 0.1);
+            this.applyFontSize(this.currentFontSize);
+        });
+
+        this.increaseBtn.addEventListener('click', () => {
+            this.currentFontSize = Math.min(1.5, this.currentFontSize + 0.1);
+            this.applyFontSize(this.currentFontSize);
+        });
+
+        this.resetBtn.addEventListener('click', () => {
+            this.currentFontSize = 1.0;
+            this.applyFontSize(this.currentFontSize);
+        });
+
+        // Add keyboard support
+        [this.decreaseBtn, this.increaseBtn, this.resetBtn].forEach(btn => {
+            if (btn) {
+                btn.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        btn.click();
+                    }
+                });
+            }
+        });
+    }
+
+    applyFontSize(fontSize) {
+        document.documentElement.style.fontSize = `${fontSize}em`;
+        localStorage.setItem('fontSize', fontSize);
+        this.announceNewFontSize(fontSize);
+    }
+
+    announceNewFontSize(fontSize) {
+        let announcer = document.getElementById('font-size-announcer');
+        if (!announcer) {
+            announcer = document.createElement('div');
+            announcer.id = 'font-size-announcer';
+            announcer.setAttribute('aria-live', 'polite');
+            announcer.className = 'sr-only';
+            document.body.appendChild(announcer);
+        }
+        announcer.textContent = `Font size ${Math.round(fontSize * 100)}%`;
+    }
+}
+
+// Initialize components when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    /*** Initialize Mobile Menu ***/
-    initializeMobileMenu();
+    // Initialize mobile menu
+    const mobileMenu = new MobileMenuManager();
 
-    /*** Initialize Font Size Adjuster ***/
-    initializeFontSizeAdjuster();
+    // Initialize font size controls
+    const fontSizeManager = new FontSizeManager();
 
-    /*** Flash Message Handling ***/
+    // Handle flash messages
+    initializeFlashMessages();
+
+    // Initialize tooltips
+    initializeTooltips();
+
+    // Initialize modals
+    initializeModals();
+});
+
+function initializeFlashMessages() {
     const flashMessages = document.querySelectorAll('[role="alert"]');
     flashMessages.forEach(message => {
         const dismissButton = message.querySelector('button');
         let timeoutId;
 
         const removeMessage = () => {
-            if (message.style) {
-                message.style.opacity = '0';
-                message.style.transform = 'translateY(-10px)';
-            }
+            message.style.opacity = '0';
+            message.style.transform = 'translateY(-10px)';
             setTimeout(() => message.remove(), 300);
         };
 
@@ -108,111 +276,102 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
-
-    /*** Initialize Tooltips ***/
-    function initializeTooltips() {
-        const tooltipElements = document.querySelectorAll('[data-tooltip]');
-        tooltipElements.forEach(element => {
-            const tooltipText = element.getAttribute('data-tooltip');
-            if (tooltipText) {
-                const tooltip = document.createElement('div');
-                tooltip.className = 'tooltip hidden bg-black text-white text-sm px-2 py-1 rounded absolute z-50';
-                tooltip.textContent = tooltipText;
-                element.appendChild(tooltip);
-
-                element.addEventListener('mouseenter', () => {
-                    tooltip.classList.remove('hidden');
-                    const rect = element.getBoundingClientRect();
-                    if (tooltip.style) {
-                        tooltip.style.top = `${rect.bottom + window.scrollY}px`;
-                        tooltip.style.left = `${rect.left + window.scrollX}px`;
-                    }
-                });
-
-                element.addEventListener('mouseleave', () => {
-                    tooltip.classList.add('hidden');
-                });
-            }
-        });
-    }
-
-    /*** Initialize Modals ***/
-    function initializeModals() {
-        const modalTriggers = document.querySelectorAll('[data-modal-target]');
-        modalTriggers.forEach(trigger => {
-            const modalId = trigger.getAttribute('data-modal-target');
-            if (!modalId) return;
-
-            const modal = document.getElementById(modalId);
-            if (!modal) return;
-
-            // Open modal
-            trigger.addEventListener('click', () => {
-                modal.classList.remove('hidden');
-                document.body.classList.add('overflow-hidden');
-            });
-
-            // Close modal
-            const closeButtons = modal.querySelectorAll('[data-modal-close]');
-            closeButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    modal.classList.add('hidden');
-                    document.body.classList.remove('overflow-hidden');
-                });
-            });
-
-            // Click outside modal to close
-            modal.addEventListener('click', event => {
-                if (event.target === modal) {
-                    modal.classList.add('hidden');
-                    document.body.classList.remove('overflow-hidden');
-                }
-            });
-
-            // Close on ESC
-            document.addEventListener('keydown', event => {
-                if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
-                    modal.classList.add('hidden');
-                    document.body.classList.remove('overflow-hidden');
-                }
-            });
-        });
-    }
-
-    // Call initialization functions
-    initializeTooltips();
-    initializeModals();
-    initializeFontSizeAdjuster();
-});
-
-/*** Font Size Adjustment Handling ***/
-function initializeFontSizeAdjuster() {
-    const decreaseBtn = document.getElementById('decrease-font-size');
-    const increaseBtn = document.getElementById('increase-font-size');
-    const resetBtn = document.getElementById('reset-font-size');
-
-    let currentFontSize = parseFloat(localStorage.getItem('fontSize')) || 1.0;
-    applyFontSize(currentFontSize);
-
-    if (decreaseBtn && increaseBtn && resetBtn) {
-        decreaseBtn.addEventListener('click', () => {
-            currentFontSize = Math.max(0.8, currentFontSize - 0.1);
-            applyFontSize(currentFontSize);
-        });
-
-        increaseBtn.addEventListener('click', () => {
-            currentFontSize = Math.min(1.5, currentFontSize + 0.1);
-            applyFontSize(currentFontSize);
-        });
-
-        resetBtn.addEventListener('click', () => {
-            currentFontSize = 1.0;
-            applyFontSize(currentFontSize);
-        });
-    }
 }
 
-function applyFontSize(fontSize) {
-    document.documentElement.style.fontSize = fontSize + 'em';
-    localStorage.setItem('fontSize', fontSize);
+function initializeTooltips() {
+    const tooltipElements = document.querySelectorAll('[data-tooltip]');
+    tooltipElements.forEach(element => {
+        const tooltipText = element.getAttribute('data-tooltip');
+        if (!tooltipText) return;
+
+        const tooltip = document.createElement('div');
+        tooltip.className = 'tooltip hidden bg-black text-white text-sm px-2 py-1 rounded absolute z-50 transform -translate-x-1/2 transition-opacity duration-200';
+        tooltip.textContent = tooltipText;
+        document.body.appendChild(tooltip);
+
+        function positionTooltip() {
+            const rect = element.getBoundingClientRect();
+            tooltip.style.left = `${rect.left + rect.width / 2}px`;
+            tooltip.style.top = `${rect.bottom + 8}px`;
+        }
+
+        element.addEventListener('mouseenter', () => {
+            tooltip.classList.remove('hidden');
+            tooltip.classList.add('opacity-100');
+            positionTooltip();
+        });
+
+        element.addEventListener('mouseleave', () => {
+            tooltip.classList.add('hidden');
+            tooltip.classList.remove('opacity-100');
+        });
+
+        // Reposition tooltip on scroll and resize
+        window.addEventListener('scroll', positionTooltip);
+        window.addEventListener('resize', positionTooltip);
+    });
+}
+
+function initializeModals() {
+    const modalTriggers = document.querySelectorAll('[data-modal-target]');
+    modalTriggers.forEach(trigger => {
+        const modalId = trigger.getAttribute('data-modal-target');
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+
+        function openModal() {
+            modal.classList.remove('hidden');
+            modal.classList.add('opacity-100');
+            document.body.classList.add('overflow-hidden');
+
+            // Trap focus within modal
+            const focusableElements = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            const firstFocusable = focusableElements[0];
+            const lastFocusable = focusableElements[focusableElements.length - 1];
+
+            firstFocusable?.focus();
+
+            modal.addEventListener('keydown', function(e) {
+                if (e.key === 'Tab') {
+                    if (e.shiftKey && document.activeElement === firstFocusable) {
+                        e.preventDefault();
+                        lastFocusable?.focus();
+                    } else if (!e.shiftKey && document.activeElement === lastFocusable) {
+                        e.preventDefault();
+                        firstFocusable?.focus();
+                    }
+                }
+            });
+        }
+
+        function closeModal() {
+            modal.classList.add('hidden');
+            modal.classList.remove('opacity-100');
+            document.body.classList.remove('overflow-hidden');
+            trigger.focus(); // Return focus to trigger
+        }
+
+        // Open modal
+        trigger.addEventListener('click', openModal);
+
+        // Close modal
+        const closeButtons = modal.querySelectorAll('[data-modal-close]');
+        closeButtons.forEach(button => {
+            button.addEventListener('click', closeModal);
+        });
+
+        // Click outside to close
+        modal.addEventListener('click', event => {
+            if (event.target === modal) {
+                closeModal();
+            }
+        });
+
+        // Close on ESC
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !modal.classList.contains('hidden')) {
+                closeModal();
+            }
+        });
+    });
 }

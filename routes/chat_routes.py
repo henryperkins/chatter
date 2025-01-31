@@ -34,7 +34,7 @@ from chat_utils import (
     count_tokens,
 )
 from conversation_manager import conversation_manager
-from database import db_session, is_initialized
+from database import db_session, is_initialized, get_db_state
 from models.chat import Chat
 from models.model import Model
 from models.provider import Provider
@@ -385,15 +385,11 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             requires_o1_handling=getattr(model_obj, "requires_o1_handling", False),
         )
 
-        # Prep for Azure
+        # Get conversation history
         history = conversation_manager.get_context(
             chat_id,
             include_system=not getattr(model_obj, "requires_o1_handling", False),
         )
-        api_version = getattr(model_obj, "api_version", "2024-12-01-preview")
-        if not api_version:
-            logger.error("API version not configured for this model")
-            return jsonify({"error": "API version is not configured"}), 400
 
         # Check streaming
         use_streaming = (
@@ -402,15 +398,20 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             and request.headers.get("Accept") == "text/event-stream"
         )
 
-        if use_streaming:
-            # Get app instance before entering generator
-            app = current_app._get_current_object()
+        # Get app instance once
+        app = current_app._get_current_object()
 
+        if use_streaming:
             # SSE streaming response
             def generate():
                 try:
-                    # Wrap entire generator function in app context
+                    # Use app context from outer scope
                     with app.app_context():
+                        # Verify API version
+                        api_version = getattr(model_obj, "api_version", "2024-12-01-preview")
+                        if not api_version:
+                            logger.error("API version not configured for this model")
+                            raise RuntimeError("API version is not configured")
                         # Check database initialization
                         db_state = get_db_state()
                         if not db_state.get("initialized"):
@@ -418,10 +419,21 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                             raise RuntimeError("Database not initialized. Please try again.")
 
                         try:
+                            # Get provider capabilities
+                            provider = Provider.get_by_id(model_obj.provider_id)
+                            provider_caps = provider.capabilities if provider else {}
+
+                            # Apply provider-specific settings
+                            max_tokens = min(
+                                model_obj.max_completion_tokens,
+                                provider_caps.get('max_tokens', 16384)
+                            )
+                            temperature = 1.0 if provider_caps.get('fixed_temperature') else model_obj.temperature
+
                             response_generator = get_azure_response(
                                 messages=history,
                                 deployment_name=model_obj.deployment_name,
-                                max_completion_tokens=model_obj.max_completion_tokens,
+                                max_completion_tokens=max_tokens,
                                 api_endpoint=model_obj.api_endpoint,
                                 api_key=model_obj.api_key,
                                 api_version=api_version,
@@ -438,21 +450,57 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                         for chunk in response_generator:
                             if "choices" in chunk and len(chunk["choices"]) > 0:
                                 delta = chunk["choices"][0].get("delta", {})
-                                content_chunk = delta.get("content", "")
-                                if content_chunk:
-                                    accumulated += content_chunk
-                                    yield f"data: {content_chunk}\n\n"
+                                # Process chunk in the same way as non-streaming response
+                                if "message" in chunk["choices"][0] and "content" in chunk["choices"][0]["message"]:
+                                    content = chunk["choices"][0]["message"]["content"]
+                                else:
+                                    content = str(chunk["choices"][0].get("text", ""))
 
-                        conversation_manager.add_message(
-                            chat_id=chat_id,
-                            role="assistant",
-                            content=accumulated,
-                            model_max_tokens=get_model_token_limit(model_obj),
-                            requires_o1_handling=model_obj.requires_o1_handling,
-                        )
-                        yield "data: [DONE]\n\n"
+                                if content:
+                                    accumulated += content
+                                    yield f"data: {content}\n\n"
+
+                        try:
+                            # Process content to prevent Jinja2 injection
+                            content_processed = accumulated.replace("{%", "&#123;%").replace("%}", "%&#125;")
+                            conversation_manager.add_message(
+                                chat_id=chat_id,
+                                role="assistant",
+                                content=content_processed,
+                                model_max_tokens=get_model_token_limit(model_obj),
+                                requires_o1_handling=model_obj.requires_o1_handling,
+                            )
+                            yield "data: [DONE]\n\n"
+                        except Exception as save_error:
+                            logger.error("Error saving response: %s", str(save_error))
+                            # Still try to save the message even if we can't stream it
+                            try:
+                                content_processed = accumulated.replace("{%", "&#123;%").replace("%}", "%&#125;")
+                                conversation_manager.add_message(
+                                    chat_id=chat_id,
+                                    role="assistant",
+                                    content=content_processed,
+                                    model_max_tokens=get_model_token_limit(model_obj),
+                                    requires_o1_handling=model_obj.requires_o1_handling,
+                                )
+                            except Exception as final_error:
+                                logger.error("Failed to save response: %s", str(final_error))
+                            yield f"data: [ERROR] {str(save_error)}\n\n"
                 except Exception as e:
                     logger.error("Streaming error: %s", str(e))
+                    # Try to save whatever we accumulated
+                    if accumulated:
+                        try:
+                            content_processed = accumulated.replace("{%", "&#123;%").replace("%}", "%&#125;")
+                            conversation_manager.add_message(
+                                chat_id=chat_id,
+                                role="assistant",
+                                content=content_processed,
+                                model_max_tokens=get_model_token_limit(model_obj),
+                                requires_o1_handling=model_obj.requires_o1_handling,
+                            )
+                        except Exception as save_error:
+                            logger.error("Failed to save partial response: %s", str(save_error))
                     yield f"data: [ERROR] {str(e)}\n\n"
 
             response = Response(generate(), mimetype="text/event-stream")
@@ -461,9 +509,6 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
         else:
             # Normal (non-stream) response
-            # Get app instance
-            app = current_app._get_current_object()
-
             try:
                 # Wrap entire response handling in app context
                 with app.app_context():
@@ -475,11 +520,28 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                             "error": "Database not initialized. Please try again."
                         }), 503  # Service Unavailable
 
+                    # Get conversation history
+                    history = conversation_manager.get_context(
+                        chat_id,
+                        include_system=not getattr(model_obj, "requires_o1_handling", False),
+                    )
+
+                    # Get provider capabilities
+                    provider = Provider.get_by_id(model_obj.provider_id)
+                    provider_caps = provider.capabilities if provider else {}
+
+                    # Apply provider-specific settings
+                    max_tokens = min(
+                        model_obj.max_completion_tokens,
+                        provider_caps.get('max_tokens', 16384)
+                    )
+                    temperature = 1.0 if provider_caps.get('fixed_temperature') else model_obj.temperature
+
                     # Get Azure response
                     response = get_azure_response(
                         messages=history,
                         deployment_name=model_obj.deployment_name,
-                        max_completion_tokens=model_obj.max_completion_tokens,
+                        max_completion_tokens=max_tokens,
                         api_endpoint=model_obj.api_endpoint,
                         api_key=model_obj.api_key,
                         api_version=api_version,
@@ -642,6 +704,18 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     today = datetime.now().strftime("%Y-%m-%d")
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
 
+    # Prepare current model data
+    current_model_data = None
+    if current_model:
+        current_model_data = {
+            'id': current_model.id,
+            'name': current_model.name,
+            'model_type': current_model.model_type,
+            'requires_o1_handling': current_model.requires_o1_handling,
+            'supports_streaming': current_model.supports_streaming,
+            'max_completion_tokens': current_model.max_completion_tokens
+        }
+
     return cast(
         FlaskResponse,
         render_template(
@@ -649,7 +723,7 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             chat_id=chat_id,
             chat_title=chat_title,
             model_name=model_name,
-            current_model=current_model,
+            current_model=current_model_data,
             messages=messages,
             models=models_serialized,
             conversations=conversations,

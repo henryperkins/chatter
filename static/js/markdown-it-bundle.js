@@ -1,27 +1,36 @@
-// Initialize markdown-it
-const md = window.markdownit({
-  html: true,
-  linkify: true,
-  typographer: true,
-  highlight: function (str, lang) {
-    if (lang && window.Prism && window.Prism.languages[lang]) {
-      try {
-        return window.Prism.highlight(str, window.Prism.languages[lang], lang);
-      } catch (error) {
-        console.error('Prism highlighting error:', error);
-      }
-    }
-    return str; // return original string if no highlighting possible
+// Initialize markdown-it with proper error handling
+try {
+  if (typeof window.markdownIt !== 'function') {
+    throw new Error('markdown-it library not found');
   }
-});
 
-// Add plugin functionality directly
-md.use((md) => {
-  const highlight = md.options.highlight;
-  md.options.highlight = (code, lang) => {
-    if (!lang) return code;
-    return highlight(code, lang);
-  };
-});
+  const md = window.markdownIt({
+    html: true,
+    linkify: true,
+    typographer: true,
+    highlight: function (str, lang) {
+      if (lang && window.Prism && window.Prism.languages[lang]) {
+        try {
+          return window.Prism.highlight(str, window.Prism.languages[lang], lang);
+        } catch (error) {
+          console.error('Prism highlighting error:', error);
+        }
+      }
+      return str; // return original string if no highlighting possible
+    }
+  });
 
-window.md = md;
+  // Add plugin functionality directly
+  md.use((md) => {
+    const highlight = md.options.highlight;
+    md.options.highlight = (code, lang) => {
+      if (!lang) return code;
+      return highlight(code, lang);
+    };
+  });
+
+  window.md = md;
+} catch (error) {
+  console.error('Failed to initialize markdown-it:', error);
+  // Don't throw here - let the chat.js handle the error
+}

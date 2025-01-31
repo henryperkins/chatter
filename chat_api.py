@@ -21,14 +21,13 @@ logger = logging.getLogger(__name__)
 def get_azure_response(
     messages: List[Dict[str, str]],
     deployment_name: Optional[str] = None,
-    selected_model_id: Optional[int] = None,
     max_completion_tokens: Optional[int] = None,
     api_endpoint: Optional[str] = None,
     api_key: Optional[str] = None,
     api_version: Optional[str] = None,
     requires_o1_handling: bool = False,
     timeout_seconds: int = 600,
-    stream: bool = False,  # Add this parameter
+    stream: bool = False
 ) -> Union[Dict[str, Any], str, Generator]:
     try:
         # Validate parameters
@@ -148,6 +147,15 @@ def get_azure_response(
                         else:
                             try:
                                 data = json.loads(data_str)
+                                # Ensure consistent format with non-streaming response
+                                if "choices" in data and len(data["choices"]) > 0:
+                                    choice = data["choices"][0]
+                                    if "delta" in choice:
+                                        # Convert delta format to match non-streaming format
+                                        delta = choice["delta"]
+                                        if "content" in delta:
+                                            choice["message"] = {"content": delta["content"]}
+                                            del choice["delta"]
                                 yield data
                             except json.JSONDecodeError:
                                 logger.error("Failed to parse JSON: %s", data_str)

@@ -351,7 +351,7 @@ class Chat:
                 })
                 message_id = result.scalar()
                 db.commit()
-                logger.info(f"Added message to chat {chat_id} with message_id {message_id}")
+                logger.debug(f"Added message to chat {chat_id} with message_id {message_id}")
                 return message_id
             except Exception as e:
                 db.rollback()

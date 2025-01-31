@@ -10,6 +10,17 @@ async function init() {
         console.log('Initializing chat interface');
         showLoadingIndicator();
 
+        // Wait for utils to be available
+        let attempts = 0;
+        while (!window.utils && attempts < 50) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
+
+        if (!window.utils) {
+            throw new Error('Utils not initialized after 5 seconds');
+        }
+
         // Add navigation state handler
         const handleNavigation = () => {
             if (window.location.pathname === '/chat') {
@@ -33,7 +44,9 @@ async function init() {
         console.debug('Chat initialization completed successfully');
     } catch (error) {
         console.error('Error during initialization:', error);
-        utils.showFeedback(error.message || 'Failed to initialize chat', 'error');
+        if (window.utils) {
+            window.utils.showFeedback(error.message || 'Failed to initialize chat', 'error');
+        }
     } finally {
         hideLoadingIndicator();
     }
@@ -163,7 +176,23 @@ async function initializeInterface() {
 
     // 7. Handle model changes
     if (modelSelect) {
-        modelSelect.addEventListener('change', handleModelChange);
+        // Create a debounced version of the handler
+        const debouncedModelChange = debounce(handleModelChange, 300);
+
+        // Store the current handler on the element to help with cleanup
+        modelSelect.modelChangeHandler = async (e) => {
+            e.preventDefault(); // Prevent any default form submission
+            await debouncedModelChange();
+        };
+
+        // Remove any existing listener using the stored handler
+        if (modelSelect.previousHandler) {
+            modelSelect.removeEventListener('change', modelSelect.previousHandler);
+        }
+
+        // Add the new listener and store it
+        modelSelect.addEventListener('change', modelSelect.modelChangeHandler);
+        modelSelect.previousHandler = modelSelect.modelChangeHandler;
     }
 
     // 8. Edit chat title (if applicable)
@@ -266,10 +295,15 @@ function removeTypingIndicator() {
  * Send message handling
  */
 async function sendMessage() {
+    if (!window.utils) {
+        console.error('Utils not initialized');
+        return;
+    }
+
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
     if (!messageInput || !sendButton) {
-        utils.showFeedback('Chat interface not properly initialized', 'error');
+        window.utils.showFeedback('Chat interface not properly initialized', 'error');
         return;
     }
 
@@ -277,7 +311,7 @@ async function sendMessage() {
     const hasUploadedFiles = window.fileUploadManager?.uploadedFiles?.length > 0;
 
     if (!messageText && !hasUploadedFiles) {
-        utils.showFeedback('Please enter a message or upload files.', 'error');
+        window.utils.showFeedback('Please enter a message or upload files.', 'error');
         return;
     }
 
@@ -293,7 +327,6 @@ async function sendMessage() {
         const formData = new FormData();
         if (messageText) {
             formData.append('message', messageText);
-            appendUserMessage(messageText);
         }
         // Add files if available
         if (window.fileUploadManager?.uploadedFiles?.length > 0) {
@@ -304,16 +337,19 @@ async function sendMessage() {
 
         formData.append('model_id', modelId);
         formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
-        sendButton.disabled = true;
-        sendButton.classList.add('sending');
 
         try {
-            await utils.withLoading(sendButton, async () => {
-                const chatBox = document.getElementById('chat-box');
-                if (chatBox.lastElementChild?.querySelector('[data-role="assistant-message"]')) {
-                    chatBox.lastElementChild.remove();
+            if (!window.utils) {
+                throw new Error('Utils not initialized');
+            }
+
+            await window.utils.withLoading(sendButton, async () => {
+                // Add user's message to the chat
+                if (messageText) {
+                    appendUserMessage(messageText);
                 }
 
+                // Only one response handler should be used
                 if (useStreaming) {
                     await handleStreamingResponse(formData);
                 } else {
@@ -325,37 +361,26 @@ async function sendMessage() {
                 messageInput.style.height = 'auto';
                 window.fileUploadManager.uploadedFiles = [];
                 window.fileUploadManager.renderFileList();
+
+                // Show success feedback
+                window.utils.showFeedback('Message sent successfully', 'success');
             });
-        } finally {
-            sendButton.disabled = false;
-            sendButton.classList.remove('sending');
+
+            // Update token usage
+            if (window.tokenUsageManager) {
+                await window.tokenUsageManager.updateStats();
+            }
+        } catch (error) {
+            console.error('Error sending message:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+            if (window.utils) {
+                window.utils.showFeedback(errorMessage, 'error', { duration: 0 }); // Duration 0 means it won't auto-hide
+            }
         }
-
-        // Update token usage
-        if (window.tokenUsageManager) {
-            await window.tokenUsageManager.updateStats();
-        }
-    } catch (error) {
-        console.error('Error sending message:', error);
-
-        // Show persistent error with retry
-        const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
-        const sanitizedError = errorMessage.replace(/<\/?[^>]+(>|$)/g, "");
-
-        const errorIndicator = document.createElement('div');
-        errorIndicator.className = 'error-indicator bg-red-100 border border-red-400 p-2 mb-2 rounded';
-        errorIndicator.innerHTML = `
-            <span class="text-red-700">${sanitizedError}</span>
-            <button class="ml-2 text-red-700 hover:text-red-900 retry-button">Retry</button>
-        `;
-        messageInput.parentNode.insertBefore(errorIndicator, messageInput);
-
-        errorIndicator.querySelector('.retry-button').addEventListener('click', () => {
-            errorIndicator.remove();
-            sendMessage();
-        });
     } finally {
         removeTypingIndicator();
+        sendButton.disabled = false;
+        sendButton.classList.remove('sending');
     }
 }
 
@@ -400,6 +425,7 @@ async function handleStreamingResponse(formData) {
         let accumulatedResponse = '';
         let lastUpdateTime = Date.now();
         const updateInterval = 100;
+        let messageDiv = null;
 
         while (true) {
             const { value, done } = await reader.read();
@@ -419,17 +445,19 @@ async function handleStreamingResponse(formData) {
 
                     const now = Date.now();
                     if (now - lastUpdateTime > updateInterval) {
-                        appendAssistantMessage(accumulatedResponse, true);
+                        // Update existing message div or create new one
+                        if (!messageDiv) {
+                            messageDiv = document.createElement('div');
+                            const chatBox = document.getElementById('chat-box');
+                            chatBox.appendChild(messageDiv);
+                        }
+                        appendAssistantMessage(accumulatedResponse, true, messageDiv);
                         lastUpdateTime = now;
                     }
                 }
             }
         }
 
-        // Final update
-        if (accumulatedResponse) {
-            appendAssistantMessage(accumulatedResponse, false);
-        }
     } catch (error) {
         console.error('Streaming error:', error);
         // Re-throw the original error without wrapping it
@@ -454,7 +482,8 @@ async function handleNormalResponse(formData) {
             body: formData,
             headers: {
                 'X-Chat-ID': window.CHAT_CONFIG.chatId,
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
             }
         });
 
@@ -486,11 +515,24 @@ async function handleNormalResponse(formData) {
 /**
  * Appends the assistant's message to the chat
  */
-async function appendAssistantMessage(message, isStreaming = false) {
+async function appendAssistantMessage(message, isStreaming = false, existingDiv = null) {
     if (!message) return;
 
     const chatBox = document.getElementById('chat-box');
     if (!chatBox) return;
+
+    // Process message content consistently
+    let processedMessage = message;
+    if (typeof message === 'object') {
+        if (message.choices && message.choices[0]) {
+            const choice = message.choices[0];
+            if (choice.message && choice.message.content) {
+                processedMessage = choice.message.content;
+            } else if (choice.text) {
+                processedMessage = choice.text;
+            }
+        }
+    }
 
     const DOMPurifyOptions = {
         ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'a', 'span'],
@@ -502,13 +544,17 @@ async function appendAssistantMessage(message, isStreaming = false) {
         }
     };
 
-    // For streaming updates, reuse the last assistant message div
-    let messageDiv;
-    if (isStreaming && chatBox.lastElementChild?.querySelector('[data-role="assistant-message"]')) {
+    // For streaming updates, use the provided div or reuse the last assistant message div
+    let messageDiv = existingDiv;
+    if (!messageDiv && isStreaming && chatBox.lastElementChild?.querySelector('[data-role="assistant-message"]')) {
         messageDiv = chatBox.lastElementChild;
         const contentDiv = messageDiv.querySelector('[data-role="assistant-message"]');
         if (contentDiv) {
-            const renderedHtml = window.md.render(message);
+            // First decode any HTML entities
+            const decodedContent = window.he.decode(message);
+            // Then render markdown
+            const renderedHtml = window.md.render(decodedContent);
+            // Finally sanitize
             contentDiv.innerHTML = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
             if (window.Prism) {
                 window.Prism.highlightAllUnder(contentDiv);
@@ -518,10 +564,8 @@ async function appendAssistantMessage(message, isStreaming = false) {
         messageDiv = document.createElement('div');
         messageDiv.className = 'flex w-full mt-2 space-x-2 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl';
 
-        const renderedHtml = window.DOMPurify.sanitize(
-            window.md.render(message),
-            DOMPurifyOptions
-        );
+        const renderedHtml = window.md.render(message);
+        const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
 
         messageDiv.innerHTML = `
             <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gray-300 dark:bg-gray-700" role="img"
@@ -604,52 +648,49 @@ function renderInitialAssistantMessages() {
     assistantMessageDivs.forEach(div => {
         const rawContent = div.getAttribute('data-content');
         if (rawContent) {
-            // Render and sanitize the message content
-            const renderedHtml = window.md.render(rawContent);
-            const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, {
-                ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'a', 'span'],
-                ALLOWED_ATTRS: {
-                    'a': ['href', 'title', 'target', 'rel'],
-                    'span': ['class'],
-                    'code': ['class'],
-                    'pre': ['class']
+            try {
+                // First decode any HTML entities in the content
+                const decodedContent = he.decode(rawContent);
+
+                // Render markdown
+                const renderedHtml = window.md.render(decodedContent);
+
+                // Sanitize the rendered HTML
+                const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, {
+                    ALLOWED_TAGS: ['p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote', 'a', 'span'],
+                    ALLOWED_ATTRS: {
+                        'a': ['href', 'title', 'target', 'rel'],
+                        'span': ['class'],
+                        'code': ['class'],
+                        'pre': ['class']
+                    }
+                });
+
+                // Update the content
+                div.innerHTML = sanitizedHtml;
+
+                // Apply syntax highlighting
+                if (window.Prism) {
+                    window.Prism.highlightAllUnder(div);
                 }
-            });
-            div.innerHTML = sanitizedHtml;
-            // Apply syntax highlighting
-            if (window.Prism) {
-                window.Prism.highlightAllUnder(div);
+            } catch (error) {
+                console.error('Error rendering message:', error);
+                // Show a fallback message if rendering fails
+                div.innerHTML = `<p class="text-red-500">Error rendering message: ${error.message}</p>`;
             }
         }
     });
 }
 
 /**
- * Markdown-it initialization (secure defaults)
+ * Markdown-it initialization check
  */
-window.md = window.markdownit({
-    html: false,
-    linkify: true,
-    typographer: true,
-    breaks: true,
-    xhtmlOut: true,
-    maxNesting: 100,
-    quotes: ["\"\"", "''"],
-    highlight: function (str, lang) {
-        if (lang && window.Prism && window.Prism.languages[lang]) {
-            try {
-                return '<pre class="language-' + lang + '"><code>' +
-                    window.Prism.highlight(str, window.Prism.languages[lang], lang) +
-                    '</code></pre>';
-            } catch (error) {
-                console.error('Prism highlighting error:', error);
-            }
-        }
-        // Basic escaping if no language is specified
-        return '<pre class="language-unknown"><code>' +
-                window.md.utils.escapeHtml(str) + '</code></pre>';
+if (!window.md) {
+    console.error('Markdown renderer not initialized');
+    if (window.utils) {
+        window.utils.showFeedback('Failed to initialize markdown renderer', 'error');
     }
-}).disable(['image', 'html_block', 'html_inline']);
+}
 
 /**
  * Attach copy/regenerate functionality to chat action buttons
@@ -751,11 +792,14 @@ function preventDefaults(e) {
  */
 function cleanup() {
     try {
-        const messageInput = document.getElementById('message-input');
         window.removeEventListener('beforeunload', cleanup);
 
-        // Example: removing event listeners if needed
-        // messageInput.removeEventListener(...);
+        // Clean up model select event listener
+        const modelSelect = document.getElementById('model-select');
+        if (modelSelect && modelSelect.previousHandler) {
+            modelSelect.removeEventListener('change', modelSelect.previousHandler);
+            modelSelect.previousHandler = null;
+        }
 
         console.debug('Chat cleanup completed successfully');
     } catch (error) {
@@ -798,37 +842,95 @@ async function createNewChat() {
 /**
  * Model change handler
  */
-function handleModelChange() {
-    const modelSelect = document.getElementById('model-select');
-    const modelId = modelSelect.value;
+// Debounce function to prevent multiple rapid calls
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
 
-    fetch('/chat/update_model', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': utils.getCSRFToken(),
-            'X-Chat-ID': window.CHAT_CONFIG.chatId,
-        },
-        body: JSON.stringify({
-            'model_id': modelId,
-            'chat_id': window.CHAT_CONFIG.chatId,
-        }),
-    })
-    .then(response => response.json())
-    .then(async data => {
+let modelChangeInProgress = false;
+
+async function handleModelChange() {
+    if (!window.utils) {
+        console.error('Utils not initialized');
+        return;
+    }
+
+    if (modelChangeInProgress) {
+        return;
+    }
+
+    const modelSelect = document.getElementById('model-select');
+    const sendButton = document.getElementById('send-button');
+    const modelId = modelSelect.value;
+    const originalValue = modelSelect.getAttribute('data-original-value');
+
+    // If the value hasn't changed, don't do anything
+    if (modelId === originalValue) {
+        return;
+    }
+
+    modelChangeInProgress = true;
+    if (sendButton) {
+        sendButton.disabled = true;
+    }
+
+    try {
+        const response = await fetch('/chat/update_model', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': window.utils.getCSRFToken(),
+                'X-Chat-ID': window.CHAT_CONFIG.chatId,
+            },
+            body: JSON.stringify({
+                'model_id': modelId,
+                'chat_id': window.CHAT_CONFIG.chatId,
+            }),
+        });
+
+        const data = await response.json();
+
         if (data.success) {
-            utils.showFeedback('Model updated successfully', 'success');
+            window.utils.showFeedback('Model updated successfully', 'success');
             if (window.tokenUsageManager) {
-                window.tokenUsageManager.updateStats();
+                await window.tokenUsageManager.updateStats();
+            }
+            // Update the current model in the window config
+            const selectedModel = window.CHAT_CONFIG.models.find(m => m.id === parseInt(modelId));
+            if (selectedModel) {
+                window.CHAT_CONFIG.currentModel = selectedModel;
             }
         } else {
-            utils.showFeedback(data.error || 'Failed to update model', 'error');
+            window.utils.showFeedback(data.error || 'Failed to update model', 'error');
+            // Revert model selection on failure
+            const previousModel = window.CHAT_CONFIG.currentModel;
+            if (previousModel && modelSelect) {
+                modelSelect.value = previousModel.id;
+            }
         }
-    })
-    .catch(error => {
+    } catch (error) {
         console.error('Error updating model:', error);
-        utils.showFeedback('Error updating model', 'error');
-    });
+        window.utils.showFeedback('Error updating model', 'error');
+        // Revert model selection on error
+        const previousModel = window.CHAT_CONFIG.currentModel;
+        if (previousModel && modelSelect) {
+            modelSelect.value = previousModel.id;
+        }
+    } finally {
+        modelChangeInProgress = false;
+        // Re-enable send button
+        if (sendButton) {
+            sendButton.disabled = false;
+        }
+    }
 }
 
 /**

@@ -135,22 +135,16 @@ class TokenUsageManager {
             const modelId = modelSelect?.value || '';
             console.log('TokenUsageManager: Using model ID:', modelId);
 
-            const url = `/chat/stats/${this.chatId}?model_id=${modelId}`;
+            const url = `/chat/stats/${this.chatId}`;
             console.log('TokenUsageManager: Fetching stats from:', url);
 
-            // Fetch stats from the server
-            const response = await fetch(url, {
+            // Fetch stats from the server using utils.fetchWithCSRF
+            const data = await window.utils.fetchWithCSRF(url, {
+                method: 'GET',
                 headers: {
-                    'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json'
                 }
             });
-            console.log('TokenUsageManager: Response status:', response.status);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
             console.log('TokenUsageManager: Received data:', data);
 
             if (data.success && data.stats) {
@@ -200,14 +194,20 @@ class TokenUsageManager {
      * Show an error message briefly at the bottom of the token usage container.
      */
     showError(message) {
-        const errorElement = document.createElement('div');
-        errorElement.className = 'text-red-500 text-sm mt-2';
-        errorElement.textContent = message;
+        // Use utils.showFeedback for consistent error display
+        window.utils.showFeedback(message, 'error', {
+            duration: 5000,
+            position: 'top'
+        });
 
+        // Also show error in the token usage container
         if (this.elements.container) {
+            const errorElement = document.createElement('div');
+            errorElement.className = 'text-red-500 text-sm mt-2';
+            errorElement.textContent = message;
             this.elements.container.appendChild(errorElement);
 
-            // Remove the message after 5 seconds
+            // Remove the container error after 5 seconds
             setTimeout(() => {
                 errorElement.remove();
             }, 5000);
