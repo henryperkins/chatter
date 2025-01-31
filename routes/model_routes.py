@@ -449,6 +449,10 @@ def edit_model(model_id):
             # Extract and validate data with improved error handling
             data = extract_model_data(form)
 
+            # Remove 'provider_id' from data as it is immutable
+            if 'provider_id' in data:
+                data.pop('provider_id', None)
+
             # Handle numeric fields with proper validation
             numeric_fields = {
                 "max_tokens": int,
