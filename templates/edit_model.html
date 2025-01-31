@@ -14,12 +14,13 @@
 
         <!-- Provider -->
         <div class="mb-6">
-            {{ form.provider_id.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Select the AI provider for this model</p>
-            {{ form.provider_id(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", value=model.provider_id) }}
-            {% if form.provider_id.errors %}
-            <p class="text-sm text-red-500 dark:text-red-400 mt-1">{{ form.provider_id.errors[0] }}</p>
-            {% endif %}
+            <!-- Disable or remove the provider selector so it will not be changed or submitted -->
+            <label class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1">
+                Provider (cannot be changed)
+            </label>
+            <p class="text-sm text-gray-500 dark:text-gray-400">{{ model.provider_id }}</p>
+            <!-- Or display the provider name:
+                 <p>{{ model.provider.name }}</p> -->
         </div>
 
         <!-- Model Name -->
