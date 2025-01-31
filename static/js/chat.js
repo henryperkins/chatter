@@ -595,6 +595,7 @@ async function initializeInterface() {
     console.debug('Chat initialization completed successfully');
     hideLoadingIndicator();
 }
+}
 
 /**
  * Attach event listeners to action buttons within the chat messages
@@ -977,6 +978,7 @@ function adjustTextareaHeight(textarea) {
     } catch (error) {
         console.error('Error regenerating response:', error);
         utils.showFeedback(error.message || 'An unexpected error occurred', 'error');
+    }
     } finally {
         const sendButton = document.getElementById('send-button');
         if (sendButton) {
