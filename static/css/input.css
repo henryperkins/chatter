@@ -145,27 +145,67 @@
 /* Mobile optimizations */
 @media (max-width: 640px) {
     .chat-message {
-        @apply max-w-[92%] mx-1;
+        @apply max-w-[95%] mx-0;
     }
 
     .input-area {
-        @apply pb-safe;
+        @apply pb-safe px-2 safe-area-bottom;
     }
 
     .mobile-menu {
         @apply top-16 w-[85%] max-w-[320px];
     }
 
-    /* Improve mobile message spacing */
+    /* Enhanced mobile message spacing */
     #chat-box {
-        @apply px-2 py-3;
+        @apply px-2 py-2 pb-24 space-y-3;
+        -webkit-overflow-scrolling: touch;
     }
 
-    /* Adjust mobile input area */
+    /* Enhanced mobile input area */
     #message-input {
-        @apply text-base;
-        min-height: 44px;
+        @apply text-base px-3 py-2 min-h-touch;
         max-height: 100px;
+        line-height: 1.4;
+    }
+
+    /* Improve touch targets */
+    .icon-button {
+        @apply min-w-touch min-h-touch w-14 h-14;
+    }
+
+    /* Optimize message containers */
+    .prose {
+        @apply text-[15px] leading-relaxed xs:text-base;
+        max-width: 100%;
+    }
+
+    /* Enhance mobile message actions */
+    .copy-button, .regenerate-button {
+        @apply p-2 min-w-touch min-h-touch;
+    }
+
+    /* Improve code block readability */
+    pre code {
+        @apply text-sm;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Better handle long messages */
+    .message-content {
+        @apply break-words;
+        word-break: break-word;
+        hyphens: auto;
+    }
+
+    /* Enhance mobile buttons */
+    #send-button, #upload-button {
+        @apply min-w-touch min-h-touch;
+    }
+
+    /* Improve mobile menu interaction */
+    #mobile-menu-toggle {
+        @apply min-w-touch min-h-touch p-2;
     }
 }
 
@@ -207,10 +247,35 @@
 /* Safe area adjustments for mobile */
 @supports(padding: max(0px)) {
     .safe-area-bottom {
-        padding-bottom: max(env(safe-area-inset-bottom), 1rem);
+        padding-bottom: max(env(safe-area-inset-bottom), 1.25rem);
     }
 
     .safe-area-top {
-        padding-top: max(env(safe-area-inset-top), 1rem);
+        padding-top: max(env(safe-area-inset-top), 1.25rem);
     }
+}
+
+/* Enhanced touch feedback */
+@media (hover: none) {
+    .btn, .icon-button, .nav-link {
+        @apply active:opacity-70 active:scale-95 transition-all duration-150;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Improve touch scrolling */
+    .scrollbar-thin {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    
+    .scrollbar-thin::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+/* Prevent text selection during touch interactions */
+.touch-manipulation {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }

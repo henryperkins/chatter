@@ -8,19 +8,39 @@ try {
     const md = markdownit({
         html: true,
         linkify: true,
-        typographer: true,
+        breaks: true,  // Enable line breaks
+        typographer: true,  // Enable smart quotes and other typographic replacements
         highlight: function (str, lang) {
             // Use the specified language or default to 'plaintext'
             const language = lang && Prism.languages[lang] ? lang : 'plaintext';
             const className = 'language-' + language;
 
             try {
+                // Clean up the code string
+                str = str.replace(/^\n+|\n+$/g, '');  // Remove extra newlines
                 const highlighted = Prism.highlight(str, Prism.languages[language], language);
-                // Return the formatted code block
-                return `<pre class="${className}"><code class="${className}">${highlighted}</code></pre>`;
+                
+                // Add copy button and wrap in container
+                return `
+                    <div class="code-block-wrapper relative group">
+                        <button class="copy-code-button absolute right-2 top-2 p-2 rounded-lg bg-gray-800/50 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                        </button>
+                        <pre class="${className} overflow-x-auto"><code class="${className}">${highlighted}</code></pre>
+                    </div>`;
             } catch (__) {
                 // Fallback for unknown languages
-                return `<pre class="${className}"><code class="${className}">${md.utils.escapeHtml(str)}</code></pre>`;
+                return `
+                    <div class="code-block-wrapper relative group">
+                        <button class="copy-code-button absolute right-2 top-2 p-2 rounded-lg bg-gray-800/50 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                        </button>
+                        <pre class="${className} overflow-x-auto"><code class="${className}">${md.utils.escapeHtml(str)}</code></pre>
+                    </div>`;
             }
         }
     });
@@ -62,13 +82,24 @@ try {
     // Add HTML entity decoding to markdown-it
     const originalRender = md.render.bind(md);
     md.render = function(src) {
+        // Clean up the source text
+        src = src.replace(/\n{3,}/g, '\n\n');  // Replace multiple newlines with double newlines
+        
         // First decode any HTML entities in the source
         const decodedSrc = src.replace(/&[#A-Za-z0-9]+;/g, match => {
             const textarea = document.createElement('textarea');
             textarea.innerHTML = match;
             return textarea.value;
         });
-        return originalRender(decodedSrc);
+        
+        // Render and enhance the output
+        let html = originalRender(decodedSrc);
+        
+        // Add proper spacing around elements
+        html = html.replace(/<\/pre>\s*<pre/g, '</pre>\n<pre');  // Add newline between code blocks
+        html = html.replace(/<\/h([1-6])>\s*<p/g, '</h$1>\n<p');  // Add newline after headers
+        
+        return html;
     };
 
     // Add code block copy functionality

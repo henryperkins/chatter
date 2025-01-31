@@ -85,7 +85,14 @@ module.exports = {
         '32': '8rem',
       },
       screens: {
+        'xs': '375px',
         '2xl': '1440px',
+      },
+      minHeight: {
+        'touch': '44px',
+      },
+      minWidth: {
+        'touch': '44px',
       },
       animation: {
         'fade-in': 'fade-in 0.3s ease-out',
@@ -127,7 +134,14 @@ module.exports = {
       typography: {
         DEFAULT: {
           css: {
-            maxWidth: '65ch',
+            maxWidth: {
+              sm: '100%',
+              DEFAULT: '65ch',
+            },
+            fontSize: {
+              sm: ['14px', '20px'],
+              base: ['16px', '24px'],
+            },
             color: 'var(--tw-prose-body)',
             a: {
               color: 'var(--tw-prose-links)',
@@ -159,6 +173,12 @@ module.exports = {
           },
         },
       },
+    },
+  },
+  variants: {
+    extend: {
+      scale: ['active', 'group-hover'],
+      opacity: ['active', 'group-hover'],
     },
   },
   plugins: [

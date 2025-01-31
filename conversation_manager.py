@@ -308,34 +308,90 @@ class ConversationManager:
     def perform_linting(self, content: str) -> str:
         """
         Perform linting on the message content.
-
+        
         Args:
             content: The original message content.
-
+        
         Returns:
             The linted message content.
         """
-        # Example: Fix unclosed markdown code blocks
-        linted_content = self.fix_unclosed_code_blocks(content)
-        # Additional linting steps can be added here
+        # Fix code blocks and markdown formatting
+        linted_content = self._fix_code_blocks(content)
+        linted_content = self._fix_markdown_spacing(linted_content)
         return linted_content
 
-    def fix_unclosed_code_blocks(self, content: str) -> str:
+    def _fix_code_blocks(self, content: str) -> str:
         """
-        Fix unclosed code blocks in markdown content.
-
-        Args:
-            content: The original message content.
-
-        Returns:
-            The content with any unclosed code blocks fixed.
+        Fix code block formatting and ensure proper closure.
         """
         code_block_delimiter = "```"
-        code_block_count = content.count(code_block_delimiter)
-        if code_block_count % 2 != 0:
-            # Append a closing code block
-            content += f"\n{code_block_delimiter}"
-        return content
+        lines = content.split("\n")
+        result = []
+        in_code_block = False
+        language = ""
+        
+        for line in lines:
+            if line.startswith(code_block_delimiter):
+                if not in_code_block:
+                    # Starting a code block
+                    in_code_block = True
+                    # Extract language if specified
+                    language = line[3:].strip()
+                    # Add empty line before code block if needed
+                    if result and result[-1].strip():
+                        result.append("")
+                    result.append(f"```{language}")
+                else:
+                    # Ending a code block
+                    in_code_block = False
+                    result.append("```")
+                    # Add empty line after code block
+                    result.append("")
+            else:
+                # Inside code block: preserve indentation
+                if in_code_block:
+                    result.append(line)
+                else:
+                    # Outside code block: normalize spacing
+                    result.append(line.rstrip())
+        
+        # Close any unclosed code block
+        if in_code_block:
+            result.append("```")
+            result.append("")
+        
+        return "\n".join(result).strip()
+
+    def _fix_markdown_spacing(self, content: str) -> str:
+        """
+        Fix markdown spacing and formatting issues.
+        """
+        lines = content.split("\n")
+        result = []
+        prev_line_empty = True
+        
+        for line in lines:
+            line = line.rstrip()
+            
+            # Skip multiple empty lines
+            if not line:
+                if not prev_line_empty:
+                    result.append("")
+                    prev_line_empty = True
+                continue
+            
+            # Handle headers and lists
+            if line.startswith(("#", "-", "*", "1.")):
+                if not prev_line_empty:
+                    result.append("")
+                result.append(line)
+                prev_line_empty = False
+                continue
+            
+            result.append(line)
+            prev_line_empty = False
+        
+        return "\n".join(result).strip()
 
     def _remove_old_messages(self, chat_id: str, keep_ids: List[int]) -> None:
         """
