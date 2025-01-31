@@ -472,9 +472,14 @@ async function appendAssistantMessage(message, isStreaming = false) {
     chatBox.scrollTop = chatBox.scrollHeight;
 } // Closing brace for appendAssistantMessage function
 
+async function initializeInterface() {
+    // Existing initialization code...
+
     // Initialize FileUploadManager if needed
     const chatId = window.CHAT_CONFIG.chatId;
     const userId = window.CHAT_CONFIG.userId;
+    const uploadButton = document.getElementById('upload-button');
+    const mobileUploadButton = document.getElementById('mobile-upload-button');
     const correctUploadBtn = window.innerWidth < 768 ? mobileUploadButton : uploadButton;
 
     if (!window.fileUploadManager) {
@@ -497,9 +502,8 @@ async function appendAssistantMessage(message, isStreaming = false) {
         console.error('TokenUsageManager initialization failed - missing dependencies');
     }
 
-    // Mobile menu is initialized in base.js
-
-    // Fix chat input visibility (ensure chat box doesn't overlap the input area)
+    // Fix chat input visibility (adjust heights)
+    const chatBox = document.getElementById('chat-box');
     const messageInputContainer = document.getElementById('message-input-container');
     if (chatBox && messageInputContainer) {
         // Adjust chat box height based on keyboard visibility
@@ -551,6 +555,9 @@ async function appendAssistantMessage(message, isStreaming = false) {
         window.addEventListener('resize', updateChatBoxHeight);
         updateChatBoxHeight();
     }
+
+    // Other initialization code...
+}
 
     // New chat button
     const newChatBtn = document.getElementById('new-chat-btn');
