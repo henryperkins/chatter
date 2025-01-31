@@ -453,106 +453,102 @@ def edit_model(model_id):
             if 'provider_id' in data:
                 data.pop('provider_id', None)
 
-            # Handle numeric fields with proper validation
-            numeric_fields = {
-                "max_tokens": int,
-                "max_completion_tokens": int,
-                "temperature": float,
-                "version": int,
-            }
+           # Handle numeric fields with proper validation
+           numeric_fields = {
+               "max_tokens": int,
+               "max_completion_tokens": int,
+               "temperature": float,
+               "version": int,
+           }
 
-            for field, converter in numeric_fields.items():
-                value = data.get(field)
-                if value in ("", None, "None"):
-                    data[field] = None
-                elif isinstance(value, str):
-                    try:
-                        if value.strip() == "":
-                            data[field] = None
-                        else:
-                            data[field] = converter(value)
-                    except (ValueError, TypeError):
-                        logger.warning(f"Invalid {field} value: {value}")
-                        data[field] = None
-                elif value is not None:
-                    try:
-                        data[field] = converter(value)
-                    except (ValueError, TypeError):
-                        logger.warning(f"Invalid {field} value: {value}")
-                        data[field] = None
+           for field, converter in numeric_fields.items():
+               value = data.get(field)
+               if value in (None, '', 'None'):
+                   data[field] = None
+               else:
+                   try:
+                       data[field] = converter(value)
+                   except (ValueError, TypeError):
+                       data[field] = None
 
-            logger.debug(
-                "Extracted model data: %s",
-                {k: v if k != "api_key" else "****" for k, v in data.items()},
-            )
-            validate_immutable_fields(model_id, data)
+           # Correctly handle boolean fields
+           boolean_fields = ["requires_o1_handling", "is_default", "supports_streaming"]
+           for field in boolean_fields:
+               value = data.get(field)
+               data[field] = value in (True, 'true', 'on', '1')
 
-            # Handle o1-preview model constraints
-            if data.get("requires_o1_handling"):
-                if data.get("supports_streaming", False):
-                    if not hasattr(form.supports_streaming, "errors"):
-                        form.supports_streaming.errors = []
-                    form.supports_streaming.errors.append(
-                        "o1-preview models do not support streaming"
-                    )
-                    return render_template(
-                        "edit_model.html", form=form, model=model, provider=provider, errors=form.errors
-                    )
-                data["temperature"] = 1.0  # Force temperature for o1-preview
-                data["supports_streaming"] = False  # Force disable streaming
-                logger.info("Enforcing o1-preview constraints for model %d", model_id)
+           logger.debug(
+               "Extracted model data: %s",
+               {k: v if k != "api_key" else "****" for k, v in data.items()},
+           )
+           validate_immutable_fields(model_id, data)
 
-            # Validate model configuration
-            validation_errors = validate_model_data(data)
-            if validation_errors:
-                return render_template(
-                    "edit_model.html",
-                    form=form,
-                    model=model,
-                    provider=provider,
-                    error=validation_errors[0],
-                )
+           # Handle o1-preview model constraints
+           if data.get("requires_o1_handling"):
+               if data.get("supports_streaming", False):
+                   if not hasattr(form.supports_streaming, "errors"):
+                       form.supports_streaming.errors = []
+                   form.supports_streaming.errors.append(
+                       "o1-preview models do not support streaming"
+                   )
+                   return render_template(
+                       "edit_model.html", form=form, model=model, provider=provider, errors=form.errors
+                   )
+               data["temperature"] = 1.0  # Force temperature for o1-preview
+               data["supports_streaming"] = False  # Force disable streaming
+               logger.info("Enforcing o1-preview constraints for model %d", model_id)
 
-            # Update model within transaction
-            with db_session() as db:
-                # Handle is_default setting
-                if data.get("is_default"):
-                    if model_id is not None:
-                        Model.set_default(model_id)
-                        logger.info("Set model %d as default", model_id)
-                    else:
-                        # If unsetting default, ensure another model is set as default
-                        current_default = Model.get_default()
-                    if current_default and current_default.id == model_id:
-                        # Find another model to set as default
-                        other_models = Model.get_all(limit=1, exclude_id=model_id)
-                        if other_models:
-                            Model.set_default(other_models[0].id)
-                        else:
-                            raise ValueError(
-                                "Cannot unset default model - no other models exist"
-                            )
+           # Validate model configuration
+           validation_errors = validate_model_data(data)
+           if validation_errors:
+               return render_template(
+                   "edit_model.html",
+                   form=form,
+                   model=model,
+                   provider=provider,
+                   error=validation_errors[0],
+               )
 
-                Model.update(model_id, data)
-                logger.info("Model updated successfully: %d", model_id)
-                db.commit()
+           # Update model within transaction
+           with db_session() as db:
+               # Handle is_default setting
+               if data.get("is_default"):
+                   if model_id is not None:
+                       Model.set_default(model_id)
+                       logger.info("Set model %d as default", model_id)
+                   else:
+                       # If unsetting default, ensure another model is set as default
+                       current_default = Model.get_default()
+                   if current_default and current_default.id == model_id:
+                       # Find another model to set as default
+                       other_models = Model.get_all(limit=1, exclude_id=model_id)
+                       if other_models:
+                           Model.set_default(other_models[0].id)
+                       else:
+                           raise ValueError(
+                               "Cannot unset default model - no other models exist"
+                           )
 
-            redirect_url = url_for("chat.chat_interface", _external=True)
-            logger.debug(
-                "Sending response with redirect: %s",
-                {
-                    "success": True,
-                    "message": "Model updated successfully",
-                    "redirect": redirect_url,
-                },
-            )
-            return jsonify(
-                {
-                    "success": True,
-                    "message": "Model updated successfully",
-                    "redirect": redirect_url,
-                }
-            )
+               Model.update(model_id, data)
+               logger.info("Model updated successfully: %d", model_id)
+               db.commit()
+
+           redirect_url = url_for("chat.chat_interface", _external=True)
+           logger.debug(
+               "Sending response with redirect: %s",
+               {
+                   "success": True,
+                   "message": "Model updated successfully",
+                   "redirect": redirect_url,
+               },
+           )
+           return jsonify(
+               {
+                   "success": True,
+                   "message": "Model updated successfully",
+                   "redirect": redirect_url,
+               }
+           )
 
         logger.debug("Rendering edit model page for model ID %d", model_id)
         return render_template(

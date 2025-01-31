@@ -400,8 +400,7 @@ class ModelForm(FlaskForm):
     max_completion_tokens = NullableIntegerField(
         "Max Completion Tokens (Output)",
         validators=[
-            DataRequired(message="Max completion tokens is required."),
-            NumberRange(min=1, max=16384, message="Must be between 1 and 16384."),
+            DataRequired(message="Max completion tokens is required.")
         ],
     )
 

@@ -67,20 +67,26 @@ class ModelFormHandler {
 
                 // Handle numeric fields with proper null/empty handling
                 if (["max_tokens", "max_completion_tokens"].includes(key)) {
-                    if (stringValue === "" || stringValue === null || stringValue === undefined || stringValue === "None") {
+                    if (value === "" || value === null || value === undefined || value === "None") {
                         data[key] = null;
                     } else {
-                        const parsed = parseFloat(stringValue);
+                        const parsed = parseInt(value);
                         data[key] = isNaN(parsed) ? null : parsed;
                     }
                 }
                 // Handle temperature field
                 else if (key === "temperature") {
-                    data[key] = stringValue ? parseFloat(stringValue) : null;
+                    if (value === "" || value === null || value === undefined || value === "None") {
+                        data[key] = null;
+                    } else {
+                        const parsed = parseFloat(value);
+                        data[key] = isNaN(parsed) ? null : parsed;
+                    }
                 }
                 // Handle boolean fields
                 else if (["requires_o1_handling", "is_default", "supports_streaming"].includes(key)) {
-                    data[key] = stringValue === "on" || stringValue === "true";
+                    // Handle both string "on"/"true"/"false" and actual boolean values
+                    data[key] = value === "on" || value === "true" || value === true;
                 }
                 // Handle other fields
                 else {
