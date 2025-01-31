@@ -461,21 +461,21 @@ def edit_model(model_id):
                 "version": int,
             }
 
-           for field, converter in numeric_fields.items():
-               value = data.get(field)
-               if value in (None, '', 'None'):
-                   data[field] = None
-               else:
-                   try:
-                       data[field] = converter(value)
-                   except (ValueError, TypeError):
-                       data[field] = None
+            for field, converter in numeric_fields.items():
+                value = data.get(field)
+                if value in (None, '', 'None'):
+                    data[field] = None
+                else:
+                    try:
+                        data[field] = converter(value)
+                    except (ValueError, TypeError):
+                        data[field] = None
 
-           # Correctly handle boolean fields
-           boolean_fields = ["requires_o1_handling", "is_default", "supports_streaming"]
-           for field in boolean_fields:
-               value = data.get(field)
-               data[field] = value in (True, 'true', 'on', '1')
+            # Correctly handle boolean fields
+            boolean_fields = ["requires_o1_handling", "is_default", "supports_streaming"]
+            for field in boolean_fields:
+                value = data.get(field)
+                data[field] = value in (True, 'true', 'on', '1')
 
            logger.debug(
                "Extracted model data: %s",
