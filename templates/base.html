@@ -234,24 +234,28 @@
          aria-live="assertive">
     </div>
 
-    <!-- Core Libraries -->
-    <script src="{{ url_for('static', filename='js/axios.min.js') }}"></script>
+    <!-- Core libraries and utilities -->
+    <script src="{{ url_for('static', filename='js/axios.min.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}" defer></script>
 
-    <!-- Utility Scripts -->
-    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+    <!-- Base application scripts -->
+    <script src="{{ url_for('static', filename='js/base.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/dark-mode.js') }}" defer></script>
 
-    <!-- Base Application Script -->
-    <script src="{{ url_for('static', filename='js/fileUpload.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/token-usage.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/dark-mode.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/base.js') }}"></script>
+    <!-- File upload and token usage managers -->
+    <script src="{{ url_for('static', filename='js/fileUpload.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/token-usage.js') }}" defer></script>
 
-    <!-- Dark Mode Script -->
-    <script src="{{ url_for('static', filename='js/dark-mode.js') }}"></script>
+    <!-- Ensure utils is loaded before other scripts -->
+    <script>window.addEventListener('load', () => window.utils || console.error('Utils not loaded'));</script>
 
+    <!-- File input element -->
+    <input type="file" id="file-input" multiple style="display: none;" accept=".txt,.pdf,.md,.py,.js,.html,.css,.json,.csv,image/*">
+
+    <!-- Page-specific scripts -->
     {% block scripts %}
-    <script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+    <!-- Scripts specific to each page will be loaded here -->
     {% endblock %}
+
 </body>
 </html>

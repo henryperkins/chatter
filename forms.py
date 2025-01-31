@@ -336,6 +336,14 @@ class ModelForm(FlaskForm):
     supports_streaming = BooleanField('Streaming Support')
     requires_o1_handling = BooleanField('Requires o1-preview Handling')
     model_family = StringField('Model Family', validators=[Optional(), Length(max=255)])
+    api_version = StringField('API Version', validators=[
+        DataRequired(message="API version is required."),
+        Length(max=20, message="API version cannot exceed 20 characters."),
+        Regexp(
+            r"^\d{4}-\d{2}-\d{2}(?:-preview)?$",
+            message="API version must be in format YYYY-MM-DD or YYYY-MM-DD-preview"
+        )
+    ], default="2024-12-01-preview")
     version = HiddenField('Version')
     api_endpoint = URLField('API Endpoint', validators=[
         DataRequired(message="API endpoint is required."),

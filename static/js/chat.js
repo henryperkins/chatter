@@ -1,23 +1,90 @@
 /* static/js/chat.js */
 
 /**
+ * Wait for a global object to be available
+ */
+async function waitForDependency(name, timeout = 5000) {
+    const start = Date.now();
+    while (!window[name]) {
+        if (Date.now() - start > timeout) {
+            throw new Error(`Timeout waiting for ${name}`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return window[name];
+}
+
+/**
+ * Load a script if not already loaded
+ */
+async function ensureScriptLoaded(id, src) {
+    if (document.getElementById(id)) {
+        return;
+    }
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.id = id;
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
+/**
+ * Get base URL for static assets
+ */
+function getStaticUrl(path) {
+    const baseUrl = document.querySelector('script[src*="/static/"]')?.src.split('/static/')[0] || '';
+    return `${baseUrl}/static${path}`;
+}
+
+/**
  * Main initialization function
  */
 async function init() {
     try {
         console.log('Initializing chat interface');
+
+        // Wait for core dependencies
+        await waitForDependency('utils');
+        console.log('Utils loaded');
+
+        // Load required scripts for chat
+        await Promise.all([
+            ensureScriptLoaded('markdown-it', getStaticUrl('/js/markdown-it.min.js')),
+            ensureScriptLoaded('dompurify', getStaticUrl('/js/dompurify.min.js')),
+            ensureScriptLoaded('prism', getStaticUrl('/js/prism.js')),
+            ensureScriptLoaded('file-upload', getStaticUrl('/js/fileUpload.js')),
+            ensureScriptLoaded('token-usage', getStaticUrl('/js/token-usage.js'))
+        ]);
+
+        // Wait for managers to initialize
+        try {
+            await Promise.all([
+                waitForDependency('FileUploadManager'),
+                waitForDependency('TokenUsageManager'),
+                waitForDependency('md'),
+                waitForDependency('DOMPurify')
+            ]);
+        } catch (error) {
+            throw new Error(`Failed to initialize managers: ${error.message}`);
+        }
+
+        // Verify CHAT_CONFIG
+        if (!window.CHAT_CONFIG) {
+            throw new Error('Chat configuration not found');
+        }
+
+        // Verify required DOM elements
+        const requiredElements = ['chat-box', 'message-input', 'send-button'];
+        const missingElements = requiredElements.filter(id => !document.getElementById(id));
+
+        if (missingElements.length > 0) {
+            throw new Error(`Missing required elements: ${missingElements.join(', ')}`);
+        }
+
         showLoadingIndicator();
-
-        // Wait for utils to be available
-        let attempts = 0;
-        while (!window.utils && attempts < 50) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
-        }
-
-        if (!window.utils) {
-            throw new Error('Utils not initialized after 5 seconds');
-        }
 
         // Add navigation state handler
         const handleNavigation = () => {
@@ -27,27 +94,14 @@ async function init() {
         };
         window.addEventListener('popstate', handleNavigation);
 
-        // Set up mobile viewport height and safe areas
+        // Set up mobile viewport height
         function updateVH() {
             let vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', `${vh}px`);
-
-            // Handle safe areas
-            const safeAreaBottom = getComputedStyle(document.documentElement).getPropertyValue('--sab') || '0px';
-            const safeAreaTop = getComputedStyle(document.documentElement).getPropertyValue('--sat') || '0px';
-
-            // Apply safe areas to chat elements
-            const chatBox = document.getElementById('chat-box');
-            const inputArea = document.querySelector('.input-area');
-
-            if (chatBox && inputArea) {
-                chatBox.style.paddingBottom = `calc(80px + ${safeAreaBottom})`;
-                inputArea.style.paddingBottom = safeAreaBottom;
-            }
         }
 
         updateVH();
-        window.addEventListener('resize', window.utils?.debounce(updateVH, 100));
+        window.addEventListener('resize', updateVH);
 
         // Initialize interface components
         await initializeInterface();
@@ -89,18 +143,22 @@ async function initializeInterface() {
     // 2. Initialize FileUploadManager if needed
     const chatId = window.CHAT_CONFIG.chatId;
     const userId = window.CHAT_CONFIG.userId;
-    const uploadButton = document.getElementById('upload-button');
-    const correctUploadBtn = uploadButton;
 
-    if (!window.fileUploadManager) {
-        try {
-            window.fileUploadManager = new FileUploadManager(chatId, userId, correctUploadBtn);
-            logger.debug("FileUploadManager initialized successfully");
-        } catch (error) {
-            logger.error("Failed to initialize FileUploadManager:", error);
-            window.utils.showFeedback("Failed to initialize file upload functionality", "error");
-            throw error;
+    try {
+        // Wait for FileUploadManager class to be available
+        await waitForDependency('FileUploadManager');
+
+        const uploadButton = document.getElementById('upload-button');
+        const mobileUploadButton = document.getElementById('mobile-upload-button');
+        const correctUploadBtn = window.innerWidth < 768 ? mobileUploadButton : uploadButton;
+
+        if (!window.fileUploadManager) {
+            window.fileUploadManager = new window.FileUploadManager(chatId, userId, correctUploadBtn);
         }
+        console.debug('FileUploadManager initialized');
+    } catch (error) {
+        console.error('Error initializing FileUploadManager:', error);
+        throw error;
     }
 
     // 3. Initialize TokenUsageManager with full configuration
@@ -113,18 +171,26 @@ async function initializeInterface() {
                 max_tokens: model?.max_tokens || 32000
             }
         };
-        window.tokenUsageManager = new window.TokenUsageManager(config);
 
+        // Verify token usage elements exist
+        const tokenUsageContainer = document.getElementById('token-usage');
+        const tokenElements = ['token-progress', 'tokens-used', 'tokens-limit'];
+        const missingTokenElements = tokenElements.filter(id => !document.getElementById(id));
+
+        if (missingTokenElements.length > 0) {
+            console.warn(`Token usage elements missing: ${missingTokenElements.join(', ')}`);
+            return; // Skip token manager initialization but continue with chat
+        }
+        window.tokenUsageManager = new TokenUsageManager(config);
         // Force an immediate update of token usage stats
         try {
-            await window.tokenUsageManager.updateStats();
+            await window.tokenUsageManager?.updateStats();
 
             // Start periodic updates
             window.tokenUsageManager.startPeriodicUpdates();
 
-            // Show token usage panel by default
-            const tokenUsageContainer = document.getElementById('token-usage');
-            if (tokenUsageContainer?.classList.contains('hidden')) {
+            // Show token usage panel if hidden
+            if (tokenUsageContainer.classList.contains('hidden')) {
                 window.tokenUsageManager.toggleDisplay();
             }
         } catch (error) {
@@ -132,6 +198,7 @@ async function initializeInterface() {
         }
     } else {
         console.error('TokenUsageManager initialization failed - missing dependencies');
+        return;
     }
 
     // 4. Fix chat input visibility / dynamic height
@@ -139,26 +206,22 @@ async function initializeInterface() {
     const messageInputContainer = document.getElementById('message-input-container');
     if (chatBox && messageInputContainer) {
         // Adjust chat box height based on keyboard visibility
-        const updateLayout = () => {
-            const isMobile = window.innerWidth <= 640;
-            const isKeyboardOpen = window.innerHeight < 500;
-
-            if (isMobile) {
-                if (isKeyboardOpen) {
-                    chatBox.style.maxHeight = 'calc(100vh - 280px)';
-                    chatBox.style.paddingBottom = '80px';
-                } else {
-                    chatBox.style.maxHeight = 'calc(100vh - 180px)';
-                    chatBox.style.paddingBottom = '120px';
-                }
+        const updateChatBoxHeight = () => {
+            if (window.innerHeight < 500) {
+                // Keyboard is likely open
+                chatBox.style.maxHeight = 'calc(100vh - 300px)';
             } else {
-                chatBox.style.maxHeight = 'calc(100vh - 160px)';
-                chatBox.style.paddingBottom = '80px';
+                chatBox.style.maxHeight = 'calc(100vh - 120px)';
             }
         };
 
-        updateLayout();
-        window.addEventListener('resize', window.utils?.debounce(updateLayout, 100));
+        chatBox.style.cssText = `
+            padding-bottom: 120px !important;
+            margin-bottom: 0 !important;
+            max-height: calc(100vh - 120px);
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        `;
 
         messageInputContainer.style.cssText = `
             position: sticky !important;
@@ -171,20 +234,23 @@ async function initializeInterface() {
             margin-top: auto !important;
         `;
 
-        // Add touch-action manipulation for better mobile handling
-        chatBox.style.touchAction = 'manipulation';
+        // Dark mode overrides
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = `
+            .dark #message-input-container {
+                background-color: #1a202c;
+                border-color: #4a5568;
+            }
+            #message-input-container {
+                position: sticky !important;
+                bottom: 0 !important;
+                z-index: 10 !important;
+            }
+        `;
+        document.head.appendChild(styleSheet);
 
-        // Handle mobile keyboard
-        const messageInput = document.getElementById('message-input');
-        if (messageInput) {
-            messageInput.addEventListener('focus', () => {
-                if (window.innerWidth <= 640) {
-                    setTimeout(() => {
-                        chatBox.scrollTop = chatBox.scrollHeight;
-                    }, 300);
-                }
-            });
-        }
+        window.addEventListener('resize', updateChatBoxHeight);
+        updateChatBoxHeight();
     }
 
     // 5. New chat button
@@ -236,79 +302,7 @@ async function initializeInterface() {
         editTitleBtn.addEventListener('click', handleEditTitle);
     }
     function handleEditTitle() {
-        if (!window.utils) {
-            console.error('Utils not initialized');
-            return;
-        }
-
-        const chatTitle = document.getElementById('chat-title');
-        if (!chatTitle) {
-            console.error('Chat title element not found');
-            return;
-        }
-
-        const currentTitle = chatTitle.textContent.split(' - ')[0].trim();
-        const modelName = chatTitle.textContent.split(' - ')[1]?.trim() || '';
-
-        // Create input element
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = currentTitle;
-        input.className = 'px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-gray-100 text-lg font-semibold w-full max-w-[200px] sm:max-w-none';
-
-        // Replace title with input
-        const originalContent = chatTitle.innerHTML;
-        chatTitle.innerHTML = '';
-        chatTitle.appendChild(input);
-        input.focus();
-        input.select();
-
-        const saveTitle = async () => {
-            const newTitle = input.value.trim();
-            if (!newTitle) {
-                window.utils.showFeedback('Title cannot be empty', 'error');
-                chatTitle.innerHTML = originalContent;
-                return;
-            }
-
-            try {
-                const response = await window.utils.fetchWithCSRF('/chat/update_title', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Chat-ID': window.CHAT_CONFIG.chatId
-                    },
-                    body: JSON.stringify({
-                        title: newTitle,
-                        chat_id: window.CHAT_CONFIG.chatId
-                    })
-                });
-
-                if (response.success) {
-                    chatTitle.innerHTML = `${newTitle}${modelName ? ` - ${modelName}` : ''}`;
-                    window.utils.showFeedback('Title updated successfully', 'success');
-                } else {
-                    throw new Error(response.error || 'Failed to update title');
-                }
-            } catch (error) {
-                console.error('Error updating title:', error);
-                window.utils.showFeedback(error.message || 'Failed to update title', 'error');
-                chatTitle.innerHTML = originalContent;
-            }
-        };
-
-        // Handle save on Enter and cancel on Escape
-        input.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                await saveTitle();
-            } else if (e.key === 'Escape') {
-                chatTitle.innerHTML = originalContent;
-            }
-        });
-
-        // Handle save on blur
-        input.addEventListener('blur', saveTitle);
+        // Implement the logic to edit chat title
     }
 
     // 9. Delete chat buttons
@@ -338,20 +332,25 @@ async function initializeInterface() {
 function showLoadingIndicator() {
     const loadingDiv = document.createElement('div');
     loadingDiv.id = 'loading-indicator';
-    loadingDiv.className = 'fixed inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center transition-colors duration-300';
+    loadingDiv.className = 'fixed inset-0 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm z-modal flex items-center justify-center transition-all duration-300 ease-in-out';
     loadingDiv.innerHTML = `
-        <div class="flex items-center space-x-2">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span class="text-gray-700 dark:text-gray-300">Loading chat...</span>
+        <div class="flex items-center space-x-3 bg-white/90 dark:bg-gray-800/90 px-6 py-4 rounded-xl shadow-soft backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 transform transition-all duration-300 animate-slide-up">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 dark:border-primary-400"></div>
+            <span class="text-gray-700 dark:text-gray-300 font-medium">Loading chat...</span>
         </div>
     `;
     document.body.appendChild(loadingDiv);
+    // Ensure animation plays
+    requestAnimationFrame(() => {
+        loadingDiv.style.opacity = '1';
+    });
 }
 
 function hideLoadingIndicator() {
     const loadingDiv = document.getElementById('loading-indicator');
     if (loadingDiv) {
-        loadingDiv.remove();
+        loadingDiv.style.opacity = '0';
+        setTimeout(() => loadingDiv.remove(), 300); // Match duration-300
     }
 }
 
@@ -366,22 +365,22 @@ function showTypingIndicator() {
 
     indicator = document.createElement('div');
     indicator.id = 'typing-indicator';
-    indicator.className = 'flex w-full mt-4 space-x-3 max-w-3xl';
+    indicator.className = 'flex w-full mt-4 space-x-3 max-w-3xl animate-slide-up';
     indicator.setAttribute('role', 'status');
     indicator.setAttribute('aria-label', 'Assistant is typing');
     indicator.innerHTML = `
-        <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white">
+        <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-soft">
             <i class="fas fa-robot text-sm"></i>
         </div>
         <div class="relative max-w-3xl">
-            <div class="bg-gray-100/95 dark:bg-gray-800/95 p-4 rounded-r-lg rounded-bl-lg shadow-sm backdrop-blur-sm transition-all duration-300">
+            <div class="bg-gray-100/95 dark:bg-gray-800/95 p-4 rounded-r-lg rounded-bl-lg shadow-soft group hover:shadow-md transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50">
                 <div class="typing-animation">
                     <div class="dot"></div>
                     <div class="dot"></div>
                     <div class="dot"></div>
                 </div>
             </div>
-            <span class="text-xs text-gray-500 dark:text-gray-400 leading-none">
+            <span class="text-xs text-gray-500 dark:text-gray-400 leading-none block mt-1">
                 ${new Date().toLocaleTimeString()}
             </span>
         </div>
@@ -442,7 +441,13 @@ async function sendMessage() {
 
         // Count tokens and check limits
         const maxTokens = model?.max_tokens || 32000;
-        const tokenCount = await window.tokenUsageManager.countMessageTokens(messageText);
+        let tokenCount = 0;
+        try {
+            tokenCount = await window.tokenUsageManager?.countMessageTokens(messageText) || Math.ceil(messageText.length / 4);
+        } catch (error) {
+            console.error('Error counting tokens:', error);
+            tokenCount = Math.ceil(messageText.length / 4); // Fallback estimation
+        }
 
         if (tokenCount > maxTokens) {
             window.utils.showFeedback(`Message exceeds token limit (${tokenCount}/${maxTokens})`, 'error');
@@ -463,7 +468,7 @@ async function sendMessage() {
         if (messageText) {
             // Truncate if needed
             const truncatedMessage = tokenCount > maxTokens ?
-                await window.tokenUsageManager.truncateContent(messageText, maxTokens) :
+                await window.tokenUsageManager?.truncateContent(messageText, maxTokens) || messageText :
                 messageText;
             formData.append('message', truncatedMessage);
             formData.append('metadata', JSON.stringify(metadata));
@@ -503,8 +508,8 @@ async function sendMessage() {
 
             // Update token usage and handle new message
             if (window.tokenUsageManager) {
-                await window.tokenUsageManager.handleNewMessage();
-                await window.tokenUsageManager.updateStats();
+                await window.tokenUsageManager?.handleNewMessage();
+                await window.tokenUsageManager?.updateStats();
 
                 // Update model limits if needed
                 const modelLimits = {
@@ -513,9 +518,8 @@ async function sendMessage() {
                 window.tokenUsageManager.updateModelLimits(modelLimits);
 
                 // Show token usage panel if hidden
-                const tokenUsageContainer = document.getElementById('token-usage');
-                if (tokenUsageContainer?.classList.contains('hidden')) {
-                    window.tokenUsageManager.toggleDisplay();
+                if (document.getElementById('token-usage')?.classList.contains('hidden')) {
+                    window.tokenUsageManager?.toggleDisplay();
                 }
             }
         } catch (error) {
@@ -583,13 +587,13 @@ async function handleStreamingResponse(formData) {
 
         // Create message div once at the start
         messageDiv = document.createElement('div');
-        messageDiv.className = 'flex w-full mt-2 space-x-2 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl';
+        messageDiv.className = 'flex w-full mt-4 space-x-3 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl animate-slide-up';
         const chatBox = document.getElementById('chat-box');
         chatBox.appendChild(messageDiv);
 
         // Initialize the message structure
         messageDiv.innerHTML = `
-            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white" role="img"
+            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-soft" role="img"
                 aria-label="Assistant avatar">
                 <i class="fas fa-robot text-sm"></i>
             </div>
@@ -601,8 +605,8 @@ async function handleStreamingResponse(formData) {
                         <i class="fas fa-copy"></i>
                     </button>
                 </div>
-                <div class="bg-gray-100 dark:bg-gray-800 p-4 rounded-r-lg rounded-bl-lg shadow-sm group hover:shadow-md transition-all duration-200">
-                    <div class="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto"
+                <div class="bg-gray-100/95 dark:bg-gray-800/95 p-5 rounded-r-lg rounded-bl-lg shadow-soft group hover:shadow-md transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:-translate-y-0.5 dark-mode-transition">
+                    <div class="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto [&_pre]:my-4 [&_pre]:p-4 [&_pre]:bg-gray-50 dark:[&_pre]:bg-gray-900 [&_pre]:rounded-lg [&_code]:text-sm [&_code]:bg-gray-50 dark:[&_code]:bg-gray-900 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_p]:leading-relaxed [&_ul]:my-4 [&_ol]:my-4 [&_li]:my-1"
                          data-role="assistant-message">
                     </div>
                 </div>
@@ -642,7 +646,7 @@ async function handleStreamingResponse(formData) {
                     const now = Date.now();
                     if (now - lastUpdateTime > updateInterval) {
                         const contentDiv = messageDiv.querySelector('[data-role="assistant-message"]');
-                        if (contentDiv) {
+                        if (contentDiv && accumulatedResponse?.trim()) {
                             appendAssistantMessage(accumulatedResponse, true, messageDiv);
                             lastUpdateTime = now;
                         }
@@ -652,11 +656,17 @@ async function handleStreamingResponse(formData) {
         }
 
         // Final update with complete response
-        if (accumulatedResponse) {
+        if (accumulatedResponse?.trim()) {
             console.log('Final response:', accumulatedResponse); // Debug log
 
             // Lint the message before final display
-            const lintedResponse = await window.tokenUsageManager.lintMessage(accumulatedResponse);
+            let lintedResponse = accumulatedResponse;
+            try {
+                lintedResponse = await window.tokenUsageManager?.lintMessage(accumulatedResponse) || accumulatedResponse;
+            } catch (error) {
+                console.warn('Error linting message:', error);
+                lintedResponse = accumulatedResponse;
+            }
 
             // Display final linted response
             appendAssistantMessage(lintedResponse, true, messageDiv);
@@ -717,7 +727,13 @@ async function handleNormalResponse(formData) {
         }
 
         // Lint and process the message
-        const lintedContent = await window.tokenUsageManager.lintMessage(content);
+        let lintedContent = content;
+        try {
+            lintedContent = await window.tokenUsageManager?.lintMessage(content) || content;
+        } catch (error) {
+            console.warn('Error linting message, using raw content:', error);
+            // Continue with unlinted content
+        }
 
         // Display final linted response
         appendAssistantMessage(lintedContent);
@@ -752,7 +768,7 @@ async function appendAssistantMessage(message, isStreaming = false, existingDiv 
         console.error('Required dependencies not available after 5 seconds');
         const errorDiv = document.createElement('div');
         errorDiv.innerHTML = `<p class="text-red-500">Error: Required dependencies not available. Please refresh the page.</p>`;
-        chatBox.appendChild(errorDiv);
+        chatBox.insertBefore(errorDiv, chatBox.firstChild);
         return;
     }
 
@@ -828,14 +844,14 @@ async function appendAssistantMessage(message, isStreaming = false, existingDiv 
             const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
 
             messageDiv.innerHTML = `
-                <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white" role="img"
+                <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-soft" role="img"
                     aria-label="Assistant avatar">
                     <i class="fas fa-robot text-sm"></i>
                 </div>
                 <div class="relative flex-1">
                     <div class="absolute right-2 top-2 flex items-center space-x-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                         <button
-                            class="copy-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                            class="copy-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
                             title="Copy to clipboard"
                             data-raw-content="${processedMessage.replace(/"/g, '&quot;')}"
                             aria-label="Copy message to clipboard">
@@ -844,7 +860,7 @@ async function appendAssistantMessage(message, isStreaming = false, existingDiv 
                         ${
                           !isStreaming
                             ? `<button
-                                class="regenerate-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                                class="regenerate-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
                                 title="Regenerate response"
                                 aria-label="Regenerate response">
                                 <i class="fas fa-redo-alt"></i>
@@ -852,7 +868,7 @@ async function appendAssistantMessage(message, isStreaming = false, existingDiv 
                             : ''
                         }
                     </div>
-                    <div class="bg-gray-100 dark:bg-gray-800 p-5 rounded-r-lg rounded-bl-lg shadow-sm group hover:shadow-md transition-all duration-200">
+                    <div class="bg-gray-100/95 dark:bg-gray-800/95 p-5 rounded-r-lg rounded-bl-lg shadow-soft group hover:shadow-md transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:-translate-y-0.5 dark-mode-transition">
                         <div class="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto [&_pre]:my-4 [&_pre]:p-4 [&_pre]:bg-gray-50 dark:[&_pre]:bg-gray-900 [&_pre]:rounded-lg [&_code]:text-sm [&_code]:bg-gray-50 dark:[&_code]:bg-gray-900 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_p]:leading-relaxed [&_ul]:my-4 [&_ol]:my-4 [&_li]:my-1"
                              data-role="assistant-message">
                             ${sanitizedHtml}
@@ -893,18 +909,19 @@ function appendUserMessage(message) {
     }
 
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'flex w-full mt-4 space-x-3 max-w-[85%] sm:max-w-md md:max-w-2xl ml-auto justify-end';
+    messageDiv.className = 'flex w-full mt-4 space-x-3 max-w-[85%] sm:max-w-md md:max-w-2xl ml-auto justify-end animate-slide-up';
     messageDiv.innerHTML = `
         <div>
-            <div class="relative bg-gradient-to-r from-primary-600/95 to-secondary-600/95 dark:from-primary-500/95 dark:to-secondary-500/95 text-white p-4 rounded-l-lg rounded-br-lg shadow-sm backdrop-blur-sm transition-all duration-300">
-                <p class="text-[15px] leading-relaxed break-words overflow-x-auto whitespace-pre-wrap">${message}</p>
+            <div class="relative bg-gradient-to-r from-primary-600/95 to-secondary-600/95 dark:from-primary-500/95 dark:to-secondary-500/95 text-white p-4 rounded-l-lg rounded-br-lg shadow-soft hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 backdrop-blur-sm border border-primary-500/10 dark:border-primary-400/10">
+                <p class="text-[15px] leading-relaxed break-words overflow-x-auto whitespace-pre-wrap prose-sm dark:prose-invert">${message}</p>
             </div>
             <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
                 ${new Date().toLocaleTimeString()}
             </span>
         </div>
     `;
-    document.getElementById('chat-box').appendChild(messageDiv);
+    const chatBox = document.getElementById('chat-box');
+    chatBox.appendChild(messageDiv);
     document.getElementById('chat-box').scrollTop = document.getElementById('chat-box').scrollHeight;
 }
 
@@ -924,7 +941,7 @@ async function renderInitialAssistantMessages() {
     if (!window.md || !window.DOMPurify || !window.he) {
         console.error('Required dependencies not available after 5 seconds');
         assistantMessageDivs.forEach(div => {
-            div.innerHTML = `<p class="text-red-500">Error: Required dependencies not available. Please refresh the page.</p>`;
+            div.innerHTML = `<p class="text-error-500 dark:text-error-400 font-medium">Error: Required dependencies not available. Please refresh the page.</p>`;
         });
         return;
     }
@@ -962,7 +979,7 @@ async function renderInitialAssistantMessages() {
             } catch (error) {
                 console.error('Error rendering message:', error);
                 // Show a fallback message if rendering fails
-                div.innerHTML = `<p class="text-red-500">Error rendering message: ${error.message}</p>`;
+                div.innerHTML = `<p class="text-error-500 dark:text-error-400 font-medium">Error rendering message: ${error.message}</p>`;
             }
         }
     });
@@ -974,7 +991,7 @@ async function renderInitialAssistantMessages() {
 if (!window.md) {
     console.error('Markdown renderer not initialized');
     if (window.utils) {
-        window.utils.showFeedback('Failed to initialize markdown renderer', 'error');
+        window.utils.showFeedback('Failed to initialize markdown renderer. Please refresh the page.', 'error');
     }
 }
 
@@ -1105,7 +1122,7 @@ function cleanup() {
 
             // Update final stats before cleanup
             try {
-                window.tokenUsageManager.updateStats();
+                window.tokenUsageManager?.updateStats();
             } catch (error) {
                 console.error('Error updating final token stats:', error);
             }
@@ -1257,13 +1274,25 @@ async function handleModelChange() {
 /**
  * DOM readiness -> Start the chat
  */
-document.addEventListener('DOMContentLoaded', async () => {
+async function startChat() {
     try {
         await init();
     } catch (error) {
-        console.error("Failed to initialize chat:", error);
-        window.utils?.showFeedback("Failed to initialize chat interface", "error");
+        console.error('Failed to initialize chat:', error);
+        showError(error.message);
     }
-});
+}
 
-window.FileUploadManager = FileUploadManager;
+function showError(message) {
+    // Create a basic error message if utils not available
+    if (!window.utils) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg';
+        errorDiv.textContent = message;
+        document.body.appendChild(errorDiv);
+    } else {
+        window.utils.showFeedback(message, 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', startChat);

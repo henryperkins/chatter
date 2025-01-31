@@ -442,7 +442,9 @@ window.FileUploadManager = class {
     }
 
     updateMobileMenuVisibility() {
-        this.mobileUploadMenu?.style.display = window.innerWidth <= 640 ? 'block' : 'none';
+        if (this.mobileUploadMenu) {
+            this.mobileUploadMenu.style.display = window.innerWidth <= 640 ? 'block' : 'none';
+        }
     }
 
     /**

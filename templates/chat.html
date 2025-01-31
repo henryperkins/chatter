@@ -532,18 +532,12 @@
     console.log('CHAT_CONFIG initialized:', window.CHAT_CONFIG);
 </script>
 
-<!-- Load core libraries first -->
+<!-- Chat-specific libraries -->
 <script src="{{ url_for('static', filename='js/markdown-it.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dompurify.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/prism.js') }}"></script>
-
-<!-- Load markdown bundle after core libraries -->
 <script src="{{ url_for('static', filename='js/markdown-it-bundle.js') }}"></script>
 
-<!-- Load managers -->
-<script src="{{ url_for('static', filename='js/token-usage.js') }}"></script>
-<script src="{{ url_for('static', filename='js/fileUpload.js') }}"></script>
-
-<!-- Include chat.js script last -->
+<!-- Main chat script -->
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 {% endblock %}
