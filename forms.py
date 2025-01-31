@@ -357,7 +357,7 @@ class ModelForm(FlaskForm):
         try:
             with db_session() as session:
                 providers = session.execute(
-                    text("SELECT id, name FROM providers WHERE is_active = TRUE ORDER BY name")
+                    text("SELECT id, name FROM providers ORDER BY name")
                 ).fetchall()
                 self.provider_id.choices = [(p.id, p.name) for p in providers]
         except Exception as e:

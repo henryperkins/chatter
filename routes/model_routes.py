@@ -415,7 +415,7 @@ def edit_model(model_id):
         model = Model.get_by_id(model_id)
         if not model:
             flash(f"Model with ID {model_id} not found", "error")
-            return redirect(url_for('model.list_models'))
+            return redirect(url_for('model.get_models'))
 
         provider = Provider.get_by_id(model.provider_id)
         form = ModelForm(request.form, obj=model)
