@@ -433,11 +433,12 @@ class ModelForm(FlaskForm):
     def validate_max_completion_tokens(self, field: Any) -> None:
         """Ensure max_completion_tokens is valid and within range."""
         try:
-            value = int(field.data) if field.data not in (None, '', 'None') else 0
+            if field.data in (None, '', 'None'):
+                raise ValidationError("Max completion tokens is required.")
+            value = int(field.data)
 
             # Base validation for all models
-            base_validation = (1 <= value <= 16384)
-            if not base_validation:
+            if not (1 <= value <= 16384):
                 raise ValidationError("Max completion tokens must be between 1 and 16384")
 
             # o1-preview model validation
