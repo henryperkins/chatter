@@ -195,21 +195,6 @@ class TokenUsageManager {
         // Store the limits if needed
         this.currentLimits = limits;
     }
-        const { max_tokens } = limits;
-
-        // Update the ARIA max for the progress bar
-        if (this.elements.progress) {
-            this.elements.progress.setAttribute('aria-valuemax', max_tokens);
-        }
-
-        // Update the token limit text
-        if (this.elements.tokensLimit) {
-            this.elements.tokensLimit.textContent = `/ ${max_tokens.toLocaleString()} max`;
-        }
-
-        // Keep them in memory if needed for other calculations
-        this.currentLimits = limits;
-    }
 
     /**
      * Show an error message briefly at the bottom of the token usage container.
