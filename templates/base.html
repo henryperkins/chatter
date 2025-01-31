@@ -167,10 +167,12 @@
 
     <!-- Utility Scripts (load after core) -->
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/dark-mode.js') }}"></script>
 
     <!-- Base Application Script -->
     <script src="{{ url_for('static', filename='js/base.js') }}"></script>
+    
+    <!-- Dark Mode Script -->
+    <script src="{{ url_for('static', filename='js/dark-mode.js') }}"></script>
 
     {% block scripts %}
     <script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>

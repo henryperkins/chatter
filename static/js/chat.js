@@ -1063,32 +1063,7 @@ window.md = window.markdownit({
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('DOMContentLoaded event fired');
-    try {
-        // Ensure CHAT_CONFIG is available
-        if (!window.CHAT_CONFIG) {
-            console.error('CHAT_CONFIG is not defined');
-            window.utils?.showFeedback?.(
-                'Configuration error: CHAT_CONFIG is not defined. Please refresh the page.',
-                'error',
-                { duration: 0 }
-            );
-            return;
-        }
-
-        // Initialize chat interface
-        await window.init();
-
-        // Render initial assistant messages
-        renderInitialAssistantMessages();
-    } catch (error) {
-        console.error('Error during initialization:', error);
-        window.utils?.showFeedback?.(
-            `Failed to initialize chat: ${error.message}. Please refresh the page.`,
-            'error',
-            { duration: 0 }
-        );
-    }
+    await init();
 });
 function handleModelChange() {
     const modelSelect = document.getElementById('model-select');
