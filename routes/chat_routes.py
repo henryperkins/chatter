@@ -352,37 +352,22 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
         # Add file content with proper formatting
         file_ids = request.form.getlist('file_ids[]')
+        azure_file_ids = []
         if file_ids:
             from models.uploaded_file import UploadedFile
-            files_data = []
             for file_id in file_ids:
                 file_record = UploadedFile.get_by_id(file_id)
-                if file_record:
-                    try:
-                        # Try to get content from cache first
-                        cache_key = hash((file_record.filename, os.path.getsize(file_record.filepath)))
-                        cached_content = context_manager.context_cache.get(cache_key)
-                        if cached_content:
-                            files_data.append((file_record.filename, cached_content))
-                        else:
-                            logger.warning(f"Cache miss for file {file_record.filename}")
-                            # Fall back to reading from disk
-                            try:
-                                with open(file_record.filepath, 'r', encoding='utf-8') as f:
-                                    content = f.read()
-                                    files_data.append((file_record.filename, content))
-                            except Exception as e:
-                                logger.error(f"Failed to read file {file_record.filename}: {str(e)}")
-                    except Exception as e:
-                        logger.error(f"Error processing file {file_record.filename}: {str(e)}")
+                if file_record and file_record.azure_file_id:
+                    azure_file_ids.append(file_record.azure_file_id)
+                    logger.info(f"Added Azure file ID {file_record.azure_file_id} for file {file_record.filename}")
+                else:
+                    logger.warning(f"No Azure file ID found for file {file_id}")
 
-            if files_data:
+            if azure_file_ids:
                 if combined_message:
                     combined_message += "\n\n"
-                # Format file contents for model input
-                combined_message += "Here are the contents of the uploaded files:\n\n"
-                for filename, content in files_data:
-                    combined_message += f"[File: {filename}]\n{content}\n\n"
+                combined_message += "I've uploaded some files for you to analyze. You can access their contents directly through the Azure file system.\n"
+                combined_message += "Please analyze these files and provide your insights."
 
         # If total tokens > max, truncate
         if total_tokens > MAX_INPUT_TOKENS:
@@ -479,6 +464,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                                 requires_o1_handling=model_obj.requires_o1_handling,
                                 timeout_seconds=120,
                                 stream=True,
+                                file_ids=azure_file_ids if azure_file_ids else None
                             )
                         except Exception as api_err:
                             logger.error("Azure API error: %s", str(api_err))
@@ -595,6 +581,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                         requires_o1_handling=model_obj.requires_o1_handling,
                         timeout_seconds=120,
                         stream=False,
+                        file_ids=azure_file_ids if azure_file_ids else None
                     )
 
                     # Process response

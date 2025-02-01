@@ -301,20 +301,93 @@ async function initializeInterface() {
     if (editTitleBtn) {
         editTitleBtn.addEventListener('click', handleEditTitle);
     }
-    function handleEditTitle() {
-        // Implement the logic to edit chat title
+    async function handleEditTitle() {
+        if (!window.utils) {
+            console.error('Utils not initialized');
+            return;
+        }
+
+        const chatTitle = document.getElementById('chat-title');
+        if (!chatTitle) return;
+
+        const currentTitle = chatTitle.textContent.split(' - ')[0].trim();
+        const newTitle = prompt('Enter new chat title:', currentTitle);
+
+        if (!newTitle || newTitle === currentTitle) return;
+
+        try {
+            const response = await window.utils.fetchWithCSRF(`/chat/update_chat_title/${window.CHAT_CONFIG.chatId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ title: newTitle })
+            });
+
+            if (response.success) {
+                chatTitle.textContent = `${newTitle} - ${window.CHAT_CONFIG.currentModel?.name || 'Default Model'}`;
+                window.utils.showFeedback('Chat title updated successfully', 'success');
+
+                // Update title in sidebar
+                const sidebarLink = document.querySelector(`a[href*="${window.CHAT_CONFIG.chatId}"] span`);
+                if (sidebarLink) {
+                    sidebarLink.textContent = newTitle;
+                }
+            } else {
+                throw new Error(response.error || 'Failed to update chat title');
+            }
+        } catch (error) {
+            console.error('Error updating chat title:', error);
+            window.utils.showFeedback(error.message || 'Failed to update chat title', 'error');
+        }
     }
 
     // 9. Delete chat buttons
     const deleteChatButtons = document.querySelectorAll('.delete-chat-btn');
     deleteChatButtons.forEach(button => {
-        button.addEventListener('click', () => {
+        button.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             const chatId = button.getAttribute('data-chat-id');
             handleDeleteChat(chatId);
         });
     });
-    function handleDeleteChat(chatId) {
-        // Implement the logic to delete the chat
+
+    async function handleDeleteChat(chatId) {
+        if (!window.utils) {
+            console.error('Utils not initialized');
+            return;
+        }
+
+        if (!confirm('Are you sure you want to delete this chat?')) {
+            return;
+        }
+
+        try {
+            const response = await window.utils.fetchWithCSRF(`/chat/delete_chat/${chatId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.success) {
+                window.utils.showFeedback('Chat deleted successfully', 'success');
+
+                // Remove chat from sidebar
+                const chatElement = document.querySelector(`[data-chat-id="${chatId}"]`).closest('.relative');
+                if (chatElement) {
+                    chatElement.remove();
+                }
+
+                // If we're in the deleted chat, redirect to new chat
+                if (chatId === window.CHAT_CONFIG.chatId) {
+                    window.location.href = '/chat/chat_interface';
+                }
+            } else {
+                throw new Error(response.error || 'Failed to delete chat');
+            }
+        } catch (error) {
+            console.error('Error deleting chat:', error);
+            window.utils.showFeedback(error.message || 'Failed to delete chat', 'error');
+        }
     }
 
     // 10. Additional setup: attach action buttons, render existing messages, drag & drop, file toggles
@@ -330,11 +403,11 @@ async function initializeInterface() {
 
             const fileName = toggleButton.getAttribute('data-file-name');
             const fileContentDiv = toggleButton.closest('.file-item').nextElementSibling;
-            
+
             if (fileContentDiv && fileContentDiv.classList.contains('file-content')) {
                 const isHidden = fileContentDiv.classList.contains('hidden');
                 fileContentDiv.classList.toggle('hidden');
-                
+
                 // Update icon
                 const icon = toggleButton.querySelector('i');
                 if (icon) {
@@ -1022,7 +1095,7 @@ async function renderInitialAssistantMessages() {
                     // Get the language class
                     const langClass = Array.from(block.classList)
                         .find(className => className.startsWith('language-'));
-                    
+
                     if (langClass) {
                         const language = langClass.replace('language-', '');
                         if (Prism.languages[language]) {

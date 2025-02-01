@@ -27,11 +27,12 @@ class UploadedFile:
     description: Optional[str] = None
     mime_type: Optional[str] = None
     version: int = 1
+    azure_file_id: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
     @staticmethod
-    def create(chat_id: str, filename: str, filepath: str, mime_type: Optional[str] = None, description: Optional[str] = None) -> str:
+    def create(chat_id: str, filename: str, filepath: str, mime_type: Optional[str] = None, description: Optional[str] = None, azure_file_id: Optional[str] = None) -> str:
         """
         Insert a new uploaded file record into the database.
         Returns the unique file ID for reference.
@@ -65,9 +66,9 @@ class UploadedFile:
                 # Insert new version
                 query = text("""
                     INSERT INTO uploaded_files
-                    (chat_id, filename, filepath, uuid, size, mime_type, description, version, created_at, updated_at)
+                    (chat_id, filename, filepath, uuid, size, mime_type, description, version, azure_file_id, created_at, updated_at)
                     VALUES
-                    (:chat_id, :filename, :filepath, :uuid, :size, :mime_type, :description, :version, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    (:chat_id, :filename, :filepath, :uuid, :size, :mime_type, :description, :version, :azure_file_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     RETURNING id
                 """)
                 result = db.execute(query, {
@@ -78,7 +79,8 @@ class UploadedFile:
                     "size": file_size,
                     "mime_type": mime_type,
                     "description": description,
-                    "version": new_version
+                    "version": new_version,
+                    "azure_file_id": azure_file_id
                 })
                 file_id = result.scalar()
                 db.commit()
@@ -172,5 +174,86 @@ class UploadedFile:
             except Exception as e:
                 db.rollback()
                 logger.error(f"Error deleting uploaded files: {e}")
+                raise
+
+    @staticmethod
+    def update_azure_file_id(file_id: int, azure_file_id: str) -> bool:
+        """
+        Update the Azure file ID for an uploaded file.
+
+        Args:
+            file_id (int): The ID of the uploaded file
+            azure_file_id (str): The Azure OpenAI file ID
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        with db_session() as db:
+            try:
+                query = text("""
+                    UPDATE uploaded_files
+                    SET azure_file_id = :azure_file_id,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :file_id
+                """)
+                result = db.execute(query, {
+                    "file_id": file_id,
+                    "azure_file_id": azure_file_id
+                })
+                db.commit()
+                success = result.rowcount > 0
+                if success:
+                    logger.info(f"Updated Azure file ID for file {file_id}")
+                return success
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error updating Azure file ID: {e}")
+                raise
+
+    @staticmethod
+    def delete_by_azure_file_id(azure_file_id: str) -> bool:
+        """
+        Delete an uploaded file by its Azure file ID.
+
+        Args:
+            azure_file_id (str): The Azure OpenAI file ID
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        with db_session() as db:
+            try:
+                # First get file info for cleanup
+                query = text("""
+                    SELECT filepath, size FROM uploaded_files
+                    WHERE azure_file_id = :azure_file_id
+                """)
+                file = db.execute(query, {"azure_file_id": azure_file_id}).first()
+
+                if not file:
+                    return False
+
+                # Delete database record
+                delete_query = text("""
+                    DELETE FROM uploaded_files
+                    WHERE azure_file_id = :azure_file_id
+                """)
+                db.execute(delete_query, {"azure_file_id": azure_file_id})
+                db.commit()
+
+                # Clean up file from disk
+                filepath, size = file
+                try:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                        logger.info(f"Deleted file {filepath} ({size} bytes)")
+                except Exception as e:
+                    logger.error(f"Failed to delete file {filepath}: {e}")
+
+                return True
+
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error deleting file by Azure ID: {e}")
                 raise
 

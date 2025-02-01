@@ -27,7 +27,8 @@ def get_azure_response(
     api_version: Optional[str] = None,
     requires_o1_handling: bool = False,
     timeout_seconds: int = 600,
-    stream: bool = False
+    stream: bool = False,
+    file_ids: Optional[List[str]] = None
 ) -> Union[Dict[str, Any], str, Generator]:
     try:
         # Validate parameters
@@ -66,12 +67,15 @@ def get_azure_response(
             "Content-Type": "application/json",
             "api-key": api_key,
         }
-
         # Prepare the payload based on model requirements
         payload = {
             "messages": messages,
             "stream": stream,
         }
+
+        # Add file IDs if provided
+        if file_ids:
+            payload["file_ids"] = file_ids
 
         # Handle o1-preview specific requirements
         if requires_o1_handling:
