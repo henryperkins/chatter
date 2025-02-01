@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Add Provider - Azure OpenAI Chat{% endblock %}
+{% block title %}Edit Provider - Azure OpenAI Chat{% endblock %}
 
 {% block content %}
 <div class="container mx-auto px-4 py-6 max-w-4xl bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">
     <!-- Page Header -->
-    <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6">Add a New Provider</h1>
+    <h1 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mb-6">Edit Provider</h1>
 
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -22,7 +22,7 @@
     {% endwith %}
 
     <!-- Form -->
-    <form id="add-provider-form" method="POST" action="{{ url_for('provider.add_provider') }}" class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
+    <form id="edit-provider-form" method="POST" class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
         {{ form.hidden_tag() }}
 
         <!-- Provider Name -->
@@ -88,12 +88,12 @@
 
         <!-- Submit & Cancel -->
         <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
-            <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-green-500 text-white rounded-lg shadow-lg font-medium hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+            <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-blue-500 text-white rounded-lg shadow-lg font-medium hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
                 <span class="inline-flex items-center">
-                    <span>Add Provider</span>
+                    <span>Save Changes</span>
                 </span>
             </button>
-            <a href="{{ url_for('chat.chat_interface') }}" class="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white rounded-lg shadow-lg font-medium hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 text-center transition duration-150 ease-in-out">
+            <a href="{{ url_for('provider.list_providers') }}" class="w-full sm:w-auto px-6 py-3 bg-gray-500 text-white rounded-lg shadow-lg font-medium hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 text-center transition duration-150 ease-in-out">
                 Cancel
             </a>
         </div>
@@ -105,10 +105,10 @@
 {{ super() }}
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        const form = document.getElementById("add-provider-form");
+        const form = document.getElementById("edit-provider-form");
         if (form) {
             form.classList.add('provider-form');
-            form.dataset.submitText = "Add Provider";
+            form.dataset.submitText = "Save Changes";
         }
     });
 </script>

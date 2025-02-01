@@ -307,11 +307,71 @@ class ProviderForm(FlaskForm):
         "API Base URL",
         validators=[
             DataRequired(message="API base URL is required."),
-            URL(message="Must be a valid URL."),
+            URL(message="Must be a valid URL.")
         ],
+        description="Base URL for your OpenAI-compatible API (e.g., https://api.openai.com/v1)"
     )
 
     requires_authentication = BooleanField("Requires Authentication", default=True)
+
+    endpoint_pattern = StringField(
+        "API Path",
+        validators=[
+            DataRequired(message="API path is required."), 
+            Length(max=255, message="API path cannot exceed 255 characters."),
+            Regexp(r"^/.*$", message="API path must start with /")
+        ],
+        default="/chat/completions",
+        description="API path that will be appended to the base URL. Defaults to /chat/completions for OpenAI compatibility."
+    )
+
+    def validate_endpoint_pattern(self, field):
+        """Validate the API path format."""
+        try:
+            # Don't allow Azure OpenAI patterns
+            if 'azure' in self.slug.data.lower():
+                raise ValidationError("Azure OpenAI endpoints should be configured through the Azure provider type")
+
+            # Ensure path starts with /
+            if not field.data.startswith('/'):
+                raise ValidationError("API path must start with /")
+
+            # Validate no double slashes
+            if '//' in field.data:
+                raise ValidationError("API path cannot contain double slashes")
+
+        except ValidationError:
+            raise
+        except Exception as e:
+            raise ValidationError(f"Error validating API path: {str(e)}")
+
+    def validate_api_base_url(self, field):
+        """Validate the API base URL."""
+        try:
+            # Don't allow Azure OpenAI URLs
+            if 'azure' in field.data.lower():
+                raise ValidationError("Azure OpenAI endpoints should be configured through the Azure provider type")
+
+            # Remove trailing slash
+            field.data = field.data.rstrip('/')
+
+        except ValidationError:
+            raise
+        except Exception as e:
+            raise ValidationError(f"Error validating API base URL: {str(e)}")
+
+    api_version_format = StringField(
+        "API Version Format",
+        validators=[
+            DataRequired(message="API version format is required."),
+            Length(max=20, message="API version format cannot exceed 20 characters."),
+            Regexp(
+                r"^\d{4}-\d{2}-\d{2}(?:-preview)?$",
+                message="API version format must be in format YYYY-MM-DD or YYYY-MM-DD-preview",
+            ),
+        ],
+        default="2024-12-01-preview"
+    )
 
 
 # ------------------------------------------------------------------------

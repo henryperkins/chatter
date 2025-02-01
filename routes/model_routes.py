@@ -391,6 +391,15 @@ def add_model_page():
     Render a page for adding a model.
     """
     form = ModelForm()
+
+    # Populate provider choices
+    form.provider_id.choices = [(p.id, p.name) for p in Provider.get_all()]
+    
+    # Pre-select provider if provider_id is provided
+    provider_id = request.args.get('provider_id', type=int)
+    if provider_id:
+        form.provider_id.data = provider_id
+    
     if request.method == "POST":
         return create_model()
     logger.debug("Rendering add model page")

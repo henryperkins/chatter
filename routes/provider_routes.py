@@ -62,10 +62,10 @@ def add_provider() -> Response:
                     """
                     INSERT INTO providers (
                         name, slug, api_base_url, capabilities, requires_authentication,
-                        api_version_format, created_at
+                        api_version_format, endpoint_pattern, created_at
                     ) VALUES (
                         :name, :slug, :api_base_url, :capabilities, :requires_authentication,
-                        :api_version_format, NOW()
+                        :api_version_format, :endpoint_pattern, NOW()
                     )
                     RETURNING id
                 """
@@ -78,7 +78,8 @@ def add_provider() -> Response:
                         "api_base_url": (form.api_base_url.data or "").rstrip("/"),
                         "capabilities": "{}",  # Default empty JSON capabilities
                         "requires_authentication": form.requires_authentication.data or False,
-                        "api_version_format": None  # Default null api_version_format
+                        "api_version_format": form.api_version_format.data,
+                        "endpoint_pattern": form.endpoint_pattern.data  # Now validated by form
                     },
                 )
                 provider_id: Optional[int] = result.scalar()
@@ -88,7 +89,7 @@ def add_provider() -> Response:
 
                 db.commit()
                 flash(f"Provider {form.name.data} added successfully", "success")
-                return redirect(url_for("model.add_model"))
+                return redirect(url_for("model.add_model_page", provider_id=provider_id))
 
         except Exception as e:
             logger.error("Error creating provider: %s", str(e), exc_info=True)
@@ -154,7 +155,9 @@ def edit_provider(provider_id: int) -> Response:
                     SET name = :name,
                         slug = :slug,
                         api_base_url = :api_base_url,
-                        requires_authentication = :requires_authentication
+                        requires_authentication = :requires_authentication,
+                        api_version_format = :api_version_format,
+                        endpoint_pattern = :endpoint_pattern
                     WHERE id = :provider_id
                     """
                 )
@@ -165,6 +168,8 @@ def edit_provider(provider_id: int) -> Response:
                         "slug": form.slug.data or "",
                         "api_base_url": (form.api_base_url.data or "").rstrip("/"),
                         "requires_authentication": form.requires_authentication.data or False,
+                        "api_version_format": form.api_version_format.data,
+                        "endpoint_pattern": form.endpoint_pattern.data,
                         "provider_id": provider_id
                     },
                 )
@@ -177,6 +182,8 @@ def edit_provider(provider_id: int) -> Response:
             form.slug.data = provider.slug
             form.api_base_url.data = provider.api_base_url
             form.requires_authentication.data = provider.requires_authentication
+            form.api_version_format.data = provider.api_version_format
+            form.endpoint_pattern.data = provider.endpoint_pattern
 
     except Exception as e:
         logger.error("Error editing provider: %s", str(e), exc_info=True)
