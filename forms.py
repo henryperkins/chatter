@@ -510,6 +510,26 @@ class ModelForm(FlaskForm):
         self.load_providers()
         self.load_provider_validation_rules()
 
+    def load_provider_validation_rules(self):
+        """
+        Carga las reglas de validación basadas en el provider_id seleccionado
+        y las asigna a self.provider_validation_rules.
+        """
+        provider = Provider.get_by_id(self.provider_id.data)
+        if provider is None:
+            self.provider_validation_rules = {}
+            return
+
+        # Puede que provider.validation_rules sea un dict o un string JSON;
+        # si es un string, conviértelo a dict.
+        rules = provider.validation_rules
+        if isinstance(rules, str):
+            import json
+            rules = json.loads(rules)
+
+        # Asigna las reglas obtenidas al atributo de instancia.
+        self.provider_validation_rules = rules
+
     def process_formdata(self, valuelist):
         """Handle both form and JSON data processing"""
         if valuelist:
