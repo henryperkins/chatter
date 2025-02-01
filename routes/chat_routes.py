@@ -356,18 +356,33 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             from models.uploaded_file import UploadedFile
             files_data = []
             for file_id in file_ids:
-                file = UploadedFile.get_by_id(file_id)
-                if file and os.path.exists(file.filepath):
-                    with open(file.filepath, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        files_data.append((file.filename, content))
+                file_record = UploadedFile.get_by_id(file_id)
+                if file_record:
+                    try:
+                        # Try to get content from cache first
+                        cache_key = hash((file_record.filename, os.path.getsize(file_record.filepath)))
+                        cached_content = context_manager.context_cache.get(cache_key)
+                        if cached_content:
+                            files_data.append((file_record.filename, cached_content))
+                        else:
+                            logger.warning(f"Cache miss for file {file_record.filename}")
+                            # Fall back to reading from disk
+                            try:
+                                with open(file_record.filepath, 'r', encoding='utf-8') as f:
+                                    content = f.read()
+                                    files_data.append((file_record.filename, content))
+                            except Exception as e:
+                                logger.error(f"Failed to read file {file_record.filename}: {str(e)}")
+                    except Exception as e:
+                        logger.error(f"Error processing file {file_record.filename}: {str(e)}")
 
             if files_data:
                 if combined_message:
                     combined_message += "\n\n"
-                combined_message += "Attached files:\n"
+                # Format file contents for model input
+                combined_message += "Here are the contents of the uploaded files:\n\n"
                 for filename, content in files_data:
-                    combined_message += f"\n[{filename}]:\n{content}\n"
+                    combined_message += f"[File: {filename}]\n{content}\n\n"
 
         # If total tokens > max, truncate
         if total_tokens > MAX_INPUT_TOKENS:

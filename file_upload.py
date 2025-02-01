@@ -332,7 +332,7 @@ class FileUploadHandler:
                 saved_files.append(file_info)
 
                 # Cache the processed content
-                cache_key = hash((filename, len(content)))
+                cache_key = hash((filename, os.path.getsize(filepath)))
                 context_manager.context_cache[cache_key] = compressed_content
 
             except Exception as e:

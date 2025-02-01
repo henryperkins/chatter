@@ -98,33 +98,19 @@ class ConversationManager:
             requires_o1_handling: Flag for special handling (e.g., O1 transformations).
             streaming_stats: Optional dict containing streaming statistics.
         """
-        # Extract file attachments if present in content
+        # Process file attachments if present
         file_attachments = []
-        if "Attached files:" in content:
-            parts = content.split("Attached files:", 1)
-            main_content = parts[0].strip()
-            attachments_text = parts[1].strip()
-
-            # Parse file attachments
-            current_file = {"name": "", "content": ""}
-            for line in attachments_text.split('\n'):
-                if line.startswith('[') and line.endswith(']:'):
-                    # Save previous file if exists
-                    if current_file["name"] and current_file["content"]:
-                        file_attachments.append(current_file.copy())
-                    # Start new file
-                    current_file["name"] = line[1:-2]
-                    current_file["content"] = ""
-                else:
-                    current_file["content"] += line + "\n"
-
-            # Add last file
-            if current_file["name"] and current_file["content"]:
-                file_attachments.append(current_file)
-
-            # Use main content for the message
-            content = main_content
-
+        if isinstance(content, str) and "Here are the contents of the uploaded files:" in content:
+            # Keep the full content including attachments for the model
+            file_attachments = self._extract_file_attachments(content)
+            
+            # Don't split the content - keep it as is for the model to process
+            # This ensures the model sees both the message and file contents
+            metadata = {
+                "has_attachments": True,
+                "attachments": file_attachments
+            }
+            
         message_obj = {"role": role, "content": content}
         tokens = count_message_tokens(message_obj)
         logger.debug("Calculated %d tokens for message: %s", tokens, message_obj)
@@ -136,11 +122,6 @@ class ConversationManager:
             "model_max_tokens": model_max_tokens,
             "has_attachments": bool(file_attachments)
         }
-
-        # Add file attachments to metadata if present
-        if file_attachments:
-            metadata["attachments"] = file_attachments
-            logger.debug("Added %d file attachments to metadata", len(file_attachments))
 
         # Add streaming stats if provided
         if streaming_stats:
@@ -170,6 +151,39 @@ class ConversationManager:
 
         # Manage context window
         self._manage_context_window(chat_id, model_max_tokens)
+
+    def _extract_file_attachments(self, content: str) -> List[Dict[str, str]]:
+        """
+        Extract file attachments from message content.
+        
+        Args:
+            content: The message content containing file attachments.
+            
+        Returns:
+            A list of dictionaries containing file name and content.
+        """
+        file_attachments = []
+        if "Here are the contents of the uploaded files:" in content:
+            parts = content.split("Here are the contents of the uploaded files:", 1)
+            attachments_text = parts[1].strip()
+
+            current_file = {"name": "", "content": ""}
+            for line in attachments_text.split('\n'):
+                if line.startswith('[File:') and line.endswith(']'):
+                    # Save previous file if exists
+                    if current_file["name"] and current_file["content"]:
+                        file_attachments.append(current_file.copy())
+                    # Start new file
+                    current_file["name"] = line[7:-1]  # Remove '[File: ' and ']'
+                    current_file["content"] = ""
+                else:
+                    current_file["content"] += line + "\n"
+
+            # Add last file
+            if current_file["name"] and current_file["content"]:
+                file_attachments.append(current_file)
+
+        return file_attachments
 
     def _truncate_content(self, content: str, encoding: Any) -> str:
         """
