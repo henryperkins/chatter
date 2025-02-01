@@ -56,6 +56,9 @@ class Config:
         "AZURE_API_KEY"
     }
 
+    # Print the loaded DATABASE_URI for debugging
+    print(f"Loaded DATABASE_URI: {os.getenv('DATABASE_URI')}")
+
     # Validate required configuration
     for var in REQUIRED_CONFIG:
         value = os.getenv(var)
