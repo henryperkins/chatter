@@ -304,10 +304,6 @@ def configure_app(app: Optional[Flask] = None) -> None:
     if not app.config.get("SECRET_KEY"):
         app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", os.urandom(32))
 
-
-    # Print the DATABASE_URI to verify it's correctly set
-    print(f"Using DATABASE_URI: {app.config['DATABASE_URI']}")
-
     # Enhanced session settings
     app.config.update(
         {
