@@ -305,23 +305,8 @@ def configure_app(app: Optional[Flask] = None) -> None:
         app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", os.urandom(32))
 
 
-    # Database connection settings
-    app.config.update(
-        {
-            "SQLALCHEMY_POOL_SIZE": int(os.getenv("DB_POOL_SIZE", "5")),
-            "SQLALCHEMY_POOL_TIMEOUT": int(os.getenv("DB_POOL_TIMEOUT", "30")),
-            "SQLALCHEMY_POOL_RECYCLE": int(os.getenv("DB_POOL_RECYCLE", "1800")),
-            "SQLALCHEMY_MAX_OVERFLOW": int(os.getenv("DB_MAX_OVERFLOW", "10")),
-            "SQLALCHEMY_ENGINE_OPTIONS": {
-                "pool_pre_ping": True,
-                "pool_use_lifo": True,
-                "connect_args": {
-                    "connect_timeout": 10,
-                    "options": "-c statement_timeout=30000 -c default_transaction_isolation='read committed'",
-                },
-            },
-        }
-    )
+    # Print the DATABASE_URI to verify it's correctly set
+    print(f"Using DATABASE_URI: {app.config['DATABASE_URI']}")
 
     # Enhanced session settings
     app.config.update(

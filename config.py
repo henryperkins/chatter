@@ -75,6 +75,7 @@ class Config:
                 logger.warning("Corrected DATABASE_URI scheme to 'postgresql://'")
 
             validate_database_uri(value)
+            DATABASE_URI = value  # Set the corrected DATABASE_URI as a class attribute
 
         # Set the attribute directly on the class
         globals()[var] = value
