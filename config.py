@@ -17,7 +17,7 @@ def validate_database_uri(uri: str) -> None:
         parsed = urlparse(uri)
 
         # Check if the scheme is valid
-        valid_schemes = {"postgresql", "postgres", "postgresql+psycopg2"}
+        valid_schemes = {"postgresql", "postgresql+psycopg2"}
         if parsed.scheme not in valid_schemes:
             raise ValueError(
                 f"Invalid DATABASE_URI scheme: {parsed.scheme}. "
