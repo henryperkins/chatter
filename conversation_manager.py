@@ -62,6 +62,13 @@ class ConversationManager:
         messages = Chat.get_messages(chat_id=chat_id, include_system=include_system)
         context: List[Dict[str, str]] = []
 
+        # Always add markdown formatting request, even for models that don't use system messages
+        markdown_request = {
+            "role": "system" if include_system else "user",
+            "content": "Format your responses using markdown for better readability. Use standard markdown syntax for headers (#), lists (- or 1.), emphasis (* or _), etc. For code blocks, specify the language after the opening triple backticks (e.g., ```python, ```javascript, ```sql) to enable syntax highlighting. Only use triple backticks to enclose code blocks - do not wrap the entire response in a code block."
+        }
+        context.append(markdown_request)
+
         for msg in messages:
             role = msg.get("role")
             content = msg.get("content")

@@ -73,17 +73,24 @@
         <!-- API Endpoint -->
         <div class="mb-6">
             {{ form.api_endpoint.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Your Azure OpenAI endpoint URL (e.g.,
-                "https://your-resource.openai.azure.com")</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Your Azure OpenAI endpoint URL</p>
             {{ form.api_endpoint(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200",
-            placeholder="https://your-resource.openai.azure.com") }}
+            placeholder="https://your-resource.openai.azure.com/openai/deployments/{deployment-name}/chat/completions?api-version=2024-12-01-preview") }}
             {% if form.api_endpoint.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
             {% endif %}
+            <div class="mt-2 p-3 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-xs">
+                <strong>Valid endpoint format:</strong>
+                <ul class="list-disc list-inside mt-1">
+                    <li>Must use *.openai.azure.com or *.azure-api.net domain</li>
+                    <li>Must follow pattern: /openai/deployments/{name}/chat/completions</li>
+                    <li>Must include api-version query parameter</li>
+                </ul>
+            </div>
         </div>
 
         <!-- API Key -->
-        <div class="mb-6">
+        <div class="mb-6 api-key-section" {% if provider and not provider.requires_authentication %}style="display: none;"{% endif %}>
             {{ form.api_key.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Your Azure OpenAI API key</p>
             {{ form.api_key(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", type="password",
@@ -96,16 +103,23 @@
         <!-- Model Type -->
         <div class="mb-6">
             {{ form.model_type.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Select 'azure' for standard models or 'o1-preview' for preview models
-            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ form.model_type.description }}</p>
             {{ form.model_type(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
             {% if form.model_type.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.model_type.errors[0] }}</p>
             {% endif %}
+            <div class="mt-2 p-3 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-lg text-xs">
+                <strong>Note for o1-preview models:</strong>
+                <ul class="list-disc list-inside mt-1">
+                    <li>Temperature will be fixed at 1.0</li>
+                    <li>Streaming is not supported</li>
+                    <li>Max completion tokens must be between 1-8300</li>
+                </ul>
+            </div>
         </div>
 
         <!-- Temperature -->
-        <div class="mb-6">
+        <div class="mb-6" {% if provider and provider.capabilities.get('temperature_range') %}data-min="{{ provider.capabilities['temperature_range']['min'] }}" data-max="{{ provider.capabilities['temperature_range']['max'] }}"{% endif %}>
             {{ form.temperature.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Controls randomness (0.0 for focused, up to 2.0 for more creative
                 responses). Note: For o1-preview models, temperature is automatically set to 1.0.</p>
@@ -116,7 +130,7 @@
         </div>
 
         <!-- Max Tokens and Max Completion Tokens -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6" {% if provider and provider.capabilities.get('max_tokens') %}data-max-tokens="{{ provider.capabilities['max_tokens'] }}"{% endif %}>
             <div>
                 {{ form.max_tokens.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
                 <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Maximum input tokens (1-4000)</p>
@@ -128,12 +142,15 @@
             </div>
             <div>
                 {{ form.max_completion_tokens.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Maximum response length (1-16384)</p>
-                {{ form.max_completion_tokens(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", type="number", min="1",
-                max="16384") }}
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Maximum response length (dynamically adjusted based on model type)</p>
+                {{ form.max_completion_tokens(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", type="number", min="1") }}
                 {% if form.max_completion_tokens.errors %}
                 <p class="text-sm text-red-500 mt-1">{{ form.max_completion_tokens.errors[0] }}</p>
                 {% endif %}
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <span class="standard-model-note">Standard models: 1-16384 tokens</span>
+                    <span class="o1-preview-note" style="display: none;">o1-preview models: 1-8300 tokens</span>
+                </p>
             </div>
         </div>
 
@@ -151,7 +168,44 @@
         <div class="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
             <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Advanced Settings</h3>
 
-            <!-- Requires o1-preview Handling -->
+            <!-- Reasoning Settings (for o1/o3 models) -->
+            <div class="reasoning-settings mb-6" style="display: none;">
+                <h4 class="text-md font-semibold text-gray-700 dark:text-gray-300 mb-2">Reasoning Configuration</h4>
+                
+                <!-- Reasoning Effort -->
+                <div class="mb-4">
+                    {{ form.reasoning_effort.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ form.reasoning_effort.description }}</p>
+                    {{ form.reasoning_effort(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
+                    {% if form.reasoning_effort.errors %}
+                    <p class="text-sm text-red-500 mt-1">{{ form.reasoning_effort.errors[0] }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Store Completion -->
+                <div class="mb-4">
+                    <label class="inline-flex items-center">
+                        {{ form.store(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500 focus:ring-2") }}
+                        <span class="ml-2 text-sm text-gray-700 dark:text-gray-300 font-medium">
+                            {{ form.store.label.text }}
+                        </span>
+                    </label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-7">{{ form.store.description }}</p>
+                </div>
+
+                <!-- Reasoning Info -->
+                <div class="mt-4 p-3 bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-lg text-xs">
+                    <strong>About Reasoning Models:</strong>
+                    <ul class="list-disc list-inside mt-1">
+                        <li>Generate reasoning tokens before responding</li>
+                        <li>Reasoning tokens are billed but not visible</li>
+                        <li>Reserve at least 25,000 tokens for reasoning</li>
+                        <li>Use simple, direct prompts - no need for "think step by step"</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Model Specific Settings -->
             <div class="mb-4">
                 <label class="inline-flex items-center">
                     {{ form.requires_o1_handling(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500
@@ -165,7 +219,7 @@
             </div>
 
             <!-- Streaming Support -->
-            <div class="mb-4">
+            <div class="mb-4 streaming-section" {% if provider and not provider.capabilities.get('streaming') %}style="display: none;"{% endif %}>
                 <label class="inline-flex items-center">
                     {{ form.supports_streaming(class="h-5 w-5 text-blue-600 form-checkbox focus:ring-blue-500
                     focus:ring-2") }}
@@ -215,6 +269,200 @@
         if (form) {
             form.classList.add('model-form');
             form.dataset.submitText = "Add Model";
+
+            // Handle temperature range
+            const temperatureDiv = form.querySelector('[data-min]');
+            if (temperatureDiv) {
+                const min = parseFloat(temperatureDiv.dataset.min);
+                const max = parseFloat(temperatureDiv.dataset.max);
+                const temperatureInput = temperatureDiv.querySelector('input[type="number"]');
+                if (temperatureInput) {
+                    temperatureInput.min = min;
+                    temperatureInput.max = max;
+                    temperatureInput.step = 0.1;
+                }
+            }
+
+            // Handle max tokens
+            const tokensDiv = form.querySelector('[data-max-tokens]');
+            if (tokensDiv) {
+                const maxTokens = parseInt(tokensDiv.dataset.maxTokens);
+                const maxTokensInput = tokensDiv.querySelector('input[name="max_tokens"]');
+                const maxCompletionTokensInput = tokensDiv.querySelector('input[name="max_completion_tokens"]');
+                if (maxTokensInput) {
+                    maxTokensInput.max = maxTokens;
+                }
+                if (maxCompletionTokensInput) {
+                    maxCompletionTokensInput.max = maxTokens;
+                }
+            }
+
+            // Handle provider changes
+            const providerSelect = form.querySelector('select[name="provider_id"]');
+            if (providerSelect) {
+                providerSelect.addEventListener('change', async function(e) {
+                    const providerId = e.target.value;
+                    if (providerId) {
+                        try {
+                            const response = await fetch(`/models/api/providers/${providerId}`);
+                            const provider = await response.json();
+                            
+                            // Update form based on provider capabilities
+                            const apiKeyDiv = form.querySelector('.api-key-section');
+                            if (apiKeyDiv) {
+                                apiKeyDiv.style.display = provider.requires_authentication ? 'block' : 'none';
+                            }
+
+                            // Update temperature limits
+                            const temperatureInput = form.querySelector('input[name="temperature"]');
+                            if (temperatureInput && provider.capabilities.temperature_range) {
+                                temperatureInput.min = provider.capabilities.temperature_range.min;
+                                temperatureInput.max = provider.capabilities.temperature_range.max;
+                                temperatureInput.value = provider.capabilities.temperature_range.default;
+                            }
+
+                            // Update max tokens
+                            const maxTokensInput = form.querySelector('input[name="max_tokens"]');
+                            const maxCompletionTokensInput = form.querySelector('input[name="max_completion_tokens"]');
+                            if (provider.capabilities.max_tokens) {
+                                const maxTokens = provider.capabilities.max_tokens;
+                                if (maxTokensInput) maxTokensInput.max = maxTokens;
+                                if (maxCompletionTokensInput) {
+                                    maxCompletionTokensInput.max = maxTokens;
+                                    maxCompletionTokensInput.value = Math.min(
+                                        maxCompletionTokensInput.value || DEFAULT_MAX_COMPLETION_TOKENS,
+                                        maxTokens
+                                    );
+                                }
+                            }
+
+                            // Update streaming support
+                            const streamingDiv = form.querySelector('.streaming-section');
+                            if (streamingDiv) {
+                                streamingDiv.style.display = provider.capabilities.streaming ? 'block' : 'none';
+                                const streamingCheckbox = streamingDiv.querySelector('input[type="checkbox"]');
+                                if (streamingCheckbox) {
+                                    streamingCheckbox.checked = provider.capabilities.streaming;
+                                }
+                            }
+
+                            // Pre-fill API endpoint using provider's stored base URL
+                            const apiEndpointInput = form.querySelector('input[name="api_endpoint"]');
+                            if (apiEndpointInput) {
+                                if (provider.api_base_url) {
+                                    // Use provider's stored base URL
+                                    apiEndpointInput.value = provider.api_base_url;
+                                } else if (provider.endpoint_pattern) {
+                                    // Fallback to pattern if no base URL is stored
+                                    apiEndpointInput.value = provider.endpoint_pattern;
+                                }
+                            }
+
+                            // Set API version if format exists
+                            if (provider.api_version_format) {
+                                const apiVersionInput = form.querySelector('input[name="api_version"]');
+                                if (apiVersionInput) {
+                                    apiVersionInput.value = provider.api_version_format;
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Error fetching provider details:', error);
+                        }
+                    }
+                });
+            }
+
+            // Handle model type changes
+            const modelTypeSelect = form.querySelector('select[name="model_type"]');
+            if (modelTypeSelect) {
+                const updateForModelType = function(modelType) {
+                    const temperatureInput = form.querySelector('input[name="temperature"]');
+                    const streamingCheckbox = form.querySelector('input[name="supports_streaming"]');
+                    const o1HandlingCheckbox = form.querySelector('input[name="requires_o1_handling"]');
+                    const maxCompletionTokensInput = form.querySelector('input[name="max_completion_tokens"]');
+                    const standardModelNote = form.querySelector('.standard-model-note');
+                    const o1PreviewNote = form.querySelector('.o1-preview-note');
+                    const reasoningSettings = form.querySelector('.reasoning-settings');
+                    
+                    // Show/hide reasoning settings for o1/o3 models
+                    if (reasoningSettings) {
+                        reasoningSettings.style.display = ['o1-preview', 'o3-mini'].includes(modelType) ? 'block' : 'none';
+                    }
+                    
+                    switch(modelType) {
+                        case 'o1-preview':
+                            // Update temperature
+                            temperatureInput.value = '1.0';
+                            temperatureInput.disabled = true;
+                            
+                            // Update streaming
+                            streamingCheckbox.checked = false;
+                            streamingCheckbox.disabled = true;
+                            
+                            // Update o1 handling
+                            o1HandlingCheckbox.checked = true;
+                            
+                            // Update max completion tokens
+                            maxCompletionTokensInput.max = 8300;
+                            if (maxCompletionTokensInput.value > 8300) {
+                                maxCompletionTokensInput.value = 8300;
+                            }
+                            
+                            // Update token limit notes
+                            if (standardModelNote) standardModelNote.style.display = 'none';
+                            if (o1PreviewNote) o1PreviewNote.style.display = 'inline';
+                            break;
+                            
+                        case 'o3-mini':
+                            // Reset temperature
+                            temperatureInput.disabled = false;
+                            
+                            // Enable streaming
+                            streamingCheckbox.disabled = false;
+                            
+                            // Disable o1 handling
+                            o1HandlingCheckbox.checked = false;
+                            
+                            // Set max completion tokens for reasoning
+                            maxCompletionTokensInput.max = 25000;
+                            
+                            // Update token limit notes
+                            if (standardModelNote) standardModelNote.style.display = 'none';
+                            if (o1PreviewNote) o1PreviewNote.style.display = 'none';
+                            break;
+                            
+                        default: // standard azure models
+                            // Reset temperature
+                            temperatureInput.disabled = false;
+                            
+                            // Reset streaming
+                            streamingCheckbox.disabled = false;
+                            
+                            // Reset o1 handling
+                            o1HandlingCheckbox.checked = false;
+                            
+                            // Reset max completion tokens
+                            maxCompletionTokensInput.max = 16384;
+                            
+                            // Update token limit notes
+                            if (standardModelNote) standardModelNote.style.display = 'inline';
+                            if (o1PreviewNote) o1PreviewNote.style.display = 'none';
+                            
+                            // Hide reasoning settings
+                            if (reasoningSettings) {
+                                reasoningSettings.style.display = 'none';
+                            }
+                    }
+                };
+
+                // Set initial state
+                updateForModelType(modelTypeSelect.value);
+                
+                // Handle changes
+                modelTypeSelect.addEventListener('change', function(e) {
+                    updateForModelType(e.target.value);
+                });
+            }
         }
     });
 </script>

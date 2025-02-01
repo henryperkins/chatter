@@ -540,6 +540,14 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                         include_system=not getattr(model_obj, "requires_o1_handling", False),
                     )
 
+                    # Verify API version
+                    api_version = getattr(model_obj, "api_version", "2024-12-01-preview")
+                    if not api_version:
+                        logger.error("API version not configured for this model")
+                        return jsonify({
+                            "error": "API version is not configured"
+                        }), 500
+
                     # Get provider capabilities
                     provider = Provider.get_by_id(model_obj.provider_id)
                     provider_caps = provider.capabilities if provider else {}

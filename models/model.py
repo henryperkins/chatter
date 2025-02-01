@@ -65,7 +65,9 @@ class Model:
     is_default: bool = field(default=False, metadata={"sa": mapped_column(Boolean, nullable=False)})
     requires_o1_handling: bool = field(default=False, metadata={"sa": mapped_column(Boolean, nullable=False)})
     supports_streaming: bool = field(default=False, metadata={"sa": mapped_column(Boolean, nullable=False)})
-    api_version: str = field(default="2023-07-01-preview", metadata={"sa": mapped_column(String(50), nullable=False)})
+    api_version: str = field(default="2024-12-01-preview", metadata={"sa": mapped_column(String(50), nullable=False)})
+    reasoning_effort: str = field(default="medium", metadata={"sa": mapped_column(String(10), nullable=False)})
+    store_completion: bool = field(default=False, metadata={"sa": mapped_column(Boolean, nullable=False)})
     created_at: Optional[str] = field(default=None, metadata={"sa": mapped_column(DateTime, nullable=True)})
     version: int = field(default=1, metadata={"sa": mapped_column(Integer, nullable=False, server_default=text("1"))})
 
@@ -194,12 +196,12 @@ class Model:
                         provider_id, name, deployment_name, description, api_endpoint, api_key,
                         api_version, temperature, max_tokens, max_completion_tokens,
                         model_type, requires_o1_handling, supports_streaming, is_default,
-                        created_at
+                        reasoning_effort, store_completion, created_at
                     ) VALUES (
                         :provider_id, :name, :deployment_name, :description, :api_endpoint, :api_key,
                         :api_version, :temperature, :max_tokens, :max_completion_tokens,
                         :model_type, :requires_o1_handling, :supports_streaming, :is_default,
-                        NOW()
+                        :reasoning_effort, :store_completion, NOW()
                     )
                     RETURNING id
                 """
@@ -323,7 +325,8 @@ class Model:
                     "api_endpoint", "api_key", "api_version",
                     "temperature", "max_tokens", "max_completion_tokens",
                     "model_type", "requires_o1_handling",
-                    "supports_streaming", "is_default", "provider_id"
+                    "supports_streaming", "is_default", "provider_id",
+                    "reasoning_effort", "store_completion"
                 }
 
                 update_data = {
@@ -541,22 +544,51 @@ class Model:
 
         config['supports_streaming'] = provider_caps.get('streaming', True)
 
-        # Handle max_completion_tokens based on model type
+        # Handle max_completion_tokens based on model type and provider capabilities
         model_type = config.get('model_type', '').lower()
         requires_o1 = config.get('requires_o1_handling', False)
         is_o1_preview = model_type == 'o1-preview' and requires_o1
 
+        # Get provider-specific capabilities
+        model_caps = provider_caps.get(model_type, {})
+        
+        # For o1-preview models, enforce stricter limits
         if is_o1_preview:
-            config['max_completion_tokens'] = min(
-                config.get('max_completion_tokens', 8300),
-                8300
-            )
+            max_tokens = config.get('max_completion_tokens', 8300)
+            if not (1 <= max_tokens <= 25000):
+                raise ValueError("For o1-preview models, max_completion_tokens must be between 1 and 25000 (OpenAI recommended)")
+            config['max_completion_tokens'] = max_tokens
         else:
-            provider_max = provider_caps.get('max_tokens', 16384)
-            config['max_completion_tokens'] = min(
-                config.get('max_completion_tokens', provider_max),
-                provider_max
-            )
+            # For non-o1 models (like azure), just ensure it's a positive number
+            max_tokens = config.get('max_completion_tokens')
+            if max_tokens is not None and max_tokens <= 0:
+                raise ValueError("max_completion_tokens must be positive")
+            
+            # Use provider's max_tokens if available, otherwise no upper limit
+            if 'max_tokens' in model_caps:
+                config['max_completion_tokens'] = min(
+                    max_tokens or model_caps['max_tokens'],
+                    model_caps['max_tokens']
+                )
+
+        # Handle reasoning settings for o1/o3 models
+        model_type = config.get('model_type', '').lower()
+        is_reasoning_model = model_type in ['o1-preview', 'o3-mini']
+        
+        if is_reasoning_model:
+            # Validate reasoning_effort
+            reasoning_effort = config.get('reasoning_effort', 'medium')
+            if reasoning_effort not in ['low', 'medium', 'high']:
+                raise ValueError("reasoning_effort must be one of: low, medium, high")
+            config['reasoning_effort'] = reasoning_effort
+            
+            # Ensure store_completion is boolean
+            store_completion = config.get('store_completion', False)
+            config['store_completion'] = bool(store_completion)
+        else:
+            # For non-reasoning models, set defaults
+            config['reasoning_effort'] = 'medium'
+            config['store_completion'] = False
 
         # Validate required fields with strict type checking
         required_fields = {
@@ -579,35 +611,52 @@ class Model:
             if not isinstance(value, expected_type):
                 raise ValueError(f"{field} must be of type {expected_type.__name__}")
 
-        # Additional API endpoint validation for Azure OpenAI
+        # API endpoint validation using provider's rules
         api_endpoint = config["api_endpoint"]
         if not isinstance(api_endpoint, str):
             raise ValueError("API endpoint must be a string")
 
-        # Validate basic URL structure
+        # Basic HTTPS validation
         if not api_endpoint.startswith("https://"):
             raise ValueError("API endpoint must use HTTPS")
 
-        # Extract and validate instance name
-        instance_parts = api_endpoint.split('.')
-        if len(instance_parts) < 2 or not instance_parts[0].startswith("https://"):
-            raise ValueError("API endpoint must start with https://instancename")
+        # Get provider's validation rules
+        validation_rules = provider.validation_rules
+        if isinstance(validation_rules, str):
+            validation_rules = json.loads(validation_rules)
 
-        # Validate domain
-        if not any(domain in api_endpoint for domain in ["openai.azure.com", "azure-api.net"]):
-            raise ValueError("API endpoint must be an Azure OpenAI domain (openai.azure.com or azure-api.net)")
+        # For Azure providers
+        if provider.is_azure:
+            # Validate domain
+            if not any(domain in api_endpoint for domain in ["openai.azure.com", "azure-api.net"]):
+                raise ValueError("API endpoint must be an Azure OpenAI domain (openai.azure.com or azure-api.net)")
 
-        # Validate deployment path and api-version
-        if "/openai/deployments/" not in api_endpoint:
-            raise ValueError("API endpoint must include /openai/deployments/{deployment-name}")
+            # Validate deployment path and api-version
+            if "/openai/deployments/" not in api_endpoint:
+                raise ValueError("API endpoint must include /openai/deployments/{deployment-name}")
 
-        # Validate api-version query parameter
-        if "api-version=" not in api_endpoint:
-            raise ValueError("API endpoint must include api-version query parameter")
+            # Validate api-version query parameter
+            if "api-version=" not in api_endpoint:
+                raise ValueError("API endpoint must include api-version query parameter")
 
-        # Validate chat completions endpoint
-        if "/chat/completions" not in api_endpoint:
-            raise ValueError("API endpoint must be a chat completions endpoint (/chat/completions)")
+            # Validate chat completions endpoint
+            if "/chat/completions" not in api_endpoint:
+                raise ValueError("API endpoint must be a chat completions endpoint (/chat/completions)")
+
+            # Validate api version format if specified
+            api_version_pattern = validation_rules.get("api_version")
+            if api_version_pattern:
+                from urllib.parse import parse_qs, urlparse
+                query = parse_qs(urlparse(api_endpoint).query)
+                api_version = query.get("api-version", [""])[0]
+                if not re.match(api_version_pattern, api_version):
+                    raise ValueError(f"API version must match pattern: {api_version_pattern}")
+
+        # For other providers, use their specific validation rules
+        else:
+            endpoint_pattern = validation_rules.get("endpoint")
+            if endpoint_pattern and not re.match(endpoint_pattern, api_endpoint):
+                raise ValueError(f"API endpoint must match provider's required format")
 
         # Validate temperature
         temperature = config.get("temperature")

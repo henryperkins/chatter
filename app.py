@@ -225,6 +225,10 @@ def initialize_default_model(app):
                 raise ValueError("Failed to create Azure OpenAI provider")
 
             # Create default model using the same transaction
+            max_completion_tokens = Config.DEFAULT_MAX_COMPLETION_TOKENS
+            if not (1 <= max_completion_tokens <= 16384):
+                raise ValueError("DEFAULT_MAX_COMPLETION_TOKENS must be between 1 and 16384")
+
             model_data = {
                 "provider_id": provider_id,
                 "name": Config.DEFAULT_MODEL_NAME,
@@ -235,12 +239,16 @@ def initialize_default_model(app):
                 "model_type": "azure",
                 "temperature": Config.DEFAULT_TEMPERATURE,
                 "max_tokens": Config.DEFAULT_MAX_TOKENS,
-                "max_completion_tokens": Config.DEFAULT_MAX_COMPLETION_TOKENS,
+                "max_completion_tokens": max_completion_tokens,
                 "requires_o1_handling": Config.DEFAULT_REQUIRES_O1_HANDLING,
                 "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
                 "is_default": True,
                 "api_version": Config.DEFAULT_API_VERSION,
             }
+
+            # Validate model configuration before insertion
+            from models.model import Model
+            Model.validate_model_config(model_data)
 
             # Insert model in same transaction
             model_id = db.execute(

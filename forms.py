@@ -373,6 +373,47 @@ class ProviderForm(FlaskForm):
         default="2024-12-01-preview"
     )
 
+    api_key = PasswordField(
+        "API Key",
+        validators=[
+            Optional(),
+            Length(min=32, message="API key must be at least 32 characters if provided.")
+        ],
+        description="Provider-level API key (if using a shared key)"
+    )
+
+    model_name = StringField(
+        "Default Model Name",
+        validators=[
+            Optional(),
+            Length(max=50, message="Model name cannot exceed 50 characters."),
+            Regexp(
+                r"^[a-zA-Z0-9_\-\s]+$",
+                message="Model name can only contain letters, numbers, spaces, underscores, and hyphens.",
+            ),
+        ],
+        description="Default model name for this provider"
+    )
+
+    deployment_name = StringField(
+        "Default Deployment Name",
+        validators=[
+            Optional(),
+            Length(max=50, message="Deployment name cannot exceed 50 characters."),
+            Regexp(
+                r"^[a-zA-Z0-9_\-]+$",
+                message="Deployment name can only contain letters, numbers, underscores, and hyphens.",
+            ),
+        ],
+        description="Default deployment name (Azure OpenAI only)"
+    )
+
+    is_azure = BooleanField(
+        "Azure OpenAI Provider",
+        default=False,
+        description="Check if this is an Azure OpenAI provider"
+    )
+
 
 # ------------------------------------------------------------------------
 # ModelForm
@@ -385,7 +426,31 @@ class ModelForm(FlaskForm):
     description = TextAreaField('Description', validators=[Optional(), Length(max=500)])
     provider_id = SelectField('Provider', coerce=int, validators=[DataRequired()])
     api_key = PasswordField('API Key', validators=[DataRequired(), Length(min=32, message="API key must be at least 32 characters.")])
-    model_type = StringField('Model Type', validators=[DataRequired(), Length(max=255)])
+    model_type = SelectField('Model Type',
+        choices=[
+            ('azure', 'Azure OpenAI (Standard)'),
+            ('o1-preview', 'Azure OpenAI (o1-preview)'),
+            ('o3-mini', 'Azure OpenAI (o3-mini)')
+        ],
+        validators=[DataRequired()],
+        description="Select the model type - o1/o3 models support advanced reasoning capabilities"
+    )
+
+    reasoning_effort = SelectField('Reasoning Effort',
+        choices=[
+            ('low', 'Low - Faster responses, fewer tokens'),
+            ('medium', 'Medium - Balanced speed and reasoning (Default)'),
+            ('high', 'High - More thorough reasoning, more tokens')
+        ],
+        default='medium',
+        validators=[Optional()],
+        description="Controls how many reasoning tokens the model generates before responding"
+    )
+
+    store = BooleanField('Store Completion',
+        default=False,
+        description="Whether to store this completion for future reference"
+    )
     max_completion_tokens = IntegerField('Max Completion Tokens', validators=[DataRequired(), NumberRange(min=1)])
     max_tokens = IntegerField('Max Tokens', validators=[Optional(), NumberRange(min=1)])
     temperature = FloatField('Temperature', validators=[Optional(), NumberRange(min=0.0, max=2.0)])
@@ -477,8 +542,8 @@ class ModelForm(FlaskForm):
         provider_max = provider.capabilities.get('max_tokens', 16384) if provider else 16384
 
         if self.requires_o1_handling.data:
-            if not (1 <= value <= 8300):
-                raise ValidationError("Must be between 1-8300 for o1-preview models")
+            if not (1 <= value <= 25000):
+                raise ValidationError("Must be between 1-25000 for o1-preview models (OpenAI recommended)")
         else:
             if not (1 <= value <= provider_max):
                 raise ValidationError(f"Must be between 1-{provider_max} for this provider")

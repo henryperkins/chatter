@@ -361,7 +361,7 @@ def create_default_model(db: Session) -> Optional[int]:
                 "requires_authentication": True
             }
 
-            # Insert provider
+            # Insert provider and get ID
             provider_query = text("""
                 INSERT INTO providers (
                     name, slug, api_base_url, api_version_format,
@@ -376,7 +376,8 @@ def create_default_model(db: Session) -> Optional[int]:
             """)
             result = db.execute(provider_query, default_provider)
             provider_id = result.scalar_one()
-            logger.info("Created new Azure OpenAI provider")
+            db.commit()  # Commit the provider creation
+            logger.info(f"Created new Azure OpenAI provider with ID: {provider_id}")
 
         # Create default model with proper encryption
         from cryptography.fernet import Fernet
@@ -403,22 +404,36 @@ def create_default_model(db: Session) -> Optional[int]:
             logger.error(f"Failed to encrypt API key: {e}")
             raise ValueError("Failed to encrypt API key")
 
+        # Build API endpoint with deployment path
+        api_endpoint = Config.DEFAULT_API_ENDPOINT.rstrip("/")
+        deployment_name = Config.DEFAULT_DEPLOYMENT_NAME
+        api_endpoint = f"{api_endpoint}/openai/deployments/{deployment_name}/chat/completions?api-version={Config.DEFAULT_API_VERSION}"
+
+        # Determine model type and appropriate max_completion_tokens
+        model_type = "azure"  # Default model type
+        max_completion_tokens = Config.DEFAULT_MAX_COMPLETION_TOKENS
+        requires_o1_handling = Config.DEFAULT_REQUIRES_O1_HANDLING
+
         default_model = {
             "name": Config.DEFAULT_MODEL_NAME,
-            "deployment_name": Config.DEFAULT_DEPLOYMENT_NAME,
+            "deployment_name": deployment_name,
             "description": Config.DEFAULT_MODEL_DESCRIPTION,
             "provider_id": provider_id,
-            "api_endpoint": Config.DEFAULT_API_ENDPOINT,
+            "api_endpoint": api_endpoint,
             "api_key": encrypted_api_key,
             "model_type": "azure",
             "temperature": Config.DEFAULT_TEMPERATURE,
             "max_tokens": Config.DEFAULT_MAX_TOKENS,
-            "max_completion_tokens": Config.DEFAULT_MAX_COMPLETION_TOKENS,
+            "max_completion_tokens": max_completion_tokens,
             "is_default": True,
             "requires_o1_handling": Config.DEFAULT_REQUIRES_O1_HANDLING,
             "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
             "api_version": Config.DEFAULT_API_VERSION,
         }
+
+        # Validate model configuration
+        from models.model import Model
+        Model.validate_model_config(default_model)
 
         # Insert model
         model_query = text("""
@@ -435,6 +450,7 @@ def create_default_model(db: Session) -> Optional[int]:
         """)
         result = db.execute(model_query, default_model)
         model_id = result.scalar_one()
+        db.commit()  # Commit the model creation
         
         logger.info("Default provider and model created successfully")
         return model_id

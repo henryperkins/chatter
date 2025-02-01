@@ -13,6 +13,7 @@ from typing import Optional, Dict, Any, List
 from sqlalchemy import text
 
 from database import db_session
+from utils.encryption import encrypt_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +114,10 @@ class Provider:
         requires_authentication: Whether provider requires authentication
         capabilities: Provider capabilities configuration
         created_at: Creation timestamp
+        api_key: Optional provider-level API key
+        model_name: Optional default model name
+        deployment_name: Optional default deployment name (Azure only)
+        is_azure: Whether this is an Azure OpenAI provider
     """
 
     id: int
@@ -121,19 +126,36 @@ class Provider:
     api_base_url: str
     api_version_format: str
     auth_type: str = "api-key"
-    endpoint_pattern: str = "https://{endpoint}/openai/deployments/{deployment}/chat/completions"
-    validation_rules: Dict[str, str] = field(default_factory=lambda: {
-        "model_id": "^[a-zA-Z0-9-]{3,64}$",
-        "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$"
-    })
+    endpoint_pattern: str = field(default_factory=lambda: "")  # Will be set based on provider type
+    validation_rules: Dict[str, str] = field(default_factory=lambda: {})  # Will be set based on provider type
     requires_authentication: bool = field(default=True)
     capabilities: Dict[str, Any] = field(default_factory=dict)
     created_at: Optional[str] = None
+    api_key: Optional[str] = None
+    model_name: Optional[str] = None
+    deployment_name: Optional[str] = None
+    is_azure: bool = False
 
     def __post_init__(self):
-        """Parse capabilities from JSON if stored as a JSON string"""
+        """Set appropriate defaults based on provider type"""
+        # Parse capabilities from JSON if stored as a JSON string
         if isinstance(self.capabilities, str):
             self.capabilities = json.loads(self.capabilities)
+
+        # Set endpoint pattern and validation rules based on provider type
+        if self.is_azure or "openai.azure.com" in self.api_base_url:
+            self.endpoint_pattern = "https://{endpoint}/openai/deployments/{deployment}/chat/completions"
+            self.validation_rules = {
+                "model_id": "^[a-zA-Z0-9-]{3,64}$",
+                "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$"
+            }
+        else:
+            # OpenAI format
+            self.endpoint_pattern = "https://api.openai.com/v1/chat/completions"
+            self.validation_rules = {
+                "model_id": "^(gpt-4|gpt-3.5-turbo).*$",  # OpenAI model pattern
+                "api_version": "^v[0-9]+.*$"  # OpenAI version pattern
+            }
 
     def validate_model_id(self, model_id: str) -> bool:
         if not isinstance(model_id, str):
@@ -202,21 +224,41 @@ class Provider:
                 if isinstance(data.get("capabilities"), dict):
                     data["capabilities"] = json.dumps(data["capabilities"])
 
-                # Convert capabilities to JSON string
-                if isinstance(data.get("capabilities"), dict):
-                    data["capabilities"] = json.dumps(data["capabilities"])
+                # Encrypt API key if provided
+                api_key = data.get("api_key")
+                if api_key:
+                    api_key = encrypt_api_key(api_key)
 
-                # Insert new provider with consistent parameter style
+                # Determine provider type and set appropriate defaults
+                is_azure = data.get("is_azure", False) or "openai.azure.com" in data.get("api_base_url", "")
+                
+                # Set endpoint pattern based on provider type
+                if is_azure:
+                    endpoint_pattern = "https://{endpoint}/openai/deployments/{deployment}/chat/completions"
+                    validation_rules = {
+                        "model_id": "^[a-zA-Z0-9-]{3,64}$",
+                        "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$"
+                    }
+                else:
+                    endpoint_pattern = "https://api.openai.com/v1/chat/completions"
+                    validation_rules = {
+                        "model_id": "^(gpt-4|gpt-3.5-turbo).*$",
+                        "api_version": "^v[0-9]+.*$"
+                    }
+
+                # Insert new provider with provider-specific settings
                 query = text(
                     """
                     INSERT INTO providers (
                         name, slug, api_base_url, capabilities,
                         requires_authentication, api_version_format,
-                        endpoint_pattern, auth_type, validation_rules
+                        endpoint_pattern, auth_type, validation_rules,
+                        api_key, model_name, deployment_name, is_azure
                     ) VALUES (
                         :name, :slug, :api_base_url, :capabilities,
                         :requires_authentication, :api_version_format,
-                        :endpoint_pattern, :auth_type, :validation_rules
+                        :endpoint_pattern, :auth_type, :validation_rules,
+                        :api_key, :model_name, :deployment_name, :is_azure
                     )
                     RETURNING id
                 """
@@ -231,12 +273,13 @@ class Provider:
                         "capabilities": data.get("capabilities", "{}"),
                         "requires_authentication": data.get("requires_authentication", True),
                         "api_version_format": data.get("api_version_format"),
-                        "endpoint_pattern": data.get("endpoint_pattern", "https://{endpoint}/openai/deployments/{deployment}/chat/completions"),
+                        "endpoint_pattern": data.get("endpoint_pattern", endpoint_pattern),
                         "auth_type": data.get("auth_type", "api-key"),
-                        "validation_rules": json.dumps(data.get("validation_rules", {
-                            "model_id": "^[a-zA-Z0-9-]{3,64}$",
-                            "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$"
-                        }))
+                        "validation_rules": json.dumps(data.get("validation_rules", validation_rules)),
+                        "api_key": api_key,
+                        "model_name": data.get("model_name"),
+                        "deployment_name": data.get("deployment_name") if is_azure else None,
+                        "is_azure": is_azure
                     }
                 )
                 provider_id = result.scalar()

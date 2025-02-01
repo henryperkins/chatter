@@ -135,6 +135,8 @@ def extract_model_data(form: ModelForm) -> dict:
         "requires_o1_handling": form.requires_o1_handling.data,
         "supports_streaming": form.supports_streaming.data,
         "is_default": form.is_default.data,
+        "reasoning_effort": form.reasoning_effort.data,
+        "store_completion": form.store.data,
     }
     return data
 
@@ -165,12 +167,36 @@ def validate_model_data(data: Dict[str, Any]) -> List[str]:
         if not data.get(field):
             errors.append(f"Missing required field: {field}")
 
-    # Validate API endpoint format
+    # Get provider and its validation rules
+    provider = Provider.get_by_id(data.get("provider_id"))
+    if not provider:
+        errors.append("Invalid provider_id")
+        return errors
+
+    # Basic HTTPS validation
     if data.get("api_endpoint"):
         if not data["api_endpoint"].startswith("https://"):
             errors.append("API endpoint must use HTTPS")
-        if "openai.azure.com" not in data["api_endpoint"]:
-            errors.append("Invalid Azure OpenAI endpoint")
+
+        # Get provider's validation rules
+        validation_rules = provider.validation_rules
+        if isinstance(validation_rules, str):
+            validation_rules = json.loads(validation_rules)
+
+        # For Azure providers
+        if provider.is_azure:
+            if not any(domain in data["api_endpoint"] for domain in ["openai.azure.com", "azure-api.net"]):
+                errors.append("Must use a valid Azure OpenAI domain (*.openai.azure.com or *.azure-api.net)")
+            if "/openai/deployments/" not in data["api_endpoint"]:
+                errors.append("Must include /openai/deployments/{deployment-name}")
+            if "api-version=" not in data["api_endpoint"]:
+                errors.append("Must include api-version query parameter")
+        # For other providers
+        elif validation_rules.get("endpoint"):
+            import re
+            pattern = validation_rules["endpoint"]
+            if not re.match(pattern, data["api_endpoint"]):
+                errors.append(f"API endpoint must match provider's required format")
 
     # Validate model type specific requirements
     if data.get("requires_o1_handling"):
@@ -178,6 +204,8 @@ def validate_model_data(data: Dict[str, Any]) -> List[str]:
             errors.append("o1 models require temperature=1.0")
         if data.get("supports_streaming"):
             errors.append("o1 models do not support streaming")
+        if data.get("max_completion_tokens", 0) > 8300:
+            errors.append("Must be between 1-8300 for o1-preview models")
 
     return errors
 
@@ -397,15 +425,50 @@ def add_model_page():
     
     # Pre-select provider if provider_id is provided
     provider_id = request.args.get('provider_id', type=int)
+    provider = None
     if provider_id:
-        form.provider_id.data = provider_id
+        provider = Provider.get_by_id(provider_id)
+        if provider:
+            form.provider_id.data = provider_id
+            
+            # Pre-fill form based on provider settings
+            capabilities = provider.capabilities
+            
+            # Set temperature limits based on provider capabilities
+            if 'temperature_range' in capabilities:
+                temp_range = capabilities['temperature_range']
+                form.temperature.data = temp_range.get('default', 1.0)
+            
+            # Set max tokens limit
+            if 'max_tokens' in capabilities:
+                form.max_tokens.data = capabilities['max_tokens']
+                form.max_completion_tokens.data = min(
+                    Config.DEFAULT_MAX_COMPLETION_TOKENS,
+                    capabilities['max_tokens']
+                )
+            
+            # Set streaming support
+            form.supports_streaming.data = capabilities.get('streaming', False)
+            
+            # Pre-fill API endpoint using provider's stored base URL
+            if provider.api_base_url:
+                form.api_endpoint.data = provider.api_base_url
+            elif provider.endpoint_pattern:
+                # Fallback to pattern if no base URL is stored
+                form.api_endpoint.data = provider.endpoint_pattern
+            
+            # Set API version
+            if provider.api_version_format:
+                form.api_version.data = provider.api_version_format
     
     if request.method == "POST":
         return create_model()
+    
     logger.debug("Rendering add model page")
     return render_template(
         "add_model.html",
         form=form,
+        provider=provider,
         DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS,
     )
 
@@ -598,6 +661,29 @@ def set_default_model(model_id: int):
     except Exception as e:
         return handle_error(e, "Unexpected error setting default model")
 
+
+@bp.route("/api/providers/<int:provider_id>", methods=["GET"])
+@login_required
+def get_provider_details(provider_id: int):
+    """
+    Get provider details including capabilities for form configuration.
+    """
+    try:
+        provider = Provider.get_by_id(provider_id)
+        if not provider:
+            return jsonify({"error": "Provider not found"}), 404
+            
+        return jsonify({
+            "id": provider.id,
+            "name": provider.name,
+            "requires_authentication": provider.requires_authentication,
+            "endpoint_pattern": provider.endpoint_pattern,
+            "api_version_format": provider.api_version_format,
+            "capabilities": provider.capabilities
+        })
+    except Exception as e:
+        logger.error(f"Error retrieving provider details: {str(e)}", exc_info=True)
+        return jsonify({"error": "Failed to retrieve provider details"}), 500
 
 @bp.route("/models/<int:model_id>/immutable-fields", methods=["GET"])
 @login_required

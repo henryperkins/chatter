@@ -181,11 +181,15 @@ class User(UserMixin):
                     create_default_model(db)
                     db.commit()  # Commit the model creation first
                 
+                # Check if this is the first user
+                user_count = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
+                is_first_user = user_count == 0
+
                 # Now check for existing users
                 existing = db.execute(
                     text("""
-                        SELECT 1 FROM users 
-                        WHERE LOWER(username) = LOWER(:username) 
+                        SELECT 1 FROM users
+                        WHERE LOWER(username) = LOWER(:username)
                         OR LOWER(email) = LOWER(:email)
                     """),
                     {
@@ -197,7 +201,7 @@ class User(UserMixin):
                 if existing:
                     raise ValueError("Username or email already exists")
 
-                # Insert new user
+                # Insert new user - first user gets admin role
                 result = db.execute(
                     text(
                         """
@@ -207,7 +211,7 @@ class User(UserMixin):
                             created_at, is_active
                         )
                         VALUES (
-                            :username, :email, :password_hash, 'user',
+                            :username, :email, :password_hash, :role,
                             NULL, NULL, NOW(), TRUE
                         )
                         RETURNING id
@@ -217,6 +221,7 @@ class User(UserMixin):
                         "username": username.strip(),
                         "email": email.strip().lower(),
                         "password_hash": password_hash,
+                        "role": "admin" if is_first_user else "user"
                     },
                 )
                 user_id = result.scalar_one()
