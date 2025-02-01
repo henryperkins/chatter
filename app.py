@@ -49,6 +49,7 @@ from routes.auth_routes import bp as auth_bp
 from routes.chat_routes import chat_routes
 from routes.model_routes import bp as model_bp
 from routes.provider_routes import bp as provider_bp
+from routes.file_routes import init_file_routes
 
 
 
@@ -480,6 +481,9 @@ def init_app_components(app: Flask) -> None:
     app.register_blueprint(chat_routes)
     app.register_blueprint(model_bp, url_prefix="/models")
     app.register_blueprint(provider_bp, url_prefix="/providers")
+    
+    # Initialize file routes
+    init_file_routes(app)
 
     # Debug: Print all registered routes
     print("Registered routes:")

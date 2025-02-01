@@ -195,8 +195,32 @@ class TokenUsageManager {
             if (data.success && data.stats) {
                 console.log('TokenUsageManager: Processing stats:', data.stats);
 
-                // Update UI with stats
-                this.updateDisplay(data.stats);
+                // Get file tokens if files are present
+                let fileTokens = 0;
+                if (window.fileUploadManager?.uploadedFiles) {
+                    fileTokens = window.fileUploadManager.uploadedFiles.reduce((sum, file) => {
+                        return sum + (file.tokenCount || Math.ceil(file.size / 4));
+                    }, 0);
+                }
+
+                // Combine message and file tokens
+                const combinedStats = {
+                    ...data.stats,
+                    total_tokens: (data.stats.total_tokens || 0) + fileTokens,
+                    token_breakdown: {
+                        ...data.stats.token_breakdown,
+                        files: fileTokens
+                    }
+                };
+
+                // Update token usage percentage
+                if (data.stats.model_limits?.max_tokens) {
+                    combinedStats.token_usage_percentage =
+                        (combinedStats.total_tokens / data.stats.model_limits.max_tokens) * 100;
+                }
+
+                // Update UI with combined stats
+                this.updateDisplay(combinedStats);
 
                 // Update model-specific token limits, if provided
                 if (data.stats.model_limits) {
@@ -274,7 +298,7 @@ class TokenUsageManager {
         const limit = stats.token_limit || 0;
         const used = stats.total_tokens || 0;
         const percentage = stats.token_usage_percentage || 0;
-        const breakdown = stats.token_breakdown || { user: 0, assistant: 0, system: 0 };
+        const breakdown = stats.token_breakdown || { user: 0, assistant: 0, system: 0, files: 0 };
 
         console.log('TokenUsageManager: Parsed values:', { limit, used, percentage, breakdown });
 
@@ -300,23 +324,27 @@ class TokenUsageManager {
             this.elements.tokensLimit.textContent = text;
         }
 
-        // Token breakdown (user/assistant/system)
-        if (this.elements.userTokens) {
-            const text = (breakdown.user || 0).toLocaleString();
-            console.log('TokenUsageManager: Setting user tokens to:', text);
-            this.elements.userTokens.textContent = text;
-        }
-
-        if (this.elements.assistantTokens) {
-            const text = (breakdown.assistant || 0).toLocaleString();
-            console.log('TokenUsageManager: Setting assistant tokens to:', text);
-            this.elements.assistantTokens.textContent = text;
-        }
-
-        if (this.elements.systemTokens) {
-            const text = (breakdown.system || 0).toLocaleString();
-            console.log('TokenUsageManager: Setting system tokens to:', text);
-            this.elements.systemTokens.textContent = text;
+        // Create or update the token breakdown display
+        const breakdownContainer = document.querySelector('.token-breakdown');
+        if (breakdownContainer) {
+            breakdownContainer.innerHTML = `
+                <span class="flex items-center">
+                    <i class="fas fa-user text-xs mr-1"></i>
+                    <span id="user-tokens" aria-label="User tokens">${(breakdown.user || 0).toLocaleString()}</span>
+                </span>
+                <span class="flex items-center">
+                    <i class="fas fa-robot text-xs mr-1"></i>
+                    <span id="assistant-tokens" aria-label="Assistant tokens">${(breakdown.assistant || 0).toLocaleString()}</span>
+                </span>
+                <span class="flex items-center">
+                    <i class="fas fa-cog text-xs mr-1"></i>
+                    <span id="system-tokens" aria-label="System tokens">${(breakdown.system || 0).toLocaleString()}</span>
+                </span>
+                <span class="flex items-center">
+                    <i class="fas fa-file text-xs mr-1"></i>
+                    <span id="file-tokens" aria-label="File tokens">${(breakdown.files || 0).toLocaleString()}</span>
+                </span>
+            `;
         }
 
         console.log('TokenUsageManager: Display update complete');

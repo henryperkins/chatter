@@ -317,10 +317,33 @@ async function initializeInterface() {
         // Implement the logic to delete the chat
     }
 
-    // 10. Additional setup: attach action buttons, render existing messages, drag & drop
+    // 10. Additional setup: attach action buttons, render existing messages, drag & drop, file toggles
     attachActionButtonListeners();
     renderInitialAssistantMessages();
     setupDragAndDrop();
+    setupFileToggles();
+
+    function setupFileToggles() {
+        document.addEventListener('click', (e) => {
+            const toggleButton = e.target.closest('.toggle-file-content');
+            if (!toggleButton) return;
+
+            const fileName = toggleButton.getAttribute('data-file-name');
+            const fileContentDiv = toggleButton.closest('.file-item').nextElementSibling;
+            
+            if (fileContentDiv && fileContentDiv.classList.contains('file-content')) {
+                const isHidden = fileContentDiv.classList.contains('hidden');
+                fileContentDiv.classList.toggle('hidden');
+                
+                // Update icon
+                const icon = toggleButton.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-chevron-down', !isHidden);
+                    icon.classList.toggle('fa-chevron-up', isHidden);
+                }
+            }
+        });
+    }
 
     // Done
     console.debug('Chat interface setup completed');
@@ -421,21 +444,20 @@ async function sendMessage() {
     }
     sendButton.disabled = true;
 
-    const messageText = messageInput.value.trim();
-    const hasUploadedFiles = window.fileUploadManager?.uploadedFiles?.length > 0;
-
-    if (!messageText && !hasUploadedFiles) {
-        window.utils.showFeedback('Please enter a message or upload files.', 'error');
-        sendButton.disabled = false;
-        return;
-    }
-
-    const modelSelect = document.getElementById('model-select');
-    const modelId = modelSelect?.value;
-    const model = window.CHAT_CONFIG.models?.find(m => m.id === parseInt(modelId));
-    const useStreaming = model?.supports_streaming && !model?.requires_o1_handling;
-
     try {
+        const messageText = messageInput.value.trim();
+        const hasUploadedFiles = window.fileUploadManager?.uploadedFiles?.length > 0;
+
+        if (!messageText && !hasUploadedFiles) {
+            window.utils.showFeedback('Please enter a message or upload files.', 'error');
+            return;
+        }
+
+        const modelSelect = document.getElementById('model-select');
+        const modelId = modelSelect?.value;
+        const model = window.CHAT_CONFIG.models?.find(m => m.id === parseInt(modelId));
+        const useStreaming = model?.supports_streaming && !model?.requires_o1_handling;
+
         // Clear previous errors
         document.querySelectorAll('.error-indicator').forEach(el => el.remove());
 
@@ -451,8 +473,13 @@ async function sendMessage() {
 
         if (tokenCount > maxTokens) {
             window.utils.showFeedback(`Message exceeds token limit (${tokenCount}/${maxTokens})`, 'error');
-            sendButton.disabled = false;
             return;
+        }
+
+        // Upload files first if any
+        let uploadedFiles = [];
+        if (window.fileUploadManager?.uploadedFiles?.length > 0) {
+            uploadedFiles = await window.fileUploadManager.uploadFiles(window.CHAT_CONFIG.chatId) || [];
         }
 
         // Prepare message metadata
@@ -474,10 +501,11 @@ async function sendMessage() {
             formData.append('metadata', JSON.stringify(metadata));
         }
 
-        // Add files if available
-        if (window.fileUploadManager?.uploadedFiles?.length > 0) {
-            window.fileUploadManager.uploadedFiles.forEach(file => {
-                formData.append('files[]', file);
+        // Add file references if available
+        if (uploadedFiles.length > 0) {
+            formData.append('has_files', 'true');
+            uploadedFiles.forEach(file => {
+                formData.append('file_ids[]', file.id);
             });
         }
 
@@ -492,41 +520,43 @@ async function sendMessage() {
         // Show typing indicator before the request
         showTypingIndicator();
 
-        try {
-            // Only one response handler should be used
-            if (useStreaming) {
-                await handleStreamingResponse(formData);
-            } else {
-                await handleNormalResponse(formData);
-            }
+        // Send the message
+        if (useStreaming) {
+            await handleStreamingResponse(formData);
+        } else {
+            await handleNormalResponse(formData);
+        }
 
-            // Clear inputs on success
-            messageInput.value = '';
-            messageInput.style.height = 'auto';
+        // Update token usage after successful message handling
+        if (window.tokenUsageManager) {
+            await window.tokenUsageManager?.handleNewMessage();
+            await window.tokenUsageManager?.updateStats();
+
+            // Update model limits if needed
+            const modelLimits = {
+                max_tokens: model?.max_tokens || 32000
+            };
+            window.tokenUsageManager.updateModelLimits(modelLimits);
+
+            // Show token usage panel if hidden
+            if (document.getElementById('token-usage')?.classList.contains('hidden')) {
+                window.tokenUsageManager?.toggleDisplay();
+            }
+        }
+
+        // Only clear inputs after successful handling
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+
+        // Clear file list only after successful message handling
+        if (uploadedFiles.length > 0) {
             window.fileUploadManager.uploadedFiles = [];
             window.fileUploadManager.renderFileList();
-
-            // Update token usage and handle new message
-            if (window.tokenUsageManager) {
-                await window.tokenUsageManager?.handleNewMessage();
-                await window.tokenUsageManager?.updateStats();
-
-                // Update model limits if needed
-                const modelLimits = {
-                    max_tokens: model?.max_tokens || 32000
-                };
-                window.tokenUsageManager.updateModelLimits(modelLimits);
-
-                // Show token usage panel if hidden
-                if (document.getElementById('token-usage')?.classList.contains('hidden')) {
-                    window.tokenUsageManager?.toggleDisplay();
-                }
-            }
-        } catch (error) {
-            console.error('Error sending message:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
-            window.utils.showFeedback(errorMessage, 'error', { duration: 0 }); // Duration 0 means it won't auto-hide
         }
+    } catch (error) {
+        console.error('Error sending message:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
+        window.utils.showFeedback(errorMessage, 'error', { duration: 0 }); // Duration 0 means it won't auto-hide
     } finally {
         removeTypingIndicator();
         sendButton.disabled = false;

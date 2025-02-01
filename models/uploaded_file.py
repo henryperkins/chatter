@@ -2,6 +2,7 @@ import logging
 import os
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional, List, Dict
 from werkzeug.utils import secure_filename
 
@@ -23,18 +24,36 @@ class UploadedFile:
     filepath: str
     uuid: str
     size: int
+    description: Optional[str] = None
+    mime_type: Optional[str] = None
+    version: int = 1
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     @staticmethod
-    def create(chat_id: str, filename: str, filepath: str) -> str:
+    def create(chat_id: str, filename: str, filepath: str, mime_type: Optional[str] = None, description: Optional[str] = None) -> str:
         """
         Insert a new uploaded file record into the database.
         Returns the unique file ID for reference.
         """
         with db_session() as db:
             try:
-                # Generate unique filename with UUID
+                # Check for existing versions
+                version_query = text("""
+                    SELECT MAX(version) FROM uploaded_files
+                    WHERE chat_id = :chat_id AND filename = :filename
+                """)
+                result = db.execute(version_query, {
+                    "chat_id": chat_id,
+                    "filename": filename
+                })
+                current_version = result.scalar() or 0
+                new_version = current_version + 1
+
+                # Generate unique filename with UUID and version
                 file_uuid = str(uuid.uuid4())
-                unique_filename = f"{file_uuid}_{secure_filename(filename)}"
+                base_name, ext = os.path.splitext(secure_filename(filename))
+                unique_filename = f"{file_uuid}_{base_name}_v{new_version}{ext}"
                 unique_filepath = os.path.join(os.path.dirname(filepath), unique_filename)
 
                 # Move file to unique path
@@ -43,9 +62,12 @@ class UploadedFile:
                 # Get file size
                 file_size = os.path.getsize(unique_filepath)
 
+                # Insert new version
                 query = text("""
-                    INSERT INTO uploaded_files (chat_id, filename, filepath, uuid, size)
-                    VALUES (:chat_id, :filename, :filepath, :uuid, :size)
+                    INSERT INTO uploaded_files
+                    (chat_id, filename, filepath, uuid, size, mime_type, description, version, created_at, updated_at)
+                    VALUES
+                    (:chat_id, :filename, :filepath, :uuid, :size, :mime_type, :description, :version, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     RETURNING id
                 """)
                 result = db.execute(query, {
@@ -54,11 +76,13 @@ class UploadedFile:
                     "filepath": unique_filepath,
                     "uuid": file_uuid,
                     "size": file_size,
-                    "created_at": datetime.utcnow()
+                    "mime_type": mime_type,
+                    "description": description,
+                    "version": new_version
                 })
                 file_id = result.scalar()
                 db.commit()
-                logger.info(f"File uploaded: {filename} for chat {chat_id}")
+                logger.info(f"File uploaded: {filename} (v{new_version}) for chat {chat_id}")
                 return file_id
             except Exception as e:
                 db.rollback()
@@ -66,6 +90,25 @@ class UploadedFile:
                 if os.path.exists(unique_filepath):
                     os.remove(unique_filepath)
                 logger.error(f"Failed to create uploaded file record: {e}")
+                raise
+
+    @staticmethod
+    def get_by_id(file_id: int) -> Optional["UploadedFile"]:
+        """
+        Retrieve an uploaded file by its ID.
+        """
+        with db_session() as db:
+            try:
+                query = text("""
+                    SELECT * FROM uploaded_files
+                    WHERE id = :file_id
+                """)
+                row = db.execute(query, {"file_id": file_id}).mappings().first()
+                if row:
+                    return UploadedFile(**dict(row))
+                return None
+            except Exception as e:
+                logger.error(f"Error retrieving uploaded file by ID: {e}")
                 raise
 
     @staticmethod

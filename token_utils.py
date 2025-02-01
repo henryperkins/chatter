@@ -56,7 +56,7 @@ def validate_message(message: dict) -> bool:
         return False
 
 def count_message_tokens(message: dict) -> int:
-    """Count tokens for a single message with role metadata."""
+    """Count tokens for a single message with role metadata and file attachments."""
     logger.debug("Counting tokens for message: %s", message)
 
     if not validate_message(message):
@@ -89,6 +89,24 @@ def count_message_tokens(message: dict) -> int:
     logger.debug("Content tokens: %d for content length %d",
                  content_tokens, len(message["content"]))
     tokens += content_tokens
+
+    # Add file attachment tokens if present
+    metadata = message.get("metadata", {})
+    if metadata.get("has_attachments"):
+        attachments = metadata.get("attachments", [])
+        for attachment in attachments:
+            # Add tokens for file name
+            name_tokens = cached_count_tokens(f"[{attachment['name']}]:\n")
+            tokens += name_tokens
+            logger.debug("Added %d tokens for file name: %s", name_tokens, attachment['name'])
+
+            # Add tokens for file content
+            content_tokens = cached_count_tokens(attachment['content'])
+            tokens += content_tokens
+            logger.debug("Added %d tokens for file content", content_tokens)
+
+            # Add tokens for formatting
+            tokens += 2  # For newlines and formatting
 
     # Add multi-message overhead if not first message
     if message.get("is_first", False):

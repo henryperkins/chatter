@@ -149,6 +149,24 @@ class Config:
         "js",
         "md",
     }
+    ALLOWED_MIME_TYPES = {
+        'text/plain',
+        'text/markdown',
+        'text/x-python',
+        'text/javascript',
+        'text/css',
+        'text/html',
+        'text/csv',
+        'application/json',
+        'application/pdf',
+        'application/javascript',
+        'application/x-javascript',
+        'application/octet-stream',  # Will be handled with special text detection
+        'image/jpeg',
+        'image/png',
+        'image/gif'
+    }
+
     MIME_TYPE_MAP = {
         "pdf": "application/pdf",
         "png": "image/png",
@@ -158,7 +176,11 @@ class Config:
         "csv": "text/csv",
         "py": "text/x-python",
         "js": "application/javascript",
+        "json": "application/json",
+        "css": "text/css",
+        "html": "text/html",
         "md": "text/markdown",
+        "gif": "image/gif"
     }
 
     MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")

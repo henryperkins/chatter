@@ -351,13 +351,23 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             combined_message = message
 
         # Add file content with proper formatting
-        if file_contents:
-            if combined_message:
-                combined_message += "\n\n"
-            combined_message += "Attached files:\n"
-            for i, content in enumerate(file_contents):
-                filename = included_files[i]["filename"]
-                combined_message += f"\n[{filename}]:\n{content}\n"
+        file_ids = request.form.getlist('file_ids[]')
+        if file_ids:
+            from models.uploaded_file import UploadedFile
+            files_data = []
+            for file_id in file_ids:
+                file = UploadedFile.get_by_id(file_id)
+                if file and os.path.exists(file.filepath):
+                    with open(file.filepath, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        files_data.append((file.filename, content))
+
+            if files_data:
+                if combined_message:
+                    combined_message += "\n\n"
+                combined_message += "Attached files:\n"
+                for filename, content in files_data:
+                    combined_message += f"\n[{filename}]:\n{content}\n"
 
         # If total tokens > max, truncate
         if total_tokens > MAX_INPUT_TOKENS:

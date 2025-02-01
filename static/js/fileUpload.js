@@ -211,24 +211,35 @@ window.FileUploadManager = class {
 
         // Build the file list markup
         fileList.innerHTML = this.uploadedFiles.map((file, index) => `
-            <div class="file-item group flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg mb-2 shadow-sm hover:shadow-md transition-all duration-200">
-                <div class="flex items-center space-x-3 w-full">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-${this.getFileIcon(file.type)} text-2xl text-blue-500"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center justify-between">
-                            <span class="block text-sm font-medium text-gray-900 dark:text-gray-100 truncate" title="${file.name}">
-                                ${file.name}
-                            </span>
-                            <span class="text-xs text-gray-500 dark:text-gray-400 ml-2 whitespace-nowrap">
-                                ${(file.size / 1024).toFixed(2)} KB
-                            </span>
+            <div class="file-item group flex flex-col p-3 bg-white dark:bg-gray-800 rounded-lg mb-2 shadow-sm hover:shadow-md transition-all duration-200">
+                <div class="flex items-center justify-between w-full">
+                    <div class="flex items-center space-x-3 flex-1">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-${this.getFileIcon(file.type)} text-2xl text-blue-500"></i>
                         </div>
-                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-1">
-                            <div id="progress-${file.name}"
-                                class="bg-blue-500 h-1.5 rounded-full text-[10px] text-center text-white"
-                                style="width: 0%">0%</div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between">
+                                <span class="block text-sm font-medium text-gray-900 dark:text-gray-100 truncate" title="${file.name}">
+                                    ${file.name}
+                                </span>
+                                <div class="flex items-center space-x-2 ml-2">
+                                    ${file.version ? `<span class="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100 px-2 py-0.5 rounded">v${file.version}</span>` : ''}
+                                    <span class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                        ${(file.size / 1024).toFixed(2)} KB
+                                    </span>
+                                    ${file.token_count ? `<span class="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded">${file.token_count} tokens</span>` : ''}
+                                    ${file.is_truncated ? `<span class="text-xs bg-yellow-100 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-100 px-2 py-0.5 rounded">Truncated</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                <span class="mr-2">${file.mime_type || file.type}</span>
+                                ${file.uploadTime ? `<span>• Uploaded: ${new Date(file.uploadTime).toLocaleString()}</span>` : ''}
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-1">
+                                <div id="progress-${file.name}"
+                                    class="bg-blue-500 h-1.5 rounded-full text-[10px] text-center text-white"
+                                    style="width: 0%">0%</div>
+                            </div>
                         </div>
                     </div>
                     <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -243,6 +254,14 @@ window.FileUploadManager = class {
                             <i class="fas fa-times text-sm"></i>
                         </button>
                     </div>
+                </div>
+                <div class="mt-2">
+                    <textarea
+                        class="w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Add a description..."
+                        rows="1"
+                        onchange="window.fileUploadManager.updateFileDescription(${index}, this.value)"
+                    >${file.description || ''}</textarea>
                 </div>
             </div>
         `).join('');
@@ -292,8 +311,13 @@ window.FileUploadManager = class {
         try {
             await window.utils.withLoading(uploadBtn, async () => {
                 const formData = new FormData();
+                
+                // Add files and their descriptions
                 this.uploadedFiles.forEach(file => {
                     formData.append('files[]', file);
+                    if (file.description) {
+                        formData.append(`description_${file.name}`, file.description);
+                    }
                 });
 
                 const response = await window.utils.fetchWithCSRF(`/chat/${chatId}/upload`, {
@@ -302,9 +326,26 @@ window.FileUploadManager = class {
                 });
 
                 if (response.success) {
+                    // Keep track of uploaded files
+                    const uploadedFiles = response.saved_files.map(file => ({
+                        ...file,
+                        type: file.mime_type,
+                        uploadTime: file.upload_time,
+                        version: file.version || 1
+                    }));
+                    
                     window.utils.showFeedback('Files uploaded successfully', 'success');
-                    this.uploadedFiles = [];
-                    this.renderFileList();
+                    
+                    // Emit custom event for chat interface with uploaded files
+                    window.dispatchEvent(new CustomEvent('filesUploaded', {
+                        detail: {
+                            files: uploadedFiles,
+                            totalSize: response.total_size
+                        }
+                    }));
+    
+                    // Return uploaded files for further processing
+                    return uploadedFiles;
                 } else {
                     throw new Error(response.error || 'Upload failed');
                 }
@@ -450,6 +491,12 @@ window.FileUploadManager = class {
     /**
      * Show a quick preview of an uploaded file in a modal.
      */
+    updateFileDescription(index, description) {
+        if (this.uploadedFiles[index]) {
+            this.uploadedFiles[index].description = description;
+        }
+    }
+
     showPreview(index) {
         const file = this.uploadedFiles[index];
         if (!file) return;
@@ -464,14 +511,31 @@ window.FileUploadManager = class {
             previewModal.innerHTML = `
                 <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
                     <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">${file.name}</h3>
+                        <div class="flex-1 mr-4">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">${file.name}</h3>
+                            <div class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                <span class="mr-3">${file.mime_type || file.type}</span>
+                                <span class="mr-3">${(file.size / 1024).toFixed(2)} KB</span>
+                                ${file.version ? `<span class="bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100 px-2 py-0.5 rounded text-xs">v${file.version}</span>` : ''}
+                            </div>
+                            ${file.uploadTime ? `<div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Uploaded: ${new Date(file.uploadTime).toLocaleString()}</div>` : ''}
+                        </div>
                         <button onclick="this.closest('#file-preview-modal').classList.add('hidden')"
                                 class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
                                 aria-label="Close preview">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
-                    <div class="flex-1 overflow-auto p-4" id="file-preview-content"></div>
+                    <div class="flex-1 overflow-auto" id="file-preview-content"></div>
+                    <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
+                        <textarea
+                            class="w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="Add a description..."
+                            rows="2"
+                            onchange="window.fileUploadManager.updateFileDescription(${index}, this.value)"
+                        >${file.description || ''}</textarea>
+                    </div>
                 </div>
             `;
             document.body.appendChild(previewModal);
@@ -479,6 +543,7 @@ window.FileUploadManager = class {
 
         const previewContent = document.getElementById('file-preview-content');
         previewContent.innerHTML = this.getPreviewContent(file);
+        previewContent.className = 'flex-1 overflow-auto p-4';
 
         previewModal.classList.remove('hidden');
 
@@ -492,28 +557,51 @@ window.FileUploadManager = class {
      * Return HTML snippet to preview the file based on type.
      */
     getPreviewContent(file) {
-        if (file.type.startsWith('image/')) {
-            return `<img src="${URL.createObjectURL(file)}" alt="Preview of ${file.name}" class="max-w-full h-auto rounded-lg">`;
-        } else if (file.type === 'application/pdf') {
-            return `
-                <div class="h-[70vh]">
-                    <iframe src="${URL.createObjectURL(file)}" class="w-full h-full rounded-lg" title="PDF Preview"></iframe>
-                </div>
-            `;
-        } else if (file.type === 'text/plain' || file.type === 'text/markdown') {
-            return `
-                <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
-                    <pre class="whitespace-pre-wrap break-words text-sm">Loading...</pre>
-                </div>
-            `;
-        } else {
-            return `
-                <div class="text-center py-8">
-                    <i class="fas fa-file text-4xl text-gray-400 mb-4"></i>
-                    <p class="text-gray-500 dark:text-gray-400">Preview not available for this file type</p>
-                </div>
-            `;
+        // For files that haven't been uploaded yet
+        if (!file.id) {
+            if (file.type.startsWith('image/')) {
+                return `<img src="${URL.createObjectURL(file)}" alt="Preview of ${file.name}" class="max-w-full h-auto rounded-lg">`;
+            } else if (file.type === 'application/pdf') {
+                return `
+                    <div class="h-[70vh]">
+                        <iframe src="${URL.createObjectURL(file)}" class="w-full h-full rounded-lg" title="PDF Preview"></iframe>
+                    </div>
+                `;
+            } else if (file.type === 'text/plain' || file.type === 'text/markdown') {
+                return `
+                    <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
+                        <pre class="whitespace-pre-wrap break-words text-sm">Loading...</pre>
+                    </div>
+                `;
+            }
         }
+        
+        // For uploaded files, use the server preview route
+        if (file.id) {
+            if (file.type.startsWith('image/')) {
+                return `<img src="/file/${file.id}/preview" alt="Preview of ${file.name}" class="max-w-full h-auto rounded-lg">`;
+            } else if (file.type === 'application/pdf') {
+                return `
+                    <div class="h-[70vh]">
+                        <iframe src="/file/${file.id}/preview" class="w-full h-full rounded-lg" title="PDF Preview"></iframe>
+                    </div>
+                `;
+            } else if (file.type === 'text/plain' || file.type === 'text/markdown') {
+                return `
+                    <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
+                        <pre class="whitespace-pre-wrap break-words text-sm">Loading...</pre>
+                    </div>
+                `;
+            }
+        }
+
+        // Default for unsupported types
+        return `
+            <div class="text-center py-8">
+                <i class="fas fa-file text-4xl text-gray-400 mb-4"></i>
+                <p class="text-gray-500 dark:text-gray-400">Preview not available for this file type</p>
+            </div>
+        `;
     }
 
     /**
@@ -524,7 +612,17 @@ window.FileUploadManager = class {
         if (!previewContent) return;
 
         try {
-            const text = await file.text();
+            let text;
+            if (file.id) {
+                // For uploaded files, fetch from server
+                const response = await fetch(`/file/${file.id}/preview`);
+                if (!response.ok) throw new Error('Failed to fetch file content');
+                text = await response.text();
+            } else {
+                // For files not yet uploaded
+                text = await file.text();
+            }
+
             const preElement = previewContent.querySelector('pre');
             if (preElement) {
                 preElement.textContent = text;
