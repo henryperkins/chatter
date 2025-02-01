@@ -183,20 +183,22 @@ def validate_model_data(data: Dict[str, Any]) -> List[str]:
         if isinstance(validation_rules, str):
             validation_rules = json.loads(validation_rules)
 
-        # For Azure providers
+        # Dynamic API endpoint validation based on provider type
         if provider.is_azure:
+            # Azure-specific validations
             if not any(domain in data["api_endpoint"] for domain in ["openai.azure.com", "azure-api.net"]):
                 errors.append("Must use a valid Azure OpenAI domain (*.openai.azure.com or *.azure-api.net)")
             if "/openai/deployments/" not in data["api_endpoint"]:
                 errors.append("Must include /openai/deployments/{deployment-name}")
             if "api-version=" not in data["api_endpoint"]:
                 errors.append("Must include api-version query parameter")
-        # For other providers
-        elif validation_rules.get("endpoint"):
-            import re
-            pattern = validation_rules["endpoint"]
-            if not re.match(pattern, data["api_endpoint"]):
-                errors.append(f"API endpoint must match provider's required format")
+        else:
+            # OpenAI validations
+            if "openai.azure.com" in data["api_endpoint"] or "azure-api.net" in data["api_endpoint"]:
+                errors.append("Must use standard OpenAI endpoint for non-Azure providers")
+            # Validate OpenAI endpoint format
+            if not data["api_endpoint"].startswith("https://api.openai.com/v1"):
+                errors.append("OpenAI endpoints must use format: https://api.openai.com/v1/...")
 
     # Validate model type specific requirements
     if data.get("requires_o1_handling"):
@@ -679,7 +681,8 @@ def get_provider_details(provider_id: int):
             "requires_authentication": provider.requires_authentication,
             "endpoint_pattern": provider.endpoint_pattern,
             "api_version_format": provider.api_version_format,
-            "capabilities": provider.capabilities
+            "capabilities": provider.capabilities,
+            "is_azure": provider.is_azure
         })
     except Exception as e:
         logger.error(f"Error retrieving provider details: {str(e)}", exc_info=True)

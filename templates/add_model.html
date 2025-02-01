@@ -79,7 +79,7 @@
             {% if form.api_endpoint.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
             {% endif %}
-            <div class="mt-2 p-3 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-xs">
+            <div class="mt-2 p-3 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-xs endpoint-info">
                 <strong>Valid endpoint format:</strong>
                 <ul class="list-disc list-inside mt-1">
                     <li>Must use *.openai.azure.com or *.azure-api.net domain</li>
@@ -258,7 +258,6 @@
         </div>
     </form>
 </div>
-
 {% endblock content %}
 
 {% block scripts %}
@@ -308,7 +307,131 @@
                             const provider = await response.json();
                             
                             // Update form based on provider capabilities
+                            const deploymentNameDiv = form.querySelector('.deployment-name-section');
+                            const apiVersionDiv = form.querySelector('.api-version-section');
+                            const apiEndpointInput = form.querySelector('input[name="api_endpoint"]');
                             const apiKeyDiv = form.querySelector('.api-key-section');
+
+                            // Handle provider-specific fields and validation
+                            const endpointInfo = form.querySelector('.endpoint-info');
+                            if (provider.is_azure) {
+                                // Show Azure-specific fields
+                                if (deploymentNameDiv) deploymentNameDiv.style.display = 'block';
+                                if (apiVersionDiv) apiVersionDiv.style.display = 'block';
+                                
+                                // Set Azure endpoint format
+                                if (apiEndpointInput) {
+                                    apiEndpointInput.placeholder = "https://your-resource.openai.azure.com/openai/deployments/{deployment-name}/chat/completions?api-version=2024-12-01-preview";
+                                    // If provider has a base URL, construct the endpoint
+                                    if (provider.api_base_url) {
+                                        const deploymentName = form.querySelector('input[name="deployment_name"]')?.value || '{deployment-name}';
+                                        apiEndpointInput.value = `${provider.api_base_url}/openai/deployments/${deploymentName}/chat/completions?api-version=${provider.api_version_format || '2024-12-01-preview'}`;
+                                    }
+                                }
+
+                                // Update endpoint validation info for Azure
+                                if (endpointInfo) {
+                                    endpointInfo.innerHTML = `
+                                        <strong>Valid endpoint format:</strong>
+                                        <ul class="list-disc list-inside mt-1">
+                                            <li>Must use *.openai.azure.com or *.azure-api.net domain</li>
+                                            <li>Must follow pattern: /openai/deployments/{name}/chat/completions</li>
+                                            <li>Must include api-version query parameter</li>
+                                        </ul>
+                                    `;
+                                }
+                            } else {
+                                // Handle standard OpenAI provider
+                                if (deploymentNameDiv) deploymentNameDiv.style.display = 'none';
+                                if (apiVersionDiv) apiVersionDiv.style.display = 'none';
+                                if (apiEndpointInput) {
+                                    apiEndpointInput.placeholder = "https://api.openai.com/v1/chat/completions";
+                                    apiEndpointInput.value = "https://api.openai.com/v1/chat/completions";
+                                }
+
+                                // Update endpoint validation info for OpenAI
+                                if (endpointInfo) {
+                                    endpointInfo.innerHTML = `
+                                        <strong>Valid endpoint format:</strong>
+                                        <ul class="list-disc list-inside mt-1">
+                                            <li>Must use api.openai.com domain</li>
+                                            <li>Must follow pattern: /v1/chat/completions</li>
+                                        </ul>
+                                    `;
+                                }
+                            }
+
+                            // Add form validation
+                            const validateEndpoint = function(endpoint, isAzure) {
+                                let isValid = true;
+                                let errorMessage = '';
+
+                                if (isAzure) {
+                                    // Validate Azure endpoint
+                                    if (!endpoint.match(/^https:\/\/[^\/]+\.(openai\.azure\.com|azure-api\.net)/)) {
+                                        isValid = false;
+                                        errorMessage = 'Must use *.openai.azure.com or *.azure-api.net domain';
+                                    } else if (!endpoint.includes('/openai/deployments/')) {
+                                        isValid = false;
+                                        errorMessage = 'Must include /openai/deployments/{name}';
+                                    } else if (!endpoint.includes('api-version=')) {
+                                        isValid = false;
+                                        errorMessage = 'Must include api-version parameter';
+                                    }
+                                } else {
+                                    // Validate OpenAI endpoint
+                                    if (!endpoint.match(/^https:\/\/api\.openai\.com\/v1\/chat\/completions$/)) {
+                                        isValid = false;
+                                        errorMessage = 'Must use format: https://api.openai.com/v1/chat/completions';
+                                    }
+                                }
+
+                                return { isValid, errorMessage };
+                            };
+
+                            // Add input validation
+                            if (apiEndpointInput) {
+                                apiEndpointInput.addEventListener('change', function() {
+                                    // Remove any existing error messages
+                                    const existingError = this.parentNode.querySelector('.endpoint-error');
+                                    if (existingError) {
+                                        existingError.remove();
+                                    }
+
+                                    // Validate the endpoint
+                                    const { isValid, errorMessage } = validateEndpoint(this.value, provider.is_azure);
+                                    if (!isValid) {
+                                        const error = document.createElement('p');
+                                        error.className = 'text-sm text-red-500 mt-1 endpoint-error';
+                                        error.textContent = errorMessage;
+                                        this.parentNode.appendChild(error);
+                                    }
+                                });
+                            }
+
+                            // Add form submit validation
+                            form.addEventListener('submit', function(e) {
+                                if (apiEndpointInput) {
+                                    const { isValid, errorMessage } = validateEndpoint(apiEndpointInput.value, provider.is_azure);
+                                    if (!isValid) {
+                                        e.preventDefault();
+                                        // Remove any existing error messages
+                                        const existingError = apiEndpointInput.parentNode.querySelector('.endpoint-error');
+                                        if (existingError) {
+                                            existingError.remove();
+                                        }
+                                        // Add new error message
+                                        const error = document.createElement('p');
+                                        error.className = 'text-sm text-red-500 mt-1 endpoint-error';
+                                        error.textContent = errorMessage;
+                                        apiEndpointInput.parentNode.appendChild(error);
+                                        // Scroll to error
+                                        error.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }
+                                }
+                            });
+
+                            // Handle API key visibility
                             if (apiKeyDiv) {
                                 apiKeyDiv.style.display = provider.requires_authentication ? 'block' : 'none';
                             }
@@ -327,43 +450,33 @@
                             if (provider.capabilities.max_tokens) {
                                 const maxTokens = provider.capabilities.max_tokens;
                                 if (maxTokensInput) maxTokensInput.max = maxTokens;
-                                if (maxCompletionTokensInput) {
-                                    maxCompletionTokensInput.max = maxTokens;
-                                    maxCompletionTokensInput.value = Math.min(
-                                        maxCompletionTokensInput.value || DEFAULT_MAX_COMPLETION_TOKENS,
-                                        maxTokens
-                                    );
-                                }
+                                if (maxCompletionTokensInput) maxCompletionTokensInput.max = maxTokens;
                             }
 
                             // Update streaming support
                             const streamingDiv = form.querySelector('.streaming-section');
-                            if (streamingDiv) {
-                                streamingDiv.style.display = provider.capabilities.streaming ? 'block' : 'none';
-                                const streamingCheckbox = streamingDiv.querySelector('input[type="checkbox"]');
-                                if (streamingCheckbox) {
-                                    streamingCheckbox.checked = provider.capabilities.streaming;
-                                }
+                            const streamingCheckbox = streamingDiv?.querySelector('input[type="checkbox"]');
+                            if (streamingDiv && streamingCheckbox) {
+                                const supportsStreaming = provider.capabilities.streaming;
+                                streamingDiv.style.display = supportsStreaming ? 'block' : 'none';
+                                streamingCheckbox.checked = supportsStreaming;
+                                streamingCheckbox.disabled = !supportsStreaming;
                             }
 
                             // Pre-fill API endpoint using provider's stored base URL
-                            const apiEndpointInput = form.querySelector('input[name="api_endpoint"]');
                             if (apiEndpointInput) {
                                 if (provider.api_base_url) {
-                                    // Use provider's stored base URL
-                                    apiEndpointInput.value = provider.api_base_url;
+                                    const deploymentName = form.querySelector('input[name="deployment_name"]')?.value || '{deployment-name}';
+                                    apiEndpointInput.value = `${provider.api_base_url}/openai/deployments/${deploymentName}/chat/completions?api-version=${provider.api_version_format || '2024-12-01-preview'}`;
                                 } else if (provider.endpoint_pattern) {
-                                    // Fallback to pattern if no base URL is stored
                                     apiEndpointInput.value = provider.endpoint_pattern;
                                 }
                             }
 
                             // Set API version if format exists
-                            if (provider.api_version_format) {
-                                const apiVersionInput = form.querySelector('input[name="api_version"]');
-                                if (apiVersionInput) {
-                                    apiVersionInput.value = provider.api_version_format;
-                                }
+                            const apiVersionInput = form.querySelector('input[name="api_version"]');
+                            if (apiVersionInput && provider.api_version_format) {
+                                apiVersionInput.value = provider.api_version_format;
                             }
                         } catch (error) {
                             console.error('Error fetching provider details:', error);
@@ -374,94 +487,101 @@
 
             // Handle model type changes
             const modelTypeSelect = form.querySelector('select[name="model_type"]');
-            if (modelTypeSelect) {
-                const updateForModelType = function(modelType) {
+            const o1HandlingCheckbox = form.querySelector('input[name="requires_o1_handling"]');
+            if (modelTypeSelect && o1HandlingCheckbox) {
+                const updateForModelType = function() {
+                    const modelType = modelTypeSelect.value;
+                    const requiresO1 = o1HandlingCheckbox.checked;
+                    const isO1Preview = modelType === 'o1-preview' && requiresO1;
+
                     const temperatureInput = form.querySelector('input[name="temperature"]');
                     const streamingCheckbox = form.querySelector('input[name="supports_streaming"]');
-                    const o1HandlingCheckbox = form.querySelector('input[name="requires_o1_handling"]');
                     const maxCompletionTokensInput = form.querySelector('input[name="max_completion_tokens"]');
                     const standardModelNote = form.querySelector('.standard-model-note');
                     const o1PreviewNote = form.querySelector('.o1-preview-note');
                     const reasoningSettings = form.querySelector('.reasoning-settings');
-                    
+
                     // Show/hide reasoning settings for o1/o3 models
                     if (reasoningSettings) {
                         reasoningSettings.style.display = ['o1-preview', 'o3-mini'].includes(modelType) ? 'block' : 'none';
                     }
-                    
-                    switch(modelType) {
-                        case 'o1-preview':
-                            // Update temperature
+
+                    if (isO1Preview) {
+                        // Update temperature
+                        if (temperatureInput) {
                             temperatureInput.value = '1.0';
                             temperatureInput.disabled = true;
-                            
-                            // Update streaming
+                        }
+
+                        // Update streaming
+                        if (streamingCheckbox) {
                             streamingCheckbox.checked = false;
                             streamingCheckbox.disabled = true;
-                            
-                            // Update o1 handling
-                            o1HandlingCheckbox.checked = true;
-                            
-                            // Update max completion tokens
+                        }
+
+                        // Update max completion tokens
+                        if (maxCompletionTokensInput) {
                             maxCompletionTokensInput.max = 8300;
                             if (maxCompletionTokensInput.value > 8300) {
                                 maxCompletionTokensInput.value = 8300;
                             }
-                            
-                            // Update token limit notes
-                            if (standardModelNote) standardModelNote.style.display = 'none';
-                            if (o1PreviewNote) o1PreviewNote.style.display = 'inline';
-                            break;
-                            
-                        case 'o3-mini':
-                            // Reset temperature
+                        }
+
+                        // Update token limit notes
+                        if (standardModelNote) standardModelNote.style.display = 'none';
+                        if (o1PreviewNote) o1PreviewNote.style.display = 'inline';
+
+                        // Auto-check o1 handling
+                        o1HandlingCheckbox.checked = true;
+                    } else {
+                        // Reset temperature
+                        if (temperatureInput) {
                             temperatureInput.disabled = false;
-                            
-                            // Enable streaming
-                            streamingCheckbox.disabled = false;
-                            
-                            // Disable o1 handling
-                            o1HandlingCheckbox.checked = false;
-                            
-                            // Set max completion tokens for reasoning
-                            maxCompletionTokensInput.max = 25000;
-                            
-                            // Update token limit notes
-                            if (standardModelNote) standardModelNote.style.display = 'none';
-                            if (o1PreviewNote) o1PreviewNote.style.display = 'none';
-                            break;
-                            
-                        default: // standard azure models
-                            // Reset temperature
-                            temperatureInput.disabled = false;
-                            
-                            // Reset streaming
-                            streamingCheckbox.disabled = false;
-                            
-                            // Reset o1 handling
-                            o1HandlingCheckbox.checked = false;
-                            
-                            // Reset max completion tokens
-                            maxCompletionTokensInput.max = 16384;
-                            
-                            // Update token limit notes
-                            if (standardModelNote) standardModelNote.style.display = 'inline';
-                            if (o1PreviewNote) o1PreviewNote.style.display = 'none';
-                            
-                            // Hide reasoning settings
-                            if (reasoningSettings) {
-                                reasoningSettings.style.display = 'none';
+                            // Get provider's default temperature if available
+                            const provider = form.querySelector('select[name="provider_id"]');
+                            if (provider && provider.dataset.defaultTemp) {
+                                temperatureInput.value = provider.dataset.defaultTemp;
                             }
+                        }
+
+                        // Reset streaming based on provider capabilities
+                        if (streamingCheckbox) {
+                            const provider = form.querySelector('select[name="provider_id"]');
+                            if (provider) {
+                                const supportsStreaming = provider.dataset.supportsStreaming === 'true';
+                                streamingCheckbox.disabled = !supportsStreaming;
+                                streamingCheckbox.checked = supportsStreaming;
+                            }
+                        }
+
+                        // Reset max completion tokens based on provider capabilities
+                        const tokensDiv = form.querySelector('[data-max-tokens]');
+                        if (tokensDiv && maxCompletionTokensInput) {
+                            const maxTokens = parseInt(tokensDiv.dataset.maxTokens) || 16384;
+                            maxCompletionTokensInput.max = maxTokens;
+                            // Set a reasonable default if not already set
+                            if (!maxCompletionTokensInput.value) {
+                                maxCompletionTokensInput.value = Math.min(4096, maxTokens);
+                            }
+                        }
+
+                        // Update token limit notes
+                        if (standardModelNote) standardModelNote.style.display = 'inline';
+                        if (o1PreviewNote) o1PreviewNote.style.display = 'none';
+
+                        // Reset o1 handling for non-o1 models
+                        if (!['o1-preview', 'o3-mini'].includes(modelType)) {
+                            o1HandlingCheckbox.checked = false;
+                        }
                     }
                 };
 
                 // Set initial state
-                updateForModelType(modelTypeSelect.value);
-                
+                updateForModelType();
+
                 // Handle changes
-                modelTypeSelect.addEventListener('change', function(e) {
-                    updateForModelType(e.target.value);
-                });
+                modelTypeSelect.addEventListener('change', updateForModelType);
+                o1HandlingCheckbox.addEventListener('change', updateForModelType);
             }
         }
     });
