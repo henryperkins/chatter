@@ -197,21 +197,6 @@ class RegistrationForm(FlaskForm):
         """
         if not field.data:
             return
-
-        pattern = self.provider_validation_rules.get('model_id')
-        if pattern:
-            import re
-            if not re.match(pattern, field.data):
-                raise ValidationError("Deployment name does not match the required format specified by the provider.")
-            return
-
-        pattern = self.provider_validation_rules.get('endpoint')
-        if pattern:
-            import re
-            if not re.match(pattern, field.data):
-                raise ValidationError("API endpoint does not match the required format specified by the provider.")
-            raise ValidationError("Username is required")
-
         username = field.data.strip()
 
         if not is_initialized():
