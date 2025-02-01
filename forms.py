@@ -491,6 +491,7 @@ class ModelForm(FlaskForm):
         super().__init__(*args, **kwargs)
         self.setup_edit_mode()
         self.load_providers()
+        self.load_provider_validation_rules()  # Add this line
 
     def process_formdata(self, valuelist):
         """Handle both form and JSON data processing"""
@@ -585,35 +586,24 @@ class ModelForm(FlaskForm):
                 raise ValidationError("Failed to secure API key")
 
     def validate_api_endpoint(self, field):
-        """Validate the complete Azure OpenAI endpoint URL structure"""
         if not field.data:
             return
 
-        # Parse URL to validate structure
-        try:
-            from urllib.parse import urlparse, parse_qs
-            parsed = urlparse(field.data)
+        pattern = self.provider_validation_rules.get('endpoint')
+        if pattern:
+            import re
+            if not re.match(pattern, field.data):
+                raise ValidationError("API endpoint does not match the required format specified by the provider.")
 
-            # Validate domain
-            if not re.match(r"^[^/]+\.(openai\.azure\.com|azure-api\.net)$", parsed.netloc):
-                raise ValidationError("Must use a valid Azure OpenAI domain (*.openai.azure.com or *.azure-api.net)")
+    def validate_deployment_name(self, field):
+        if not field.data:
+            return
 
-            # Validate path structure
-            path_parts = parsed.path.strip('/').split('/')
-            if len(path_parts) < 4 or path_parts[0] != 'openai' or path_parts[1] != 'deployments' or path_parts[-1] != 'completions' or path_parts[-2] != 'chat':
-                raise ValidationError("URL must follow format: /openai/deployments/{deployment-name}/chat/completions")
-
-            # Validate api-version query parameter
-            query_params = parse_qs(parsed.query)
-            if 'api-version' not in query_params:
-                raise ValidationError("URL must include api-version query parameter")
-
-            api_version = query_params['api-version'][0]
-            if not re.match(r'^\d{4}-\d{2}-\d{2}(?:-preview)?$', api_version):
-                raise ValidationError("api-version must be in format YYYY-MM-DD or YYYY-MM-DD-preview")
-
-        except ValueError as e:
-            raise ValidationError(str(e))
+        pattern = self.provider_validation_rules.get('model_id')
+        if pattern:
+            import re
+            if not re.match(pattern, field.data):
+                raise ValidationError("Deployment name does not match the required format specified by the provider.")
 
     def validate_version(self, field):
         """Optimistic concurrency control"""

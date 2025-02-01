@@ -625,38 +625,23 @@ class Model:
         if isinstance(validation_rules, str):
             validation_rules = json.loads(validation_rules)
 
-        # For Azure providers
-        if provider.is_azure:
-            # Validate domain
-            if not any(domain in api_endpoint for domain in ["openai.azure.com", "azure-api.net"]):
-                raise ValueError("API endpoint must be an Azure OpenAI domain (openai.azure.com or azure-api.net)")
+        # Validate 'api_endpoint' using provider's 'endpoint' pattern
+        api_endpoint = config.get("api_endpoint")
+        if api_endpoint:
+            pattern = validation_rules.get('endpoint')
+            if pattern:
+                import re
+                if not re.match(pattern, api_endpoint):
+                    raise ValueError("API endpoint does not match the required format specified by the provider.")
 
-            # Validate deployment path and api-version
-            if "/openai/deployments/" not in api_endpoint:
-                raise ValueError("API endpoint must include /openai/deployments/{deployment-name}")
-
-            # Validate api-version query parameter
-            if "api-version=" not in api_endpoint:
-                raise ValueError("API endpoint must include api-version query parameter")
-
-            # Validate chat completions endpoint
-            if "/chat/completions" not in api_endpoint:
-                raise ValueError("API endpoint must be a chat completions endpoint (/chat/completions)")
-
-            # Validate api version format if specified
-            api_version_pattern = validation_rules.get("api_version")
-            if api_version_pattern:
-                from urllib.parse import parse_qs, urlparse
-                query = parse_qs(urlparse(api_endpoint).query)
-                api_version = query.get("api-version", [""])[0]
-                if not re.match(api_version_pattern, api_version):
-                    raise ValueError(f"API version must match pattern: {api_version_pattern}")
-
-        # For other providers, use their specific validation rules
-        else:
-            endpoint_pattern = validation_rules.get("endpoint")
-            if endpoint_pattern and not re.match(endpoint_pattern, api_endpoint):
-                raise ValueError(f"API endpoint must match provider's required format")
+        # Validate 'deployment_name' using provider's 'model_id' pattern
+        deployment_name = config.get("deployment_name")
+        if deployment_name:
+            pattern = validation_rules.get('model_id')
+            if pattern:
+                import re
+                if not re.match(pattern, deployment_name):
+                    raise ValueError("Deployment name does not match the required format specified by the provider.")
 
         # Validate temperature
         temperature = config.get("temperature")

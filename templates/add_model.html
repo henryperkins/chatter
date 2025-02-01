@@ -312,54 +312,34 @@
                             const apiEndpointInput = form.querySelector('input[name="api_endpoint"]');
                             const apiKeyDiv = form.querySelector('.api-key-section');
 
-                            // Handle provider-specific fields and validation
-                            const endpointInfo = form.querySelector('.endpoint-info');
-                            if (provider.is_azure) {
-                                // Show Azure-specific fields
-                                if (deploymentNameDiv) deploymentNameDiv.style.display = 'block';
-                                if (apiVersionDiv) apiVersionDiv.style.display = 'block';
-                                
-                                // Set Azure endpoint format
-                                if (apiEndpointInput) {
-                                    apiEndpointInput.placeholder = "https://your-resource.openai.azure.com/openai/deployments/{deployment-name}/chat/completions?api-version=2024-12-01-preview";
-                                    // If provider has a base URL, construct the endpoint
-                                    if (provider.api_base_url) {
-                                        const deploymentName = form.querySelector('input[name="deployment_name"]')?.value || '{deployment-name}';
-                                        apiEndpointInput.value = `${provider.api_base_url}/openai/deployments/${deploymentName}/chat/completions?api-version=${provider.api_version_format || '2024-12-01-preview'}`;
-                                    }
-                                }
+                        // Store validation rules
+                        const validationRules = provider.validation_rules || {};
 
-                                // Update endpoint validation info for Azure
-                                if (endpointInfo) {
-                                    endpointInfo.innerHTML = `
-                                        <strong>Valid endpoint format:</strong>
-                                        <ul class="list-disc list-inside mt-1">
-                                            <li>Must use *.openai.azure.com or *.azure-api.net domain</li>
-                                            <li>Must follow pattern: /openai/deployments/{name}/chat/completions</li>
-                                            <li>Must include api-version query parameter</li>
-                                        </ul>
-                                    `;
+                        // Validate 'api_endpoint' field using provider's 'endpoint' pattern
+                        const apiEndpointInput = form.querySelector('input[name="api_endpoint"]');
+                        if (apiEndpointInput && validationRules['endpoint']) {
+                            const pattern = new RegExp(validationRules['endpoint']);
+                            apiEndpointInput.addEventListener('input', function() {
+                                if (!pattern.test(this.value)) {
+                                    this.setCustomValidity('API endpoint does not match the required format.');
+                                } else {
+                                    this.setCustomValidity('');
                                 }
-                            } else {
-                                // Handle standard OpenAI provider
-                                if (deploymentNameDiv) deploymentNameDiv.style.display = 'none';
-                                if (apiVersionDiv) apiVersionDiv.style.display = 'none';
-                                if (apiEndpointInput) {
-                                    apiEndpointInput.placeholder = "https://api.openai.com/v1/chat/completions";
-                                    apiEndpointInput.value = "https://api.openai.com/v1/chat/completions";
-                                }
+                            });
+                        }
 
-                                // Update endpoint validation info for OpenAI
-                                if (endpointInfo) {
-                                    endpointInfo.innerHTML = `
-                                        <strong>Valid endpoint format:</strong>
-                                        <ul class="list-disc list-inside mt-1">
-                                            <li>Must use api.openai.com domain</li>
-                                            <li>Must follow pattern: /v1/chat/completions</li>
-                                        </ul>
-                                    `;
+                        // Validate 'deployment_name' field using provider's 'model_id' pattern
+                        const deploymentNameInput = form.querySelector('input[name="deployment_name"]');
+                        if (deploymentNameInput && validationRules['model_id']) {
+                            const pattern = new RegExp(validationRules['model_id']);
+                            deploymentNameInput.addEventListener('input', function() {
+                                if (!pattern.test(this.value)) {
+                                    this.setCustomValidity('Deployment name does not match the required format.');
+                                } else {
+                                    this.setCustomValidity('');
                                 }
-                            }
+                            });
+                        }
 
                             // Add form validation
                             const validateEndpoint = function(endpoint, isAzure) {
@@ -584,6 +564,15 @@
                 o1HandlingCheckbox.addEventListener('change', updateForModelType);
             }
         }
+
+        // Handle form submission
+        form.addEventListener('submit', function(e) {
+            if (!form.checkValidity()) {
+                e.preventDefault();
+                e.stopPropagation();
+                form.classList.add('was-validated');
+            }
+        }, false);
     });
 </script>
 {% endblock scripts %}
