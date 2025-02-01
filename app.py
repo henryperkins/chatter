@@ -304,42 +304,6 @@ def configure_app(app: Optional[Flask] = None) -> None:
     if not app.config.get("SECRET_KEY"):
         app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", os.urandom(32))
 
-    # Database URI configuration with validation
-    def build_database_uri():
-        if uri := os.getenv("DATABASE_URI"):
-            return uri
-
-        required_params = {
-            "DB_USER": os.getenv("DB_USER", "postgres"),
-            "DB_PASSWORD": os.getenv("DB_PASSWORD", "postgres"),
-            "DB_HOST": os.getenv("DB_HOST", "localhost"),
-            "DB_PORT": os.getenv("DB_PORT", "5432"),
-            "DB_NAME": os.getenv("DB_NAME", "chatter"),
-        }
-
-        # Validate port number
-        try:
-            port = int(required_params["DB_PORT"])
-            if not (1024 <= port <= 65535):
-                raise ValueError(f"Invalid port number: {port}")
-        except ValueError as e:
-            logger.error(f"Database configuration error: {str(e)}")
-            raise RuntimeError(f"Invalid database port configuration: {str(e)}")
-
-        return (
-            f"postgresql://{required_params['DB_USER']}:"
-            f"{required_params['DB_PASSWORD']}@"
-            f"{required_params['DB_HOST']}:"
-            f"{required_params['DB_PORT']}/"
-            f"{required_params['DB_NAME']}"
-        )
-
-    try:
-        app.config["DATABASE_URI"] = build_database_uri()
-        logger.info("Database URI configured successfully")
-    except Exception as e:
-        logger.error(f"Failed to configure database URI: {str(e)}")
-        raise RuntimeError(f"Database configuration failed: {str(e)}")
 
     # Database connection settings
     app.config.update(
