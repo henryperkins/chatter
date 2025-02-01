@@ -48,17 +48,8 @@ class NullableIntegerField(IntegerField):
     A custom IntegerField that treats empty or invalid input as None.
     """
 
-    def load_provider_validation_rules(self):
-        """Load validation rules based on the selected provider."""
-        provider_id = self.provider_id.data
-        if provider_id:
-            provider = Provider.get_by_id(provider_id)
-            if provider and provider.validation_rules:
-                self.provider_validation_rules = provider.validation_rules
-            else:
-                self.provider_validation_rules = {}
-        else:
-            self.provider_validation_rules = {}
+    def process_formdata(self, valuelist):
+        """Process form data for NullableIntegerField."""
         if valuelist and valuelist[0]:
             try:
                 self.data = int(valuelist[0])
