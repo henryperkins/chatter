@@ -48,7 +48,17 @@ class NullableIntegerField(IntegerField):
     A custom IntegerField that treats empty or invalid input as None.
     """
 
-    def process_formdata(self, valuelist):
+    def load_provider_validation_rules(self):
+        """Load validation rules based on the selected provider."""
+        provider_id = self.provider_id.data
+        if provider_id:
+            provider = Provider.get_by_id(provider_id)
+            if provider and provider.validation_rules:
+                self.provider_validation_rules = provider.validation_rules
+            else:
+                self.provider_validation_rules = {}
+        else:
+            self.provider_validation_rules = {}
         if valuelist and valuelist[0]:
             try:
                 self.data = int(valuelist[0])
@@ -194,6 +204,20 @@ class RegistrationForm(FlaskForm):
         Checks if username or email is already taken, plus format checks.
         """
         if not field.data:
+            return
+
+        pattern = self.provider_validation_rules.get('model_id')
+        if pattern:
+            import re
+            if not re.match(pattern, field.data):
+                raise ValidationError("Deployment name does not match the required format specified by the provider.")
+            return
+
+        pattern = self.provider_validation_rules.get('endpoint')
+        if pattern:
+            import re
+            if not re.match(pattern, field.data):
+                raise ValidationError("API endpoint does not match the required format specified by the provider.")
             raise ValidationError("Username is required")
 
         username = field.data.strip()
@@ -477,6 +501,7 @@ class ModelForm(FlaskForm):
 
     def __init__(self, *args, **kwargs):
         self.is_edit = kwargs.pop('is_edit', False)
+        self.provider_validation_rules = {}  # Initialize here
 
         # Handle both dict and MultiDict inputs
         if args and isinstance(args[0], (dict, list)):
@@ -491,7 +516,7 @@ class ModelForm(FlaskForm):
         super().__init__(*args, **kwargs)
         self.setup_edit_mode()
         self.load_providers()
-        self.load_provider_validation_rules()  # Add this line
+        self.load_provider_validation_rules()
 
     def process_formdata(self, valuelist):
         """Handle both form and JSON data processing"""
