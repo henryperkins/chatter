@@ -69,6 +69,11 @@ class Config:
         if var == "SECRET_KEY":
             validate_secret_key(value)
         elif var == "DATABASE_URI":
+            # Correct the scheme if needed
+            if value.startswith("postgres://"):
+                value = value.replace("postgres://", "postgresql://", 1)
+                logger.warning("Corrected DATABASE_URI scheme to 'postgresql://'")
+
             validate_database_uri(value)
 
         # Set the attribute directly on the class
