@@ -500,8 +500,14 @@ class ModelForm(FlaskForm):
         Carga las reglas de validación basadas en el provider_id seleccionado
         y las asigna a self.provider_validation_rules.
         """
-        provider = Provider.get_by_id(self.provider_id.data)
+        provider_id = self.provider_id.data
+        if not provider_id:
+            self.provider_validation_rules = {}
+            return
+        provider = Provider.get_by_id(provider_id)
         if provider is None:
+            self.provider_validation_rules = {}
+            return
             self.provider_validation_rules = {}
             return
 

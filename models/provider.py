@@ -312,7 +312,7 @@ class Provider:
                 row = session.execute(query, {"id": provider_id}).mappings().first()
 
                 if not row:
-                    logger.warning("No provider found with ID %d", provider_id)
+                    logger.warning("No provider found with ID %s", provider_id)
                     return None
 
                 return Provider(**dict(row))
