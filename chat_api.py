@@ -77,6 +77,10 @@ def get_azure_response(
         if file_ids:
             payload["file_ids"] = file_ids
 
+        # Include file_ids if provided
+        if file_ids:
+            payload["file_ids"] = file_ids
+
         # Handle o1-preview specific requirements
         if requires_o1_handling:
             payload["temperature"] = 1.0  # Must be fixed at 1.0 for o1-preview

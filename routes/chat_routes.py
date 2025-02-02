@@ -405,7 +405,19 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             )
             Chat.update_title(chat_id, generate_chat_title(conversation_text))
 
-        # Add user message
+        # Pass azure_file_ids to get_azure_response
+        response_generator = get_azure_response(
+            messages=history,
+            deployment_name=model_obj.deployment_name,
+            max_completion_tokens=max_tokens,
+            api_endpoint=model_obj.api_endpoint,
+            api_key=model_obj.api_key,
+            api_version=api_version,
+            requires_o1_handling=model_obj.requires_o1_handling,
+            timeout_seconds=120,
+            stream=True,
+            file_ids=azure_file_ids if azure_file_ids else None
+        )
         conversation_manager.add_message(
             chat_id=chat_id,
             role="user",

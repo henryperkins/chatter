@@ -33,7 +33,14 @@ class UploadedFile:
     updated_at: Optional[datetime] = None
 
     @staticmethod
-    def create(chat_id: str, filename: str, filepath: str, mime_type: Optional[str] = None, description: Optional[str] = None, azure_file_id: Optional[str] = None) -> str:
+    def create(
+        chat_id: str,
+        filename: str,
+        filepath: str,
+        mime_type: Optional[str] = None,
+        description: Optional[str] = None,
+        azure_file_id: Optional[str] = None
+    ) -> str:
         """
         Insert a new uploaded file record into the database.
         Returns the unique file ID for reference.
