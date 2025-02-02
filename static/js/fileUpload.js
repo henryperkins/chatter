@@ -311,7 +311,7 @@ window.FileUploadManager = class {
         try {
             await window.utils.withLoading(uploadBtn, async () => {
                 const formData = new FormData();
-                
+
                 // Add files and their descriptions
                 this.uploadedFiles.forEach(file => {
                     formData.append('files[]', file);
@@ -320,7 +320,7 @@ window.FileUploadManager = class {
                     }
                 });
 
-                const response = await window.utils.fetchWithCSRF(`/chat/${chatId}/upload`, {
+                const response = await window.utils.fetchWithCSRF(`/api/files/upload/${chatId}`, {
                     method: 'POST',
                     body: formData
                 });
@@ -333,9 +333,9 @@ window.FileUploadManager = class {
                         uploadTime: file.upload_time,
                         version: file.version || 1
                     }));
-                    
+
                     window.utils.showFeedback('Files uploaded successfully', 'success');
-                    
+
                     // Emit custom event for chat interface with uploaded files
                     window.dispatchEvent(new CustomEvent('filesUploaded', {
                         detail: {
@@ -343,7 +343,7 @@ window.FileUploadManager = class {
                             totalSize: response.total_size
                         }
                     }));
-    
+
                     // Return uploaded files for further processing
                     return uploadedFiles;
                 } else {
@@ -575,15 +575,15 @@ window.FileUploadManager = class {
                 `;
             }
         }
-        
+
         // For uploaded files, use the server preview route
         if (file.id) {
             if (file.type.startsWith('image/')) {
-                return `<img src="/file/${file.id}/preview" alt="Preview of ${file.name}" class="max-w-full h-auto rounded-lg">`;
+                return `<img src="/api/files/preview/${file.id}" alt="Preview of ${file.name}" class="max-w-full h-auto rounded-lg">`;
             } else if (file.type === 'application/pdf') {
                 return `
                     <div class="h-[70vh]">
-                        <iframe src="/file/${file.id}/preview" class="w-full h-full rounded-lg" title="PDF Preview"></iframe>
+                        <iframe src="/api/files/preview/${file.id}" class="w-full h-full rounded-lg" title="PDF Preview"></iframe>
                     </div>
                 `;
             } else if (file.type === 'text/plain' || file.type === 'text/markdown') {
@@ -615,7 +615,7 @@ window.FileUploadManager = class {
             let text;
             if (file.id) {
                 // For uploaded files, fetch from server
-                const response = await fetch(`/file/${file.id}/preview`);
+                const response = await fetch(`/api/files/preview/${file.id}`);
                 if (!response.ok) throw new Error('Failed to fetch file content');
                 text = await response.text();
             } else {

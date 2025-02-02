@@ -210,5 +210,13 @@ def init_file_routes(app):
                 'status_code': 500
             }), 500
 
+    @file_routes.route('/preview/<file_id>', methods=['GET'])
+    def preview_file(file_id: str):
+         from flask import send_file, jsonify
+         file_record = UploadedFile.get_by_id(file_id)
+         if not file_record:
+             return jsonify({"error": "File not found"}), 404
+         return send_file(file_record.filepath, mimetype=file_record.mime_type)
+
     # Register the blueprint with a URL prefix
     app.register_blueprint(file_routes, url_prefix='/api/files')

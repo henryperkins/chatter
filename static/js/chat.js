@@ -565,14 +565,16 @@ async function sendMessage() {
 
         // Create form data with metadata
         const formData = new FormData();
-        if (messageText) {
-            // Truncate if needed
-            const truncatedMessage = tokenCount > maxTokens ?
-                await window.tokenUsageManager?.truncateContent(messageText, maxTokens) || messageText :
-                messageText;
-            formData.append('message', truncatedMessage);
-            formData.append('metadata', JSON.stringify(metadata));
+        // Always include a "message" field, even if empty, to satisfy backend requirements
+        let messageForSend = messageText ? (tokenCount > maxTokens ?
+           await window.tokenUsageManager?.truncateContent(messageText, maxTokens) || messageText :
+           messageText) : "";
+        // If no message text provided but files exist, use a placeholder space
+        if (!messageForSend && uploadedFiles.length > 0) {
+            messageForSend = " ";
         }
+        formData.append('message', messageForSend);
+        formData.append('metadata', JSON.stringify(metadata));
 
         // Add file references if available
         if (uploadedFiles.length > 0) {
