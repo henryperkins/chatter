@@ -27,6 +27,7 @@ CREATE TABLE providers (
     validation_rules JSONB NOT NULL DEFAULT '{}',
     capabilities JSONB NOT NULL DEFAULT '{}',
     requires_authentication BOOLEAN NOT NULL DEFAULT TRUE,
+    is_azure BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
