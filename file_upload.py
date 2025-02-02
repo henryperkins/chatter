@@ -4,6 +4,7 @@ from flask import current_app, request, jsonify
 from typing import List, Dict, Tuple
 from models.uploaded_file import UploadedFile
 from config import Config  # Import centralized configuration
+from chat_api import upload_file_to_azure
 
 
 class FileUploadHandler:
