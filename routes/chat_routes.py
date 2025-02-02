@@ -25,7 +25,7 @@ from flask_login import login_required, current_user
 from flask_wtf.csrf import validate_csrf, CSRFError
 from sqlalchemy import text
 
-from chat_api import get_azure_response, scrape_data
+from chat_api import get_azure_response, scrape_data, upload_file_to_azure
 from chat_utils import (
     allowed_file,
     generate_chat_title,
@@ -404,6 +404,16 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                 for msg in conversation_manager.get_context(chat_id)[:5]
             )
             Chat.update_title(chat_id, generate_chat_title(conversation_text))
+
+        # Get conversation history
+        history = conversation_manager.get_context(
+            chat_id,
+            include_system=not getattr(model_obj, "requires_o1_handling", False),
+        )
+
+        # Define max_tokens and api_version
+        max_tokens = model_obj.max_completion_tokens
+        api_version = model_obj.api_version
 
         # Pass azure_file_ids to get_azure_response
         response_generator = get_azure_response(
