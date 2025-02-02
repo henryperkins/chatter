@@ -156,7 +156,8 @@ class Config:
         "md",     # Markdown
         "html",   # HTML documents
         "docx",   # Microsoft Word
-        "pptx"    # Microsoft PowerPoint
+        "pptx",   # Microsoft PowerPoint
+        "py"      # Python scripts
     }
     ALLOWED_MIME_TYPES = {
         'text/plain',
@@ -164,7 +165,8 @@ class Config:
         'text/html',
         'application/pdf',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  # .docx
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation'  # .pptx
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',  # .pptx
+        'text/x-python'  # Python scripts
     }
 
     MIME_TYPE_MAP = {
@@ -173,7 +175,8 @@ class Config:
         "html": "text/html",
         "md": "text/markdown",
         "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "py": "text/x-python"  # Python scripts
     }
 
     MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")
