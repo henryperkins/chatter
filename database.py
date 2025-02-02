@@ -84,15 +84,7 @@ def create_db_engine(db_uri: str) -> Engine:
         pool_use_lifo=True,  # Better connection reuse
         isolation_level="READ COMMITTED",
         execution_options={"autocommit": False},  # Explicit transaction control
-        connect_args={
-            "connect_timeout": 10,
-            "keepalives": 1,
-            "keepalives_idle": 30,
-            "keepalives_interval": 10,
-            "keepalives_count": 5,
-            "application_name": "chatter-app",
-            "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=60000"
-        },
+        # Remove connect_args to rely on URI parameters
         json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
     )
 
