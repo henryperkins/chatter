@@ -161,8 +161,6 @@ def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], in
     excluded_files = []
     total_tokens = 0
     file_contents = []
-    total_tokens = 0
-    azure_file_ids = []
 
     for file in files:
         if not file or not file.filename:
@@ -174,21 +172,44 @@ def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], in
 
         try:
             filename = secure_filename(file.filename)
+            # Get file metadata
+            file_size = file.content_length or 0
+            file_type = file.content_type or 'text/plain'
+
             # Read file content
             content = file.read().decode('utf-8', errors='ignore')
             tokens = count_tokens(content, MODEL_NAME)
+
             if total_tokens + tokens > MAX_INPUT_TOKENS:
                 excluded_files.append({"filename": filename, "error": "Exceeds token limit"})
                 continue
 
-            included_files.append({"filename": filename})
-            file_contents.append({"filename": filename, "content": content})
+            # Format file info
+            file_info = {
+                "filename": filename,
+                "size": f"{file_size / 1024:.1f}KB",
+                "type": file_type,
+                "token_count": tokens
+            }
+
+            included_files.append(file_info)
+            file_contents.append({
+                "filename": filename,
+                "content": content,
+                "metadata": {
+                    "size": file_size,
+                    "type": file_type,
+                    "tokens": tokens,
+                    "timestamp": datetime.now().isoformat()
+                }
+            })
             total_tokens += tokens
+
         except Exception as e:
             logger.error("Error processing file %s: %s", file.filename, e)
             excluded_files.append({"filename": file.filename, "error": str(e)})
 
-    return included_files, excluded_files, total_tokens, azure_file_ids
+    return included_files, excluded_files, total_tokens, file_contents
 
 
 ##############################################################################
@@ -333,12 +354,11 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             logger.warning("No message or files provided")
             return jsonify({"error": "Message or files are required."}), 400
 
-        combined_message = ""
-        included_files, excluded_files, file_contents, total_tokens = [], [], [], 0
-        included_files, excluded_files, file_tokens, azure_file_ids = process_uploaded_files(
+        # Process uploaded files and build message
+        included_files, excluded_files, file_tokens, file_contents = process_uploaded_files(
             request.files.getlist("files[]")
         )
-        total_tokens += file_tokens
+        total_tokens = file_tokens
 
         # Count message tokens
         if message:
@@ -350,27 +370,47 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             total_tokens += message_tokens
 
         # Build the combined message with proper formatting
-        if message:
-            combined_message = message
+        combined_message = []
 
-        # Add file content with proper formatting
+        # Add user message if present
+        if message:
+            combined_message.append(message)
+
+        # Add file contents with metadata
+        if file_contents:
+            combined_message.append("\nI'm sharing some files with you:")
+            for file in file_contents:
+                combined_message.append(f"\n[File: {file['filename']}]")
+                combined_message.append(f"Type: {file['metadata']['type']}")
+                combined_message.append(f"Size: {file['metadata']['size']} bytes")
+                combined_message.append(f"Tokens: {file['metadata']['tokens']}")
+                combined_message.append("Content:\n```")
+                combined_message.append(file['content'])
+                combined_message.append("```\n")
+
+        # Add Azure file IDs if present
         file_ids = request.form.getlist('file_ids[]')
-        azure_file_ids = []
         if file_ids:
             from models.uploaded_file import UploadedFile
+            azure_files = []
             for file_id in file_ids:
                 file_record = UploadedFile.get_by_id(file_id)
                 if file_record and file_record.azure_file_id:
-                    azure_file_ids.append(file_record.azure_file_id)
+                    azure_files.append({
+                        'id': file_record.azure_file_id,
+                        'name': file_record.filename
+                    })
                     logger.info(f"Added Azure file ID {file_record.azure_file_id} for file {file_record.filename}")
                 else:
                     logger.warning(f"No Azure file ID found for file {file_id}")
 
-            if azure_file_ids:
-                if combined_message:
-                    combined_message += "\n\n"
-                combined_message += "I've uploaded some files for you to analyze. You can access their contents directly through the Azure file system.\n"
-                combined_message += "Please analyze these files and provide your insights."
+            if azure_files:
+                combined_message.append("\nAdditional files available in Azure:")
+                for file in azure_files:
+                    combined_message.append(f"- {file['name']} (ID: {file['id']})")
+
+        # Join all message parts
+        combined_message = "\n".join(filter(None, combined_message))
 
         # If total tokens > max, truncate
         if total_tokens > MAX_INPUT_TOKENS:
@@ -413,18 +453,9 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         max_tokens = model_obj.max_completion_tokens
         api_version = model_obj.api_version
 
-        # Process uploaded files
-        included_files, excluded_files, file_tokens, file_contents = process_uploaded_files(
-            request.files.getlist("files[]")
-        )
-        total_tokens += file_tokens
-
-        # Combine message and file contents
-        combined_message = message if message else ""
-        if file_contents:
-            combined_message += "\n\nHere are the contents of the uploaded files:\n"
-            for file in file_contents:
-                combined_message += f"\n[File: {file['filename']}]\n{file['content']}\n"
+        # Count tokens for the combined message
+        message_tokens = count_tokens(combined_message, MODEL_NAME)
+        total_tokens = message_tokens + file_tokens
 
         # Count tokens for the combined message
         message_tokens = count_tokens(combined_message, MODEL_NAME)
@@ -438,7 +469,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                 "\n\n[Note: Content truncated due to token limit.]",
             )
             logger.info("Input content truncated due to token limit")
-        
+
         # Log included and excluded files
         if included_files:
             logger.info("Processed files: %s", [f["filename"] for f in included_files])
@@ -504,8 +535,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                                 api_version=api_version,
                                 requires_o1_handling=model_obj.requires_o1_handling,
                                 timeout_seconds=120,
-                                stream=True,
-                                file_ids=azure_file_ids if azure_file_ids else None
+                                stream=True
                             )
                         except Exception as api_err:
                             logger.error("Azure API error: %s", str(api_err))
@@ -621,8 +651,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                         api_version=api_version,
                         requires_o1_handling=model_obj.requires_o1_handling,
                         timeout_seconds=120,
-                        stream=False,
-                        file_ids=azure_file_ids if azure_file_ids else None
+                        stream=False
                     )
 
                     # Process response

@@ -247,22 +247,113 @@ window.FileUploadManager = class {
     /**
      * Return a Font Awesome icon class based on file type.
      */
-    getFileIcon(fileType) {
-        const iconMap = {
-            'application/pdf': 'file-pdf',
-            'image/': 'file-image',
-            'text/': 'file-alt',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'file-word',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'file-excel',
-            'application/zip': 'file-archive'
+    getFileType(file) {
+        const type = file.type || this.getMimeType(file.name);
+
+        // Define type configurations
+        const typeConfigs = {
+            'application/pdf': {
+                icon: 'file-pdf',
+                bgColor: 'bg-red-100 dark:bg-red-900/30',
+                textColor: 'text-red-600 dark:text-red-400'
+            },
+            'image/': {
+                icon: 'file-image',
+                bgColor: 'bg-green-100 dark:bg-green-900/30',
+                textColor: 'text-green-600 dark:text-green-400'
+            },
+            'text/markdown': {
+                icon: 'file-alt',
+                bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+                textColor: 'text-purple-600 dark:text-purple-400'
+            },
+            'text/': {
+                icon: 'file-alt',
+                bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+                textColor: 'text-blue-600 dark:text-blue-400'
+            },
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': {
+                icon: 'file-word',
+                bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+                textColor: 'text-blue-600 dark:text-blue-400'
+            },
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
+                icon: 'file-excel',
+                bgColor: 'bg-green-100 dark:bg-green-900/30',
+                textColor: 'text-green-600 dark:text-green-400'
+            },
+            'application/zip': {
+                icon: 'file-archive',
+                bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
+                textColor: 'text-yellow-600 dark:text-yellow-400'
+            }
         };
 
-        for (const [type, icon] of Object.entries(iconMap)) {
-            if (fileType.includes(type)) {
-                return icon;
+        // Find matching type configuration
+        for (const [typePrefix, config] of Object.entries(typeConfigs)) {
+            if (type.includes(typePrefix)) {
+                return config;
             }
         }
-        return 'file';
+
+        // Default configuration
+        return {
+            icon: 'file',
+            bgColor: 'bg-gray-100 dark:bg-gray-900/30',
+            textColor: 'text-gray-600 dark:text-gray-400'
+        };
+    }
+
+    getStatusIndicator(file) {
+        const indicators = [];
+
+        // Version badge
+        if (file.version) {
+            indicators.push(`
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                    <i class="fas fa-code-branch mr-1"></i>v${file.version}
+                </span>
+            `);
+        }
+
+        // Token count badge
+        if (file.token_count) {
+            indicators.push(`
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200">
+                    <i class="fas fa-calculator mr-1"></i>${file.token_count} tokens
+                </span>
+            `);
+        }
+
+        // Truncation warning
+        if (file.is_truncated) {
+            indicators.push(`
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200">
+                    <i class="fas fa-exclamation-triangle mr-1"></i>Truncated
+                </span>
+            `);
+        }
+
+        // Processing status
+        if (file.status === 'processing') {
+            indicators.push(`
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                    <i class="fas fa-spinner fa-spin mr-1"></i>Processing
+                </span>
+            `);
+        }
+
+        return indicators.join(' ');
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
     /**
@@ -273,62 +364,105 @@ window.FileUploadManager = class {
         const totalSizeEl = document.getElementById('total-size');
         if (!fileList || !totalSizeEl) return;
 
-        // Build the file list markup
-        fileList.innerHTML = this.uploadedFiles.map((file, index) => `
-            <div class="file-item group flex flex-col p-3 bg-white dark:bg-gray-800 rounded-lg mb-2 shadow-sm hover:shadow-md transition-all duration-200">
-                <div class="flex items-center justify-between w-full">
-                    <div class="flex items-center space-x-3 flex-1">
-                        <div class="flex-shrink-0">
-                            <i class="fas fa-${this.getFileIcon(file.type)} text-2xl text-blue-500"></i>
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-center justify-between">
-                                <span class="block text-sm font-medium text-gray-900 dark:text-gray-100 truncate" title="${file.name}">
+        // Build the file list markup with enhanced UI
+        fileList.innerHTML = this.uploadedFiles.map((file, index) => {
+            const fileType = this.getFileType(file);
+            const statusIndicator = this.getStatusIndicator(file);
+            const fileSize = this.formatFileSize(file.size);
+            const uploadTime = file.uploadTime ? new Date(file.uploadTime).toLocaleString() : 'Not uploaded';
+
+            return `
+            <div class="file-item group p-4 bg-white dark:bg-gray-800 rounded-xl mb-3 shadow-md hover:shadow-lg transition-all duration-300 border border-gray-100 dark:border-gray-700">
+                <!-- Primary Section -->
+                <div class="flex items-start space-x-4">
+                    <!-- File Type Icon -->
+                    <div class="flex-shrink-0 w-12 h-12 rounded-lg ${fileType.bgColor} flex items-center justify-center">
+                        <i class="fas fa-${fileType.icon} text-2xl ${fileType.textColor}"></i>
+                    </div>
+
+                    <!-- Main Content -->
+                    <div class="flex-1 min-w-0">
+                        <!-- Header -->
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors" title="${file.name}">
                                     ${file.name}
-                                </span>
-                                <div class="flex items-center space-x-2 ml-2">
-                                    ${file.version ? `<span class="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100 px-2 py-0.5 rounded">v${file.version}</span>` : ''}
-                                    <span class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                                        ${(file.size / 1024).toFixed(2)} KB
-                                    </span>
-                                    ${file.token_count ? `<span class="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded">${file.token_count} tokens</span>` : ''}
-                                    ${file.is_truncated ? `<span class="text-xs bg-yellow-100 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-100 px-2 py-0.5 rounded">Truncated</span>` : ''}
+                                </h3>
+                                <div class="flex items-center space-x-2 mt-0.5">
+                                    ${statusIndicator}
+                                    <span class="text-sm text-gray-500 dark:text-gray-400">${fileSize}</span>
                                 </div>
                             </div>
-                            <div class="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                <span class="mr-2">${file.mime_type || file.type}</span>
-                                ${file.uploadTime ? `<span>• Uploaded: ${new Date(file.uploadTime).toLocaleString()}</span>` : ''}
-                            </div>
-                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 mt-1">
-                                <div id="progress-${file.name}"
-                                    class="bg-blue-500 h-1.5 rounded-full text-[10px] text-center text-white"
-                                    style="width: 0%">0%</div>
+
+                            <!-- Action Buttons -->
+                            <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                <button onclick="window.fileUploadManager.showPreview(${index})"
+                                        class="p-2 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 dark:hover:text-primary-400 transition-all duration-200"
+                                        aria-label="Preview file"
+                                        title="Preview file">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button onclick="window.fileUploadManager.removeFile(${index})"
+                                        class="p-2 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200"
+                                        aria-label="Remove file"
+                                        title="Remove file">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
                             </div>
                         </div>
-                    </div>
-                    <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <button onclick="window.fileUploadManager.showPreview(${index})"
-                                class="text-gray-500 hover:text-blue-500 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                aria-label="Preview file">
-                            <i class="fas fa-eye text-sm"></i>
-                        </button>
-                        <button onclick="window.fileUploadManager.removeFile(${index})"
-                                class="text-gray-500 hover:text-red-500 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                                aria-label="Remove file">
-                            <i class="fas fa-times text-sm"></i>
-                        </button>
+
+                        <!-- Technical Info -->
+                        <div class="mt-2 grid grid-cols-2 gap-2 text-sm">
+                            <div class="flex items-center space-x-1 text-gray-600 dark:text-gray-400">
+                                <i class="fas fa-code text-xs"></i>
+                                <span>${file.mime_type || file.type}</span>
+                            </div>
+                            <div class="flex items-center space-x-1 text-gray-600 dark:text-gray-400">
+                                <i class="fas fa-clock text-xs"></i>
+                                <span>${uploadTime}</span>
+                            </div>
+                            ${file.token_count ? `
+                            <div class="flex items-center space-x-1 text-gray-600 dark:text-gray-400">
+                                <i class="fas fa-calculator text-xs"></i>
+                                <span>${file.token_count} tokens</span>
+                            </div>
+                            ` : ''}
+                            ${file.version ? `
+                            <div class="flex items-center space-x-1 text-gray-600 dark:text-gray-400">
+                                <i class="fas fa-code-branch text-xs"></i>
+                                <span>Version ${file.version}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+
+                        <!-- Progress Bar -->
+                        <div class="mt-3">
+                            <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+                                <span>Upload Progress</span>
+                                <span id="progress-text-${file.name}">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                                <div id="progress-${file.name}"
+                                     class="bg-primary-600 dark:bg-primary-500 h-2 rounded-full transition-all duration-300 ease-out"
+                                     style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="mt-3">
+                            <label for="description-${index}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                            <textarea
+                                id="description-${index}"
+                                class="w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
+                                placeholder="Add a description..."
+                                rows="2"
+                                onchange="window.fileUploadManager.updateFileDescription(${index}, this.value)"
+                            >${file.description || ''}</textarea>
+                        </div>
                     </div>
                 </div>
-                <div class="mt-2">
-                    <textarea
-                        class="w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Add a description..."
-                        rows="1"
-                        onchange="window.fileUploadManager.updateFileDescription(${index}, this.value)"
-                    >${file.description || ''}</textarea>
-                </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
 
         // Update total size display
         const totalBytes = this.uploadedFiles.reduce((sum, file) => sum + file.size, 0);

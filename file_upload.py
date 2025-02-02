@@ -55,13 +55,19 @@ class FileUploadHandler:
 
         # Check MIME type
         try:
-            import magic
-            file.seek(0)
-            mime_type = magic.from_buffer(file.read(1024), mime=True)
-            file.seek(0)
+            try:
+                import magic
+                file.seek(0)
+                mime_type = magic.from_buffer(file.read(1024), mime=True)
+                file.seek(0)
+                current_app.logger.debug(f"Detected MIME type for {filename}: {mime_type}")
+            except ImportError:
+                # Fallback for when python-magic is not available
+                current_app.logger.debug("python-magic not available, using extension-based detection")
+                mime_type = Config.MIME_TYPE_MAP.get(ext, 'application/octet-stream')
 
             # Special handling for Python files and other text-based files
-            if ext == 'py' or mime_type == 'application/octet-stream':
+            if ext == 'py' or mime_type == 'application/octet-stream' or ext == 'md':
                 # Try to detect text content
                 try:
                     file.seek(0)
@@ -128,12 +134,14 @@ class FileUploadHandler:
         for file in files:
             file.seek(0)
             current_app.logger.debug(f"Validating file: {file.filename}")
-
             # Basic validation
+            current_app.logger.debug(f"Starting validation for file: {file.filename}")
             is_allowed, validation_errors = self.allowed_file(file.filename, file)
             if not is_allowed:
                 error_msg = f"File validation failed for {file.filename}: {validation_errors}"
                 current_app.logger.error(error_msg)
+                current_app.logger.debug(f"Allowed extensions: {self.ALLOWED_EXTENSIONS}")
+                current_app.logger.debug(f"Allowed MIME types: {Config.ALLOWED_MIME_TYPES}")
                 errors.append(error_msg)
                 continue
 
@@ -210,13 +218,34 @@ class FileUploadHandler:
         Returns:
             bool: True if the file content matches its extension, False otherwise.
         """
-        import magic
+        file.seek(0)
+        mime = None
+
+        # Try python-magic first
+        try:
+            import magic
+            mime = magic.from_buffer(file.read(1024), mime=True)
+            current_app.logger.debug(f"MIME type detected using python-magic: {mime}")
+        except (ImportError, Exception) as e:
+            current_app.logger.warning(f"python-magic detection failed: {str(e)}")
+
+        # If python-magic fails, try mimetypes module
+        if not mime:
+            try:
+                import mimetypes
+                ext = file.filename.split(".")[-1].lower()
+                mime = mimetypes.guess_type(file.filename)[0]
+                current_app.logger.debug(f"MIME type detected using mimetypes: {mime}")
+            except Exception as e:
+                current_app.logger.warning(f"mimetypes detection failed: {str(e)}")
+
+        # Final fallback to extension-based detection
+        if not mime:
+            ext = file.filename.split(".")[-1].lower()
+            mime = Config.MIME_TYPE_MAP.get(ext, 'application/octet-stream')
+            current_app.logger.debug(f"MIME type set from extension mapping: {mime}")
 
         file.seek(0)
-        mime = magic.from_buffer(file.read(1024), mime=True)
-        file.seek(0)
-
-        current_app.logger.debug(f"Validating content for {file.filename}, detected MIME: {mime}")
 
         # Use MIME type map from centralized configuration
         mime_map = Config.MIME_TYPE_MAP
@@ -234,8 +263,20 @@ class FileUploadHandler:
                 current_app.logger.error(f"Python file {file.filename} is not valid UTF-8 text")
                 return False
 
-        # Special handling for text files
-        if ext in ['txt', 'md'] and mime.startswith('text/'):
+        # Special handling for markdown files
+        if ext == 'md':
+            try:
+                file.seek(0)
+                content = file.read(1024).decode('utf-8')
+                file.seek(0)
+                current_app.logger.debug(f"Markdown file {file.filename} validated as UTF-8 text")
+                return True
+            except UnicodeDecodeError:
+                current_app.logger.error(f"Markdown file {file.filename} is not valid UTF-8 text")
+                return False
+
+        # Special handling for other text files
+        if ext == 'txt' and mime.startswith('text/'):
             current_app.logger.debug(f"Text file {file.filename} validated")
             return True
 
@@ -365,10 +406,34 @@ class FileUploadHandler:
             description = descriptions.get(filename)
 
             try:
-                # Get MIME type
+                # Get MIME type with robust fallback mechanism
                 file.seek(0)
-                import magic
-                mime_type = magic.from_buffer(file.read(1024), mime=True)
+                mime_type = None
+
+                # Try python-magic first
+                try:
+                    import magic
+                    mime_type = magic.from_buffer(file.read(1024), mime=True)
+                    current_app.logger.debug(f"MIME type detected using python-magic: {mime_type}")
+                except (ImportError, Exception) as e:
+                    current_app.logger.warning(f"python-magic detection failed: {str(e)}")
+
+                # If python-magic fails, try mimetypes module
+                if not mime_type:
+                    try:
+                        import mimetypes
+                        ext = filename.rsplit(".", 1)[1].lower()
+                        mime_type = mimetypes.guess_type(filename)[0]
+                        current_app.logger.debug(f"MIME type detected using mimetypes: {mime_type}")
+                    except Exception as e:
+                        current_app.logger.warning(f"mimetypes detection failed: {str(e)}")
+
+                # Final fallback to extension-based detection
+                if not mime_type:
+                    ext = filename.rsplit(".", 1)[1].lower()
+                    mime_type = Config.MIME_TYPE_MAP.get(ext, 'application/octet-stream')
+                    current_app.logger.debug(f"MIME type set from extension mapping: {mime_type}")
+
                 file.seek(0)
 
                 # Save file with progress tracking
@@ -452,7 +517,7 @@ class FileUploadHandler:
                         pass
 
             except Exception as e:
-                current_app.logger.error(f"Error saving file {filename}: {str(e)}")
+                current_app.logger.error(f"Error saving file {filename} to {filepath}: {str(e)}")
                 errors.append(f"Failed to save file: {filename}")
                 if os.path.exists(filepath):
                     try:

@@ -15,10 +15,17 @@ logger = logging.getLogger(__name__)
 class AzureSearchConfig:
     def __init__(self):
         # Required Azure AI Search settings
+        # Core settings
         self.search_endpoint = os.getenv('AZURE_SEARCH_ENDPOINT')
         self.search_key = os.getenv('AZURE_SEARCH_KEY')
         self.search_index_name = os.getenv('AZURE_SEARCH_INDEX_NAME', 'chatterindex')
-        self.api_version = os.getenv('AZURE_SEARCH_API_VERSION', '2023-07-01-preview')
+        self.api_version = os.getenv('AZURE_SEARCH_API_VERSION', '2023-11-01')
+
+        # Service configuration
+        self.replica_count = int(os.getenv('AZURE_SEARCH_REPLICA_COUNT', '2'))
+        self.partition_count = int(os.getenv('AZURE_SEARCH_PARTITION_COUNT', '1'))
+        self.hosting_mode = os.getenv('AZURE_SEARCH_HOSTING_MODE', 'default')
+        self.semantic_search = os.getenv('AZURE_SEARCH_SEMANTIC_SEARCH', 'free')
 
         # Validate required settings
         if not all([self.search_endpoint, self.search_key]):
@@ -32,9 +39,17 @@ class AzureSearchConfig:
         Create or update the search index for file content.
         """
         try:
-            # Define the index schema
-            index_schema = {
+            # Define the service configuration
+            service_config = {
                 "name": self.search_index_name,
+                "replicaCount": self.replica_count,
+                "partitionCount": self.partition_count,
+                "hostingMode": self.hosting_mode.capitalize(),
+                "semanticSearch": self.semantic_search,
+                "networkRuleSet": {
+                    "ipRules": [],
+                    "bypass": "None"
+                },
                 "fields": [
                     {
                         "name": "id",
@@ -92,12 +107,12 @@ class AzureSearchConfig:
                                 "titleField": {
                                     "fieldName": "title"
                                 },
-                                "contentFields": [
+                                "prioritizedContentFields": [
                                     {
                                         "fieldName": "content"
                                     }
                                 ],
-                                "keywordsFields": [
+                                "prioritizedKeywordsFields": [
                                     {
                                         "fieldName": "metadata"
                                     }
@@ -105,6 +120,12 @@ class AzureSearchConfig:
                             }
                         }
                     ]
+                },
+                "encryptionWithCmk": {
+                    "enforcement": "Unspecified"
+                },
+                "authOptions": {
+                    "apiKeyOnly": {}
                 }
             }
 
