@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import bleach
 from typing import Union, Tuple, List, Dict, Any, Optional, cast
 import tiktoken
+from werkzeug.utils import secure_filename
 from flask import (
     Response,
     Blueprint,
@@ -159,6 +160,7 @@ def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], in
     included_files = []
     excluded_files = []
     total_tokens = 0
+    file_contents = []
     total_tokens = 0
     azure_file_ids = []
 
