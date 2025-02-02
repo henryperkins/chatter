@@ -26,7 +26,7 @@ from flask_login import login_required, current_user
 from flask_wtf.csrf import validate_csrf, CSRFError
 from sqlalchemy import text
 
-from chat_api import get_azure_response, scrape_data, upload_file_to_azure
+from chat_api import get_azure_response, scrape_data
 from chat_utils import (
     allowed_file,
     generate_chat_title,
