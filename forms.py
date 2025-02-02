@@ -269,6 +269,35 @@ class RegistrationForm(FlaskForm):
 
 
 # ------------------------------------------------------------------------
+# ResetPasswordForm
+# ------------------------------------------------------------------------
+
+class ResetPasswordForm(FlaskForm):
+    """
+    Form for resetting password.
+    """
+    password = PasswordField(
+        "New Password",
+        validators=[
+            DataRequired(message="Password is required."),
+            Length(min=8, message="Password must be at least 8 characters long."),
+            Regexp(
+                r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?\":{}|<>]).+$",
+                message="Password must include uppercase, lowercase, digit, and special character.",
+            ),
+        ],
+    )
+    confirm_password = PasswordField(
+        "Confirm Password",
+        validators=[
+            DataRequired(message="Please confirm your password."),
+            EqualTo("password", message="Passwords must match."),
+        ],
+    )
+    submit = SubmitField("Reset Password")
+
+
+# ------------------------------------------------------------------------
 # ProviderForm
 # ------------------------------------------------------------------------
 
