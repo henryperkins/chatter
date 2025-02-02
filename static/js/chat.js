@@ -561,26 +561,29 @@ async function sendMessage() {
             token_count: tokenCount,
             requires_o1: model?.requires_o1_handling || false,
             model_max_tokens: maxTokens
+,
+            has_files: uploadedFiles.length > 0
         };
 
         // Create form data with metadata
         const formData = new FormData();
         // Always include a "message" field, even if empty, to satisfy backend requirements
-        let messageForSend = messageText ? (tokenCount > maxTokens ?
-           await window.tokenUsageManager?.truncateContent(messageText, maxTokens) || messageText :
-           messageText) : "";
-        // If no message text provided but files exist, use a placeholder space
-        if (!messageForSend && uploadedFiles.length > 0) {
-            messageForSend = " ";
+        let messageForSend = "";
+        if (messageText) {
+            messageForSend = tokenCount > maxTokens ?
+
+               await window.tokenUsageManager?.truncateContent(messageText, maxTokens) || messageText :
+               messageText;
+            formData.append('message', messageForSend);
         }
-        formData.append('message', messageForSend);
         formData.append('metadata', JSON.stringify(metadata));
 
         // Add file references if available
         if (uploadedFiles.length > 0) {
-            formData.append('has_files', 'true');
-            uploadedFiles.forEach(file => {
-                formData.append('file_ids[]', file.id);
+            const fileIds = uploadedFiles.filter(file => file.id).map(file => file.id);
+            fileIds.forEach(id => {
+                formData.append('file_ids[]', id);
+                console.debug('Adding file ID to request:', id);
             });
         }
 

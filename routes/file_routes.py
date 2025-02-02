@@ -113,16 +113,25 @@ def init_file_routes(app):
 
                 # Cache the file content for quick access
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        # Cache using both local file ID and Azure file ID
-                        cache_key = hash((file_info['filename'], os.path.getsize(file_path)))
-                        azure_cache_key = hash(('azure', azure_result.get('id')))
-                        from chat_utils import context_manager
-                        context_manager.context_cache[cache_key] = content
-                        context_manager.context_cache[azure_cache_key] = content
+                    # Only cache text files
+                    mime_type = file_info.get('mime_type', '')
+                    if mime_type.startswith('text/') or mime_type == 'application/json':
+                        try:
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                                # Cache using both local file ID and Azure file ID
+                                cache_key = hash((file_info['filename'], os.path.getsize(file_path)))
+                                azure_cache_key = hash(('azure', azure_result.get('id')))
+                                from chat_utils import context_manager
+                                context_manager.context_cache[cache_key] = content
+                                context_manager.context_cache[azure_cache_key] = content
+                        except UnicodeDecodeError:
+                            current_app.logger.warning(f"Could not read {file_info['filename']} as text, skipping cache")
+                    else:
+                        current_app.logger.debug(f"Skipping cache for binary file: {file_info['filename']}")
                 except Exception as e:
                     current_app.logger.warning(f"Failed to cache file content: {str(e)}")
+                    current_app.logger.debug("Stack trace:", exc_info=True)
 
                 # Update the database record with Azure file ID
                 UploadedFile.update_azure_file_id(

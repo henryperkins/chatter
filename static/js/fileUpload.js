@@ -11,16 +11,31 @@ window.FileUploadManager = class {
         this.MAX_FILES = 5;
         this.MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
         this.MAX_TOTAL_SIZE = 50 * 1024 * 1024; // 50 MB
+        this.MAX_TOKENS = 32000; // Maximum tokens per file
         this.MAX_CONCURRENT_UPLOADS = 3;
         this.ALLOWED_FILE_TYPES = [
+            // Text files
             'text/plain',
-            'application/pdf',
-            'text/x-python',
-            'application/javascript',
             'text/markdown',
+            'text/x-python',
+            'text/html',
+            'text/css',
+            'text/xml',
+            'text/yaml',
+            'text/csv',
+
+            // Application files
+            'application/json',
+            'application/javascript',
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+
+            // Images
             'image/jpeg',
             'image/png',
-            'text/csv'
+            'image/gif',
+            'image/webp'
         ];
 
         // DOM elements (fall back to ID-based references if not passed)
@@ -36,7 +51,21 @@ window.FileUploadManager = class {
             this.fileInput.type = 'file';
             this.fileInput.id = 'file-input';
             this.fileInput.multiple = true;
-            this.fileInput.accept = this.ALLOWED_FILE_TYPES.join(',');
+            // Convert MIME types to file extensions for better browser compatibility
+            const acceptTypes = [
+                // Text files
+                '.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.xml', '.yaml', '.yml',
+                // Application files
+                '.pdf', '.doc', '.docx',
+                // Images
+                '.jpg', '.jpeg', '.png', '.gif', '.webp',
+                // Also include MIME types for better coverage
+                'text/*',
+                'application/json',
+                'application/pdf',
+                'image/*'
+            ].join(',');
+            this.fileInput.accept = acceptTypes;
             this.fileInput.style.display = 'none';
             document.body.appendChild(this.fileInput);
         }
@@ -69,10 +98,31 @@ window.FileUploadManager = class {
         const fileType = file.type || this.getMimeType(file.name);
         if (!fileType) {
             errors.push(`Could not determine file type for: ${file.name}`);
-        } else if (!this.ALLOWED_FILE_TYPES.includes(fileType)) {
+            return errors;
+        }
+
+        // Check if file type is allowed
+        const isText = fileType.startsWith('text/') || fileType === 'application/json';
+        const isImage = fileType.startsWith('image/');
+        const isPDF = fileType === 'application/pdf';
+        const isDoc = fileType.includes('msword') || fileType.includes('wordprocessingml');
+
+        if (!isText && !isImage && !isPDF && !isDoc) {
             errors.push(`Unsupported file type: ${fileType}`);
-        } else if (fileType.startsWith('text/') && file.size > 1024 * 1024) {
-            errors.push(`Text file too large: ${file.name}`);
+            return errors;
+        }
+
+        // Size validation based on file type
+        if (isText && file.size > 1024 * 1024) {
+            errors.push(`Text file too large: ${file.name} (max 1MB)`);
+        }
+
+        // Additional validation for binary files
+        if (!fileType.startsWith('text/') && !fileType.includes('json')) {
+            const maxBinarySize = 5 * 1024 * 1024; // 5MB limit for binary files
+            if (file.size > maxBinarySize) {
+                errors.push(`Binary file too large: ${(file.size / 1024 / 1024).toFixed(2)} MB (max ${maxBinarySize / 1024 / 1024}MB)`);
+            }
         }
 
         // File size validation
@@ -103,18 +153,38 @@ window.FileUploadManager = class {
     getMimeType(filename) {
         const ext = filename.split('.').pop().toLowerCase();
         const mimeTypes = {
+            // Text files
             'txt': 'text/plain',
             'md': 'text/markdown',
             'js': 'application/javascript',
             'py': 'text/x-python',
             'json': 'application/json',
+            'csv': 'text/csv',
+            'html': 'text/html',
+            'css': 'text/css',
+            'xml': 'text/xml',
+            'yaml': 'text/yaml',
+            'yml': 'text/yaml',
+
+            // Binary files
             'pdf': 'application/pdf',
             'jpg': 'image/jpeg',
             'jpeg': 'image/jpeg',
             'png': 'image/png',
-            'csv': 'text/csv'
+            'gif': 'image/gif',
+            'webp': 'image/webp',
+            'doc': 'application/msword',
+            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         };
-        return mimeTypes[ext];
+
+        const mimeType = mimeTypes[ext];
+        if (!mimeType && ext) {
+            // For unknown extensions, try to infer text vs binary
+            if (['log', 'cfg', 'conf', 'ini', 'env'].includes(ext)) {
+                return 'text/plain';
+            }
+        }
+        return mimeType;
     }
 
 
@@ -142,11 +212,18 @@ window.FileUploadManager = class {
      * Display an error using the global feedback mechanism (if available).
      */
     showError(message, file = null) {
+        let errorMessage = message;
+        if (file) {
+            const fileSize = file.size ? `(${(file.size / 1024 / 1024).toFixed(2)} MB)` : '';
+            const fileType = file.type || this.getMimeType(file.name) || 'unknown type';
+            errorMessage = `${file.name} ${fileSize}: ${message} [${fileType}]`;
+        }
         window.utils.showFeedback(
-            file ? `${file.name}: ${message}` : message,
+            errorMessage,
             'error',
-            { duration: 5000, position: 'top' }
+            { duration: 7000, position: 'top' }
         );
+        console.debug('File validation error:', { file, message });
     }
 
     /**
@@ -638,8 +715,22 @@ window.FileUploadManager = class {
     triggerFileInput(accept) {
         if (!this.fileInput) return;
 
-        // Update accept attribute for specific file types
-        this.fileInput.accept = accept;
+        // Handle special cases for mobile capture
+        if (accept === 'image/*;capture=camera' || accept === 'image/*') {
+            this.fileInput.accept = accept;
+        } else {
+            // Use our standard accept types for regular file selection
+            const acceptTypes = [
+                '.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.xml', '.yaml', '.yml',
+                '.pdf', '.doc', '.docx',
+                '.jpg', '.jpeg', '.png', '.gif', '.webp',
+                'text/*',
+                'application/json',
+                'application/pdf',
+                'image/*'
+            ].join(',');
+            this.fileInput.accept = acceptTypes;
+        }
 
         // Trigger click
         this.fileInput.click();

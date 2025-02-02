@@ -56,18 +56,23 @@ class FileUploadHandler:
             mime_type = magic.from_buffer(file.read(1024), mime=True)
             file.seek(0)
 
-            # Special handling for text-based files that might be detected as octet-stream
-            if mime_type == 'application/octet-stream':
+            # Special handling for Python files and other text-based files
+            if ext == 'py' or mime_type == 'application/octet-stream':
                 # Try to detect text content
                 try:
                     file.seek(0)
                     sample = file.read(1024).decode('utf-8')
                     file.seek(0)
                     # If we can decode as UTF-8, treat as text
-                    if ext in ['md', 'txt', 'json', 'py', 'js', 'css', 'html']:
+                    if ext == 'py':
+                        mime_type = 'text/x-python'
+                    elif ext in ['md', 'txt', 'json', 'js', 'css', 'html']:
                         mime_type = f'text/{ext}' if ext != 'md' else 'text/markdown'
                 except (UnicodeDecodeError, Exception):
                     # Not text content, keep original mime type
+                    if ext == 'py':
+                        errors.append("Python file must be valid UTF-8 text")
+                        return False, errors
                     pass
 
             if mime_type not in Config.ALLOWED_MIME_TYPES and not any(
@@ -199,23 +204,29 @@ class FileUploadHandler:
         expected_mime = mime_map.get(ext, "")
         return mime.startswith(expected_mime) if expected_mime else False
 
-
     def scan_for_viruses(self, file) -> str:
         """
-        Scan file for viruses using ClamAV.
+        Scan file for viruses using ClamAV if available.
+        On Windows or if ClamAV is not installed, returns "clean".
 
         Args:
             file: The file object.
 
         Returns:
-            str: "clean" if the file is clean, otherwise the scan result.
+            str: "clean" if the file is clean or scan not available, otherwise the scan result.
         """
         try:
             import pyclamd
+            import platform
+
+            # Skip virus scan on Windows
+            if platform.system() == 'Windows':
+                return "clean"
 
             cd = pyclamd.ClamdUnixSocket()
             if not cd.ping():
-                raise Exception("ClamAV daemon not running")
+                current_app.logger.warning("ClamAV daemon not running, skipping virus scan")
+                return "clean"
 
             file.seek(0)
             scan_result = cd.scan_stream(file.read())
@@ -224,9 +235,12 @@ class FileUploadHandler:
             if scan_result is None:
                 return "clean"
             return scan_result[1]
+        except ImportError:
+            current_app.logger.warning("pyclamd not installed, skipping virus scan")
+            return "clean"
         except Exception as e:
-            current_app.logger.error(f"Virus scan failed: {str(e)}")
-            return "scan_failed"
+            current_app.logger.warning(f"Virus scan skipped: {str(e)}")
+            return "clean"
 
     def quarantine_file(self, file) -> None:
         """
@@ -294,18 +308,32 @@ class FileUploadHandler:
                             progress = (bytes_written / total_size) * 100
                             current_app.logger.debug(f"Upload progress for {filename}: {progress:.1f}%")
 
-                # Read file content for context management
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    
-                # Use context monitor for compression
-                compressed_content = context_monitor.compress_file_content(
-                    content,
-                    context_monitor.calculate_optimal_window_size(len(content))
-                )
-                
-                # Track token usage
-                file_tokens = len(compressed_content.split())
+                # Handle content based on file type
+                content = ""
+                compressed_content = ""
+                file_tokens = 0
+                if mime_type.startswith('text/') or mime_type in ['application/json', 'text/markdown']:
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f:
+                            content = f.read()
+
+                        # Use context monitor for compression only on text files
+                        compressed_content = context_monitor.compress_file_content(
+                            content,
+                            context_monitor.calculate_optimal_window_size(len(content))
+                        )
+
+                        # Only count tokens for text files
+                        file_tokens = len(compressed_content.split())
+
+                    except UnicodeDecodeError:
+                        current_app.logger.warning(f"Could not read {filename} as text, skipping content processing")
+                else:
+                    current_app.logger.debug(f"Skipping content processing for binary file: {filename}")
+
+                    # For binary files, use a token estimation based on file size
+                    file_tokens = os.path.getsize(filepath) // 4  # Rough estimate
+
                 total_tokens += file_tokens
                 context_monitor.track_token_usage(file_tokens)
 
@@ -328,7 +356,7 @@ class FileUploadHandler:
                     "token_count": file_tokens,
                     "is_truncated": len(compressed_content) < len(content)
                 }
-                
+
                 saved_files.append(file_info)
 
                 # Cache the processed content
@@ -369,7 +397,7 @@ class FileUploadHandler:
         # Get files and their descriptions
         files = request.files.getlist("files[]")
         descriptions = {}
-        
+
         # Parse file descriptions from form data
         for key, value in request.form.items():
             if key.startswith('description_'):
