@@ -634,14 +634,18 @@ class Model:
                 if not re.match(pattern, api_endpoint):
                     raise ValueError("API endpoint does not match the required format specified by the provider.")
 
-        # Validate 'deployment_name' using provider's 'model_id' pattern
-        deployment_name = config.get("deployment_name")
-        if deployment_name:
-            pattern = validation_rules.get('model_id')
-            if pattern:
-                import re
-                if not re.match(pattern, deployment_name):
-                    raise ValueError("Deployment name does not match the required format specified by the provider.")
+        if provider.is_azure:
+            # Validate 'deployment_name' using provider's 'model_id' pattern
+            deployment_name = config.get("deployment_name")
+            if deployment_name:
+                pattern = validation_rules.get('model_id')
+                if pattern:
+                    import re
+                    if not re.match(pattern, deployment_name):
+                        raise ValueError("Deployment name does not match the required format specified by the provider.")
+        else:
+            # For OpenAI provider, remove any deployment name from the config
+            config.pop("deployment_name", None)
 
         # Validate temperature
         temperature = config.get("temperature")
