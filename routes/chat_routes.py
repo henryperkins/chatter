@@ -155,9 +155,10 @@ def truncate_content(text: str, max_tokens: int, truncation_note: str) -> str:
     return truncated_text + truncation_note
 
 
-def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], List[str], int]:
+def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], int, List[str]]:
     included_files, excluded_files, file_contents = [], [], []
     total_tokens = 0
+    azure_file_ids = []
 
     for file in files:
         if not file or not file.filename:
@@ -173,9 +174,14 @@ def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], Li
                 excluded_files.append({"filename": filename, "error": "Exceeds token limit"})
                 continue
 
-            included_files.append({"filename": filename})
-            file_contents.append(content)
-            total_tokens += tokens
+            # Upload the file to Azure OpenAI
+            azure_file_id = upload_file_to_azure(file)
+            if azure_file_id:
+                included_files.append({"filename": filename})
+                azure_file_ids.append(azure_file_id)
+                total_tokens += tokens
+            else:
+                excluded_files.append({"filename": filename, "error": "Failed to upload to Azure"})
 
         except MemoryError as e:
             logger.error("MemoryError processing file %s: %s", file.filename, e)
@@ -184,7 +190,7 @@ def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], Li
             logger.error("Error processing file %s: %s", file.filename, e)
             excluded_files.append({"filename": file.filename, "error": str(e)})
 
-    return included_files, excluded_files, file_contents, total_tokens
+    return included_files, excluded_files, total_tokens, azure_file_ids
 
 
 ##############################################################################
@@ -331,11 +337,10 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
         combined_message = ""
         included_files, excluded_files, file_contents, total_tokens = [], [], [], 0
-        if request.files:
-            included_files, excluded_files, file_contents, file_tokens = process_uploaded_files(
-                request.files.getlist("files[]")
-            )
-            total_tokens += file_tokens
+        included_files, excluded_files, file_tokens, azure_file_ids = process_uploaded_files(
+            request.files.getlist("files[]")
+        )
+        total_tokens += file_tokens
 
         # Count message tokens
         if message:

@@ -26,6 +26,7 @@ class UploadedFile:
     size: int
     description: Optional[str] = None
     mime_type: Optional[str] = None
+    azure_file_id: Optional[str] = None
     version: int = 1
     azure_file_id: Optional[str] = None
     created_at: Optional[datetime] = None

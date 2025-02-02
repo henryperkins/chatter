@@ -373,13 +373,20 @@ class FileUploadHandler:
                 total_tokens += file_tokens
                 context_monitor.track_token_usage(file_tokens)
 
-                # Create database record with metadata
+                # Upload the file to Azure OpenAI
+                azure_file_id = upload_file_to_azure(file)
+                if not azure_file_id:
+                    # Handle the error as needed
+                    continue
+
+                # Create database record with azure_file_id
                 file_id = UploadedFile.create(
                     chat_id=chat_id,
                     filename=filename,
                     filepath=filepath,
                     mime_type=mime_type,
-                    description=description
+                    description=description,
+                    azure_file_id=azure_file_id
                 )
 
                 file_info = {

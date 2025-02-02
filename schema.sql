@@ -104,7 +104,8 @@ CREATE TABLE uploaded_files (
     filename TEXT NOT NULL,
     filepath TEXT NOT NULL,
     mime_type TEXT DEFAULT NULL,
-    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    azure_file_id TEXT DEFAULT NULL
 );
 
 -- Login attempts tracking
