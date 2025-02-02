@@ -2,11 +2,10 @@ import os
 import os
 from werkzeug.utils import secure_filename
 from flask import current_app, request, jsonify
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 from models.uploaded_file import UploadedFile
 from config import Config
 from azure_search_config import AzureSearchConfig
-from openai.embeddings_utils import get_embedding
 import hashlib
 import time
 

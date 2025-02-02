@@ -289,3 +289,53 @@ def scrape_search(search_term: str) -> str:
     search_results = [result.text for result in results[:3]]
 
     return "Search results:\n" + "\n".join(search_results)
+
+
+def upload_file_to_azure(file_content: bytes, file_name: str, content_type: str) -> Optional[str]:
+    """
+    Uploads a file to Azure Blob Storage.
+
+    Args:
+        file_content: The content of the file as bytes
+        file_name: The name of the file
+        content_type: The MIME type of the file
+
+    Returns:
+        The Azure file ID if successful, None otherwise
+    """
+    try:
+        from azure.storage.blob import BlobServiceClient
+        import os
+
+        # Get Azure Storage connection string from environment
+        connection_string = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
+        container_name = os.getenv('AZURE_STORAGE_CONTAINER')
+
+        if not connection_string or not container_name:
+            logger.error("Azure Storage configuration missing")
+            return None
+
+        # Create the BlobServiceClient
+        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+
+        # Get container client
+        container_client = blob_service_client.get_container_client(container_name)
+
+        # Generate a unique blob name
+        import uuid
+        blob_name = f"{uuid.uuid4()}-{file_name}"
+
+        # Get blob client
+        blob_client = container_client.get_blob_client(blob_name)
+
+        # Upload the file
+        blob_client.upload_blob(file_content, blob_type="BlockBlob", content_settings={
+            "content_type": content_type
+        })
+
+        logger.info(f"Successfully uploaded file {file_name} to Azure Storage")
+        return blob_name
+
+    except Exception as e:
+        logger.error(f"Error uploading file to Azure Storage: {str(e)}")
+        return None
