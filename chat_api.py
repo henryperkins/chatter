@@ -11,53 +11,6 @@ from typing import Optional, List, Dict, Union, Generator, Any
 import requests
 from bs4 import BeautifulSoup
 
-def upload_file_to_azure(file) -> Optional[str]:
-    """
-    Uploads a file to Azure OpenAI using the Files - Upload API.
-
-    Args:
-        file: The file object to upload.
-
-    Returns:
-        The Azure file ID if successful, None otherwise.
-    """
-    try:
-        # Import necessary modules
-        import requests
-        from flask import current_app
-
-        # Retrieve Azure configuration from environment variables or Flask config
-        api_version = current_app.config.get('AZURE_API_VERSION', '2024-10-21')
-        api_key = current_app.config['AZURE_API_KEY']
-        api_base = current_app.config['AZURE_API_ENDPOINT'].rstrip('/')
-
-        # Construct the upload URL
-        upload_url = f"{api_base}/openai/files?api-version={api_version}"
-
-        headers = {
-            'api-key': api_key,
-        }
-
-        # Prepare the files payload for the multipart/form-data request
-        files_payload = {
-            'file': (file.filename, file.stream, file.mimetype),
-            'purpose': (None, 'fine-tune'),  # Use the appropriate purpose
-        }
-
-        # Make the POST request to upload the file
-        response = requests.post(upload_url, headers=headers, files=files_payload)
-        response.raise_for_status()
-        result = response.json()
-        azure_file_id = result.get('id')
-        if azure_file_id:
-            logger.info(f"Uploaded file {file.filename} to Azure OpenAI with ID {azure_file_id}")
-            return azure_file_id
-        else:
-            logger.error(f"No file ID returned from Azure OpenAI for file {file.filename}")
-            return None
-    except Exception as e:
-        logger.error(f"Failed to upload file {file.filename} to Azure OpenAI: {e}")
-        return None
 
 # Type aliases for better readability
 ResponseType = Union[Dict[str, Any], str, Generator[Dict[str, Any], None, None]]
@@ -75,8 +28,7 @@ def get_azure_response(
     api_version: Optional[str] = None,
     requires_o1_handling: bool = False,
     timeout_seconds: int = 600,
-    stream: bool = False,
-    file_ids: Optional[List[str]] = None
+    stream: bool = False
 ) -> Union[Dict[str, Any], str, Generator]:
     try:
         # Validate parameters
@@ -121,13 +73,6 @@ def get_azure_response(
             "stream": stream,
         }
 
-        # Add file IDs if provided
-        if file_ids:
-            payload["file_ids"] = file_ids
-
-        # Include file_ids if provided
-        if file_ids:
-            payload["file_ids"] = file_ids
 
         # Handle o1-preview specific requirements
         if requires_o1_handling:

@@ -155,8 +155,10 @@ def truncate_content(text: str, max_tokens: int, truncation_note: str) -> str:
     return truncated_text + truncation_note
 
 
-def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], int, List[str]]:
-    included_files, excluded_files, file_contents = [], [], []
+def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], int, List[Dict]]:
+    included_files = []
+    excluded_files = []
+    total_tokens = 0
     total_tokens = 0
     azure_file_ids = []
 
@@ -169,23 +171,17 @@ def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], in
             continue
 
         try:
-            filename, content, tokens = process_file(file)
+            filename = secure_filename(file.filename)
+            # Read file content
+            content = file.read().decode('utf-8', errors='ignore')
+            tokens = count_tokens(content, MODEL_NAME)
             if total_tokens + tokens > MAX_INPUT_TOKENS:
                 excluded_files.append({"filename": filename, "error": "Exceeds token limit"})
                 continue
 
-            # Upload the file to Azure OpenAI
-            azure_file_id = upload_file_to_azure(file)
-            if azure_file_id:
-                included_files.append({"filename": filename})
-                azure_file_ids.append(azure_file_id)
-                total_tokens += tokens
-            else:
-                excluded_files.append({"filename": filename, "error": "Failed to upload to Azure"})
-
-        except MemoryError as e:
-            logger.error("MemoryError processing file %s: %s", file.filename, e)
-            excluded_files.append({"filename": file.filename, "error": "File too large to process"})
+            included_files.append({"filename": filename})
+            file_contents.append({"filename": filename, "content": content})
+            total_tokens += tokens
         except Exception as e:
             logger.error("Error processing file %s: %s", file.filename, e)
             excluded_files.append({"filename": file.filename, "error": str(e)})
@@ -426,7 +422,6 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             requires_o1_handling=model_obj.requires_o1_handling,
             timeout_seconds=120,
             stream=True,
-            file_ids=azure_file_ids if azure_file_ids else None
         )
         conversation_manager.add_message(
             chat_id=chat_id,
