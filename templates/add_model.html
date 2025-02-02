@@ -49,7 +49,7 @@
         </div>
 
         <!-- Deployment Name -->
-        <div class="mb-6 deployment-name-section">
+        <div class="mb-6 deployment-name-section" {% if not provider.is_azure %}style="display: none;"{% endif %}>
             {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2 deployment-name-description">Enter the deployment name from your Azure OpenAI resource (e.g., "gpt-4", "gpt-35-turbo")</p>
             {{ form.deployment_name(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
@@ -351,7 +351,16 @@
 
                             // Show/hide deployment name field based on provider type
                             if (deploymentNameDiv) {
-                                deploymentNameDiv.style.display = provider.is_azure ? 'block' : 'none';
+                                if (provider.is_azure) {
+                                    deploymentNameDiv.style.display = 'block';
+                                } else {
+                                    deploymentNameDiv.style.display = 'none';
+                                    // Clear deployment name value for non-Azure providers
+                                    const deploymentNameInput = deploymentNameDiv.querySelector('input[name="deployment_name"]');
+                                    if (deploymentNameInput) {
+                                        deploymentNameInput.value = '';
+                                    }
+                                }
                             }
 
                             // Store validation rules
