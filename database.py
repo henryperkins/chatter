@@ -406,7 +406,7 @@ def create_default_model(db: Session) -> Optional[int]:
 
         # Build API endpoint with deployment path
         api_endpoint = Config.DEFAULT_API_ENDPOINT.rstrip("/")
-        deployment_name = Config.DEFAULT_DEPLOYMENT_NAME
+        deployment_name = "o1-preview"
         api_endpoint = f"{api_endpoint}/openai/deployments/{deployment_name}/chat/completions?api-version={Config.DEFAULT_API_VERSION}"
 
         # Determine model type and appropriate max_completion_tokens
