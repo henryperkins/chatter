@@ -298,6 +298,24 @@ class ResetPasswordForm(FlaskForm):
 
 
 # ------------------------------------------------------------------------
+# ForgotPasswordForm
+# ------------------------------------------------------------------------
+
+class ForgotPasswordForm(FlaskForm):
+    """
+    Form for requesting a password reset.
+    """
+    email = StringField(
+        "Email",
+        validators=[
+            DataRequired(message="Email is required."),
+            Email(message="Invalid email address."),
+        ],
+    )
+    submit = SubmitField("Reset Password")
+
+
+# ------------------------------------------------------------------------
 # ProviderForm
 # ------------------------------------------------------------------------
 
