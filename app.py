@@ -11,6 +11,7 @@ import time
 import traceback
 import psutil
 import uuid
+import io
 from datetime import timedelta, datetime
 from typing import Optional, Tuple, Union
 
@@ -27,6 +28,78 @@ from dotenv import load_dotenv
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.wrappers import Response as WerkzeugResponse
+from werkzeug.serving import WSGIRequestHandler
+
+# Configure Werkzeug request handler to use UTF-8
+class UTF8RequestHandler(WSGIRequestHandler):
+    def handle(self):
+        """Handle a single HTTP request"""
+        self.raw_requestline = self.rfile.readline()
+        if not self.parse_request():
+            return
+
+        # On Windows, use the socket's file object directly with buffering
+        if platform.system() == 'Windows':
+            self.wfile = self.connection.makefile('wb', 0)  # No buffering
+            # Ensure headers are properly handled
+            self.protocol_version = 'HTTP/1.1'
+            self.close_connection = False
+            # Set required headers for session management
+            self.headers['Connection'] = 'keep-alive'
+            if 'Cookie' in self.headers:
+                self.headers['Cookie'] = self.headers['Cookie']
+        else:
+            # Keep the original binary stream for file uploads and binary data
+            self._binary_stream = io.BufferedWriter(io.FileIO(self.connection.fileno(), 'wb'))
+            self.wfile = self._binary_stream
+
+        try:
+            return super().handle()
+        finally:
+            try:
+                if hasattr(self, '_binary_stream'):
+                    self._binary_stream.flush()
+                elif hasattr(self, 'wfile'):
+                    self.wfile.flush()
+            except Exception:
+                pass
+
+    def _write(self, data):
+        """Override _write to handle both binary and text data with proper headers"""
+        if isinstance(data, str):
+            data = data.encode('utf-8')
+
+        # Ensure headers are written first
+        if not hasattr(self, '_headers_written'):
+            self._headers_written = True
+
+            # Add security and session headers
+            self.send_header('X-Content-Type-Options', 'nosniff')
+            self.send_header('X-Frame-Options', 'SAMEORIGIN')
+            self.send_header('X-XSS-Protection', '1; mode=block')
+
+            # Ensure session cookie is secure and httponly
+            if 'Set-Cookie' in self.headers:
+                cookie = self.headers['Set-Cookie']
+                if 'session=' in cookie and 'HttpOnly' not in cookie:
+                    cookie += '; HttpOnly; SameSite=Lax'
+                    if self.request_is_secure():
+                        cookie += '; Secure'
+                    self.send_header('Set-Cookie', cookie)
+
+            self.end_headers()
+
+        # Write the actual data
+        self.wfile.write(data)
+        self.wfile.flush()
+
+    def request_is_secure(self):
+        """Check if the request was made over HTTPS"""
+        return (
+            self.headers.get('X-Forwarded-Proto', '').lower() == 'https' or
+            self.headers.get('X-Forwarded-SSL', '').lower() == 'on' or
+            self.headers.get('X-Forwarded-Protocol', '').lower() == 'https'
+        )
 
 # Database & ORM
 from sqlalchemy import text
@@ -50,7 +123,6 @@ from routes.chat_routes import chat_routes
 from routes.model_routes import bp as model_bp
 from routes.provider_routes import bp as provider_bp
 from routes.file_routes import init_file_routes
-
 
 
 class ConnectionHeaderMiddleware:
@@ -228,7 +300,9 @@ def initialize_default_model(app):
             # Create default model using the same transaction
             max_completion_tokens = Config.DEFAULT_MAX_COMPLETION_TOKENS
             if not (1 <= max_completion_tokens <= 16384):
-                raise ValueError("DEFAULT_MAX_COMPLETION_TOKENS must be between 1 and 16384")
+                raise ValueError(
+                    "DEFAULT_MAX_COMPLETION_TOKENS must be between 1 and 16384"
+                )
 
             model_data = {
                 "provider_id": provider_id,
@@ -249,6 +323,7 @@ def initialize_default_model(app):
 
             # Validate model configuration before insertion
             from models.model import Model
+
             Model.validate_model_config(model_data)
 
             # Insert model in same transaction
@@ -295,7 +370,7 @@ def configure_app(app: Optional[Flask] = None) -> None:
         app = current_app
 
     # Explicitly load .env file, not test.env
-    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
     if not os.path.exists(env_path):
         raise ValueError(
             "Missing .env file. Please create one using .env.template as a guide."
@@ -434,6 +509,10 @@ def init_app_components(app: Flask) -> None:
 
     # Initialize file routes
     init_file_routes(app)
+
+    # Configure static files
+    app.static_folder = 'static'
+    app.static_url_path = '/static'
 
     # Debug: Print all registered routes
     print("Registered routes:")
@@ -874,4 +953,5 @@ if __name__ == "__main__":
 
     logger.info(f"Starting application on {host}:{port}")
     # For production, do NOT use app.run(debug=True). Instead, use a WSGI server (gunicorn, uwsgi, etc.)
-    app.run(host=host, port=port, debug=app.config["DEBUG"])
+    from werkzeug.serving import run_simple
+    run_simple(host, port, app, use_debugger=app.config["DEBUG"], request_handler=UTF8RequestHandler)

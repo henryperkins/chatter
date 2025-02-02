@@ -2,6 +2,7 @@ import logging
 import os
 import json
 import platform
+import sys
 from logging.handlers import RotatingFileHandler
 from concurrent_log_handler import ConcurrentRotatingFileHandler
 from datetime import datetime
@@ -122,9 +123,13 @@ if not logging.getLogger().handlers:
 # Add console handler for development environment
 def configure_console_logging():
     if os.getenv("FLASK_ENV") == "development":
-        console_handler = logging.StreamHandler()
+        # Use sys.stdout with UTF-8 encoding for console output
+        console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(logging.DEBUG)
         console_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
+        # Ensure UTF-8 encoding for Windows console
+        if sys.platform == 'win32':
+            sys.stdout.reconfigure(encoding='utf-8')
         root_logger = logging.getLogger()
         root_logger.addHandler(console_handler)
 
@@ -180,6 +185,7 @@ token_handler = RotatingFileHandler(
     os.path.join(LOG_DIR, f"token_usage_{datetime.now().strftime('%Y-%m-%d')}.log"),
     maxBytes=10 * 1024 * 1024,
     backupCount=5,
+    encoding="utf-8"
 )
 token_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
 token_logger.addHandler(token_handler)
@@ -192,6 +198,7 @@ api_handler = RotatingFileHandler(
     os.path.join(API_LOG_DIR, f"api_{datetime.now().strftime('%Y-%m-%d')}.log"),
     maxBytes=10 * 1024 * 1024,
     backupCount=5,
+    encoding="utf-8"
 )
 api_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
 api_logger.addHandler(api_handler)
@@ -204,6 +211,7 @@ http_handler = RotatingFileHandler(
     os.path.join(HTTP_LOG_DIR, f"http_{datetime.now().strftime('%Y-%m-%d')}.log"),
     maxBytes=10 * 1024 * 1024,
     backupCount=5,
+    encoding="utf-8"
 )
 http_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
 http_handler.addFilter(HttpClientFilter())
@@ -216,6 +224,7 @@ httpcore_handler = RotatingFileHandler(
     os.path.join(HTTP_LOG_DIR, f"httpcore_{datetime.now().strftime('%Y-%m-%d')}.log"),
     maxBytes=10 * 1024 * 1024,
     backupCount=5,
+    encoding="utf-8"
 )
 httpcore_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
 httpcore_handler.addFilter(HttpClientFilter())
@@ -230,6 +239,7 @@ user_handler = RotatingFileHandler(
     ),
     maxBytes=10 * 1024 * 1024,
     backupCount=5,
+    encoding="utf-8"
 )
 user_handler.setFormatter(logging.Formatter(USER_FORMAT))
 user_logger.addHandler(user_handler)
@@ -241,6 +251,7 @@ error_handler = RotatingFileHandler(
     os.path.join(ERROR_LOG_DIR, f"errors_{datetime.now().strftime('%Y-%m-%d')}.log"),
     maxBytes=10 * 1024 * 1024,
     backupCount=5,
+    encoding="utf-8"
 )
 error_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
 error_logger.addHandler(error_handler)
@@ -252,6 +263,7 @@ openai_handler = RotatingFileHandler(
     os.path.join(API_LOG_DIR, f"openai_{datetime.now().strftime('%Y-%m-%d')}.log"),
     maxBytes=10 * 1024 * 1024,
     backupCount=5,
+    encoding="utf-8"
 )
 openai_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
 openai_logger.addHandler(openai_handler)
