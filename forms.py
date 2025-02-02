@@ -624,9 +624,13 @@ class ModelForm(FlaskForm):
                 raise ValidationError("API endpoint does not match the required format specified by the provider.")
 
     def validate_deployment_name(self, field):
+        from models.provider import Provider
+        provider = Provider.get_by_id(self.provider_id.data)
+        if provider and not provider.is_azure:
+            # For non-Azure providers, deployment_name is not validated.
+            return
         if not field.data:
             return
-
         pattern = self.provider_validation_rules.get('model_id')
         if pattern:
             import re
@@ -853,109 +857,3 @@ class DefaultModelForm(FlaskForm):
             raise ValidationError(
                 "Max completion tokens must be a valid integer."
             ) from e
-
-
-# ------------------------------------------------------------------------
-# Password Strength Utility
-# ------------------------------------------------------------------------
-
-
-def validate_password_strength(password: str) -> None:
-    """
-    Validate password meets security requirements:
-      1. Minimum 8 characters
-      2. Includes uppercase, lowercase, digit, special char
-      3. Not in a common password list
-      4. Not containing sequential or repeated characters
-    """
-    if not password:
-        raise ValidationError("Password is required.")
-
-    password = password.strip()
-    errors = []
-
-    # Check length
-    if len(password) < 8:
-        errors.append("Password must be at least 8 characters long.")
-
-    # Required character types
-    if not re.search(r"[A-Z]", password):
-        errors.append("Password must contain at least one uppercase letter.")
-    if not re.search(r"[a-z]", password):
-        errors.append("Password must contain at least one lowercase letter.")
-    if not re.search(r"\d", password):
-        errors.append("Password must contain at least one number.")
-    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-        errors.append("Password must contain at least one special character.")
-
-    if errors:
-        raise ValidationError(" ".join(errors))
-
-    # Common password check
-    common_passwords = {
-        "password",
-        "password123",
-        "123456",
-        "qwerty",
-        "abc123",
-        "12345678",
-        "letmein",
-    }
-    if password.lower() in common_passwords:
-        raise ValidationError(
-            "This password is too common. Please choose a stronger password."
-        )
-
-    # Check for sequential characters
-    sequences = (
-        "abcdefghijklmnopqrstuvwxyz",
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-        "01234567890",
-        "qwertyuiop",
-        "asdfghjkl",
-        "zxcvbnm",
-    )
-    for seq in sequences:
-        seq_len = len(seq)
-        for i in range(seq_len - 2):
-            forward_seq = seq[i: i + 3]
-            backward_seq = forward_seq[::-1]
-            if forward_seq in password or backward_seq in password:
-                raise ValidationError("Password cannot contain sequential characters.")
-
-    # Check for repeated characters
-    for i in range(len(password) - 2):
-        if password[i] == password[i + 1] == password[i + 2]:
-            raise ValidationError(
-                "Password must not contain three or more repeated characters in a row."
-            )
-
-# ------------------------------------------------------------------------
-# ResetPasswordForm
-# ------------------------------------------------------------------------
-
-
-class ResetPasswordForm(FlaskForm):
-    """
-    Form for resetting a user's password.
-    """
-
-    password = PasswordField(
-        "New Password",
-        validators=[
-            DataRequired(message="Password is required."),
-            Length(min=8, message="Password must be at least 8 characters long."),
-            Regexp(
-                r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?\":{}|<>]).+$",
-                message="Must include uppercase, lowercase, digit, and special character.",
-            ),
-        ],
-    )
-    confirm_password = PasswordField(
-        "Confirm New Password",
-        validators=[
-            DataRequired(message="Please confirm your password."),
-            EqualTo("password", message="Passwords must match."),
-        ],
-    )
-    submit = SubmitField("Reset Password")
