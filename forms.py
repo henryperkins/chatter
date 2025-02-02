@@ -32,6 +32,7 @@ from sqlalchemy import text
 from models.provider import Provider
 from models.model import Model
 from utils.encryption import encrypt_api_key, EncryptionError
+from chat_utils import validate_password_strength
 import logging
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,6 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------------
 # Custom Fields: NullableIntegerField, NullableFloatField
 # ------------------------------------------------------------------------
-
 
 class NullableIntegerField(IntegerField):
     """
@@ -78,7 +78,6 @@ class NullableFloatField(FloatField):
 # ------------------------------------------------------------------------
 # LoginForm
 # ------------------------------------------------------------------------
-
 
 class LoginForm(FlaskForm):
     """
@@ -143,7 +142,6 @@ class LoginForm(FlaskForm):
 # ------------------------------------------------------------------------
 # RegistrationForm
 # ------------------------------------------------------------------------
-
 
 class RegistrationForm(FlaskForm):
     """
@@ -273,7 +271,6 @@ class RegistrationForm(FlaskForm):
 # ------------------------------------------------------------------------
 # ProviderForm
 # ------------------------------------------------------------------------
-
 
 class ProviderForm(FlaskForm):
     """
@@ -419,7 +416,6 @@ class ProviderForm(FlaskForm):
 # ------------------------------------------------------------------------
 # ModelForm
 # ------------------------------------------------------------------------
-
 
 class ModelForm(FlaskForm):
     name = StringField('Model Name', validators=[DataRequired(), Length(max=255)])
@@ -658,7 +654,6 @@ class ModelForm(FlaskForm):
 # DefaultModelForm
 # ------------------------------------------------------------------------
 
-
 class DefaultModelForm(FlaskForm):
     """
     Form for editing the default model configuration during registration if it is invalid,
@@ -824,36 +819,3 @@ class DefaultModelForm(FlaskForm):
         render_kw={"type": "hidden"},
     )
     submit = SubmitField("Save Configuration")
-
-    # ------------------------ Custom Validators --------------------------
-
-    def validate_api_endpoint(self, field: Any) -> None:
-        """
-        Remove trailing slashes in the submitted URL.
-        """
-        field.data = field.data.rstrip("/")
-
-    def validate_temperature(self, field: Any) -> None:
-        """
-        Ensure temperature is exactly 1.0 for o1-preview.
-        """
-        if field.data is None:
-            field.data = 1.0
-        elif field.data != 1.0:
-            raise ValidationError("Temperature must be exactly 1.0 for o1-preview.")
-
-    def validate_max_completion_tokens(self, field: Any) -> None:
-        """
-        Ensure max_completion_tokens is within o1-preview limits.
-        """
-        try:
-            value = int(field.data)
-            if not (1 <= value <= 8300):
-                raise ValidationError(
-                    "Max completion tokens must be between 1 and 8300 for o1-preview."
-                )
-            field.data = value
-        except (TypeError, ValueError) as e:
-            raise ValidationError(
-                "Max completion tokens must be a valid integer."
-            ) from e
