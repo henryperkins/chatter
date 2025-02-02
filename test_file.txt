@@ -1,9 +1,0 @@
-This is a test file to verify Azure OpenAI file handling.
-It contains some sample text that we'll ask the model to analyze.
-
-Key points:
-1. First point
-2. Second point
-3. Third point
-
-The model should be able to access this content through Azure's file system.

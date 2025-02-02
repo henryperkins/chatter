@@ -35,11 +35,13 @@ def validate_database_uri(uri: str) -> None:
     except Exception as e:
         raise ValueError(f"Invalid DATABASE_URI: {str(e)}")
 
-# Load .env from current directory or parent directory
-env_path = Path('.') / '.env'
+# Load .env from application root directory
+env_path = Path(os.path.dirname(os.path.abspath(__file__))) / '.env'
 if not env_path.exists():
-    env_path = Path('..') / '.env'
-load_dotenv(dotenv_path=env_path)
+    raise ValueError(
+        "Missing .env file. Please create one using .env.template as a guide."
+    )
+load_dotenv(dotenv_path=env_path, override=True)
 
 
 class Config:

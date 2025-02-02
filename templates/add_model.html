@@ -49,10 +49,9 @@
         </div>
 
         <!-- Deployment Name -->
-        <div class="mb-6">
+        <div class="mb-6 deployment-name-section">
             {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Enter the deployment name from your Azure OpenAI resource (e.g.,
-                "gpt-4", "gpt-35-turbo")</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2 deployment-name-description">Enter the deployment name from your Azure OpenAI resource (e.g., "gpt-4", "gpt-35-turbo")</p>
             {{ form.deployment_name(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
             {% if form.deployment_name.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.deployment_name.errors[0] }}</p>
@@ -73,13 +72,12 @@
         <!-- API Endpoint -->
         <div class="mb-6">
             {{ form.api_endpoint.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Your Azure OpenAI endpoint URL</p>
-            {{ form.api_endpoint(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200",
-            placeholder="https://your-resource.openai.azure.com/openai/deployments/{deployment-name}/chat/completions?api-version=2024-12-01-preview") }}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2 endpoint-description">Your Azure OpenAI endpoint URL</p>
+            {{ form.api_endpoint(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
             {% if form.api_endpoint.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.api_endpoint.errors[0] }}</p>
             {% endif %}
-            <div class="mt-2 p-3 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-xs endpoint-info">
+            <div class="mt-2 p-3 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-xs endpoint-info azure-endpoint-info">
                 <strong>Valid endpoint format:</strong>
                 <ul class="list-disc list-inside mt-1">
                     <li>Must use *.openai.azure.com or *.azure-api.net domain</li>
@@ -87,12 +85,18 @@
                     <li>Must include api-version query parameter</li>
                 </ul>
             </div>
+            <div class="mt-2 p-3 bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-lg text-xs endpoint-info openai-endpoint-info" style="display: none;">
+                <strong>Valid endpoint format:</strong>
+                <ul class="list-disc list-inside mt-1">
+                    <li>Must use format: https://api.openai.com/v1/chat/completions</li>
+                </ul>
+            </div>
         </div>
 
         <!-- API Key -->
         <div class="mb-6 api-key-section" {% if provider and not provider.requires_authentication %}style="display: none;"{% endif %}>
             {{ form.api_key.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
-            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Your Azure OpenAI API key</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2 api-key-description">Your Azure OpenAI API key</p>
             {{ form.api_key(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200", type="password",
             placeholder="Enter your API key") }}
             {% if form.api_key.errors %}
@@ -155,7 +159,7 @@
         </div>
 
         <!-- API Version -->
-        <div class="mb-6">
+        <div class="mb-6 api-version-section">
             {{ form.api_version.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Azure OpenAI API version (default: 2024-12-01-preview)</p>
             {{ form.api_version(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
@@ -171,7 +175,7 @@
             <!-- Reasoning Settings (for o1/o3 models) -->
             <div class="reasoning-settings mb-6" style="display: none;">
                 <h4 class="text-md font-semibold text-gray-700 dark:text-gray-300 mb-2">Reasoning Configuration</h4>
-                
+
                 <!-- Reasoning Effort -->
                 <div class="mb-4">
                     {{ form.reasoning_effort.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
@@ -305,41 +309,81 @@
                         try {
                             const response = await fetch(`/models/api/providers/${providerId}`);
                             const provider = await response.json();
-                            
+
                             // Update form based on provider capabilities
                             const deploymentNameDiv = form.querySelector('.deployment-name-section');
                             const apiVersionDiv = form.querySelector('.api-version-section');
-                            const apiEndpointInput = form.querySelector('input[name="api_endpoint"]');
                             const apiKeyDiv = form.querySelector('.api-key-section');
+                            const azureEndpointInfo = form.querySelector('.azure-endpoint-info');
+                            const openaiEndpointInfo = form.querySelector('.openai-endpoint-info');
+                            const endpointDescription = form.querySelector('.endpoint-description');
+                            const apiKeyDescription = form.querySelector('.api-key-description');
+                            const deploymentNameDescription = form.querySelector('.deployment-name-description');
 
-                        // Store validation rules
-                        const validationRules = provider.validation_rules || {};
+                            // Show/hide appropriate endpoint info
+                            azureEndpointInfo.style.display = provider.is_azure ? 'block' : 'none';
+                            openaiEndpointInfo.style.display = provider.is_azure ? 'none' : 'block';
 
-                        // Validate 'api_endpoint' field using provider's 'endpoint' pattern
-                        const apiEndpointInput = form.querySelector('input[name="api_endpoint"]');
-                        if (apiEndpointInput && validationRules['endpoint']) {
-                            const pattern = new RegExp(validationRules['endpoint']);
-                            apiEndpointInput.addEventListener('input', function() {
-                                if (!pattern.test(this.value)) {
-                                    this.setCustomValidity('API endpoint does not match the required format.');
-                                } else {
-                                    this.setCustomValidity('');
+                            // Update API endpoint placeholder based on provider type
+                            if (apiEndpointInput) {
+                                apiEndpointInput.placeholder = provider.is_azure ? "https://your-resource.openai.azure.com/openai/deployments/{deployment-name}/chat/completions?api-version=2024-12-01-preview" : "https://api.openai.com/v1/chat/completions";
+                            }
+
+                            // Update endpoint description based on provider type
+                            if (endpointDescription) {
+                                endpointDescription.textContent = provider.is_azure ? "Your Azure OpenAI endpoint URL" : "OpenAI API endpoint URL";
+                            }
+
+                            // Update API key description based on provider type
+                            if (apiKeyDescription) {
+                                apiKeyDescription.textContent = provider.is_azure ? "Your Azure OpenAI API key" : "Your OpenAI API key";
+                            }
+
+                            // Update deployment name description based on provider type
+                            if (deploymentNameDescription) {
+                                deploymentNameDescription.textContent = provider.is_azure ? "Enter the deployment name from your Azure OpenAI resource (e.g., \"gpt-4\", \"gpt-35-turbo\")" : "Enter the model name (e.g., \"gpt-4\", \"gpt-3.5-turbo\")";
+                            }
+
+            // Show/hide API version section based on provider type
+            if (apiVersionDiv) {
+                apiVersionDiv.style.display = provider.is_azure ? 'block' : 'none';
+            }
+
+                            // Show/hide deployment name field based on provider type
+                            if (deploymentNameDiv) {
+                                deploymentNameDiv.style.display = provider.is_azure ? 'block' : 'none';
+                            }
+
+                            // Store validation rules
+                            const validationRules = provider.validation_rules || {};
+                            const apiEndpointInput = form.querySelector('input[name="api_endpoint"]');
+
+                            // Validate API endpoint field using provider's endpoint pattern
+                            if (apiEndpointInput && validationRules['endpoint']) {
+                                const pattern = new RegExp(validationRules['endpoint']);
+                                apiEndpointInput.addEventListener('input', function() {
+                                    if (!pattern.test(this.value)) {
+                                        this.setCustomValidity('API endpoint does not match the required format.');
+                                    } else {
+                                        this.setCustomValidity('');
+                                    }
+                                });
+                            }
+
+                            // Validate deployment name field using provider's model_id pattern
+                            const deploymentNameInput = form.querySelector('input[name="deployment_name"]');
+                            if (deploymentNameInput) {
+                                if (provider.is_azure && validationRules['model_id']) {
+                                    const pattern = new RegExp(validationRules['model_id']);
+                                    deploymentNameInput.addEventListener('input', function() {
+                                        if (!pattern.test(this.value)) {
+                                            this.setCustomValidity('Deployment name does not match the required format.');
+                                        } else {
+                                            this.setCustomValidity('');
+                                        }
+                                    });
                                 }
-                            });
-                        }
-
-                        // Validate 'deployment_name' field using provider's 'model_id' pattern
-                        const deploymentNameInput = form.querySelector('input[name="deployment_name"]');
-                        if (deploymentNameInput && validationRules['model_id']) {
-                            const pattern = new RegExp(validationRules['model_id']);
-                            deploymentNameInput.addEventListener('input', function() {
-                                if (!pattern.test(this.value)) {
-                                    this.setCustomValidity('Deployment name does not match the required format.');
-                                } else {
-                                    this.setCustomValidity('');
-                                }
-                            });
-                        }
+                            }
 
                             // Add form validation
                             const validateEndpoint = function(endpoint, isAzure) {
@@ -462,6 +506,7 @@
                             console.error('Error fetching provider details:', error);
                         }
                     }
+
                 });
             }
 

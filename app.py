@@ -294,8 +294,13 @@ def configure_app(app: Optional[Flask] = None) -> None:
     if app is None:
         app = current_app
 
-    # Load environment variables from .env
-    load_dotenv()
+    # Explicitly load .env file, not test.env
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    if not os.path.exists(env_path):
+        raise ValueError(
+            "Missing .env file. Please create one using .env.template as a guide."
+        )
+    load_dotenv(env_path)
 
     # Load config from Config class
     app.config.from_object(Config)
@@ -426,7 +431,7 @@ def init_app_components(app: Flask) -> None:
     app.register_blueprint(chat_routes)
     app.register_blueprint(model_bp, url_prefix="/models")
     app.register_blueprint(provider_bp, url_prefix="/providers")
-    
+
     # Initialize file routes
     init_file_routes(app)
 
