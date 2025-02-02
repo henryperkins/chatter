@@ -29,7 +29,7 @@ from werkzeug.security import (
 from database import db_session
 from decorators import admin_required
 from extensions import limiter
-from forms import LoginForm, RegistrationForm, ResetPasswordForm
+from forms import LoginForm, RegistrationForm, ResetPasswordForm, ForgotPasswordForm
 from models import User
 from scripts.send_email import send_email
 
@@ -209,7 +209,7 @@ def register():
 @limiter.limit("5 per minute")
 def forgot_password():
     """Handle forgot password requests."""
-    form = ResetPasswordForm()
+    form = ForgotPasswordForm()
 
     if request.method == "POST":
         email = request.form.get("email", "").strip()
