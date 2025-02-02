@@ -109,27 +109,37 @@ class FileUploadHandler:
         errors = []
         file_hashes = set()
 
+        current_app.logger.debug(f"Starting validation of {len(files)} files")
+
         # Check total size first
         total_size = sum(len(file.read()) for file in files)
+        current_app.logger.debug(f"Total size of all files: {total_size} bytes")
+
         if total_size > self.MAX_TOTAL_SIZE:
-            errors.append(
-                f"Total size of files exceeds the limit ({self.MAX_TOTAL_SIZE} bytes)."
-            )
+            msg = f"Total size of files exceeds the limit ({self.MAX_TOTAL_SIZE} bytes)."
+            current_app.logger.error(msg)
+            errors.append(msg)
             return valid_files, errors
 
         for file in files:
             file.seek(0)
+            current_app.logger.debug(f"Validating file: {file.filename}")
 
             # Basic validation
-            if not self.allowed_file(file.filename, file)[0]:
-                errors.append(f"File type not allowed: {file.filename}")
+            is_allowed, validation_errors = self.allowed_file(file.filename, file)
+            if not is_allowed:
+                error_msg = f"File validation failed for {file.filename}: {validation_errors}"
+                current_app.logger.error(error_msg)
+                errors.append(error_msg)
                 continue
 
             file_size = len(file.read())
+            current_app.logger.debug(f"File size: {file_size} bytes")
+
             if file_size > self.MAX_FILE_SIZE:
-                errors.append(
-                    f"File too large: {file.filename} exceeds the {self.MAX_FILE_SIZE} byte limit."
-                )
+                error_msg = f"File too large: {file.filename} ({file_size} bytes) exceeds the {self.MAX_FILE_SIZE} byte limit."
+                current_app.logger.error(error_msg)
+                errors.append(error_msg)
                 continue
 
             file.seek(0)
@@ -137,25 +147,35 @@ class FileUploadHandler:
             # Calculate file hash for deduplication
             file_hash = self.calculate_file_hash(file)
             if file_hash in file_hashes:
-                errors.append(f"Duplicate file detected: {file.filename}")
+                error_msg = f"Duplicate file detected: {file.filename}"
+                current_app.logger.error(error_msg)
+                errors.append(error_msg)
                 continue
             file_hashes.add(file_hash)
 
             # Verify file content matches extension
-            if not self.validate_file_content(file) and file.filename.split('.')[-1].lower() not in ['txt', 'md']:
-                errors.append(f"File content doesn't match extension: {file.filename}")
-                continue
+            if not self.validate_file_content(file):
+                ext = file.filename.split('.')[-1].lower()
+                if ext not in ['txt', 'md']:
+                    error_msg = f"File content doesn't match extension: {file.filename}"
+                    current_app.logger.error(error_msg)
+                    errors.append(error_msg)
+                    continue
 
             # Scan for viruses
             scan_result = self.scan_for_viruses(file)
             if scan_result != "clean":
-                errors.append(f"File rejected: {scan_result}")
+                error_msg = f"File rejected: {scan_result}"
+                current_app.logger.error(error_msg)
+                errors.append(error_msg)
                 self.quarantine_file(file)
                 continue
 
             file.seek(0)
             valid_files.append(file)
+            current_app.logger.debug(f"File {file.filename} passed all validations")
 
+        current_app.logger.debug(f"Validation complete. Valid files: {len(valid_files)}, Errors: {len(errors)}")
         return valid_files, errors
 
     def calculate_file_hash(self, file) -> str:
@@ -192,17 +212,33 @@ class FileUploadHandler:
         mime = magic.from_buffer(file.read(1024), mime=True)
         file.seek(0)
 
+        current_app.logger.debug(f"Validating content for {file.filename}, detected MIME: {mime}")
+
         # Use MIME type map from centralized configuration
         mime_map = Config.MIME_TYPE_MAP
-
         ext = file.filename.split(".")[-1].lower()
+
+        # Special handling for Python files
+        if ext == 'py':
+            try:
+                file.seek(0)
+                content = file.read(1024).decode('utf-8')
+                file.seek(0)
+                current_app.logger.debug(f"Python file {file.filename} validated as UTF-8 text")
+                return True
+            except UnicodeDecodeError:
+                current_app.logger.error(f"Python file {file.filename} is not valid UTF-8 text")
+                return False
 
         # Special handling for text files
         if ext in ['txt', 'md'] and mime.startswith('text/'):
+            current_app.logger.debug(f"Text file {file.filename} validated")
             return True
 
         expected_mime = mime_map.get(ext, "")
-        return mime.startswith(expected_mime) if expected_mime else False
+        result = mime.startswith(expected_mime) if expected_mime else False
+        current_app.logger.debug(f"File {file.filename} content validation result: {result} (expected: {expected_mime})")
+        return result
 
     def scan_for_viruses(self, file) -> str:
         """
@@ -391,42 +427,64 @@ class FileUploadHandler:
         Returns:
             Response: A Flask JSON response with detailed file metadata.
         """
-        if "files[]" not in request.files:
-            return jsonify({"error": "No files provided"}), 400
+        try:
+            if "files[]" not in request.files:
+                return jsonify({"error": "No files provided"}), 400
 
-        # Get files and their descriptions
-        files = request.files.getlist("files[]")
-        descriptions = {}
+            # Get files and their descriptions
+            files = request.files.getlist("files[]")
+            descriptions = {}
 
-        # Parse file descriptions from form data
-        for key, value in request.form.items():
-            if key.startswith('description_'):
-                filename = key.replace('description_', '')
-                descriptions[filename] = value
+            # Parse file descriptions from form data
+            for key, value in request.form.items():
+                if key.startswith('description_'):
+                    filename = key.replace('description_', '')
+                    descriptions[filename] = value
 
-        valid_files, errors = self.validate_files(files)
+            # Log incoming files for debugging
+            for file in files:
+                current_app.logger.debug(f"Processing file: {file.filename}")
+                if hasattr(file, 'content_type'):
+                    current_app.logger.debug(f"Content type from request: {file.content_type}")
 
-        if errors:
-            return jsonify({"error": "File validation failed", "details": errors}), 400
+            valid_files, errors = self.validate_files(files)
 
-        saved_files = self.save_files(valid_files, chat_id, descriptions)
+            if errors:
+                current_app.logger.error(f"File validation errors: {errors}")
+                return jsonify({
+                    "error": "File validation failed",
+                    "details": errors,
+                    "validation_info": {
+                        "allowed_extensions": list(self.ALLOWED_EXTENSIONS),
+                        "allowed_mime_types": list(Config.ALLOWED_MIME_TYPES)
+                    }
+                }), 400
 
-        # Enhance response with more metadata
-        response_files = []
-        for file_info in saved_files:
-            file_data = {
-                "id": file_info["id"],
-                "filename": file_info["filename"],
-                "size": file_info["size"],
-                "mime_type": file_info["mime_type"],
-                "description": file_info["description"],
-                "upload_time": file_info.get("created_at", "")
-            }
-            response_files.append(file_data)
+            saved_files = self.save_files(valid_files, chat_id, descriptions)
 
-        return jsonify({
-            "success": True,
-            "saved_files": response_files,
-            "message": f"Successfully uploaded {len(saved_files)} files",
-            "total_size": sum(f["size"] for f in saved_files)
-        })
+            # Enhance response with more metadata
+            response_files = []
+            for file_info in saved_files:
+                file_data = {
+                    "id": file_info["id"],
+                    "filename": file_info["filename"],
+                    "size": file_info["size"],
+                    "mime_type": file_info["mime_type"],
+                    "description": file_info["description"],
+                    "upload_time": file_info.get("created_at", "")
+                }
+                response_files.append(file_data)
+
+            return jsonify({
+                "success": True,
+                "saved_files": response_files,
+                "message": f"Successfully uploaded {len(saved_files)} files",
+                "total_size": sum(f["size"] for f in saved_files)
+            })
+
+        except Exception as e:
+            current_app.logger.error(f"Error in handle_upload: {str(e)}", exc_info=True)
+            return jsonify({
+                "error": "File upload failed",
+                "details": str(e)
+            }), 500

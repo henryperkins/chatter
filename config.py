@@ -149,49 +149,31 @@ class Config:
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
     MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", 10 * 1024 * 1024))
     MAX_TOTAL_FILE_SIZE = int(os.getenv("MAX_TOTAL_FILE_SIZE", 50 * 1024 * 1024))
+    # Azure OpenAI supported file types
     ALLOWED_FILE_EXTENSIONS = {
-        "txt",
-        "pdf",
-        "png",
-        "jpg",
-        "jpeg",
-        "csv",
-        "py",
-        "js",
-        "md",
+        "txt",    # Text files
+        "pdf",    # PDF documents
+        "md",     # Markdown
+        "html",   # HTML documents
+        "docx",   # Microsoft Word
+        "pptx"    # Microsoft PowerPoint
     }
     ALLOWED_MIME_TYPES = {
         'text/plain',
         'text/markdown',
-        'text/x-python',
-        'text/javascript',
-        'text/css',
         'text/html',
-        'text/csv',
-        'application/json',
         'application/pdf',
-        'application/javascript',
-        'application/x-javascript',
-        'application/octet-stream',  # Will be handled with special text detection
-        'image/jpeg',
-        'image/png',
-        'image/gif'
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  # .docx
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation'  # .pptx
     }
 
     MIME_TYPE_MAP = {
         "pdf": "application/pdf",
-        "png": "image/png",
-        "jpg": "image/jpeg",
-        "jpeg": "image/jpeg",
         "txt": "text/plain",
-        "csv": "text/csv",
-        "py": "text/x-python",
-        "js": "application/javascript",
-        "json": "application/json",
-        "css": "text/css",
         "html": "text/html",
         "md": "text/markdown",
-        "gif": "image/gif"
+        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
     }
 
     MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")

@@ -17,25 +17,12 @@ window.FileUploadManager = class {
             // Text files
             'text/plain',
             'text/markdown',
-            'text/x-python',
             'text/html',
-            'text/css',
-            'text/xml',
-            'text/yaml',
-            'text/csv',
 
             // Application files
-            'application/json',
-            'application/javascript',
             'application/pdf',
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-
-            // Images
-            'image/jpeg',
-            'image/png',
-            'image/gif',
-            'image/webp'
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation' // .pptx
         ];
 
         // DOM elements (fall back to ID-based references if not passed)
@@ -54,16 +41,16 @@ window.FileUploadManager = class {
             // Convert MIME types to file extensions for better browser compatibility
             const acceptTypes = [
                 // Text files
-                '.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.xml', '.yaml', '.yml',
+                '.txt', '.md', '.html',
                 // Application files
-                '.pdf', '.doc', '.docx',
-                // Images
-                '.jpg', '.jpeg', '.png', '.gif', '.webp',
+                '.pdf', '.docx', '.pptx',
                 // Also include MIME types for better coverage
-                'text/*',
-                'application/json',
+                'text/plain',
+                'text/markdown',
+                'text/html',
                 'application/pdf',
-                'image/*'
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation'
             ].join(',');
             this.fileInput.accept = acceptTypes;
             this.fileInput.style.display = 'none';
