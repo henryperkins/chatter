@@ -517,7 +517,7 @@ class FileUploadHandler:
                         pass
 
             except Exception as e:
-                current_app.logger.error(f"Error saving file {filename}: {str(e)}")
+                current_app.logger.error(f"Error saving file {filename} to {filepath}: {str(e)}")
                 errors.append(f"Failed to save file: {filename}")
                 if os.path.exists(filepath):
                     try:

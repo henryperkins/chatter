@@ -48,6 +48,7 @@ class UploadedFile:
         Returns the unique file ID for reference.
         """
         with db_session() as db:
+            unique_filepath = None
             try:
                 # Check for existing versions
                 version_query = text("""
@@ -102,9 +103,12 @@ class UploadedFile:
                 return file_id
             except Exception as e:
                 db.rollback()
-                # Clean up file if database operation failed
-                if os.path.exists(unique_filepath):
-                    os.remove(unique_filepath)
+                # Clean up file if it was created and moved
+                if unique_filepath and os.path.exists(unique_filepath):
+                    try:
+                        os.remove(unique_filepath)
+                    except Exception as cleanup_error:
+                        logger.error(f"Failed to clean up file {unique_filepath}: {cleanup_error}")
                 logger.error(f"Failed to create uploaded file record: {e}")
                 raise
 
