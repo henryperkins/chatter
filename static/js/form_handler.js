@@ -12,10 +12,10 @@ class ModelFormHandler {
     }
 
     initializeForms() {
-        document.addEventListener("DOMContentLoaded", () => {
+        document.addEventListener('DOMContentLoaded', () => {
             const forms = document.querySelectorAll('.model-form');
             forms.forEach(form => {
-                form.addEventListener("submit", async (e) => {
+                form.addEventListener('submit', async (e) => {
                     e.preventDefault();
                     await this.handleFormSubmit(e);
                 });
@@ -126,18 +126,18 @@ class ModelFormHandler {
 
     async sendFormRequest(url, data, csrfToken) {
         return fetch(url, {
-            method: "POST",
+            method: 'POST',
             headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": csrfToken,
-                "X-Requested-With": "XMLHttpRequest"
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
             },
             body: JSON.stringify(data)
         });
     }
 
     handleSuccess(responseData) {
-        this.utils.showFeedback(responseData.message || "Model saved successfully", "success");
+        this.utils.showFeedback(responseData.message || 'Model saved successfully', 'success');
         
         if (responseData.redirect) {
             setTimeout(() => {
@@ -147,7 +147,7 @@ class ModelFormHandler {
     }
 
     handleErrors(form, responseData) {
-        let errorMessage = "Failed to save model";
+        let errorMessage = 'Failed to save model';
         
         if (responseData.error) {
             errorMessage = responseData.error;
@@ -159,9 +159,9 @@ class ModelFormHandler {
             this.displayFormErrors(form, responseData.errors);
         }
 
-        this.utils.showFeedback(errorMessage, "error", {
+        this.utils.showFeedback(errorMessage, 'error', {
             duration: 10000,
-            position: "top"
+            position: 'top'
         });
     }
 
@@ -202,10 +202,10 @@ class ModelFormHandler {
     }
 
     handleSubmissionError(error) {
-        console.error("Form submission error:", error);
+        console.error('Form submission error:', error);
         this.utils.showFeedback(
-            "An unexpected error occurred. Please check your connection and try again.",
-            "error"
+            'An unexpected error occurred. Please check your connection and try again.',
+            'error'
         );
     }
 
@@ -225,12 +225,12 @@ class ModelFormHandler {
 
     resetSubmitButton(button, form) {
         button.disabled = false;
-        button.innerHTML = form.dataset.submitText || "Save Model";
+        button.innerHTML = form.dataset.submitText || 'Save Model';
     }
 }
 
 // Initialize on page load
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener('DOMContentLoaded', function() {
     window.modelFormHandler = new ModelFormHandler();
 });
 

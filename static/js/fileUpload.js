@@ -857,7 +857,7 @@ window.FileUploadManager = class {
         this.fileInput.click();
     }
 
-}
+};
 
 // Expose globally if needed
 window.FileUploadManager = FileUploadManager;

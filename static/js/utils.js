@@ -45,8 +45,8 @@ class FetchError extends Error {
  */
 function getCSRFToken() {
     const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
-    const csrfToken = csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute("content") || "" : "";
-    console.debug("Retrieved CSRF token from meta tag:", csrfToken);
+    const csrfToken = csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute('content') || '' : '';
+    console.debug('Retrieved CSRF token from meta tag:', csrfToken);
     return csrfToken;
 }
 
@@ -73,8 +73,8 @@ async function fetchWithCSRF(url, options = {}) {
     }
 
     try {
-        console.debug("Making request to:", url);
-        console.debug("Request options:", {
+        console.debug('Making request to:', url);
+        console.debug('Request options:', {
             method: options.method,
             headers,
             body: options.body
@@ -86,7 +86,7 @@ async function fetchWithCSRF(url, options = {}) {
             credentials: 'same-origin'
         });
 
-        console.debug("Received response:", {
+        console.debug('Received response:', {
             status: response.status,
             statusText: response.statusText,
             headers: Object.fromEntries(response.headers.entries())
@@ -97,10 +97,10 @@ async function fetchWithCSRF(url, options = {}) {
 
         if (contentType && contentType.includes('application/json')) {
             data = await response.json();
-            console.debug("Parsed JSON response:", data);
+            console.debug('Parsed JSON response:', data);
         } else {
             const text = await response.text();
-            console.debug("Raw response text:", text);
+            console.debug('Raw response text:', text);
             throw new FetchError(`Invalid response from server: ${text}`, response.status, text);
         }
 
@@ -126,33 +126,33 @@ async function fetchWithCSRF(url, options = {}) {
  * @param {string} [type="success"]
  * @param {object} [options={}]
  */
-function showFeedback(message, type = "success", options = {}) {
-    const { duration = 5000, position = "top" } = options;
-    let feedbackMessage = document.getElementById("feedback-message");
+function showFeedback(message, type = 'success', options = {}) {
+    const { duration = 5000, position = 'top' } = options;
+    let feedbackMessage = document.getElementById('feedback-message');
 
     // Create an element if one doesn't exist
     if (!feedbackMessage) {
-        feedbackMessage = document.createElement("div");
-        feedbackMessage.id = "feedback-message";
-        feedbackMessage.setAttribute("role", "alert");
-        feedbackMessage.setAttribute("aria-live", "assertive");
+        feedbackMessage = document.createElement('div');
+        feedbackMessage.id = 'feedback-message';
+        feedbackMessage.setAttribute('role', 'alert');
+        feedbackMessage.setAttribute('aria-live', 'assertive');
         document.body.appendChild(feedbackMessage);
     }
 
     // Position classes
     const positionClasses = {
-        top: "top-4 left-1/2 transform -translate-x-1/2",
-        bottom: "bottom-4 left-1/2 transform -translate-x-1/2",
-        "top-right": "top-4 right-4",
-        "bottom-right": "bottom-4 right-4"
+        top: 'top-4 left-1/2 transform -translate-x-1/2',
+        bottom: 'bottom-4 left-1/2 transform -translate-x-1/2',
+        'top-right': 'top-4 right-4',
+        'bottom-right': 'bottom-4 right-4'
     };
 
     // Color classes
     const colorClasses = {
-        success: "bg-green-500 text-white",
-        error: "bg-red-500 text-white",
-        warning: "bg-yellow-500 text-black",
-        info: "bg-blue-500 text-white"
+        success: 'bg-green-500 text-white',
+        error: 'bg-red-500 text-white',
+        warning: 'bg-yellow-500 text-black',
+        info: 'bg-blue-500 text-white'
     };
 
     feedbackMessage.innerHTML = `
@@ -164,20 +164,20 @@ function showFeedback(message, type = "success", options = {}) {
         </div>
     `;
     feedbackMessage.className = `fixed z-50 ${positionClasses[position] || positionClasses.top}`;
-    feedbackMessage.classList.remove("hidden");
+    feedbackMessage.classList.remove('hidden');
 
     // Handle manual close
-    const closeButton = feedbackMessage.querySelector("#feedback-close");
+    const closeButton = feedbackMessage.querySelector('#feedback-close');
     if (closeButton) {
-        closeButton.addEventListener("click", () => {
-            feedbackMessage.classList.add("hidden");
+        closeButton.addEventListener('click', () => {
+            feedbackMessage.classList.add('hidden');
         });
     }
 
     // Auto-hide if not an error
-    if (type !== "error" && duration > 0) {
+    if (type !== 'error' && duration > 0) {
         setTimeout(() => {
-            feedbackMessage.classList.add("hidden");
+            feedbackMessage.classList.add('hidden');
         }, duration);
     }
 }
@@ -202,10 +202,10 @@ function formDataToObject(formData) {
  */
 function formatDate(dateString) {
     const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
+    return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
     });
 }
 
@@ -246,7 +246,7 @@ function throttle(func, limit) {
  * @param {object} [options={}]
  */
 function showLoading(element, options = {}) {
-    const { text = "Loading...", size = "1.5rem" } = options;
+    const { text = 'Loading...', size = '1.5rem' } = options;
     element.disabled = true;
     element.innerHTML = `
         <div class="flex items-center justify-center">

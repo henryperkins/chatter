@@ -157,7 +157,7 @@
         if (!window.md || !window.DOMPurify) {
             console.error('Required dependencies not available.');
             const errorDiv = document.createElement('div');
-            errorDiv.innerHTML = `<p class="text-red-500">Error: Required dependencies not available. Please refresh the page.</p>`;
+            errorDiv.innerHTML = '<p class="text-red-500">Error: Required dependencies not available. Please refresh the page.</p>';
             chatBox.insertBefore(errorDiv, chatBox.firstChild);
             return;
         }
@@ -288,7 +288,7 @@
         if (!window.md) {
             console.error('markdown-it not available');
             assistantMessageDivs.forEach(div => {
-                div.innerHTML = `<p class="text-red-500">Error: Markdown renderer not available. Please refresh the page.</p>`;
+                div.innerHTML = '<p class="text-red-500">Error: Markdown renderer not available. Please refresh the page.</p>';
             });
             return;
         }
@@ -582,7 +582,7 @@
                 has_files: uploadedFiles.length > 0
             };
             const formData = new FormData();
-            let messageForSend = "";
+            let messageForSend = '';
             if (messageText) {
                 messageForSend = tokenCount > maxTokens
                     ? await window.tokenUsageManager?.truncateContent(messageText, maxTokens) || messageText
