@@ -273,10 +273,20 @@ def create_model():
     if csrf_error:
         return csrf_error
 
-    form = ModelForm()
-    if not form.validate_on_submit():
+    # Handle form data from both JSON and form submissions
+    if request.is_json:
+        data = request.get_json()
+        form = ModelForm(data=data)
+    else:
+        form = ModelForm()
+
+    # Validate the form
+    if not form.validate():
         logger.warning("Model form validation failed: %s", form.errors)
-        return render_template("add_model.html", form=form, errors=form.errors)
+        if request.is_json:
+            return jsonify({"success": False, "errors": form.errors}), 400
+        else:
+            return render_template("add_model.html", form=form, errors=form.errors)
 
     try:
         # Begin transaction
@@ -287,9 +297,12 @@ def create_model():
             # Pre-validate model data
             validation_errors = validate_model_data(data)
             if validation_errors:
-                return render_template(
-                    "add_model.html", form=form, error=validation_errors[0]
-                )
+                if request.is_json:
+                    return jsonify({"success": False, "errors": validation_errors}), 400
+                else:
+                    return render_template(
+                        "add_model.html", form=form, error=validation_errors[0]
+                    )
 
             # Check for duplicate names/deployments
             if check_model_exists(
