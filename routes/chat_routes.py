@@ -438,7 +438,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                 "\n\n[Note: Content truncated due to token limit.]",
             )
             logger.info("Input content truncated due to token limit")
-        
+
         # Log included and excluded files
         if included_files:
             logger.info("Processed files: %s", [f["filename"] for f in included_files])
@@ -504,8 +504,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                                 api_version=api_version,
                                 requires_o1_handling=model_obj.requires_o1_handling,
                                 timeout_seconds=120,
-                                stream=True,
-                                file_ids=azure_file_ids if azure_file_ids else None
+                                stream=True
                             )
                         except Exception as api_err:
                             logger.error("Azure API error: %s", str(api_err))
@@ -621,8 +620,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                         api_version=api_version,
                         requires_o1_handling=model_obj.requires_o1_handling,
                         timeout_seconds=120,
-                        stream=False,
-                        file_ids=azure_file_ids if azure_file_ids else None
+                        stream=False
                     )
 
                     # Process response
