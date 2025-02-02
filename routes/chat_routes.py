@@ -411,31 +411,48 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         max_tokens = model_obj.max_completion_tokens
         api_version = model_obj.api_version
 
-        # Pass azure_file_ids to get_azure_response
-        response_generator = get_azure_response(
-            messages=history,
-            deployment_name=model_obj.deployment_name,
-            max_completion_tokens=max_tokens,
-            api_endpoint=model_obj.api_endpoint,
-            api_key=model_obj.api_key,
-            api_version=api_version,
-            requires_o1_handling=model_obj.requires_o1_handling,
-            timeout_seconds=120,
-            stream=True,
-        )
-        conversation_manager.add_message(
-            chat_id=chat_id,
-            role="user",
-            content=combined_message,
-            model_max_tokens=getattr(model_obj, "max_tokens", None),
-            requires_o1_handling=getattr(model_obj, "requires_o1_handling", False),
-        )
+    # Process uploaded files
+    included_files, excluded_files, file_tokens, file_contents = process_uploaded_files(
+        request.files.getlist("files[]")
+    )
+    total_tokens += file_tokens
 
-        # Get conversation history
-        history = conversation_manager.get_context(
-            chat_id,
-            include_system=not getattr(model_obj, "requires_o1_handling", False),
+    # Combine message and file contents
+    combined_message = message if message else ""
+    if file_contents:
+        combined_message += "\n\nHere are the contents of the uploaded files:\n"
+        for file in file_contents:
+            combined_message += f"\n[File: {file['filename']}]\n{file['content']}\n"
+
+    # Count tokens for the combined message
+    message_tokens = count_tokens(combined_message, MODEL_NAME)
+    total_tokens += message_tokens
+
+    # If total tokens exceed limit, truncate the message
+    if total_tokens > MAX_INPUT_TOKENS:
+        combined_message = truncate_content(
+            combined_message,
+            MAX_INPUT_TOKENS,
+            "\n\n[Note: Content truncated due to token limit.]",
         )
+        logger.info("Input content truncated due to token limit")
+    
+    # Log included and excluded files
+    if included_files:
+        logger.info("Processed files: %s", [f["filename"] for f in included_files])
+        logger.info("File tokens: %d", file_tokens)
+
+    # Sanitize the combined message
+    combined_message = bleach.clean(combined_message)
+
+    # Add the combined message to the conversation
+    conversation_manager.add_message(
+        chat_id=chat_id,
+        role="user",
+        content=combined_message,
+        model_max_tokens=getattr(model_obj, "max_tokens", None),
+        requires_o1_handling=getattr(model_obj, "requires_o1_handling", False),
+    )
 
         # Check streaming
         use_streaming = (
