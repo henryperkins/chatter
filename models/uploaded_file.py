@@ -28,6 +28,9 @@ class UploadedFile:
     mime_type: Optional[str] = None
     version: int = 1
     azure_file_id: Optional[str] = None
+    azure_search_id: Optional[str] = None
+    last_indexed_at: Optional[datetime] = None
+    indexing_status: str = 'pending'
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -73,9 +76,13 @@ class UploadedFile:
                 # Insert new version
                 query = text("""
                     INSERT INTO uploaded_files
-                    (chat_id, filename, filepath, uuid, size, mime_type, description, version, azure_file_id, created_at, updated_at)
+                    (chat_id, filename, filepath, uuid, size, mime_type, description, version,
+                    azure_file_id, azure_search_id, indexing_status, last_indexed_at,
+                    created_at, updated_at)
                     VALUES
-                    (:chat_id, :filename, :filepath, :uuid, :size, :mime_type, :description, :version, :azure_file_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    (:chat_id, :filename, :filepath, :uuid, :size, :mime_type, :description, :version,
+                    :azure_file_id, NULL, 'pending', NULL,
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     RETURNING id
                 """)
                 result = db.execute(query, {
@@ -215,6 +222,69 @@ class UploadedFile:
             except Exception as e:
                 db.rollback()
                 logger.error(f"Error updating Azure file ID: {e}")
+                raise
+
+    @staticmethod
+    def update_search_status(file_id: int, status: str, search_id: Optional[str] = None) -> bool:
+        """
+        Update the Azure Search indexing status for a file.
+
+        Args:
+            file_id (int): The ID of the uploaded file
+            status (str): The indexing status ('pending', 'indexed', 'failed')
+            search_id (Optional[str]): The Azure Search document ID if indexed successfully
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        with db_session() as db:
+            try:
+                query = text("""
+                    UPDATE uploaded_files
+                    SET indexing_status = :status,
+                        azure_search_id = COALESCE(:search_id, azure_search_id),
+                        last_indexed_at = CASE
+                            WHEN :status = 'indexed' THEN CURRENT_TIMESTAMP
+                            ELSE last_indexed_at
+                        END,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :file_id
+                """)
+                result = db.execute(query, {
+                    "file_id": file_id,
+                    "status": status,
+                    "search_id": search_id
+                })
+                db.commit()
+                success = result.rowcount > 0
+                if success:
+                    logger.info(f"Updated Azure Search status to {status} for file {file_id}")
+                return success
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error updating Azure Search status: {e}")
+                raise
+
+    @staticmethod
+    def get_unindexed_files() -> List["UploadedFile"]:
+        """
+        Get all files that haven't been indexed in Azure Search.
+
+        Returns:
+            List[UploadedFile]: List of files with pending indexing status
+        """
+        with db_session() as db:
+            try:
+                query = text("""
+                    SELECT * FROM uploaded_files
+                    WHERE indexing_status = 'pending'
+                    AND (mime_type LIKE 'text/%' OR mime_type IN ('application/json', 'text/markdown'))
+                    ORDER BY created_at ASC
+                """)
+                rows = db.execute(query).mappings().all()
+                return [UploadedFile(**dict(row)) for row in rows]
+            except Exception as e:
+                logger.error(f"Error retrieving unindexed files: {e}")
                 raise
 
     @staticmethod

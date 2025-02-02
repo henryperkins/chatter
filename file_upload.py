@@ -1,9 +1,14 @@
 import os
+import os
 from werkzeug.utils import secure_filename
 from flask import current_app, request, jsonify
 from typing import List, Dict, Tuple
 from models.uploaded_file import UploadedFile
-from config import Config  # Import centralized configuration
+from config import Config
+from azure_search_config import AzureSearchConfig
+from openai.embeddings_utils import get_embedding
+import hashlib
+import time
 
 
 class FileUploadHandler:
@@ -292,6 +297,45 @@ class FileUploadHandler:
         except Exception as e:
             current_app.logger.error(f"Failed to quarantine file: {str(e)}")
 
+    def index_file_in_search(self, file_info: Dict[str, Any]) -> None:
+        """
+        Index a file in Azure AI Search.
+
+        Args:
+            file_info: Dictionary containing file metadata and content
+        """
+        try:
+            search_config = AzureSearchConfig()
+
+            # Generate a unique document ID
+            doc_id = hashlib.sha256(
+                f"{file_info['filepath']}_{file_info['size']}".encode()
+            ).hexdigest()
+
+            # Read file content
+            with open(file_info['filepath'], 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            # Create the search document
+            document = {
+                "id": doc_id,
+                "title": file_info['filename'],
+                "content": content,
+                "filepath": file_info['filepath'],
+                "last_accessed": time.time(),
+                "mime_type": file_info['mime_type'],
+                "size": file_info['size'],
+                "description": file_info.get('description', '')
+            }
+
+            # Index the document
+            search_config.index_document(document)
+            current_app.logger.info(f"Successfully indexed file {file_info['filename']} in Azure Search")
+
+        except Exception as e:
+            current_app.logger.error(f"Failed to index file in Azure Search: {str(e)}")
+            raise
+
     def save_files(self, files: List, chat_id: str, descriptions: Dict[str, str] = None) -> List[Dict]:
         """
         Save validated files to the upload folder and database with metadata.
@@ -398,6 +442,15 @@ class FileUploadHandler:
                 # Cache the processed content
                 cache_key = hash((filename, os.path.getsize(filepath)))
                 context_manager.context_cache[cache_key] = compressed_content
+
+                # Index the file in Azure AI Search
+                if mime_type.startswith('text/') or mime_type in ['application/json', 'text/markdown']:
+                    try:
+                        self.index_file_in_search(file_info)
+                    except Exception as index_error:
+                        current_app.logger.error(f"Failed to index file in Azure Search: {str(index_error)}")
+                        # Don't fail the upload if indexing fails
+                        pass
 
             except Exception as e:
                 current_app.logger.error(f"Error saving file {filename}: {str(e)}")
