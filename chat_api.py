@@ -7,16 +7,45 @@ including sending chat messages and getting responses, as well as web scraping.
 
 import logging
 import json
+import os
 from typing import Optional, List, Dict, Union, Generator, Any
 import requests
 from bs4 import BeautifulSoup
-
+from azure_file_manager import AzureOpenAIChatWithFiles, AzureOpenAIFileManager
+from azure_search_client import create_search_client, AzureOpenAISearchChat
 
 # Type aliases for better readability
 ResponseType = Union[Dict[str, Any], str, Generator[Dict[str, Any], None, None]]
 ApiParams = Dict[str, Any]
 
 logger = logging.getLogger(__name__)
+
+# Initialize clients
+_file_chat_client = None
+_search_chat_client = None
+
+def get_file_chat_client() -> Optional[AzureOpenAIChatWithFiles]:
+    global _file_chat_client
+    if _file_chat_client is None and os.getenv("AZURE_OPENAI_ENDPOINT"):
+        try:
+            _file_chat_client = AzureOpenAIChatWithFiles(
+                endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", ""),
+                api_key=os.getenv("AZURE_OPENAI_KEY", ""),
+                deployment_id=os.getenv("AZURE_OPENAI_DEPLOYMENT", "")
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize file chat client: {str(e)}")
+    return _file_chat_client
+
+def get_search_chat_client(model_type: str) -> Optional[AzureOpenAISearchChat]:
+    """Get or create search-enabled chat client"""
+    global _search_chat_client
+    if _search_chat_client is None and os.getenv("AZURE_SEARCH_ENDPOINT"):
+        try:
+            _search_chat_client = create_search_client(model_type)
+        except Exception as e:
+            logger.error(f"Failed to initialize search chat client: {str(e)}")
+    return _search_chat_client
 
 
 def get_azure_response(
@@ -26,13 +55,48 @@ def get_azure_response(
     api_endpoint: Optional[str] = None,
     api_key: Optional[str] = None,
     api_version: Optional[str] = None,
+    model_type: Optional[str] = None,
     requires_o1_handling: bool = False,
+    reasoning_effort: str = 'medium',
+    store_completion: bool = False,
+    response_format: Optional[Dict[str, Any]] = None,
     timeout_seconds: int = 600,
     stream: bool = False,
-    file_ids: Optional[List[str]] = None
+    file_ids: Optional[List[str]] = None,
+    vector_store_id: Optional[str] = None,
+    use_code_interpreter: bool = False
 ) -> Union[Dict[str, Any], str, Generator]:
     try:
-        # Validate parameters
+        # Check if we should use file-based operations
+        if (file_ids or vector_store_id or use_code_interpreter) and model_type in ['gpt-4o', 'o1']:
+            file_client = get_file_chat_client()
+            if not file_client:
+                raise ValueError("File operations requested but file client not available")
+
+            # Handle code interpreter
+            if use_code_interpreter and file_ids:
+                return file_client.chat_with_code_interpreter(
+                    messages=messages,
+                    file_ids=file_ids,
+                    temperature=1.0  # Fixed for these models
+                )
+
+            # Handle vector store search
+            if vector_store_id:
+                search_client = get_search_chat_client(model_type)
+                if not search_client:
+                    raise ValueError("Search operations requested but search client not available")
+
+                return search_client.chat_with_search(
+                    messages=messages,
+                    query_type="vector",
+                    temperature=1.0,  # Fixed for these models
+                    max_tokens=max_completion_tokens or (25000 if model_type == 'o1' else 16384),
+                    top_n=5,
+                    strictness=3
+                )
+
+        # Validate parameters for regular API call
         if not deployment_name or not api_endpoint or not api_key or not api_version:
             raise ValueError("Missing required parameters")
 
@@ -78,14 +142,62 @@ def get_azure_response(
         if file_ids:
             payload["file_ids"] = file_ids
 
+        # Import os for environment variables
+        import os
 
-        # Handle o1-preview specific requirements
-        if requires_o1_handling:
-            payload["temperature"] = 1.0  # Must be fixed at 1.0 for o1-preview
-            payload["max_tokens"] = min(max_completion_tokens or 8300, 8300)  # Max 8300 for o1-preview
+        # Set model-specific parameters
+        if model_type == 'o1':
+            # O1 model requirements
+            payload.update({
+                "temperature": 1.0,  # Fixed at 1.0 for O1
+                "max_completion_tokens": min(max_completion_tokens or 25000, 25000),  # Max 25000 for O1
+                "reasoning_effort": reasoning_effort,  # low, medium, high
+                "store_completion": store_completion
+            })
+            if response_format:
+                payload["response_format"] = response_format
+
+            # Add search capabilities if enabled
+            if os.getenv("USE_AZURE_SEARCH", "false").lower() == "true":
+                search_client = get_search_chat_client(model_type)
+                if search_client:
+                    search_params = search_client.search_extension.get_search_parameters(
+                        query_type="vector",
+                        top_n=5,
+                        strictness=3
+                    )
+                    payload["data_sources"] = [search_params]
+
+        elif model_type == 'gpt-4o':
+            # GPT-4o requirements
+            payload.update({
+                "temperature": 1.0,  # Fixed at 1.0 for GPT-4o
+                "max_tokens": min(max_completion_tokens or 16384, 16384)  # Max 16384 for GPT-4o
+            })
+            if response_format:
+                payload["response_format"] = response_format
+
+            # Add search capabilities if enabled
+            if os.getenv("USE_AZURE_SEARCH", "false").lower() == "true":
+                search_client = get_search_chat_client(model_type)
+                if search_client:
+                    search_params = search_client.search_extension.get_search_parameters(
+                        query_type="vector",
+                        top_n=5,
+                        strictness=3
+                    )
+                    payload["data_sources"] = [search_params]
+
         else:
-            payload["temperature"] = 1.0  # Default temperature
-            payload["max_tokens"] = max_completion_tokens or 256  # Default max tokens
+            # Default handling for other models
+            payload.update({
+                "temperature": 1.0,  # Default temperature
+                "max_tokens": max_completion_tokens or 256  # Default max tokens
+            })
+
+        # Ensure proper API version for models that support vector search
+        if model_type in ['o1', 'gpt-4o']:
+            api_version = '2025-01-01-preview'
 
         logger.debug("Making API call to %s with parameters: %s", endpoint, payload)
 

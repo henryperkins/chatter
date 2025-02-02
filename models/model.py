@@ -81,7 +81,31 @@ class Model:
         'gpt-4o': {
             'fixed_temperature': True,
             'streaming': True,
-            'max_tokens': 16384
+            'max_tokens': 16384,
+            'supports_json_mode': True,
+            'supports_vector_search': True,
+            'supports_file_search': True,
+            'supports_code_interpreter': True,
+            'api_version': '2025-01-01-preview'
+        },
+        'o1': {
+            'fixed_temperature': True,
+            'streaming': False,
+            'max_tokens': 25000,
+            'supports_json_mode': True,
+            'requires_reasoning_effort': True,
+            'supports_vector_search': True,
+            'supports_file_search': True,
+            'supports_code_interpreter': True,
+            'api_version': '2025-01-01-preview',
+            'default_reasoning_effort': 'medium',
+            'supports_completion_storage': True,
+            'vector_search_config': {
+                'max_chunks': 50,
+                'chunk_size': 1000,
+                'chunk_overlap': 100,
+                'default_strictness': 3
+            }
         },
         'gpt-3.5-turbo': {
             'fixed_temperature': False,
@@ -551,7 +575,7 @@ class Model:
 
         # Get provider-specific capabilities
         model_caps = provider_caps.get(model_type, {})
-        
+
         # For o1-preview models, enforce stricter limits
         if is_o1_preview:
             max_tokens = config.get('max_completion_tokens', 8300)
@@ -563,7 +587,7 @@ class Model:
             max_tokens = config.get('max_completion_tokens')
             if max_tokens is not None and max_tokens <= 0:
                 raise ValueError("max_completion_tokens must be positive")
-            
+
             # Use provider's max_tokens if available, otherwise no upper limit
             if 'max_tokens' in model_caps:
                 config['max_completion_tokens'] = min(
@@ -574,14 +598,14 @@ class Model:
         # Handle reasoning settings for o1/o3 models
         model_type = config.get('model_type', '').lower()
         is_reasoning_model = model_type in ['o1-preview', 'o3-mini']
-        
+
         if is_reasoning_model:
             # Validate reasoning_effort
             reasoning_effort = config.get('reasoning_effort', 'medium')
             if reasoning_effort not in ['low', 'medium', 'high']:
                 raise ValueError("reasoning_effort must be one of: low, medium, high")
             config['reasoning_effort'] = reasoning_effort
-            
+
             # Ensure store_completion is boolean
             store_completion = config.get('store_completion', False)
             config['store_completion'] = bool(store_completion)

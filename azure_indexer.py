@@ -2,6 +2,7 @@ import os
 import json
 from dotenv import load_dotenv
 from azure.core.credentials import AzureKeyCredential
+from azure.identity import DefaultAzureCredential, ManagedIdentityCredential
 from azure.search.documents.indexes import SearchIndexClient
 from azure.search.documents.indexes.models import (
     SimpleField,
@@ -20,14 +21,24 @@ from azure.search.documents import SearchClient
 load_dotenv()
 
 AZURE_SEARCH_ENDPOINT = os.environ["AZURE_SEARCH_ENDPOINT"]
-AZURE_SEARCH_KEY = os.environ["AZURE_SEARCH_KEY"]
+AZURE_SEARCH_KEY = os.getenv("AZURE_SEARCH_KEY")  # Optional when using managed identity
 INDEX_NAME = os.getenv("AZURE_SEARCH_INDEX_NAME", "markdown-index")
 EMBEDDING_DIMENSIONS = 1536
+USE_MANAGED_IDENTITY = os.getenv("USE_MANAGED_IDENTITY", "false").lower() == "true"
+MANAGED_IDENTITY_CLIENT_ID = os.getenv("MANAGED_IDENTITY_CLIENT_ID")  # For user-assigned managed identity
+
+def get_search_credential():
+    """Get the appropriate credential based on configuration."""
+    if USE_MANAGED_IDENTITY:
+        if MANAGED_IDENTITY_CLIENT_ID:
+            return ManagedIdentityCredential(client_id=MANAGED_IDENTITY_CLIENT_ID)
+        return DefaultAzureCredential()
+    return AzureKeyCredential(AZURE_SEARCH_KEY)
 
 def create_index():
     client = SearchIndexClient(
         endpoint=AZURE_SEARCH_ENDPOINT,
-        credential=AzureKeyCredential(AZURE_SEARCH_KEY)
+        credential=get_search_credential()
     )
 
     index = SearchIndex(
@@ -36,10 +47,11 @@ def create_index():
             SimpleField(name="id", type=SearchFieldDataType.String, key=True),
             SearchableField(name="title", type=SearchFieldDataType.String),
             SearchableField(name="content", type=SearchFieldDataType.String),
-            SimpleField(name="path", type=SearchFieldDataType.String),
+            SimpleField(name="filepath", type=SearchFieldDataType.String),
+            SimpleField(name="url", type=SearchFieldDataType.String),
             SimpleField(name="last_accessed", type=SearchFieldDataType.Double),
             SearchField(
-                name="embedding",
+                name="contentvector",
                 type=SearchFieldDataType.Collection(SearchFieldDataType.Single),
                 vector_search_dimensions=EMBEDDING_DIMENSIONS,
                 vector_search_profile_name="defaultVectorProfile"
@@ -47,7 +59,15 @@ def create_index():
         ],
         vector_search=VectorSearch(
             algorithms=[
-                HnswAlgorithmConfiguration(name="defaultHnsw")
+                HnswAlgorithmConfiguration(
+                    name="defaultHnsw",
+                    parameters={
+                        "m": 4,  # Number of bi-directional links created for each new node during indexing
+                        "efConstruction": 400,  # Number of nearest neighbors to inspect during index construction
+                        "efSearch": 500,  # Number of nearest neighbors to inspect during search
+                        "metric": "cosine"  # Distance metric for vector similarity
+                    }
+                )
             ],
             profiles=[
                 VectorSearchProfile(
@@ -63,7 +83,8 @@ def create_index():
                         resource_url=os.environ["AZURE_OPENAI_ENDPOINT"],
                         deployment_name=os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"],
                         model_name="text-embedding-ada-002",
-                        api_key=os.environ["AZURE_OPENAI_KEY"]
+                        api_key=os.environ.get("AZURE_OPENAI_KEY"),  # Optional when using managed identity
+                        authentication={"type": "user_assigned_managed_identity"} if USE_MANAGED_IDENTITY else None
                     )
                 )
             ]
@@ -76,7 +97,7 @@ def upload_documents(document_store="document_store.json"):
     search_client = SearchClient(
         endpoint=AZURE_SEARCH_ENDPOINT,
         index_name=INDEX_NAME,
-        credential=AzureKeyCredential(AZURE_SEARCH_KEY)
+        credential=get_search_credential()
     )
     if not os.path.exists(document_store):
         print(f"Document store file '{document_store}' not found.")

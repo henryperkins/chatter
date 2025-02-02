@@ -55,7 +55,7 @@ class Config:
         "SECRET_KEY",
         "DATABASE_URI",
         "ENCRYPTION_KEY",
-        "AZURE_API_KEY"
+        "AZURE_OPENAI_KEY"
     }
 
     # Print the loaded DATABASE_URI for debugging
@@ -103,19 +103,23 @@ class Config:
         logger.info("Encryption key properly formatted for Fernet usage")
 
     # Add explicit Azure configuration
-    AZURE_API_KEY = os.getenv("AZURE_API_KEY")
+    AZURE_API_KEY = os.getenv("AZURE_OPENAI_KEY")
     if not AZURE_API_KEY:
-        raise ValueError("AZURE_API_KEY environment variable is required")
-    AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-deployment")
-    AZURE_API_ENDPOINT = os.getenv("AZURE_API_ENDPOINT", "https://hp-east2.openai.azure.com/openai/deployments")
-    AZURE_API_VERSION = os.getenv("AZURE_API_VERSION", "2024-10-21")
-    AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "gpt-deployment")
+        raise ValueError("AZURE_OPENAI_KEY environment variable is required")
+    AZURE_API_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "https://hp-east2.openai.azure.com/openai/deployments")
+    AZURE_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
+    AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+    if not AZURE_DEPLOYMENT_NAME:
+        raise ValueError("AZURE_OPENAI_DEPLOYMENT_NAME environment variable is required")
+
+    # Make AZURE_DEPLOYMENT_NAME a class attribute
+    globals()["AZURE_DEPLOYMENT_NAME"] = AZURE_DEPLOYMENT_NAME
 
     # Added missing default model configurations
     DEFAULT_MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "Default Model")
-    DEFAULT_DEPLOYMENT_NAME = os.getenv(
-        "DEFAULT_DEPLOYMENT_NAME", AZURE_DEPLOYMENT_NAME
-    )
+    DEFAULT_DEPLOYMENT_NAME = os.getenv("DEFAULT_DEPLOYMENT_NAME")
+    if not DEFAULT_DEPLOYMENT_NAME:
+        DEFAULT_DEPLOYMENT_NAME = AZURE_DEPLOYMENT_NAME  # Use Azure deployment name as fallback
     DEFAULT_MODEL_DESCRIPTION = os.getenv(
         "DEFAULT_MODEL_DESCRIPTION", "Default model description"
     )

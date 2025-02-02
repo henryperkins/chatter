@@ -72,6 +72,10 @@ POOL_RECYCLE: int = int(os.getenv("DB_POOL_RECYCLE", "1800"))  # 30 minutes
 
 def create_db_engine(db_uri: str) -> Engine:
     """Create SQLAlchemy engine with PostgreSQL-optimized settings."""
+    # Get the path to the SSL certificate
+    cert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ca-certificate.crt")
+
+    # Create engine with SSL configuration
     engine = create_engine(
         db_uri,
         future=True,  # Enable 2.0-style transaction behavior
@@ -84,7 +88,9 @@ def create_db_engine(db_uri: str) -> Engine:
         pool_use_lifo=True,  # Better connection reuse
         isolation_level="READ COMMITTED",
         execution_options={"autocommit": False},  # Explicit transaction control
-        # Remove connect_args to rely on URI parameters
+        connect_args={
+            "sslmode": "require"
+        },
         json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
     )
 
@@ -388,7 +394,7 @@ def create_default_model(db: Session) -> Optional[int]:
 
         # Create Fernet cipher with properly encoded key
         cipher_suite = Fernet(encryption_key.encode())
-        
+
         # Encrypt API key
         try:
             encrypted_api_key = cipher_suite.encrypt(Config.AZURE_API_KEY.encode()).decode()
@@ -406,28 +412,42 @@ def create_default_model(db: Session) -> Optional[int]:
         max_completion_tokens = Config.DEFAULT_MAX_COMPLETION_TOKENS
         requires_o1_handling = Config.DEFAULT_REQUIRES_O1_HANDLING
 
-        default_model = {
-            "name": Config.DEFAULT_MODEL_NAME,
-            "deployment_name": deployment_name,
-            "description": Config.DEFAULT_MODEL_DESCRIPTION,
-            "provider_id": provider_id,
-            "api_endpoint": api_endpoint,
-            "api_key": encrypted_api_key,
+        # Log the deployment name value
+        logger.info(f"Using deployment name: {Config.DEFAULT_DEPLOYMENT_NAME}")
+
+        # Create parameters dictionary
+        params = {
+            "provider_id": int(provider_id),
+            "name": str(Config.MODEL_NAME),
+            "deployment_name": str(deployment_name),  # Use the deployment_name variable we set earlier
+            "description": "Azure OpenAI GPT-4 model with streaming support",
+            "api_endpoint": str(api_endpoint),
+            "api_key": str(encrypted_api_key),
+            "api_version": str(Config.AZURE_API_VERSION),
+            "temperature": float(Config.DEFAULT_TEMPERATURE),
+            "max_tokens": int(128000),
+            "max_completion_tokens": int(Config.MAX_TOKENS),
             "model_type": "azure",
-            "temperature": Config.DEFAULT_TEMPERATURE,
-            "max_tokens": Config.DEFAULT_MAX_TOKENS,
-            "max_completion_tokens": max_completion_tokens,
-            "is_default": True,
-            "requires_o1_handling": Config.DEFAULT_REQUIRES_O1_HANDLING,
-            "supports_streaming": Config.DEFAULT_SUPPORTS_STREAMING,
-            "api_version": Config.DEFAULT_API_VERSION,
+            "requires_o1_handling": bool(False),
+            "supports_streaming": bool(True),
+            "is_default": bool(True)
         }
+
+        # Log the exact parameters being used
+        logger.info("Model parameters before SQL execution:")
+        for key, value in params.items():
+            logger.info(f"{key}: {type(value)} = {value}")
+
+        default_model = params
+
+        # Log the complete model dictionary
+        logger.info(f"Default model configuration: {default_model}")
 
         # Validate model configuration
         from models.model import Model
         Model.validate_model_config(default_model)
 
-        # Insert model
+        # Insert model with explicit parameter binding
         model_query = text("""
             INSERT INTO models (
                 provider_id, name, deployment_name, description, api_endpoint, api_key,
@@ -440,10 +460,30 @@ def create_default_model(db: Session) -> Optional[int]:
             )
             RETURNING id
         """)
-        result = db.execute(model_query, default_model)
+
+        # Execute query with parameters as a dictionary
+        result = db.execute(
+            model_query,
+            dict(
+                provider_id=params["provider_id"],
+                name=params["name"],
+                deployment_name=deployment_name,  # Use the deployment_name variable directly
+                description=params["description"],
+                api_endpoint=params["api_endpoint"],
+                api_key=params["api_key"],
+                api_version=params["api_version"],
+                temperature=params["temperature"],
+                max_tokens=params["max_tokens"],
+                max_completion_tokens=params["max_completion_tokens"],
+                model_type=params["model_type"],
+                requires_o1_handling=params["requires_o1_handling"],
+                supports_streaming=params["supports_streaming"],
+                is_default=params["is_default"]
+            )
+        )
         model_id = result.scalar_one()
         db.commit()  # Commit the model creation
-        
+
         logger.info("Default provider and model created successfully")
         return model_id
 
