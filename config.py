@@ -88,19 +88,12 @@ class Config:
         raise ValueError("ENCRYPTION_KEY environment variable is required")
 
     # Ensure encryption key is properly formatted for Fernet
-    # Fernet requires a 32-byte key encoded in base64
-    import base64
+    from utils.encryption import validate_encryption_key
     try:
-        # If the key is already base64, this will work
-        base64.b64decode(ENCRYPTION_KEY, validate=True)
-    except Exception:
-        # If not, encode it as base64
-        # First ensure it's 32 bytes by hashing if needed
-        from cryptography.fernet import Fernet
-        import hashlib
-        key_bytes = hashlib.sha256(ENCRYPTION_KEY.encode()).digest()
-        ENCRYPTION_KEY = base64.b64encode(key_bytes).decode()
-        logger.info("Encryption key properly formatted for Fernet usage")
+        # Validate and format the encryption key
+        key_bytes = validate_encryption_key(ENCRYPTION_KEY)
+        ENCRYPTION_KEY = key_bytes.decode()
+        logger.info("Encryption key validated and properly formatted")
 
     # Add explicit Azure configuration
     AZURE_API_KEY = os.getenv("AZURE_OPENAI_KEY")
