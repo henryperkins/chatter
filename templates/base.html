@@ -32,8 +32,11 @@
 </head>
 
 <body class="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased flex flex-col safe-area-inset transition-colors duration-300">
+    <!-- Chat Tabs Area -->
+    {% block chat_tabs %}{% endblock %}
+
     <!-- Navbar -->
-    <nav class="fixed w-full top-0 z-sticky transition-all duration-300 ease-in-out backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border-b border-gray-200/80 dark:border-gray-700/80 shadow-soft" role="navigation">
+    <nav class="fixed w-full z-sticky transition-all duration-300 ease-in-out backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border-b border-gray-200/80 dark:border-gray-700/80 shadow-soft {% block nav_classes %}top-0{% endblock %}" role="navigation">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <!-- Left side (Brand + Mobile toggle) -->
@@ -102,7 +105,7 @@
 
     <!-- Dark Mode Toggle -->
     <button id="dark-mode-toggle"
-            class="fixed top-20 right-4 z-fixed p-3 bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 opacity-0 shadow-soft transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95 border border-gray-200/80 dark:border-gray-700/80 backdrop-blur-sm dark-mode-transition"
+                class="fixed top-[132px] right-4 z-fixed p-3 bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 opacity-0 shadow-soft transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95 border border-gray-200/80 dark:border-gray-700/80 backdrop-blur-sm dark-mode-transition"
             aria-label="Toggle dark mode">
         <svg class="w-6 h-6 dark:hidden" fill="currentColor" viewBox="0 0 20 20">
             <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>
@@ -195,7 +198,7 @@
     <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-        <div class="fixed top-20 left-1/2 transform -translate-x-1/2 w-full max-w-lg z-tooltip px-4 space-y-2">
+        <div class="fixed top-[132px] left-1/2 transform -translate-x-1/2 w-full max-w-lg z-tooltip px-4 space-y-2">
             {% for category, message in messages %}
             <div class="rounded-xl p-4 flex items-center justify-between transition-all duration-300 shadow-soft backdrop-blur-sm animate-slide-up transform hover:scale-[1.02]
                         {% if category == 'error' %}
@@ -229,7 +232,7 @@
 
     <!-- Feedback Message -->
     <div id="feedback-message"
-         class="hidden fixed top-20 left-1/2 transform -translate-x-1/2 p-4 rounded-xl shadow-soft z-[9999] max-w-md w-full text-center transition-all duration-300 backdrop-blur-sm animate-slide-up bg-white/90 dark:bg-gray-800/90 border border-gray-200/50 dark:border-gray-700/50 text-gray-900 dark:text-gray-100"
+              class="hidden fixed top-[132px] left-1/2 transform -translate-x-1/2 p-4 rounded-xl shadow-soft z-[9999] max-w-md w-full text-center transition-all duration-300 backdrop-blur-sm animate-slide-up bg-white/90 dark:bg-gray-800/90 border border-gray-200/50 dark:border-gray-700/50 text-gray-900 dark:text-gray-100"
          role="alert"
          aria-live="assertive">
     </div>

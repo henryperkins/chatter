@@ -141,140 +141,88 @@
 
 {% block title %}Chat - Azure OpenAI{% endblock %}
 
-{% block main_classes %}h-[calc(100vh-4rem)] flex{% endblock %}
+{% block nav_classes %}top-[84px]{% endblock %}
+
+{% block main_classes %}h-[calc(100vh-7rem)] flex{% endblock %}
+
+{% block chat_tabs %}
+<div class="fixed w-full top-0 z-[1200] bg-gradient-to-b from-white/95 to-gray-50/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-sm safe-area-top">
+    <div class="chat-tabs flex overflow-x-auto border-b border-gray-200/50 dark:border-gray-700/50 px-2">
+        <!-- New Chat Button -->
+        <button class="flex items-center gap-2 px-4 py-2 border-r border-t border-l border-gray-200/50 dark:border-gray-700/50 bg-gray-100/80 dark:bg-gray-700/80 hover:bg-gray-200/80 dark:hover:bg-gray-600/80 transition-all duration-200 rounded-t-md"
+                id="new-chat-btn"
+                aria-label="Start new chat" role="button">
+            <i class="fas fa-plus text-xs text-gray-600 dark:text-gray-300"></i>
+            <span class="text-gray-600 dark:text-gray-300">New Tab</span>
+        </button>
+
+        <!-- Chat Tabs -->
+        {% for conversation in conversations|sort(attribute='timestamp', reverse=True) %}
+        <div class="group">
+            <button class="flex items-center gap-2 px-4 py-2 border-r border-t border-l border-gray-200/50 dark:border-gray-700/50 {% if conversation.id == chat_id %}bg-white dark:bg-gray-800 border-b-0 relative mb-[-1px] rounded-t-md{% else %}bg-gray-100/80 dark:bg-gray-700/80 hover:bg-gray-200/80 dark:hover:bg-gray-600/80 rounded-t-md{% endif %} transition-all duration-200"
+                    data-chat-id="{{ conversation.id }}"
+                    onclick="window.location.href='{{ url_for('chat.chat_interface', chat_id=conversation.id) }}'">
+                <span class="truncate max-w-[200px]">{{ conversation.title | e }}</span>
+                <button class="ml-2 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400" data-chat-id="{{ conversation.id }}" title="Delete chat" aria-label="Delete chat">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Chat Controls -->
+    <div class="flex items-center gap-2 px-4 py-2 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 mt-1">
+        <!-- Model Selection -->
+        {% if models %}
+        <div class="relative flex-1 max-w-xs">
+            <select id="model-select" data-original-value="{{ current_model.id if current_model else '' }}"
+                    class="w-full h-8 px-2 pr-8 text-sm border border-gray-300/50 dark:border-gray-600/50 rounded-lg shadow-soft focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:bg-gray-800/90 dark:text-gray-200 appearance-none cursor-pointer touch-manipulation bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm transition-all duration-300 hover:border-primary-500 dark:hover:border-primary-400">
+                {% for model in models %}
+                <option value="{{ model.id }}"
+                        data-requires-o1-handling="{{ 'true' if model.requires_o1_handling else 'false' }}"
+                        data-supports-streaming="{{ 'true' if model.supports_streaming else 'false' }}"
+                        data-max-completion-tokens="{{ model.max_completion_tokens }}"
+                        {% if current_model and model.id == current_model.id %}selected{% endif %}>
+                    {{ model.name }}{% if model.is_default %} (Default){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+            <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500 dark:text-gray-400">
+                <i class="fas fa-chevron-down"></i>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Admin Buttons -->
+        {% if current_user.role == 'admin' %}
+        <div class="flex items-center gap-1">
+            <a href="{{ url_for('model.add_model_page') }}"
+               class="p-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200">
+                <i class="fas fa-plus-circle"></i>
+            </a>
+            <button id="edit-model-btn"
+                    class="p-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
+                    aria-label="Edit current model settings">
+                <i class="fas fa-edit"></i>
+            </button>
+        </div>
+        {% endif %}
+
+        <!-- Edit Title Button -->
+        <button id="edit-title-btn"
+                class="p-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
+                aria-label="Edit chat title">
+            <i class="fas fa-edit"></i>
+        </button>
+    </div>
+</div>
+{% endblock %}
 
 {% block content %}
-<div class="flex flex-col md:flex-row h-[100dvh] w-full overflow-hidden bg-white/95 dark:bg-gray-950/95 safe-area-inset touch-manipulation dark-mode-transition backdrop-blur-sm relative">
-    <!-- Sidebar -->
-    <nav id="mobile-menu"
-         class="fixed inset-y-0 left-0 top-16 z-modal w-[85%] max-w-[320px] bg-gray-50 dark:bg-gray-800 transform transition-transform duration-300 ease-in-out -translate-x-full md:relative md:top-0 md:translate-x-0 md:w-80 overflow-y-auto border-r border-gray-200 dark:border-gray-700 backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95"
-         aria-label="Mobile menu">
-        <div class="flex flex-col h-full p-4 space-y-4">
-            <!-- New Chat Button -->
-            <div class="flex-none">
-                <button id="new-chat-btn"
-                        class="w-full flex items-center justify-center bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 active:from-primary-800 active:to-secondary-800 text-white px-4 py-3 rounded-lg transition-all duration-300 text-base font-medium touch-manipulation focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 shadow-soft hover:shadow-lg transform hover:scale-[1.02] active:scale-[0.98]"
-                        aria-label="Start new chat" role="button">
-                    <i class="fas fa-plus mr-2"></i>
-                    <span>New Chat</span>
-                </button>
-            </div>
-
-            <!-- Model Selection -->
-            {% if models %}
-            <div class="flex-none">
-                <label for="model-select"
-                       class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Model:</label>
-                <div class="relative">
-                    <select id="model-select" data-original-value="{{ current_model.id if current_model else '' }}"
-                            class="w-full h-12 px-4 pr-8 border border-gray-300/50 dark:border-gray-600/50 rounded-lg shadow-soft focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:bg-gray-800/90 dark:text-gray-200 text-base appearance-none cursor-pointer touch-manipulation bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm transition-all duration-300 hover:border-primary-500 dark:hover:border-primary-400">
-                        {% for model in models %}
-                        <option value="{{ model.id }}"
-                                data-requires-o1-handling="{{ 'true' if model.requires_o1_handling else 'false' }}"
-                                data-supports-streaming="{{ 'true' if model.supports_streaming else 'false' }}"
-                                data-max-completion-tokens="{{ model.max_completion_tokens }}"
-                                {% if current_model and model.id == current_model.id %}selected{% endif %}>
-                            {{ model.name }}{% if model.is_default %} (Default){% endif %}
-                        </option>
-                        {% endfor %}
-                    </select>
-                    <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500 dark:text-gray-400">
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Admin Buttons -->
-            {% if current_user.role == 'admin' %}
-            <div class="flex-none space-y-2">
-                <a href="{{ url_for('model.add_model_page') }}"
-                   class="block w-full bg-green-500 hover:bg-green-600 active:bg-green-700 text-white px-4 py-2 rounded-lg text-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800">
-                    <i class="fas fa-plus-circle mr-2"></i>
-                    Add Model
-                </a>
-                <button id="edit-model-btn"
-                        class="block w-full bg-yellow-500 hover:bg-yellow-600 active:bg-yellow-700 text-white px-4 py-2 rounded-lg text-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                        aria-label="Edit current model settings">
-                    <i class="fas fa-edit mr-2"></i>
-                    Edit Model
-                </button>
-            </div>
-            {% endif %}
-
-            <!-- Chat List -->
-            <div class="flex-1 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
-                {% set ns = namespace(current_date=None) %}
-                {% for conversation in conversations|sort(attribute='timestamp', reverse=True) %}
-                {% set chat_date = conversation.timestamp.strftime('%Y-%m-%d') %}
-
-                {% if chat_date != ns.current_date %}
-                {% set ns.current_date = chat_date %}
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider pt-4 first:pt-0 px-2">
-                    {% if chat_date == today %}
-                    Today
-                    {% elif chat_date == yesterday %}
-                    Yesterday
-                    {% else %}
-                    {{ conversation.timestamp.strftime('%B %d, %Y') }}
-                    {% endif %}
-                </div>
-                {% endif %}
-
-                <div class="relative group touch-manipulation">
-                    <a href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
-                       class="block p-4 rounded-lg hover:bg-gray-200 active:bg-gray-300 dark:hover:bg-gray-700 dark:active:bg-gray-600 focus:ring-2 focus:ring-blue-500 text-base transition-all duration-200 touch-manipulation
-                              {% if conversation.id == chat_id %}bg-gray-300 dark:bg-gray-600{% endif %}">
-                        <div class="flex justify-between items-center">
-                            <span class="font-medium text-gray-900 dark:text-gray-100 truncate max-w-[180px]">
-                                {{ conversation.title | e }}
-                            </span>
-                            <span class="text-sm text-gray-500 dark:text-gray-400 ml-2 flex-shrink-0">
-                                {{ conversation.timestamp.strftime('%I:%M %p') }}
-                            </span>
-                        </div>
-                        <div class="text-sm text-gray-500 dark:text-gray-400 truncate mt-1">
-                            {{ conversation.model_name }}
-                        </div>
-                    </a>
-                    <button
-                        class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center justify-center w-10 h-10 rounded-full hover:bg-red-100 active:bg-red-200 dark:hover:bg-red-900 dark:active:bg-red-800 text-red-600 dark:text-red-400 transition-all duration-200 delete-chat-btn focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                        data-chat-id="{{ conversation.id }}" title="Delete chat" aria-label="Delete chat">
-                        <i class="fas fa-trash-alt text-lg"></i>
-                    </button>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </nav>
-
+<div class="flex flex-col h-[100dvh] w-full overflow-hidden bg-white/95 dark:bg-gray-950/95 safe-area-inset touch-manipulation dark-mode-transition backdrop-blur-sm relative pt-[100px]">
     <!-- Main Chat Area -->
     <div class="flex-1 flex flex-col overflow-hidden h-full pb-safe dark-mode-transition bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
-        <!-- Chat Header -->
-        <div class="chat-header sticky top-0 px-3 sm:px-4 py-2 sm:py-3 bg-white/80 dark:bg-gray-800/80 border-b border-gray-200/50 dark:border-gray-700/50 flex items-center justify-between backdrop-blur-md z-sticky safe-area-top">
-            <div class="flex items-center space-x-4">
-                <!-- Mobile Menu Button -->
-                <button id="mobile-menu-toggle"
-                        class="md:hidden p-2 min-w-touch min-h-touch text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                        aria-label="Toggle menu" aria-expanded="false">
-                    <i class="fas fa-bars text-2xl"></i>
-                </button>
-
-                <!-- Chat Title -->
-                <h2 id="chat-title"
-                    class="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate max-w-[200px] sm:max-w-none">
-                    {{ chat_title }} - {{ model_name }}
-                </h2>
-
-                <!-- Edit Title Button -->
-                <button id="edit-title-btn"
-                        class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
-                        aria-label="Edit chat title">
-                    <i class="fas fa-edit text-lg"></i>
-                </button>
-            </div>
-        </div>
-
         <!-- Messages Area -->
         <div id="chat-box"
               class="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 min-h-[200px] pb-40 scrollbar-thin scrollbar-thumb-gray-400/50 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600/50 dark:hover:scrollbar-thumb-gray-600 scrollbar-track-transparent bg-gradient-to-b from-white/50 to-gray-50/50 dark:from-gray-900/50 dark:to-gray-800/50 backdrop-blur-sm"
@@ -455,6 +403,13 @@
                         Press <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded-md shadow-sm">⏎</kbd> to send
                     </div>
                 </div>
+
+                <!-- New Chat Button -->
+                <button id="new-chat-btn"
+                        class="flex items-center justify-center w-12 h-12 min-w-[48px] min-h-[48px] rounded-xl bg-gray-100/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 hover:bg-gray-200/80 dark:hover:bg-gray-700/80 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 backdrop-blur-sm hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
+                        aria-label="Start new chat">
+                    <i class="fas fa-plus text-xl"></i>
+                </button>
 
                 <!-- Send Button -->
                 <button id="send-button"

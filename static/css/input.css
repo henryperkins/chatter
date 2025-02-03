@@ -1,7 +1,6 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@tailwind typography;
 
 @layer components {
     /* Layout components */
@@ -24,6 +23,49 @@
 
     .nav-link-default {
         @apply text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800;
+    }
+
+    /* Chat tabs components */
+    .chat-tabs {
+        @apply flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400/50 dark:scrollbar-thumb-gray-600/50 scrollbar-track-transparent gap-0.5 px-1;
+    }
+
+    .chat-tab {
+        @apply flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-t-md transition-all duration-200 whitespace-nowrap focus:outline-none relative;
+    }
+
+    .chat-tab::after {
+        @apply absolute bottom-0 left-0 right-0 h-0.5 bg-transparent transition-colors duration-200;
+        content: '';
+    }
+
+    .chat-tab-active {
+        @apply bg-white dark:bg-gray-900 text-primary-600 dark:text-primary-400;
+    }
+
+    .chat-tab-active::after {
+        @apply bg-primary-500;
+    }
+
+    .chat-tab-default {
+        @apply text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100/50 dark:hover:bg-gray-700/50;
+    }
+
+    .chat-tab-default::after {
+        @apply hover:bg-gray-300/50 dark:hover:bg-gray-600/50;
+    }
+
+    .chat-tab-close {
+        @apply ml-1 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 rounded-full p-1 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors duration-200 opacity-0 group-hover:opacity-100;
+    }
+
+    /* Chat controls */
+    .chat-controls {
+        @apply flex items-center gap-2 px-4 py-2 bg-white/90 dark:bg-gray-800/90 border-b border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm;
+    }
+
+    .chat-control-btn {
+        @apply p-2 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800;
     }
 
     /* Mobile menu components */
@@ -104,29 +146,31 @@
     .code-block-wrapper {
         @apply relative my-4 rounded-lg overflow-hidden shadow-soft;
     }
+}
 
-    /* Inline code styling */
-    p code, li code, span code {
-        background-color: #f5f5f5;
-        color: #d14;
-        padding: 0.2em 0.4em;
-        border-radius: 0.3em;
-        font-size: 0.95em;
-    }
+/* Inline code styling */
+p code,
+li code,
+span code {
+    background-color: #f5f5f5;
+    color: #d14;
+    padding: 0.2em 0.4em;
+    border-radius: 0.3em;
+    font-size: 0.95em;
+}
 
-    /* Code block styling */
-    pre code {
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.9em;
-    }
+/* Code block styling */
+pre code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9em;
+}
 
-    pre {
-        background-color: #2d2d2d;
-        color: #ccc;
-        padding: 1em;
-        overflow-x: auto;
-        border-radius: 0.3em;
-    }
+pre {
+    background-color: #2d2d2d;
+    color: #ccc;
+    padding: 1em;
+    overflow-x: auto;
+    border-radius: 0.3em;
 }
 
 /* Custom scrollbar */
@@ -181,7 +225,8 @@
     }
 
     /* Enhance mobile message actions */
-    .copy-button, .regenerate-button {
+    .copy-button,
+    .regenerate-button {
         @apply p-2 min-w-touch min-h-touch;
     }
 
@@ -199,13 +244,39 @@
     }
 
     /* Enhance mobile buttons */
-    #send-button, #upload-button {
+    #send-button,
+    #upload-button {
         @apply min-w-touch min-h-touch;
     }
 
     /* Improve mobile menu interaction */
     #mobile-menu-toggle {
         @apply min-w-touch min-h-touch p-2;
+    }
+
+    /* Chat tabs mobile optimization */
+    .chat-tabs {
+        @apply px-0.5;
+    }
+
+    .chat-tab {
+        @apply px-2 py-1 text-xs;
+    }
+
+    .chat-tab-close {
+        @apply opacity-100 p-0.5;
+    }
+
+    .chat-controls {
+        @apply px-2 py-1.5;
+    }
+
+    .chat-control-btn {
+        @apply p-1.5;
+    }
+
+    #model-select {
+        @apply h-8 text-xs;
     }
 }
 
@@ -257,7 +328,9 @@
 
 /* Enhanced touch feedback */
 @media (hover: none) {
-    .btn, .icon-button, .nav-link {
+    .btn,
+    .icon-button,
+    .nav-link {
         @apply active:opacity-70 active:scale-95 transition-all duration-150;
         -webkit-tap-highlight-color: transparent;
     }
@@ -267,7 +340,7 @@
         scrollbar-width: none;
         -ms-overflow-style: none;
     }
-    
+
     .scrollbar-thin::-webkit-scrollbar {
         display: none;
     }

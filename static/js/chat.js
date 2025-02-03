@@ -34,7 +34,7 @@
     }
 
     /**
-     * Dynamically load a script if it isn’t already present.
+     * Dynamically load a script if it isn't already present.
      * @param {string} id - Unique ID for the script element.
      * @param {string} src - Script source URL.
      * @returns {Promise<void>}
@@ -134,7 +134,7 @@
        MESSAGE RENDERING FUNCTIONS
     ===================================================== */
     /**
-     * Append the assistant’s message to the chat box.
+     * Append the assistant's message to the chat box.
      * Uses markdown-it for rendering and DOMPurify for sanitization.
      * @param {string|object} message - The message text or an API response object.
      * @param {boolean} [isStreaming=false] - If true, indicates a partial update.
@@ -439,9 +439,13 @@
               </span>
           </div>
       `;
-            while (true) {
+            let streaming = true;
+            while (streaming) {
                 const { value, done } = await reader.read();
-                if (done) break;
+                if (done) {
+                    streaming = false;
+                    continue;
+                }
                 const chunk = decoder.decode(value);
                 logDebug('Received chunk:', chunk);
                 const lines = chunk.split('\n');
@@ -651,228 +655,24 @@
                     'X-CSRFToken': window.utils.getCSRFToken(),
                     'X-Chat-ID': window.CHAT_CONFIG.chatId,
                 },
-                body: JSON.stringify({ model_id: modelId, chat_id: window.CHAT_CONFIG.chatId }),
+                body: JSON.stringify({ model_id: modelId })
             });
-            const data = await response.json();
-            if (data.success) {
-                window.utils.showFeedback('Model updated successfully', 'success');
-                if (window.tokenUsageManager) await window.tokenUsageManager.updateStats();
-                const selectedModel = window.CHAT_CONFIG.models.find(m => m.id === parseInt(modelId));
-                if (selectedModel) window.CHAT_CONFIG.currentModel = selectedModel;
-            } else {
-                window.utils.showFeedback(data.error || 'Failed to update model', 'error');
-                const previousModel = window.CHAT_CONFIG.currentModel;
-                if (previousModel && modelSelect) modelSelect.value = previousModel.id;
-            }
-        } catch (error) {
-            console.error('Error updating model:', error);
-            window.utils.showFeedback('Error updating model', 'error');
-            const previousModel = window.CHAT_CONFIG.currentModel;
-            if (previousModel && modelSelect) modelSelect.value = previousModel.id;
-        } finally {
-            modelChangeInProgress = false;
-            if (sendButton) sendButton.disabled = false;
-        }
-    }
 
-    async function createNewChat() {
-        if (!window.utils) {
-            console.error('Utils not initialized');
-            return;
-        }
-        try {
-            const newChatBtn = document.getElementById('new-chat-btn');
-            if (newChatBtn) newChatBtn.disabled = true;
-            const response = await window.utils.fetchWithCSRF('/chat/new_chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-            if (response.success && response.chat_id) {
-                window.location.href = `/chat/chat_interface?chat_id=${response.chat_id}`;
-            } else {
-                throw new Error(response.error || 'Failed to create new chat');
+            if (!response.ok) {
+                throw new Error('Failed to update model');
             }
-        } catch (error) {
-            console.error('Error creating new chat:', error);
-            window.utils.showFeedback(error.message || 'Failed to create new chat', 'error');
-        } finally {
-            const newChatBtn = document.getElementById('new-chat-btn');
-            if (newChatBtn) newChatBtn.disabled = false;
-        }
-    }
 
-    /* =====================================================
-       DRAG-AND-DROP & CLEANUP FUNCTIONS
-    ===================================================== */
-    function setupDragAndDrop() {
-        const dropZone = document.getElementById('drop-zone');
-        if (!dropZone) return;
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, preventDefaults, false);
-        });
-        dropZone.addEventListener('dragenter', () => dropZone.classList.remove('hidden'));
-        dropZone.addEventListener('dragleave', (e) => {
-            if (!e.relatedTarget || !dropZone.contains(e.relatedTarget)) dropZone.classList.add('hidden');
-        });
-        dropZone.addEventListener('drop', (e) => {
-            try {
-                dropZone.classList.add('hidden');
-                if (!e.dataTransfer?.files) {
-                    window.utils.showFeedback('No files dropped', 'error');
-                    return;
-                }
-                const files = Array.from(e.dataTransfer.files);
-                if (files.length === 0) {
-                    window.utils.showFeedback('No files dropped', 'error');
-                    return;
-                }
-                const { validFiles, errors } = window.fileUploadManager.processFiles(files);
-                if (errors.length > 0) {
-                    errors.forEach(err => window.utils.showFeedback(err.errors.join(', '), 'error'));
-                }
-                if (validFiles.length > 0) {
-                    window.fileUploadManager.uploadedFiles.push(...validFiles);
-                    window.fileUploadManager.renderFileList();
-                }
-            } catch (error) {
-                console.error('Error handling file drop:', error);
-                window.utils.showFeedback('Failed to process dropped files', 'error');
-            } finally {
-                dropZone.classList.add('hidden');
-            }
-        });
-    }
+            modelSelect.setAttribute('data-original-value', modelId);
+            window.utils.showFeedback('Model updated successfully', 'success');
 
-    function preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-
-    function cleanup() {
-        try {
-            window.removeEventListener('beforeunload', cleanup);
-            const modelSelect = document.getElementById('model-select');
-            if (modelSelect && modelSelect.previousHandler) {
-                modelSelect.removeEventListener('change', modelSelect.previousHandler);
-                modelSelect.previousHandler = null;
-            }
+            // Update token usage if available
             if (window.tokenUsageManager) {
-                window.tokenUsageManager.stopPeriodicUpdates();
-                try {
-                    window.tokenUsageManager.updateStats();
-                } catch (error) {
-                    console.error('Error updating final token stats:', error);
+                const model = window.CHAT_CONFIG.models.find(m => m.id === parseInt(modelId));
+                if (model) {
+                    const modelLimits = { max_tokens: model.max_tokens || 32000 };
+                    window.tokenUsageManager.updateModelLimits(modelLimits);
                 }
             }
-            const chatBox = document.getElementById('chat-box');
-            if (chatBox) chatBox.removeEventListener('click', attachActionButtonListeners);
-            logDebug('Chat cleanup completed successfully');
-        } catch (error) {
-            console.error('Error during cleanup:', error);
-        }
-    }
-    window.addEventListener('beforeunload', cleanup);
-
-    /* =====================================================
-       MAIN INITIALIZATION
-    ===================================================== */
-    async function init() {
-        try {
-            logDebug('Initializing chat interface');
-            await waitForDependency('utils');
-            logDebug('Utils loaded');
-            await Promise.all([
-                ensureScriptLoaded('markdown-it', getStaticUrl('/js/markdown-it.min.js')),
-                ensureScriptLoaded('dompurify', getStaticUrl('/js/dompurify.min.js')),
-                ensureScriptLoaded('prism', getStaticUrl('/js/prism.js')),
-                ensureScriptLoaded('file-upload', getStaticUrl('/js/fileUpload.js')),
-                ensureScriptLoaded('token-usage', getStaticUrl('/js/token-usage.js'))
-            ]);
-            try {
-                await Promise.all([
-                    waitForDependency('FileUploadManager'),
-                    waitForDependency('TokenUsageManager'),
-                    waitForDependency('md'),
-                    waitForDependency('DOMPurify')
-                ]);
-            } catch (error) {
-                throw new Error(`Failed to initialize managers: ${error.message}`);
-            }
-            if (!window.CHAT_CONFIG) {
-                throw new Error('Chat configuration not found');
-            }
-            const requiredElements = ['chat-box', 'message-input', 'send-button'];
-            const missingElements = requiredElements.filter(id => !document.getElementById(id));
-            if (missingElements.length > 0) {
-                throw new Error(`Missing required elements: ${missingElements.join(', ')}`);
-            }
-            showLoadingIndicator();
-            window.addEventListener('popstate', () => {
-                if (window.location.pathname === '/chat') showLoadingIndicator();
-            });
-            // Set mobile viewport CSS variable
-            function updateVH() {
-                let vh = window.innerHeight * 0.01;
-                document.documentElement.style.setProperty('--vh', `${vh}px`);
-            }
-            updateVH();
-            window.addEventListener('resize', updateVH);
-            // Initialize interface components
-            async function initializeInterface() {
-                // Initialize file upload manager
-                if (window.FileUploadManager) {
-                    window.fileUploadManager = new FileUploadManager({
-                        chatId: window.CHAT_CONFIG.chatId,
-                        csrfToken: window.CHAT_CONFIG.csrfToken
-                    });
-                }
-
-                // Initialize token usage manager
-                if (window.TokenUsageManager) {
-                    window.tokenUsageManager = new TokenUsageManager(window.CHAT_CONFIG);
-                }
-
-                // Set up event listeners
-                const messageInput = document.getElementById('message-input');
-                const sendButton = document.getElementById('send-button');
-                const modelSelect = document.getElementById('model-select');
-
-                if (messageInput) {
-                    messageInput.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            sendMessage();
-                        }
-                    });
-                }
-
-                if (sendButton) {
-                    sendButton.addEventListener('click', sendMessage);
-                }
-
-                if (modelSelect) {
-                    modelSelect.previousHandler = handleModelChange;
-                    modelSelect.addEventListener('change', handleModelChange);
-                }
-
-                // Set up drag and drop
-                setupDragAndDrop();
-
-                // Attach action button listeners
-                attachActionButtonListeners();
-
-                // Re-render any existing messages
-                await renderInitialAssistantMessages();
-
-                // Set up new chat button
-                const newChatBtn = document.getElementById('new-chat-btn');
-                if (newChatBtn) {
-                    newChatBtn.addEventListener('click', createNewChat);
-                }
-            }
-
-            await initializeInterface();
-            logDebug('Chat initialization completed successfully');
         } catch (error) {
             console.error('Error during initialization:', error);
             if (window.utils) window.utils.showFeedback(error.message || 'Failed to initialize chat', 'error');
@@ -881,9 +681,68 @@
         }
     }
 
+    async function createNewChat() {
+        try {
+            const response = await fetch('/chat/new_chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to create new chat');
+            }
+
+            const data = await response.json();
+            if (data.chat_id) {
+                window.location.href = `/chat/chat_interface?chat_id=${data.chat_id}`;
+            } else {
+                throw new Error('No chat ID returned from server');
+            }
+        } catch (error) {
+            console.error('Error creating new chat:', error);
+            if (window.utils) {
+                window.utils.showFeedback('Failed to create new chat', 'error');
+            }
+        }
+    }
+
+    async function initializeInterface() {
+        // Set up message input and send button
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        if (messageInput && sendButton) {
+            messageInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+            sendButton.addEventListener('click', sendMessage);
+        }
+
+        // Set up model select
+        const modelSelect = document.getElementById('model-select');
+        if (modelSelect) {
+            modelSelect.addEventListener('change', handleModelChange);
+        }
+
+        // Set up new chat button
+        const newChatBtn = document.getElementById('new-chat-btn');
+        if (newChatBtn) {
+            newChatBtn.addEventListener('click', createNewChat);
+        }
+
+        // Set up action buttons and render messages
+        attachActionButtonListeners();
+        await renderInitialAssistantMessages();
+    }
+
     async function startChat() {
         try {
-            await init();
+            await initializeInterface();
         } catch (error) {
             console.error('Failed to initialize chat:', error);
             showError(error.message);
