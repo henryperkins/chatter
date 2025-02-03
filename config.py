@@ -1,6 +1,8 @@
 import os
 import logging
 import re
+import base64
+import hashlib
 from pathlib import Path
 from typing import Dict, Set, Any
 from urllib.parse import urlparse
