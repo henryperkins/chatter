@@ -7,7 +7,8 @@
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
     "build:css": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css",
     "start": "flask run",
-    "watch:css": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch"
+    "watch:css": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch",
+    "update-libs": "copy node_modules\\axios\\dist\\axios.min.js* static\\js\\ && copy node_modules\\dompurify\\dist\\purify.min.js* static\\js\\ && copy node_modules\\markdown-it\\dist\\markdown-it.min.js static\\js\\ && copy node_modules\\prismjs\\prism.js static\\js\\"
   },
   "keywords": [],
   "author": "",

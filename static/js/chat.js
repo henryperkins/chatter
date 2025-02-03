@@ -592,6 +592,7 @@
                     ? await window.tokenUsageManager?.truncateContent(messageText, maxTokens) || messageText
                     : messageText;
                 formData.append('message', messageForSend);
+                formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
             }
             formData.append('metadata', JSON.stringify(metadata));
             if (uploadedFiles.length > 0) {
