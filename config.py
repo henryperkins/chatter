@@ -94,6 +94,9 @@ class Config:
         key_bytes = validate_encryption_key(ENCRYPTION_KEY)
         ENCRYPTION_KEY = key_bytes.decode()
         logger.info("Encryption key validated and properly formatted")
+    except Exception as e:
+        logger.error(f"Error validating encryption key: {str(e)}")
+        raise
 
     # Add explicit Azure configuration
     AZURE_API_KEY = os.getenv("AZURE_OPENAI_KEY")
