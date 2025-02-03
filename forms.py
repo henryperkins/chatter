@@ -362,7 +362,7 @@ class ProviderForm(FlaskForm):
     endpoint_pattern = StringField(
         "API Path",
         validators=[
-            DataRequired(message="API path is required."), 
+            DataRequired(message="API path is required."),
             Length(max=255, message="API path cannot exceed 255 characters."),
             Regexp(r"^/.*$", message="API path must start with /")
         ],
@@ -466,7 +466,14 @@ class ProviderForm(FlaskForm):
 
 class ModelForm(FlaskForm):
     name = StringField('Model Name', validators=[DataRequired(), Length(max=255)])
-    deployment_name = StringField('Deployment Name', validators=[DataRequired(), Length(max=255)])
+    deployment_name = StringField(
+        'Deployment Name',
+        validators=[Optional(), Length(max=255)],
+        description="Required for Azure OpenAI providers. Leave empty for other providers.",
+        render_kw={
+            "class": "w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200"
+        }
+    )
     description = TextAreaField('Description', validators=[Optional(), Length(max=500)])
     provider_id = SelectField('Provider', coerce=int, validators=[DataRequired()])
     api_key = PasswordField('API Key', validators=[DataRequired(), Length(min=32, message="API key must be at least 32 characters.")])
@@ -534,34 +541,94 @@ class ModelForm(FlaskForm):
                 args = (MultiDict(args[0]),) + args[1:]
 
         super().__init__(*args, **kwargs)
+
+        # Log initialization
+        logger.debug("Initializing ModelForm", extra={
+            "is_edit": self.is_edit,
+            "has_data": bool(args and args[0])
+        })
+
         self.setup_edit_mode()
         self.load_providers()
         self.load_provider_validation_rules()
 
+        # Get provider if available
+        provider = None
+        if self.provider_id.data:
+            provider = Provider.get_by_id(self.provider_id.data)
+            logger.debug("Found provider", extra={
+                "provider_id": self.provider_id.data,
+                "provider_name": provider.name if provider else None,
+                "is_azure": provider.is_azure if provider else None
+            })
+
+        # Setup deployment_name field
+        self.setup_deployment_name_field(provider)
+
+        # Log form state after initialization
+        logger.debug("Form initialized", extra={
+            "deployment_name_state": {
+                "value": self.deployment_name.data if hasattr(self, 'deployment_name') else None,
+                "required": getattr(self.deployment_name, 'flags', {}).required if hasattr(self, 'deployment_name') else None,
+                "render_kw": getattr(self.deployment_name, 'render_kw', {}) if hasattr(self, 'deployment_name') else None
+            }
+        })
+
     def load_provider_validation_rules(self):
         """
-        Carga las reglas de validación basadas en el provider_id seleccionado
-        y las asigna a self.provider_validation_rules.
+        Load validation rules based on the selected provider and update field requirements.
         """
         provider_id = self.provider_id.data
+        logger.debug("Loading provider validation rules", extra={"provider_id": provider_id})
+
         if not provider_id:
+            logger.debug("No provider_id, skipping validation rules")
             self.provider_validation_rules = {}
             return
+
         provider = Provider.get_by_id(provider_id)
         if provider is None:
-            self.provider_validation_rules = {}
-            return
+            logger.warning("Provider not found", extra={"provider_id": provider_id})
             self.provider_validation_rules = {}
             return
 
-        # Puede que provider.validation_rules sea un dict o un string JSON;
-        # si es un string, conviértelo a dict.
-        rules = provider.validation_rules
-        if isinstance(rules, str):
-            import json
-            rules = json.loads(rules)
+        # Load validation rules
+        try:
+            rules = provider.validation_rules
+            if isinstance(rules, str):
+                import json
+                rules = json.loads(rules)
+            logger.debug("Loaded provider validation rules", extra={
+                "provider": provider.name,
+                "rules": rules
+            })
+        except Exception as e:
+            logger.error("Error loading validation rules", exc_info=True)
+            rules = {}
 
-        # Asigna las reglas obtenidas al atributo de instancia.
+        # Update deployment_name field based on provider type
+        if provider.is_azure:
+            logger.debug("Setting up Azure provider validation")
+            # Make deployment_name required for Azure
+            self.deployment_name.validators = [DataRequired(), Length(max=255)]
+            if hasattr(self.deployment_name, 'flags'):
+                self.deployment_name.flags.required = True
+            if not hasattr(self.deployment_name, 'render_kw'):
+                self.deployment_name.render_kw = {}
+            self.deployment_name.render_kw['required'] = 'required'
+            self.deployment_name.render_kw['aria-required'] = 'true'
+        else:
+            logger.debug("Setting up non-Azure provider validation")
+            # Make deployment_name optional for non-Azure
+            self.deployment_name.validators = [Optional(), Length(max=255)]
+            if hasattr(self.deployment_name, 'flags'):
+                self.deployment_name.flags.required = False
+            if not hasattr(self.deployment_name, 'render_kw'):
+                self.deployment_name.render_kw = {}
+            self.deployment_name.render_kw.pop('required', None)
+            self.deployment_name.render_kw.pop('aria-required', None)
+
+        # Store the rules
         self.provider_validation_rules = rules
 
     def process_formdata(self, valuelist):
@@ -666,19 +733,98 @@ class ModelForm(FlaskForm):
             if not re.match(pattern, field.data):
                 raise ValidationError("API endpoint does not match the required format specified by the provider.")
 
+    def setup_deployment_name_field(self, provider=None):
+        """
+        Configure the deployment_name field based on provider type.
+        """
+        if not hasattr(self, 'deployment_name'):
+            return
+
+        if provider is None and self.provider_id.data:
+            provider = Provider.get_by_id(self.provider_id.data)
+
+        logger.debug("Setting up deployment_name field", extra={
+            "provider": provider.name if provider else None,
+            "is_azure": provider.is_azure if provider else None
+        })
+
+        # Configure field attributes
+        if not self.deployment_name.render_kw:
+            self.deployment_name.render_kw = {}
+
+        if provider and provider.is_azure:
+            self.deployment_name.validators = [DataRequired(), Length(max=255)]
+            self.deployment_name.flags.required = True
+            self.deployment_name.render_kw.update({
+                'required': 'required',
+                'aria-required': 'true',
+                'tabindex': '0'
+            })
+        else:
+            self.deployment_name.validators = [Optional(), Length(max=255)]
+            self.deployment_name.flags.required = False
+            self.deployment_name.render_kw.update({
+                'tabindex': '-1'
+            })
+            # Remove required attributes
+            self.deployment_name.render_kw.pop('required', None)
+            self.deployment_name.render_kw.pop('aria-required', None)
+
     def validate_deployment_name(self, field):
+        """
+        Enhanced validation for deployment_name field with detailed logging.
+        """
         from models.provider import Provider
         provider = Provider.get_by_id(self.provider_id.data)
-        if provider and not provider.is_azure:
-            # For non-Azure providers, deployment_name is not validated.
+
+        # Log validation context
+        logger.info("Validating deployment_name", extra={
+            "field_value": field.data,
+            "provider": provider.name if provider else None,
+            "is_azure": provider.is_azure if provider else None,
+            "field_required": bool(provider and provider.is_azure),
+            "field_attributes": {
+                "required": getattr(field, 'flags', {}).required,
+                "render_kw": getattr(field, 'render_kw', {}),
+                "validators": [v.__class__.__name__ for v in getattr(field, 'validators', [])]
+            }
+        })
+
+        if provider and provider.is_azure:
+            # For Azure providers, deployment_name is required
+            if not field.data:
+                logger.error("Missing required deployment_name for Azure provider", extra={
+                    "field_state": {
+                        "value": field.data,
+                        "required": getattr(field, 'flags', {}).required,
+                        "render_kw": getattr(field, 'render_kw', {})
+                    }
+                })
+                raise ValidationError("Deployment name is required for Azure OpenAI providers.")
+
+            # Validate pattern if one exists
+            pattern = self.provider_validation_rules.get('model_id')
+            if pattern:
+                import re
+                if not re.match(pattern, field.data):
+                    logger.error("Invalid deployment_name format", extra={
+                        "value": field.data,
+                        "pattern": pattern
+                    })
+                    raise ValidationError("Deployment name does not match the required format specified by the provider.")
+                logger.debug("Deployment name pattern validation passed", extra={
+                    "value": field.data,
+                    "pattern": pattern
+                })
+        else:
+            # For non-Azure providers, deployment_name should be empty
+            if field.data:
+                logger.warning("Deployment name provided for non-Azure provider", extra={
+                    "value": field.data,
+                    "provider": provider.name if provider else None
+                })
+            field.data = ""  # Clear the field for non-Azure providers
             return
-        if not field.data:
-            return
-        pattern = self.provider_validation_rules.get('model_id')
-        if pattern:
-            import re
-            if not re.match(pattern, field.data):
-                raise ValidationError("Deployment name does not match the required format specified by the provider.")
 
     def validate_version(self, field):
         """Optimistic concurrency control"""

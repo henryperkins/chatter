@@ -52,7 +52,14 @@
         <div class="mb-6 deployment-name-section" {% if not provider.is_azure %}style="display: none;"{% endif %}>
             {{ form.deployment_name.label(class="text-sm font-semibold text-gray-700 dark:text-gray-300 block mb-1") }}
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2 deployment-name-description">Enter the deployment name from your Azure OpenAI resource (e.g., "gpt-4", "gpt-35-turbo")</p>
-            {{ form.deployment_name(class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200") }}
+            {{ form.deployment_name(
+                class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200",
+                required=provider.is_azure if provider else False,
+                **({
+                    'tabindex': '0' if provider and provider.is_azure else '-1',
+                    'aria-required': 'true' if provider and provider.is_azure else None
+                })
+            ) }}
             {% if form.deployment_name.errors %}
             <p class="text-sm text-red-500 mt-1">{{ form.deployment_name.errors[0] }}</p>
             {% endif %}
@@ -267,11 +274,32 @@
 {% block scripts %}
 {{ super() }}
 <script>
+    // Debug logging function
+    function logDebug(message, data = null) {
+        console.log(`[Add Model Debug] ${message}`, data || '');
+    }
+
+    // Error logging function
+    function logError(message, error = null) {
+        console.error(`[Add Model Error] ${message}`, error || '');
+    }
+
     document.addEventListener("DOMContentLoaded", function() {
+        logDebug('DOM Content Loaded');
+
         const form = document.getElementById("add-model-form");
         if (form) {
+            logDebug('Form found', { id: form.id });
             form.classList.add('model-form');
             form.dataset.submitText = "Add Model";
+
+            // Debug form state
+            const formElements = form.elements;
+            logDebug('Initial form state', {
+                provider: formElements.provider_id?.value,
+                deployment_name: formElements.deployment_name?.value,
+                deployment_name_visible: formElements.deployment_name?.offsetParent !== null
+            });
 
             // Handle temperature range
             const temperatureDiv = form.querySelector('[data-min]');
@@ -305,10 +333,13 @@
             if (providerSelect) {
                 providerSelect.addEventListener('change', async function(e) {
                     const providerId = e.target.value;
+                    logDebug('Provider changed', { providerId });
                     if (providerId) {
                         try {
+                            logDebug('Fetching provider details');
                             const response = await fetch(`/models/api/providers/${providerId}`);
                             const provider = await response.json();
+                            logDebug('Provider details received', provider);
 
                             // Update form based on provider capabilities
                             const deploymentNameDiv = form.querySelector('.deployment-name-section');
@@ -351,14 +382,46 @@
 
                             // Show/hide deployment name field based on provider type
                             if (deploymentNameDiv) {
+                                const deploymentNameInput = deploymentNameDiv.querySelector('input[name="deployment_name"]');
+                                logDebug('Updating deployment name field', {
+                                    isAzure: provider.is_azure,
+                                    deploymentNameExists: !!deploymentNameInput,
+                                    currentValue: deploymentNameInput?.value,
+                                    currentRequired: deploymentNameInput?.required,
+                                    currentDisplay: deploymentNameDiv.style.display
+                                });
+
                                 if (provider.is_azure) {
                                     deploymentNameDiv.style.display = 'block';
-                                } else {
-                                    deploymentNameDiv.style.display = 'none';
-                                    // Clear deployment name value for non-Azure providers
-                                    const deploymentNameInput = deploymentNameDiv.querySelector('input[name="deployment_name"]');
                                     if (deploymentNameInput) {
+                                        deploymentNameInput.required = true;
+                                        deploymentNameInput.tabIndex = 0;  // Make focusable
+                                        deploymentNameInput.setAttribute('aria-required', 'true');
+                                        // Remove any inline styles that might affect visibility
+                                        deploymentNameInput.style.removeProperty('display');
+                                        deploymentNameInput.style.removeProperty('visibility');
+                                        logDebug('Deployment name field enabled', {
+                                            required: true,
+                                            display: 'block',
+                                            tabIndex: 0,
+                                            ariaRequired: true
+                                        });
+                                    }
+                                } else {
+                                    if (deploymentNameInput) {
+                                        const oldValue = deploymentNameInput.value;
                                         deploymentNameInput.value = '';
+                                        deploymentNameInput.required = false;
+                                        deploymentNameInput.tabIndex = -1;  // Remove from tab order
+                                        deploymentNameInput.removeAttribute('aria-required');
+                                        // Hide the entire section instead of the input
+                                        deploymentNameDiv.style.display = 'none';
+                                        logDebug('Deployment name field disabled', {
+                                            oldValue,
+                                            required: false,
+                                            display: 'none',
+                                            tabIndex: -1
+                                        });
                                     }
                                 }
                             }
@@ -619,12 +682,136 @@
             }
         }
 
-        // Handle form submission
+        // Log field changes for debugging
+        function logFieldChange(fieldName, oldValue, newValue) {
+            logDebug(`Field '${fieldName}' changed`, {
+                from: oldValue,
+                to: newValue,
+                field_visible: document.querySelector(`[name="${fieldName}"]`)?.offsetParent !== null
+            });
+        }
+
+        // Monitor all form fields for changes
+        Array.from(form.elements).forEach(element => {
+            if (element.name) {
+                const originalValue = element.value;
+                element.addEventListener('change', () => {
+                    logFieldChange(element.name, originalValue, element.value);
+                });
+            }
+        });
+
+        // Enhanced form validation
+        function validateForm() {
+            const fields = Array.from(form.elements);
+            const errors = [];
+            const provider = form.querySelector('select[name="provider_id"]');
+            const isAzureProvider = provider ? provider.options[provider.selectedIndex]?.text.toLowerCase().includes('azure') : false;
+
+            fields.forEach(field => {
+                if (!field.name) return;
+
+                // Special handling for deployment_name field
+                if (field.name === 'deployment_name') {
+                    const deploymentNameDiv = field.closest('.deployment-name-section');
+                    const isVisible = deploymentNameDiv.style.display !== 'none';
+
+                    logDebug('Validating deployment_name field', {
+                        isVisible,
+                        isRequired: field.required,
+                        isAzureProvider,
+                        value: field.value,
+                        validityState: field.validity,
+                        style: field.style.display,
+                        parentStyle: deploymentNameDiv.style.display,
+                        tabIndex: field.tabIndex,
+                        ariaRequired: field.getAttribute('aria-required')
+                    });
+
+                    if (isAzureProvider) {
+                        if (!field.value.trim()) {
+                            errors.push('Deployment name is required for Azure OpenAI providers');
+                            field.setCustomValidity('Deployment name is required for Azure OpenAI providers');
+                            logError('Deployment name validation failed', {
+                                reason: 'empty_value',
+                                isAzureProvider,
+                                isVisible
+                            });
+                        } else {
+                            field.setCustomValidity('');
+                        }
+                    } else {
+                        // Clear any validation errors for non-Azure providers
+                        field.setCustomValidity('');
+                        return;
+                    }
+                } else {
+                    // Skip other hidden fields that aren't required
+                    if (field.offsetParent === null && !field.required) {
+                        logDebug(`Skipping validation for hidden field: ${field.name}`);
+                        return;
+                    }
+                }
+
+                if (field.required && !field.value) {
+                    errors.push(`${field.name} is required`);
+                    logError(`Validation failed for ${field.name}`, {
+                        value: field.value,
+                        visible: field.offsetParent !== null,
+                        required: field.required
+                    });
+                }
+
+                if (field.validity && !field.validity.valid) {
+                    errors.push(`${field.name}: ${field.validationMessage}`);
+                    logError(`Custom validation failed for ${field.name}`, {
+                        validationMessage: field.validationMessage,
+                        validityState: Object.entries(field.validity).reduce((acc, [key, value]) => {
+                            if (value) acc[key] = value;
+                            return acc;
+                        }, {})
+                    });
+                }
+            });
+
+            if (errors.length > 0) {
+                logError('Form validation failed', { errors });
+            } else {
+                logDebug('Form validation passed');
+            }
+
+            return errors;
+        }
+
+        // Handle form submission with enhanced validation
         form.addEventListener('submit', function(e) {
-            if (!form.checkValidity()) {
+            logDebug('Form submission attempted');
+
+            const errors = validateForm();
+            if (errors.length > 0 || !form.checkValidity()) {
                 e.preventDefault();
                 e.stopPropagation();
                 form.classList.add('was-validated');
+
+                logError('Form submission blocked', {
+                    errors,
+                    formValid: form.checkValidity(),
+                    formState: Array.from(form.elements).reduce((acc, field) => {
+                        if (field.name) {
+                            acc[field.name] = {
+                                value: field.value,
+                                visible: field.offsetParent !== null,
+                                required: field.required,
+                                valid: field.validity.valid
+                            };
+                        }
+                        return acc;
+                    }, {})
+                });
+            } else {
+                logDebug('Form submission proceeding', {
+                    formData: new FormData(form)
+                });
             }
         }, false);
     });
