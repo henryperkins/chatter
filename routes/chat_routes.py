@@ -65,7 +65,7 @@ CHAT_RATE_LIMIT = "60 per minute"
 ##############################################################################
 # 1) Give your blueprint a URL prefix so routes map to /chat/... in the browser
 ##############################################################################
-chat_routes = Blueprint("chat", __name__, url_prefix="/chat")
+chat_routes = Blueprint("chat", __name__)
 limiter = Limiter(key_func=get_remote_address)
 
 try:
