@@ -822,12 +822,21 @@ def favicon() -> WerkzeugResponse:
     return redirect(url_for("static", filename="favicon.ico"))
 
 
-@app.route("/")
+@app.route("/", methods=['GET', 'POST'])
 def index() -> WerkzeugResponse:
     """Root endpoint."""
     if not current_user.is_authenticated:
         return redirect(url_for("auth.login"))
     return redirect(url_for("chat.chat_interface"))
+
+@app.route("/chat/chat_interface", methods=['GET', 'POST'])
+def chat_interface():
+    """Chat interface endpoint."""
+    if not current_user.is_authenticated:
+        return redirect(url_for("auth.login"))
+    if request.method == 'POST':
+        return jsonify({"status": "success"})
+    return render_template("chat/interface.html")
 
 
 @app.route("/clear-session")

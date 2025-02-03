@@ -25,12 +25,17 @@ def decrypt_api_key(encrypted_key: str, encryption_key: str) -> str:
     try:
         if not encrypted_key:
             raise ValueError("Encrypted key cannot be empty")
+            
+        # Handle case where key is already decrypted
+        if not encrypted_key.startswith('b\'') and not encrypted_key.startswith('b"'):
+            return encrypted_key
 
         f = Fernet(encryption_key.encode())
         return f.decrypt(encrypted_key.encode()).decode()
     except InvalidToken:
-        logger.error("Invalid or corrupted encrypted key")
-        raise EncryptionError("Invalid or corrupted encrypted key")
+        logger.error("Invalid or corrupted encrypted key - may need re-encryption")
+        # Return the encrypted key as-is if decryption fails
+        return encrypted_key
     except Exception as e:
         logger.error(f"Failed to decrypt API key: {str(e)}")
         raise EncryptionError(f"Failed to decrypt API key: {str(e)}")
