@@ -543,96 +543,90 @@
             console.error('Utils not initialized');
             return;
         }
+
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
+
         if (!messageInput || !sendButton) {
             window.utils.showFeedback('Chat interface not properly initialized', 'error');
             return;
         }
+
         if (sendButton.disabled) return;
-        sendButton.disabled = true;
+
         try {
+            sendButton.disabled = true;
             const messageText = messageInput.value.trim();
-            const hasUploadedFiles = window.fileUploadManager?.uploadedFiles?.length > 0;
-            if (!messageText && !hasUploadedFiles) {
-                window.utils.showFeedback('Please enter a message or upload files.', 'error');
+
+            if (!messageText) {
+                window.utils.showFeedback('Please enter a message', 'error');
                 return;
             }
+
+            // Show typing indicator
+            showTypingIndicator();
+
+            // Get current model info
             const modelSelect = document.getElementById('model-select');
             const modelId = modelSelect?.value;
             const model = window.CHAT_CONFIG.models?.find(m => m.id === parseInt(modelId));
-            const useStreaming = model?.supports_streaming && !model?.requires_o1_handling;
-            document.querySelectorAll('.error-indicator').forEach(el => el.remove());
-            const maxTokens = model?.max_tokens || 32000;
-            let tokenCount = 0;
-            try {
-                tokenCount = await window.tokenUsageManager?.countMessageTokens(messageText) || Math.ceil(messageText.length / 4);
-            } catch (error) {
-                console.error('Error counting tokens:', error);
-                tokenCount = Math.ceil(messageText.length / 4);
-            }
-            if (tokenCount > maxTokens) {
-                window.utils.showFeedback(`Message exceeds token limit (${tokenCount}/${maxTokens})`, 'error');
+
+            if (!modelId || !model) {
+                window.utils.showFeedback('No model selected', 'error');
                 return;
             }
-            let uploadedFiles = [];
-            if (window.fileUploadManager?.uploadedFiles?.length > 0) {
-                uploadedFiles = await window.fileUploadManager.uploadFiles(window.CHAT_CONFIG.chatId) || [];
-            }
+
+            const formData = new FormData();
+            formData.append('message', messageText);
+            formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
+            formData.append('model_id', model.id);
+
+            // Add model-specific parameters
+            formData.append('deployment_name', model.deployment_name);
+            formData.append('api_version', model.api_version);
+            formData.append('model_type', model.model_type);
+
+            // Add metadata with required Azure parameters
             const metadata = {
                 timestamp: new Date().toISOString(),
-                token_count: tokenCount,
-                requires_o1: model?.requires_o1_handling || false,
-                model_max_tokens: maxTokens,
-                has_files: uploadedFiles.length > 0
+                model_max_tokens: model.max_tokens || 32000,
+                requires_o1: model.requires_o1_handling || false,
+                deployment_name: model.deployment_name,
+                api_version: model.api_version || '2024-12-01-preview',
+                temperature: model.temperature || 1.0,
+                max_tokens: model.max_tokens || 32000
             };
-            const formData = new FormData();
-            let messageForSend = '';
-            if (messageText) {
-                messageForSend = tokenCount > maxTokens
-                    ? await window.tokenUsageManager?.truncateContent(messageText, maxTokens) || messageText
-                    : messageText;
-                formData.append('message', messageForSend);
-                formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
-            }
             formData.append('metadata', JSON.stringify(metadata));
-            if (uploadedFiles.length > 0) {
-                const fileIds = uploadedFiles.filter(file => file.id).map(file => file.id);
-                fileIds.forEach(id => formData.append('file_ids[]', id));
-            }
-            formData.append('model_id', modelId);
-            formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
-            if (messageText) appendUserMessage(messageText);
-            showTypingIndicator();
-            if (useStreaming) {
-                await handleStreamingResponse(formData);
-            } else {
-                await handleNormalResponse(formData);
-            }
-            if (window.tokenUsageManager) {
-                await window.tokenUsageManager?.handleNewMessage();
-                await window.tokenUsageManager?.updateStats();
-                const modelLimits = { max_tokens: model?.max_tokens || 32000 };
-                window.tokenUsageManager.updateModelLimits(modelLimits);
-                const tokenUsageContainer = document.getElementById('token-usage');
-                if (tokenUsageContainer?.classList.contains('hidden')) {
-                    window.tokenUsageManager.toggleDisplay();
+
+            const response = await window.utils.fetchWithCSRF('/chat/send', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                    'X-Requested-With': 'XMLHttpRequest'
                 }
+            });
+
+            if (!response.success) {
+                throw new Error(response.error || 'Failed to send message');
             }
+
+            // Clear input and update UI
             messageInput.value = '';
-            messageInput.style.height = 'auto';
-            if (uploadedFiles.length > 0) {
-                window.fileUploadManager.uploadedFiles = [];
-                window.fileUploadManager.renderFileList();
+            appendUserMessage(messageText);
+            appendAssistantMessage(response.message);
+
+            // Update token usage
+            if (window.tokenUsageManager) {
+                await window.tokenUsageManager.handleNewMessage();
             }
+
         } catch (error) {
             console.error('Error sending message:', error);
-            const errorMessage = error instanceof Error ? error.message : 'Failed to send message';
-            window.utils.showFeedback(errorMessage, 'error', { duration: 0 });
+            window.utils.showFeedback(error.message || 'Failed to send message', 'error');
         } finally {
-            removeTypingIndicator();
             sendButton.disabled = false;
-            sendButton.classList.remove('sending');
+            removeTypingIndicator();
         }
     }
 

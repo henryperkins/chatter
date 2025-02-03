@@ -196,7 +196,7 @@ File: chat.html
                 <option value="{{ model.id }}"
                     data-requires-o1-handling="{{ 'true' if model.requires_o1_handling else 'false' }}"
                     data-supports-streaming="{{ 'true' if model.supports_streaming else 'false' }}"
-                    data-max-completion-tokens="{{ model.max_completion_tokens }}" 
+                    data-max-completion-tokens="{{ model.max_completion_tokens }}"
                     {% if current_model and model.id|int == current_model.id|int %}selected{% endif %}>
                     {{ model.name }}{% if model.is_default %} (Default){% endif %}
                 </option>
@@ -236,20 +236,27 @@ File: chat.html
 
 {% block content %}
 <div
-    class="flex flex-col h-[100dvh] w-full overflow-hidden bg-white/95 dark:bg-gray-950/95 safe-area-inset touch-manipulation dark-mode-transition backdrop-blur-sm relative pt-[120px]">
-    
+    class="relative flex flex-col h-[100dvh] w-full overflow-hidden touch-manipulation bg-white/95 dark:bg-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm pt-[120px]">
+
     <!-- Chat Configuration -->
-    <div id="chat-config" 
-        data-chat-id="{{ chat_id }}"
+    <div id="chat-config"
+        data-chat-id="{{ chat_id if chat_id else '' }}"
         data-csrf-token="{{ csrf_token() }}"
         data-models='{{ models|tojson|safe }}'
         data-current-model='{{ current_model|tojson|safe if current_model else 'null' }}'
         data-user-id="{{ current_user.id }}"
-        class="hidden">
+        class="hidden"
+        data-debug="true">
+    <script>
+        console.log('Chat config initialized with ID:', '{{ chat_id if chat_id else "none" }}');
+        if (!('{{ chat_id }}')) {
+            console.error('No chat ID available in template');
+        }
+    </script>
     </div>
     <!-- Main Chat Area -->
     <div
-        class="flex-1 flex flex-col overflow-hidden h-full pb-safe dark-mode-transition bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+        class="flex-1 flex flex-col h-full overflow-hidden pb-safe bg-white/95 dark:bg-gray-900/95 dark-mode-transition backdrop-blur-sm">
         <!-- Messages Area -->
         <div id="chat-box"
             class="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 min-h-[200px] pb-40 scrollbar-thin scrollbar-thumb-gray-400/50 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600/50 dark:hover:scrollbar-thumb-gray-600 scrollbar-track-transparent bg-gradient-to-b from-white/50 to-gray-50/50 dark:from-gray-900/50 dark:to-gray-800/50 backdrop-blur-sm"
@@ -361,8 +368,19 @@ File: chat.html
         <!-- Token Usage Display -->
         <div id="token-usage"
             class="sticky bottom-16 px-4 sm:px-6 py-2 bg-white/90 dark:bg-gray-800/90 border-t border-gray-200/50 dark:border-gray-700/50 text-sm text-gray-600 dark:text-gray-300">
-            <!-- Placeholder: token usage info shown here -->
-            Tokens used: <span id="token-count">0</span>
+            <div class="flex flex-col space-y-1">
+                <div class="flex items-center justify-between">
+                    <span><span id="tokens-used">0</span><span id="tokens-limit" class="ml-1">/ 0 max</span></span>
+                    <button id="toggle-stats-btn" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300" title="Toggle token usage statistics">
+                        <i class="fas fa-chart-bar"></i>
+                    </button>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                    <div id="token-progress" class="bg-blue-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"
+                        role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <div class="token-breakdown flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1 space-x-4"></div>
+            </div>
         </div>
 
         <!-- Chat Input Area -->
@@ -420,7 +438,14 @@ File: chat.html
 
                 // Initialize token usage manager
                 if (window.TokenUsageManager) {
-                    window.tokenUsageManager = new TokenUsageManager(window.CHAT_CONFIG);
+                    console.log('Initializing TokenUsageManager with chatId:', window.CHAT_CONFIG.chatId);
+                    if (!window.CHAT_CONFIG.chatId) {
+                        console.error('Missing chatId in CHAT_CONFIG');
+                        return;
+                    }
+                    window.tokenUsageManager = new TokenUsageManager(window.CHAT_CONFIG.chatId);
+                } else {
+                    console.error('TokenUsageManager class not found');
                 }
 
                 // Initialize file upload manager

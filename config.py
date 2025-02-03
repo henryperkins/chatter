@@ -1,3 +1,7 @@
+"""
+Configuration module for the application.
+"""
+
 import os
 import logging
 import re
@@ -100,27 +104,14 @@ class Config:
     # Base64 encode for Fernet
     ENCRYPTION_KEY = base64.b64encode(key_bytes).decode()
     logger.info("Encryption key processed for Fernet usage")
->>>>>>> c4c569433f1edd3540b2dff3834c0a63ebd7a916
-=======
-    # Always hash and encode the encryption key consistently
-    # This ensures the same key processing regardless of input format
-    import base64
-    import hashlib
-    from cryptography.fernet import Fernet
-
-    # Convert the key to 32 bytes using SHA-256
-    key_bytes = hashlib.sha256(ENCRYPTION_KEY.encode()).digest()
-    # Base64 encode for Fernet
-    ENCRYPTION_KEY = base64.b64encode(key_bytes).decode()
-    logger.info("Encryption key processed for Fernet usage")
->>>>>>> c4c569433f1edd3540b2dff3834c0a63ebd7a916
 
     # Add explicit Azure configuration
     AZURE_API_KEY = os.getenv("AZURE_OPENAI_KEY")
     if not AZURE_API_KEY:
         raise ValueError("AZURE_OPENAI_KEY environment variable is required")
-    AZURE_API_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "https://hp-east2.openai.azure.com/openai/deployments")
-    AZURE_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
+    # Fix: Remove "/openai/deployments" from the endpoint
+    AZURE_API_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "https://hp-east2.openai.azure.com")
+    AZURE_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
     AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
     if not AZURE_DEPLOYMENT_NAME:
         raise ValueError("AZURE_OPENAI_DEPLOYMENT_NAME environment variable is required")
@@ -153,8 +144,8 @@ class Config:
             raise ValueError("DEFAULT_MAX_COMPLETION_TOKENS must be positive")
     except ValueError as e:
         raise ValueError(f"Invalid DEFAULT_MAX_COMPLETION_TOKENS value: {str(e)}")
-    DEFAULT_REQUIRES_O1_HANDLING = bool(os.getenv("DEFAULT_REQUIRES_O1_HANDLING", True))
-    DEFAULT_SUPPORTS_STREAMING = bool(os.getenv("DEFAULT_SUPPORTS_STREAMING", False))
+    DEFAULT_REQUIRES_O1_HANDLING = bool(os.getenv("DEFAULT_REQUIRES_O1_HANDLING", False))
+    DEFAULT_SUPPORTS_STREAMING = bool(os.getenv("DEFAULT_SUPPORTS_STREAMING", True))
     DEFAULT_API_VERSION = os.getenv("DEFAULT_API_VERSION", AZURE_API_VERSION)
 
     EMAIL_SENDER = os.getenv("EMAIL_SENDER", "no-reply@example.com")

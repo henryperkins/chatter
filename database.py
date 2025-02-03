@@ -1,3 +1,5 @@
+"""Database module for the application."""
+
 import os
 import logging
 from typing import Optional, TypeVar, Callable, Any, Dict, Union, cast, Iterator, List
@@ -93,8 +95,6 @@ def create_db_engine(db_uri: str) -> Engine:
         },
         json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
     )
-
-    # Add event listeners for connection management
 
     return engine
 
@@ -402,24 +402,14 @@ def create_default_model(db: Session) -> Optional[int]:
             logger.error(f"Failed to encrypt API key: {e}")
             raise ValueError("Failed to encrypt API key")
 
-        # Build API endpoint with deployment path
+        # Build API endpoint
         api_endpoint = Config.DEFAULT_API_ENDPOINT.rstrip("/")
-        deployment_name = Config.DEFAULT_DEPLOYMENT_NAME
-        api_endpoint = f"{api_endpoint}/openai/deployments/{deployment_name}/chat/completions?api-version={Config.DEFAULT_API_VERSION}"
-
-        # Determine model type and appropriate max_completion_tokens
-        model_type = "azure"  # Default model type
-        max_completion_tokens = Config.DEFAULT_MAX_COMPLETION_TOKENS
-        requires_o1_handling = Config.DEFAULT_REQUIRES_O1_HANDLING
-
-        # Log the deployment name value
-        logger.info(f"Using deployment name: {Config.DEFAULT_DEPLOYMENT_NAME}")
 
         # Create parameters dictionary
         params = {
             "provider_id": int(provider_id),
             "name": str(Config.MODEL_NAME),
-            "deployment_name": str(deployment_name),  # Use the deployment_name variable we set earlier
+            "deployment_name": str(Config.DEFAULT_DEPLOYMENT_NAME),
             "description": "Azure OpenAI GPT-4 model with streaming support",
             "api_endpoint": str(api_endpoint),
             "api_key": str(encrypted_api_key),
@@ -436,12 +426,10 @@ def create_default_model(db: Session) -> Optional[int]:
         # Log the exact parameters being used
         logger.info("Model parameters before SQL execution:")
         for key, value in params.items():
-            logger.info(f"{key}: {type(value)} = {value}")
+            if key != "api_key":  # Don't log the API key
+                logger.info(f"{key}: {type(value)} = {value}")
 
         default_model = params
-
-        # Log the complete model dictionary
-        logger.info(f"Default model configuration: {default_model}")
 
         # Validate model configuration
         from models.model import Model
@@ -462,25 +450,7 @@ def create_default_model(db: Session) -> Optional[int]:
         """)
 
         # Execute query with parameters as a dictionary
-        result = db.execute(
-            model_query,
-            dict(
-                provider_id=params["provider_id"],
-                name=params["name"],
-                deployment_name=deployment_name,  # Use the deployment_name variable directly
-                description=params["description"],
-                api_endpoint=params["api_endpoint"],
-                api_key=params["api_key"],
-                api_version=params["api_version"],
-                temperature=params["temperature"],
-                max_tokens=params["max_tokens"],
-                max_completion_tokens=params["max_completion_tokens"],
-                model_type=params["model_type"],
-                requires_o1_handling=params["requires_o1_handling"],
-                supports_streaming=params["supports_streaming"],
-                is_default=params["is_default"]
-            )
-        )
+        result = db.execute(model_query, params)
         model_id = result.scalar_one()
         db.commit()  # Commit the model creation
 

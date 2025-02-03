@@ -7,10 +7,11 @@ class TokenUsageManager {
         }
 
         this.chatId = typeof config === 'object' ? config.chatId : config;
-        if (!this.chatId) {
-            console.error('TokenUsageManager: Missing chatId in configuration');
+        if (!this.chatId || typeof this.chatId !== 'string') {
+            console.error('TokenUsageManager: Invalid or missing chatId in configuration:', config);
             return;
         }
+        console.log('TokenUsageManager: Initialized with chatId:', this.chatId, 'from config:', config);
 
         this.updateInterval = null;
 
@@ -172,6 +173,11 @@ class TokenUsageManager {
             return;
         }
 
+        if (!this.chatId || typeof this.chatId !== 'string') {
+            console.error('TokenUsageManager: Invalid chat ID for stats update:', this.chatId);
+            return;
+        }
+
         try {
             console.log('TokenUsageManager: Starting stats update for chat', this.chatId);
 
@@ -181,58 +187,67 @@ class TokenUsageManager {
             console.log('TokenUsageManager: Using model ID:', modelId);
 
             const url = `/chat/stats/${this.chatId}`;
-            console.log('TokenUsageManager: Fetching stats from:', url);
+            console.log('TokenUsageManager: Fetching stats from:', url, 'with chatId:', this.chatId);
 
-            // Fetch stats from the server using utils.fetchWithCSRF
-            const data = await window.utils.fetchWithCSRF(url, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
-            console.log('TokenUsageManager: Received data:', data);
-
-            if (data.success && data.stats) {
-                console.log('TokenUsageManager: Processing stats:', data.stats);
-
-                // Get file tokens if files are present
-                let fileTokens = 0;
-                if (window.fileUploadManager?.uploadedFiles) {
-                    fileTokens = window.fileUploadManager.uploadedFiles.reduce((sum, file) => {
-                        return sum + (file.tokenCount || Math.ceil(file.size / 4));
-                    }, 0);
-                }
-
-                // Combine message and file tokens
-                const combinedStats = {
-                    ...data.stats,
-                    total_tokens: (data.stats.total_tokens || 0) + fileTokens,
-                    token_breakdown: {
-                        ...data.stats.token_breakdown,
-                        files: fileTokens
+            let data;
+            try {
+                data = await window.utils.fetchWithCSRF(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
                     }
-                };
-
-                // Update token usage percentage
-                if (data.stats.model_limits?.max_tokens) {
-                    combinedStats.token_usage_percentage =
-                        (combinedStats.total_tokens / data.stats.model_limits.max_tokens) * 100;
+                });
+                console.log('TokenUsageManager: Received data:', data);
+            } catch (error) {
+                if (error.status === 404) {
+                    console.error('TokenUsageManager: Chat not found:', this.chatId);
+                    this.showError('Chat not found or access denied');
+                    return;
                 }
-
-                // Update UI with combined stats
-                this.updateDisplay(combinedStats);
-
-                // Update model-specific token limits, if provided
-                if (data.stats.model_limits) {
-                    console.log('TokenUsageManager: Updating model limits:', data.stats.model_limits);
-                    this.updateModelLimits(data.stats.model_limits);
-                }
-
-                console.log('TokenUsageManager: Stats updated successfully');
-            } else {
-                console.error('TokenUsageManager: Invalid response format:', data);
-                throw new Error(data.error || 'Invalid response format');
+                throw error;
             }
+
+            if (!data || !data.success || !data.stats) {
+                console.error('TokenUsageManager: Invalid response format:', data);
+                throw new Error(data?.error || 'Invalid response format');
+            }
+
+            console.log('TokenUsageManager: Processing stats:', data.stats);
+
+            // Get file tokens if files are present
+            let fileTokens = 0;
+            if (window.fileUploadManager?.uploadedFiles) {
+                fileTokens = window.fileUploadManager.uploadedFiles.reduce((sum, file) => {
+                    return sum + (file.tokenCount || Math.ceil(file.size / 4));
+                }, 0);
+            }
+
+            // Combine message and file tokens
+            const combinedStats = {
+                ...data.stats,
+                total_tokens: (data.stats.total_tokens || 0) + fileTokens,
+                token_breakdown: {
+                    ...data.stats.token_breakdown,
+                    files: fileTokens
+                }
+            };
+
+            // Update token usage percentage
+            if (data.stats.model_limits?.max_tokens) {
+                combinedStats.token_usage_percentage =
+                    (combinedStats.total_tokens / data.stats.model_limits.max_tokens) * 100;
+            }
+
+            // Update UI with combined stats
+            this.updateDisplay(combinedStats);
+
+            // Update model-specific token limits, if provided
+            if (data.stats.model_limits) {
+                console.log('TokenUsageManager: Updating model limits:', data.stats.model_limits);
+                this.updateModelLimits(data.stats.model_limits);
+            }
+
+            console.log('TokenUsageManager: Stats updated successfully');
         } catch (error) {
             console.error('TokenUsageManager: Error updating stats:', error);
             this.showError('Failed to update token usage');

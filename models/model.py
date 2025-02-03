@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 # Type aliases for better readability
 ModelDict = Dict[str, Any]
 
+
 @dataclass
 class Model:
     """
@@ -59,59 +60,81 @@ class Model:
     model_type: str
     api_endpoint: str
     api_key: str
-    temperature: Optional[float] = field(default=None, metadata={"sa": mapped_column(Float, nullable=True)})
-    max_tokens: Optional[int] = field(default=None, metadata={"sa": mapped_column(Integer, nullable=True)})
-    max_completion_tokens: Optional[int] = field(default=8300, metadata={"sa": mapped_column(Integer, nullable=False)})
-    is_default: bool = field(default=False, metadata={"sa": mapped_column(Boolean, nullable=False)})
-    requires_o1_handling: bool = field(default=False, metadata={"sa": mapped_column(Boolean, nullable=False)})
-    supports_streaming: bool = field(default=False, metadata={"sa": mapped_column(Boolean, nullable=False)})
-    api_version: str = field(default="2024-12-01-preview", metadata={"sa": mapped_column(String(50), nullable=False)})
-    reasoning_effort: str = field(default="medium", metadata={"sa": mapped_column(String(10), nullable=False)})
-    store_completion: bool = field(default=False, metadata={"sa": mapped_column(Boolean, nullable=False)})
-    created_at: Optional[str] = field(default=None, metadata={"sa": mapped_column(DateTime, nullable=True)})
-    version: int = field(default=1, metadata={"sa": mapped_column(Integer, nullable=False, server_default=text("1"))})
+    temperature: Optional[float] = field(
+        default=None, metadata={"sa": mapped_column(Float, nullable=True)}
+    )
+    max_tokens: Optional[int] = field(
+        default=None, metadata={"sa": mapped_column(Integer, nullable=True)}
+    )
+    max_completion_tokens: Optional[int] = field(
+        default=8300, metadata={"sa": mapped_column(Integer, nullable=False)}
+    )
+    is_default: bool = field(
+        default=False, metadata={"sa": mapped_column(Boolean, nullable=False)}
+    )
+    requires_o1_handling: bool = field(
+        default=False, metadata={"sa": mapped_column(Boolean, nullable=False)}
+    )
+    supports_streaming: bool = field(
+        default=False, metadata={"sa": mapped_column(Boolean, nullable=False)}
+    )
+    api_version: str = field(
+        default="2024-12-01-preview",
+        metadata={"sa": mapped_column(String(50), nullable=False)},
+    )
+    reasoning_effort: str = field(
+        default="medium", metadata={"sa": mapped_column(String(10), nullable=False)}
+    )
+    store_completion: bool = field(
+        default=False, metadata={"sa": mapped_column(Boolean, nullable=False)}
+    )
+    created_at: Optional[str] = field(
+        default=None, metadata={"sa": mapped_column(DateTime, nullable=True)}
+    )
+    version: int = field(
+        default=1,
+        metadata={
+            "sa": mapped_column(Integer, nullable=False, server_default=text("1"))
+        },
+    )
 
     # Class-level provider capabilities
     PROVIDER_CAPABILITIES: ClassVar[Dict[str, Dict[str, Any]]] = {
-        'gpt-4': {
-            'fixed_temperature': True,
-            'streaming': True,
-            'max_tokens': 8192
+        "gpt-4": {"fixed_temperature": True, "streaming": True, "max_tokens": 8192},
+        "gpt-4o": {
+            "fixed_temperature": True,
+            "streaming": True,
+            "max_tokens": 16384,
+            "supports_json_mode": True,
+            "supports_vector_search": True,
+            "supports_file_search": True,
+            "supports_code_interpreter": True,
+            "api_version": "2025-01-01-preview",
         },
-        'gpt-4o': {
-            'fixed_temperature': True,
-            'streaming': True,
-            'max_tokens': 16384,
-            'supports_json_mode': True,
-            'supports_vector_search': True,
-            'supports_file_search': True,
-            'supports_code_interpreter': True,
-            'api_version': '2025-01-01-preview'
+        "o1": {
+            "fixed_temperature": True,
+            "streaming": False,
+            "max_tokens": 25000,
+            "supports_json_mode": True,
+            "requires_reasoning_effort": True,
+            "supports_vector_search": True,
+            "supports_file_search": True,
+            "supports_code_interpreter": True,
+            "api_version": "2025-01-01-preview",
+            "default_reasoning_effort": "medium",
+            "supports_completion_storage": True,
+            "vector_search_config": {
+                "max_chunks": 50,
+                "chunk_size": 1000,
+                "chunk_overlap": 100,
+                "default_strictness": 3,
+            },
         },
-        'o1': {
-            'fixed_temperature': True,
-            'streaming': False,
-            'max_tokens': 25000,
-            'supports_json_mode': True,
-            'requires_reasoning_effort': True,
-            'supports_vector_search': True,
-            'supports_file_search': True,
-            'supports_code_interpreter': True,
-            'api_version': '2025-01-01-preview',
-            'default_reasoning_effort': 'medium',
-            'supports_completion_storage': True,
-            'vector_search_config': {
-                'max_chunks': 50,
-                'chunk_size': 1000,
-                'chunk_overlap': 100,
-                'default_strictness': 3
-            }
+        "gpt-3.5-turbo": {
+            "fixed_temperature": False,
+            "streaming": True,
+            "max_tokens": 4096,
         },
-        'gpt-3.5-turbo': {
-            'fixed_temperature': False,
-            'streaming': True,
-            'max_tokens': 4096
-        }
     }
 
     def __post_init__(self):
@@ -119,7 +142,6 @@ class Model:
         self.id = int(self.id)
         self.provider_id = int(self.provider_id)
         self.apply_provider_constraints()
-
 
     def apply_provider_constraints(self):
         """Properly apply constraints from provider"""
@@ -129,14 +151,13 @@ class Model:
 
         provider_caps = provider.capabilities
 
-        if provider_caps.get('fixed_temperature'):
-            self.temperature = provider_caps['fixed_temperature']
+        if provider_caps.get("fixed_temperature"):
+            self.temperature = provider_caps["fixed_temperature"]
 
-        if 'max_tokens' in provider_caps:
+        if "max_tokens" in provider_caps:
             if self.max_completion_tokens:
                 self.max_completion_tokens = min(
-                    self.max_completion_tokens,
-                    provider_caps['max_tokens']
+                    self.max_completion_tokens, provider_caps["max_tokens"]
                 )
 
     @staticmethod
@@ -166,13 +187,13 @@ class Model:
                     raise ValueError("Invalid provider_id")
 
                 # Apply provider validation rules
-                if provider.validation_rules.get('fixed_temperature'):
+                if provider.validation_rules.get("fixed_temperature"):
                     data["temperature"] = 1.0
 
-                if 'max_tokens' in provider.validation_rules:
+                if "max_tokens" in provider.validation_rules:
                     data["max_completion_tokens"] = min(
                         data.get("max_completion_tokens", 16384),
-                        int(provider.validation_rules['max_tokens'])
+                        int(provider.validation_rules["max_tokens"]),
                     )
 
                 # Check for existing models with same name/deployment
@@ -192,7 +213,7 @@ class Model:
                         "name": data["name"],
                         "deployment_name": data["deployment_name"],
                         "provider_id": data["provider_id"],
-                        "is_default": data.get("is_default", False)
+                        "is_default": data.get("is_default", False),
                     },
                 ).fetchone()
 
@@ -202,7 +223,9 @@ class Model:
                         if existing[0].lower() == data["name"].lower()
                         else "deployment_name"
                     )
-                    raise ValueError(f"A model with this {field} already exists for this provider")
+                    raise ValueError(
+                        f"A model with this {field} already exists for this provider"
+                    )
 
                 # Validate configuration
                 Model.validate_model_config(data)
@@ -210,7 +233,9 @@ class Model:
                 # Update default status if needed
                 if data.get("is_default", False):
                     session.execute(
-                        text("UPDATE models SET is_default = FALSE WHERE is_default = TRUE")
+                        text(
+                            "UPDATE models SET is_default = FALSE WHERE is_default = TRUE"
+                        )
                     )
 
                 # Insert new model
@@ -266,15 +291,19 @@ class Model:
 
                 # Add model-type specific immutable fields
                 if model_type == "o1-preview":
-                    immutable_fields.extend([
-                        "temperature",       # Fixed at 1.0
-                        "supports_streaming" # Always false
-                    ])
+                    immutable_fields.extend(
+                        [
+                            "temperature",  # Fixed at 1.0
+                            "supports_streaming",  # Always false
+                        ]
+                    )
 
                 return immutable_fields
 
         except Exception as e:
-            logger.error(f"Error getting immutable fields for model {model_id}: {str(e)}")
+            logger.error(
+                f"Error getting immutable fields for model {model_id}: {str(e)}"
+            )
             return ["provider_id"]  # Default fallback
 
     @staticmethod
@@ -304,80 +333,66 @@ class Model:
                 from utils.encryption import decrypt_api_key, EncryptionError
 
                 from config import Config
+
                 encrypted_key = model_dict.get("api_key", "")
                 if encrypted_key:
                     try:
-<<<<<<< HEAD
                         # Check if key needs re-encryption
                         if encrypted_key.startswith("NEEDS_REENCRYPTION:"):
                             # Strip the prefix and decrypt
-                            old_encrypted = encrypted_key[len("NEEDS_REENCRYPTION:"):]
+                            old_encrypted = encrypted_key[len("NEEDS_REENCRYPTION:") :]
                             try:
                                 # Attempt to decrypt with current key
-                                decrypted = decrypt_api_key(old_encrypted)
+                                decrypted = decrypt_api_key(old_encrypted, Config.ENCRYPTION_KEY)
                                 # Re-encrypt with new consistent method
                                 from utils.encryption import encrypt_api_key
-                                new_encrypted = encrypt_api_key(decrypted)
+
+                                new_encrypted = encrypt_api_key(decrypted, Config.ENCRYPTION_KEY)
                                 # Update in database
-                                db.execute(
-                                    text("UPDATE models SET api_key = :new_key WHERE id = :id"),
-                                    {"new_key": new_encrypted, "id": model_id}
+                                session.execute(
+                                    text(
+                                        "UPDATE models SET api_key = :new_key WHERE id = :id"
+                                    ),
+                                    {"new_key": new_encrypted, "id": model_id},
                                 )
-                                db.commit()
+                                session.commit()
                                 model_dict["api_key"] = decrypted
                             except Exception as e:
-                                logger.error(f"Failed to re-encrypt API key for model {model_id}: {str(e)}")
+                                logger.error(
+                                    f"Failed to re-encrypt API key for model {model_id}: {str(e)}"
+                                )
                                 model_dict["api_key"] = ""
                         else:
                             # Normal decryption for already properly encrypted keys
-                            model_dict["api_key"] = decrypt_api_key(encrypted_key)
->>>>>>> c4c569433f1edd3540b2dff3834c0a63ebd7a916
-=======
-                        # Check if key needs re-encryption
-                        if encrypted_key.startswith("NEEDS_REENCRYPTION:"):
-                            # Strip the prefix and decrypt
-                            old_encrypted = encrypted_key[len("NEEDS_REENCRYPTION:"):]
-                            try:
-                                # Attempt to decrypt with current key
-                                decrypted = decrypt_api_key(old_encrypted)
-                                # Re-encrypt with new consistent method
-                                from utils.encryption import encrypt_api_key
-                                new_encrypted = encrypt_api_key(decrypted)
-                                # Update in database
-                                db.execute(
-                                    text("UPDATE models SET api_key = :new_key WHERE id = :id"),
-                                    {"new_key": new_encrypted, "id": model_id}
-                                )
-                                db.commit()
-                                model_dict["api_key"] = decrypted
-                            except Exception as e:
-                                logger.error(f"Failed to re-encrypt API key for model {model_id}: {str(e)}")
-                                model_dict["api_key"] = ""
-                        else:
-                            # Normal decryption for already properly encrypted keys
-                            model_dict["api_key"] = decrypt_api_key(encrypted_key)
->>>>>>> c4c569433f1edd3540b2dff3834c0a63ebd7a916
+                            model_dict["api_key"] = decrypt_api_key(encrypted_key, Config.ENCRYPTION_KEY)
                     except EncryptionError as e:
-                        logger.error(f"Failed to decrypt API key for model {model_id}: {str(e)}")
+                        logger.error(
+                            f"Failed to decrypt API key for model {model_id}: {str(e)}"
+                        )
                         model_dict["api_key"] = ""
                 else:
                     model_dict["api_key"] = ""
 
                 # Normalize boolean fields
-                boolean_fields = ['requires_o1_handling', 'supports_streaming', 'is_default']
+                boolean_fields = [
+                    "requires_o1_handling",
+                    "supports_streaming",
+                    "is_default",
+                ]
                 for bool_field in boolean_fields:
                     value = model_dict.get(bool_field)
                     if isinstance(value, str):
-                        model_dict[bool_field] = value.lower() in ('true', 't', '1')
+                        model_dict[bool_field] = value.lower() in ("true", "t", "1")
                     elif isinstance(value, int):
                         model_dict[bool_field] = bool(value)
 
                 return Model(**model_dict)
 
         except Exception as e:
-            logger.error("Error retrieving model by ID %d: %s", model_id, e, exc_info=True)
+            logger.error(
+                "Error retrieving model by ID %d: %s", model_id, e, exc_info=True
+            )
             return None
-
 
     @staticmethod
     def update(model_id: int, data: Dict[str, Any]) -> None:
@@ -395,17 +410,26 @@ class Model:
             with db_session() as db:
                 # Filter allowed fields
                 allowed_fields = {
-                    "name", "deployment_name", "description",
-                    "api_endpoint", "api_key", "api_version",
-                    "temperature", "max_tokens", "max_completion_tokens",
-                    "model_type", "requires_o1_handling",
-                    "supports_streaming", "is_default", "provider_id",
-                    "reasoning_effort", "store_completion"
+                    "name",
+                    "deployment_name",
+                    "description",
+                    "api_endpoint",
+                    "api_key",
+                    "api_version",
+                    "temperature",
+                    "max_tokens",
+                    "max_completion_tokens",
+                    "model_type",
+                    "requires_o1_handling",
+                    "supports_streaming",
+                    "is_default",
+                    "provider_id",
+                    "reasoning_effort",
+                    "store_completion",
                 }
 
                 update_data = {
-                    key: value for key, value in data.items()
-                    if key in allowed_fields
+                    key: value for key, value in data.items() if key in allowed_fields
                 }
 
                 if not update_data:
@@ -422,49 +446,58 @@ class Model:
                 provider_caps = Model.PROVIDER_CAPABILITIES.get(model_type, {})
 
                 # Handle temperature constraint
-                if provider_caps.get('fixed_temperature'):
+                if provider_caps.get("fixed_temperature"):
                     update_data["temperature"] = 1.0
 
                 # Handle streaming support
                 update_data["supports_streaming"] = bool(
-                    provider_caps.get('streaming', True)
+                    provider_caps.get("streaming", True)
                 )
 
                 # Handle token limits
                 if "max_completion_tokens" in update_data:
-                    max_tokens = provider_caps.get('max_tokens', 16384)
+                    max_tokens = provider_caps.get("max_tokens", 16384)
                     if max_tokens is not None:
                         update_data["max_completion_tokens"] = min(
-                            update_data["max_completion_tokens"] or 0,
-                            max_tokens
+                            update_data["max_completion_tokens"] or 0, max_tokens
                         )
 
                 # Handle o1-preview settings
-                requires_o1_handling = update_data.get("requires_o1_handling", existing_model.requires_o1_handling)
+                requires_o1_handling = update_data.get(
+                    "requires_o1_handling", existing_model.requires_o1_handling
+                )
                 if requires_o1_handling:
                     # Force disable streaming for o1-preview models
                     update_data["supports_streaming"] = False
                     # Force temperature to 1.0 for o1-preview models
                     update_data["temperature"] = 1.0
-                    logger.debug("Enforcing o1-preview constraints for model %d", model_id)
+                    logger.debug(
+                        "Enforcing o1-preview constraints for model %d", model_id
+                    )
 
                 # Ensure is_default is properly handled
                 if "is_default" in update_data:
                     if update_data["is_default"]:
                         # Set all other models to non-default
                         db.execute(
-                            text("UPDATE models SET is_default = :new_default WHERE id != :model_id"),
-                            {"new_default": False, "model_id": model_id}
+                            text(
+                                "UPDATE models SET is_default = :new_default WHERE id != :model_id"
+                            ),
+                            {"new_default": False, "model_id": model_id},
                         )
                     else:
                         # Ensure at least one model remains default when unsetting is_default
                         if update_data.get("is_default") is False:
                             default_count = db.execute(
-                                text("SELECT COUNT(*) FROM models WHERE is_default = :current_default AND id != :model_id"),
-                                {"current_default": True, "model_id": model_id}
+                                text(
+                                    "SELECT COUNT(*) FROM models WHERE is_default = :current_default AND id != :model_id"
+                                ),
+                                {"current_default": True, "model_id": model_id},
                             ).scalar()
                             if default_count == 0:
-                                raise ValueError("Cannot unset default model without setting another as default")
+                                raise ValueError(
+                                    "Cannot unset default model without setting another as default"
+                                )
 
                 # Validate configuration before update, passing current model_id
                 Model.validate_model_config(update_data, model_id)
@@ -472,18 +505,25 @@ class Model:
                 # Get current version
                 current_version = db.execute(
                     text("SELECT version FROM models WHERE id = :model_id"),
-                    {"model_id": model_id}
+                    {"model_id": model_id},
                 ).scalar()
 
                 if current_version is None:
                     raise ValueError(f"Model with ID {model_id} not found")
 
                 # Add version increment to update data
-                update_data['version'] = current_version + 1
+                update_data["version"] = current_version + 1
 
                 # Build update query with version check
                 set_clause = ", ".join(f"{key} = :{key}" for key in update_data)
-                params = cast(Dict[str, Any], {**update_data, "model_id": model_id, "current_version": current_version})
+                params = cast(
+                    Dict[str, Any],
+                    {
+                        **update_data,
+                        "model_id": model_id,
+                        "current_version": current_version,
+                    },
+                )
 
                 query = text(
                     f"""
@@ -496,7 +536,9 @@ class Model:
 
                 result = db.execute(query)
                 if result.rowcount == 0:
-                    raise ValueError("Model was modified by another user. Please refresh and try again.")
+                    raise ValueError(
+                        "Model was modified by another user. Please refresh and try again."
+                    )
 
                 # Update default status if needed
                 if update_data.get("is_default", False):
@@ -508,7 +550,11 @@ class Model:
                             WHERE id != :model_id AND is_default = :current_default
                         """
                         ),
-                        {"new_default": False, "current_default": True, "model_id": model_id},
+                        {
+                            "new_default": False,
+                            "current_default": True,
+                            "model_id": model_id,
+                        },
                     )
 
                 db.commit()
@@ -532,11 +578,17 @@ class Model:
         with db_session() as db:
             try:
                 # Check if the model is the last default model
-                is_default_query = text("SELECT is_default FROM models WHERE id = :model_id")
-                is_default_result = db.execute(is_default_query, {"model_id": model_id}).scalar()
+                is_default_query = text(
+                    "SELECT is_default FROM models WHERE id = :model_id"
+                )
+                is_default_result = db.execute(
+                    is_default_query, {"model_id": model_id}
+                ).scalar()
 
                 if is_default_result:
-                    default_count_query = text("SELECT COUNT(*) FROM models WHERE is_default = TRUE")
+                    default_count_query = text(
+                        "SELECT COUNT(*) FROM models WHERE is_default = TRUE"
+                    )
                     default_count = db.execute(default_count_query).scalar()
                     if default_count == 1:
                         raise ValueError("Cannot delete the last default model")
@@ -561,7 +613,9 @@ class Model:
                     logger.info("Deleting model with provider: %s", model.model_type)
 
                 # Delete associated versions
-                delete_versions_query = text("DELETE FROM model_versions WHERE model_id = :model_id")
+                delete_versions_query = text(
+                    "DELETE FROM model_versions WHERE model_id = :model_id"
+                )
                 db.execute(delete_versions_query, {"model_id": model_id})
 
                 # Delete the model
@@ -589,11 +643,29 @@ class Model:
                 if result:
                     model_dict = dict(result)
                     # Convert numeric fields to proper types
-                    model_dict["id"] = int(model_dict["id"]) if model_dict.get("id") is not None else 0
-                    model_dict["provider_id"] = int(model_dict["provider_id"]) if model_dict.get("provider_id") is not None else 0
-                    model_dict["temperature"] = float(model_dict["temperature"]) if model_dict.get("temperature") is not None else None
-                    model_dict["max_tokens"] = int(model_dict["max_tokens"]) if model_dict.get("max_tokens") is not None else None
-                    model_dict["max_completion_tokens"] = int(model_dict["max_completion_tokens"]) if model_dict.get("max_completion_tokens") is not None else 8300
+                    model_dict["id"] = (
+                        int(model_dict["id"]) if model_dict.get("id") is not None else 0
+                    )
+                    model_dict["provider_id"] = (
+                        int(model_dict["provider_id"])
+                        if model_dict.get("provider_id") is not None
+                        else 0
+                    )
+                    model_dict["temperature"] = (
+                        float(model_dict["temperature"])
+                        if model_dict.get("temperature") is not None
+                        else None
+                    )
+                    model_dict["max_tokens"] = (
+                        int(model_dict["max_tokens"])
+                        if model_dict.get("max_tokens") is not None
+                        else None
+                    )
+                    model_dict["max_completion_tokens"] = (
+                        int(model_dict["max_completion_tokens"])
+                        if model_dict.get("max_completion_tokens") is not None
+                        else 8300
+                    )
                     return Model(**model_dict)
                 return None
             except Exception as e:
@@ -601,7 +673,9 @@ class Model:
                 return None
 
     @staticmethod
-    def validate_model_config(config: ModelDict, model_id: Optional[int] = None) -> None:
+    def validate_model_config(
+        config: ModelDict, model_id: Optional[int] = None
+    ) -> None:
         """
         Validate model configuration parameters.
         """
@@ -613,56 +687,57 @@ class Model:
         provider_caps = provider.capabilities
 
         # Apply provider-specific constraints
-        if provider_caps.get('fixed_temperature'):
-            config['temperature'] = 1.0
+        if provider_caps.get("fixed_temperature"):
+            config["temperature"] = 1.0
 
-        config['supports_streaming'] = provider_caps.get('streaming', True)
+        config["supports_streaming"] = provider_caps.get("streaming", True)
 
         # Handle max_completion_tokens based on model type and provider capabilities
-        model_type = config.get('model_type', '').lower()
-        requires_o1 = config.get('requires_o1_handling', False)
-        is_o1_preview = model_type == 'o1-preview' and requires_o1
+        model_type = config.get("model_type", "").lower()
+        requires_o1 = config.get("requires_o1_handling", False)
+        is_o1_preview = model_type == "o1-preview" and requires_o1
 
         # Get provider-specific capabilities
         model_caps = provider_caps.get(model_type, {})
 
         # For o1-preview models, enforce stricter limits
         if is_o1_preview:
-            max_tokens = config.get('max_completion_tokens', 8300)
+            max_tokens = config.get("max_completion_tokens", 8300)
             if not (1 <= max_tokens <= 25000):
-                raise ValueError("For o1-preview models, max_completion_tokens must be between 1 and 25000 (OpenAI recommended)")
-            config['max_completion_tokens'] = max_tokens
+                raise ValueError(
+                    "For o1-preview models, max_completion_tokens must be between 1 and 25000 (OpenAI recommended)"
+                )
+            config["max_completion_tokens"] = max_tokens
         else:
             # For non-o1 models (like azure), just ensure it's a positive number
-            max_tokens = config.get('max_completion_tokens')
+            max_tokens = config.get("max_completion_tokens")
             if max_tokens is not None and max_tokens <= 0:
                 raise ValueError("max_completion_tokens must be positive")
 
             # Use provider's max_tokens if available, otherwise no upper limit
-            if 'max_tokens' in model_caps:
-                config['max_completion_tokens'] = min(
-                    max_tokens or model_caps['max_tokens'],
-                    model_caps['max_tokens']
+            if "max_tokens" in model_caps:
+                config["max_completion_tokens"] = min(
+                    max_tokens or model_caps["max_tokens"], model_caps["max_tokens"]
                 )
 
         # Handle reasoning settings for o1/o3 models
-        model_type = config.get('model_type', '').lower()
-        is_reasoning_model = model_type in ['o1-preview', 'o3-mini']
+        model_type = config.get("model_type", "").lower()
+        is_reasoning_model = model_type in ["o1-preview", "o3-mini"]
 
         if is_reasoning_model:
             # Validate reasoning_effort
-            reasoning_effort = config.get('reasoning_effort', 'medium')
-            if reasoning_effort not in ['low', 'medium', 'high']:
+            reasoning_effort = config.get("reasoning_effort", "medium")
+            if reasoning_effort not in ["low", "medium", "high"]:
                 raise ValueError("reasoning_effort must be one of: low, medium, high")
-            config['reasoning_effort'] = reasoning_effort
+            config["reasoning_effort"] = reasoning_effort
 
             # Ensure store_completion is boolean
-            store_completion = config.get('store_completion', False)
-            config['store_completion'] = bool(store_completion)
+            store_completion = config.get("store_completion", False)
+            config["store_completion"] = bool(store_completion)
         else:
             # For non-reasoning models, set defaults
-            config['reasoning_effort'] = 'medium'
-            config['store_completion'] = False
+            config["reasoning_effort"] = "medium"
+            config["store_completion"] = False
 
         # Validate required fields with strict type checking
         required_fields = {
@@ -671,7 +746,7 @@ class Model:
             "deployment_name": (str, "Deployment name must be a non-empty string"),
             "model_type": (str, "Model type must be a non-empty string"),
             "api_endpoint": (str, "API endpoint must be a valid HTTPS URL"),
-            "api_key": (str, "API key must be a non-empty string")
+            "api_key": (str, "API key must be a non-empty string"),
         }
 
         for field, (expected_type, error_msg) in required_fields.items():
@@ -702,21 +777,27 @@ class Model:
         # Validate 'api_endpoint' using provider's 'endpoint' pattern
         api_endpoint = config.get("api_endpoint")
         if api_endpoint:
-            pattern = validation_rules.get('endpoint')
+            pattern = validation_rules.get("endpoint")
             if pattern:
                 import re
+
                 if not re.match(pattern, api_endpoint):
-                    raise ValueError("API endpoint does not match the required format specified by the provider.")
+                    raise ValueError(
+                        "API endpoint does not match the required format specified by the provider."
+                    )
 
         if provider.is_azure:
             # Validate 'deployment_name' using provider's 'model_id' pattern
             deployment_name = config.get("deployment_name")
             if deployment_name:
-                pattern = validation_rules.get('model_id')
+                pattern = validation_rules.get("model_id")
                 if pattern:
                     import re
+
                     if not re.match(pattern, deployment_name):
-                        raise ValueError("Deployment name does not match the required format specified by the provider.")
+                        raise ValueError(
+                            "Deployment name does not match the required format specified by the provider."
+                        )
         else:
             # For OpenAI provider, remove any deployment name from the config
             config.pop("deployment_name", None)
@@ -732,19 +813,25 @@ class Model:
             raise ValueError("Max tokens must be at least 1")
 
         # Validate only one default model, allowing updates to current default
-        if config.get('is_default', False):
+        if config.get("is_default", False):
             with db_session() as session:
-                query = text("""
+                query = text(
+                    """
                     SELECT COUNT(*) FROM models
                     WHERE is_default = TRUE
                     AND (:model_id IS NULL OR id != :model_id)
-                """)
-                existing_defaults = session.execute(query, {"model_id": model_id}).scalar()
+                """
+                )
+                existing_defaults = session.execute(
+                    query, {"model_id": model_id}
+                ).scalar()
                 if existing_defaults > 0 and model_id is None:
                     raise ValueError("Only one default model allowed")
 
     @staticmethod
-    def get_all(limit: int = 10, offset: int = 0, exclude_id: Optional[int] = None) -> List["Model"]:
+    def get_all(
+        limit: int = 10, offset: int = 0, exclude_id: Optional[int] = None
+    ) -> List["Model"]:
         """
         Retrieve all models with pagination.
 
@@ -768,28 +855,53 @@ class Model:
                     OFFSET :offset
                 """
                 )
-                result = session.execute(
-                    query, {"limit": limit, "offset": offset, "exclude_id": exclude_id}
-                ).mappings().all()
+                result = (
+                    session.execute(
+                        query,
+                        {"limit": limit, "offset": offset, "exclude_id": exclude_id},
+                    )
+                    .mappings()
+                    .all()
+                )
                 models = []
                 for row in result:
                     model_dict = dict(row)
                     # Convert numeric fields to proper types
-                    model_dict["id"] = int(model_dict["id"]) if model_dict.get("id") is not None else 0
-                    model_dict["provider_id"] = int(model_dict["provider_id"]) if model_dict.get("provider_id") is not None else 0
-                    model_dict["temperature"] = float(model_dict["temperature"]) if model_dict.get("temperature") is not None else None
-                    model_dict["max_tokens"] = int(model_dict["max_tokens"]) if model_dict.get("max_tokens") is not None else None
-                    model_dict["max_completion_tokens"] = int(model_dict["max_completion_tokens"]) if model_dict.get("max_completion_tokens") is not None else 8300
+                    model_dict["id"] = (
+                        int(model_dict["id"]) if model_dict.get("id") is not None else 0
+                    )
+                    model_dict["provider_id"] = (
+                        int(model_dict["provider_id"])
+                        if model_dict.get("provider_id") is not None
+                        else 0
+                    )
+                    model_dict["temperature"] = (
+                        float(model_dict["temperature"])
+                        if model_dict.get("temperature") is not None
+                        else None
+                    )
+                    model_dict["max_tokens"] = (
+                        int(model_dict["max_tokens"])
+                        if model_dict.get("max_tokens") is not None
+                        else None
+                    )
+                    model_dict["max_completion_tokens"] = (
+                        int(model_dict["max_completion_tokens"])
+                        if model_dict.get("max_completion_tokens") is not None
+                        else 8300
+                    )
                     models.append(Model(**model_dict))
 
                 for model in models:
-                    provider_caps = Model.PROVIDER_CAPABILITIES.get(model.model_type, {})
-                    if provider_caps.get('fixed_temperature'):
+                    provider_caps = Model.PROVIDER_CAPABILITIES.get(
+                        model.model_type, {}
+                    )
+                    if provider_caps.get("fixed_temperature"):
                         model.temperature = 1.0
-                    model.supports_streaming = provider_caps.get('streaming', True)
+                    model.supports_streaming = provider_caps.get("streaming", True)
                     model.max_completion_tokens = min(
                         model.max_completion_tokens,
-                        provider_caps.get('max_tokens', 16384)
+                        provider_caps.get("max_tokens", 16384),
                     )
                 return models
 
@@ -816,12 +928,13 @@ class Model:
                     raise ValueError(f"Model with ID {model_id} not found")
 
                 provider_caps = Model.PROVIDER_CAPABILITIES.get(model.model_type, {})
-                if provider_caps.get('fixed_temperature'):
+                if provider_caps.get("fixed_temperature"):
                     model.temperature = 1.0
-                model.supports_streaming = bool(provider_caps.get('streaming', True))
+                model.supports_streaming = bool(provider_caps.get("streaming", True))
                 model.max_completion_tokens = min(
                     model.max_completion_tokens,
-                    provider_caps.get('max_tokens', 16384) or model.max_completion_tokens
+                    provider_caps.get("max_tokens", 16384)
+                    or model.max_completion_tokens,
                 )
 
                 # Set all other models to non-default

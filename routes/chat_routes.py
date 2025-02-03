@@ -318,7 +318,7 @@ def new_chat_route() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 # 3) Separate route for handle_chat (POST) => /chat/ with blueprint prefix
 ##############################################################################
 
-@chat_routes.route("/chat/send", methods=["POST"]) 
+@chat_routes.route("/chat/send", methods=["POST"])
 @login_required
 @limiter.limit(CHAT_RATE_LIMIT)
 def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
@@ -443,15 +443,19 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             )
             Chat.update_title(chat_id, generate_chat_title(conversation_text))
 
+        # Get model parameters from request
+        deployment_name = request.form.get('deployment_name')
+        api_version = request.form.get('api_version') or model_obj.api_version
+        model_type = request.form.get('model_type')
+
         # Get conversation history
         history = conversation_manager.get_context(
             chat_id,
             include_system=not getattr(model_obj, "requires_o1_handling", False),
         )
 
-        # Define max_tokens and api_version
+        # Define max_tokens
         max_tokens = model_obj.max_completion_tokens
-        api_version = model_obj.api_version
 
         # Count tokens for the combined message
         message_tokens = count_tokens(combined_message, MODEL_NAME)
@@ -528,11 +532,12 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
                             response_generator = get_azure_response(
                                 messages=history,
-                                deployment_name=model_obj.deployment_name,
+                                deployment_name=deployment_name or model_obj.deployment_name,
                                 max_completion_tokens=max_tokens,
                                 api_endpoint=model_obj.api_endpoint,
                                 api_key=model_obj.api_key,
                                 api_version=api_version,
+                                model_type=model_type,
                                 requires_o1_handling=model_obj.requires_o1_handling,
                                 timeout_seconds=120,
                                 stream=True
@@ -644,11 +649,12 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                     # Get Azure response
                     response = get_azure_response(
                         messages=history,
-                        deployment_name=model_obj.deployment_name,
+                        deployment_name=deployment_name or model_obj.deployment_name,
                         max_completion_tokens=max_tokens,
                         api_endpoint=model_obj.api_endpoint,
                         api_key=model_obj.api_key,
                         api_version=api_version,
+                        model_type=model_type,
                         requires_o1_handling=model_obj.requires_o1_handling,
                         timeout_seconds=120,
                         stream=False
@@ -919,14 +925,18 @@ def update_chat_title(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse,
 # 5) Stats route => GET /chat/stats/<chat_id>
 ##############################################################################
 
-@chat_routes.route("/stats/<chat_id>", methods=["GET"])
+@chat_routes.route("/chat/stats/<chat_id>", methods=["GET"])
 @login_required
 def get_chat_stats(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Get chat statistics including token usage."""
+    logger.debug("Received stats request for chat_id: %s (type: %s)", chat_id, type(chat_id))
     try:
+        # First verify the chat exists and is accessible
         if not validate_chat_access(chat_id):
-            return jsonify({"error": "Unauthorized access to chat"}), 403
+            logger.warning("Unauthorized stats access attempt for chat %s", chat_id)
+            return jsonify({"error": "Chat not found or access denied"}), 404
 
+        # Get model info for token limits
         model_obj = Chat.get_model(chat_id)
         if not model_obj:
             return jsonify({"error": "Model not found"}), 404

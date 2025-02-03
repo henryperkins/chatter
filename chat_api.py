@@ -8,11 +8,14 @@ including sending chat messages and getting responses, as well as web scraping.
 import logging
 import json
 import os
+from datetime import datetime
 from typing import Optional, List, Dict, Union, Generator, Any
 import requests
 from bs4 import BeautifulSoup
+from openai import AzureOpenAI
 from azure_file_manager import AzureOpenAIChatWithFiles, AzureOpenAIFileManager
 from azure_search_client import create_search_client, AzureOpenAISearchChat
+from models.model import Model
 
 # Type aliases for better readability
 ResponseType = Union[Dict[str, Any], str, Generator[Dict[str, Any], None, None]]
@@ -23,6 +26,57 @@ logger = logging.getLogger(__name__)
 # Initialize clients
 _file_chat_client = None
 _search_chat_client = None
+_azure_client = None
+
+def get_azure_client(api_key: str, api_endpoint: str, api_version: str) -> AzureOpenAI:
+    """Get or create Azure OpenAI client with enhanced validation and error handling"""
+    global _azure_client
+    if _azure_client is None:
+        try:
+            # Validate inputs
+            if not api_key or not api_key.strip():
+                raise ValueError("API key cannot be empty")
+            if not api_endpoint or not api_endpoint.strip():
+                raise ValueError("API endpoint cannot be empty")
+            if not api_version or not api_version.strip():
+                raise ValueError("API version cannot be empty")
+
+            # Validate API endpoint format
+            if not api_endpoint.startswith(('http://', 'https://')):
+                raise ValueError("API endpoint must start with http:// or https://")
+
+            # Remove any trailing slashes from the endpoint
+            api_endpoint = api_endpoint.rstrip('/')
+
+            # Log the configuration being used (mask sensitive data)
+            logger.debug("Initializing Azure OpenAI client with:")
+            logger.debug(f"API Endpoint: {api_endpoint}")
+            logger.debug(f"API Version: {api_version}")
+            logger.debug(f"API Key: {api_key[:4]}...{api_key[-4:] if len(api_key) > 8 else '****'}")
+
+            # Initialize the client with direct API key authentication
+            _azure_client = AzureOpenAI(
+                api_key=api_key,
+                azure_endpoint=api_endpoint,
+                api_version=api_version
+            )
+
+            # Test the client with a simple request
+            try:
+                _azure_client.models.list()
+                logger.debug("Successfully tested Azure OpenAI client connection")
+            except Exception as test_error:
+                logger.error(f"Failed to test Azure OpenAI client: {str(test_error)}")
+                _azure_client = None
+                raise ValueError(f"Failed to validate Azure OpenAI client: {str(test_error)}")
+
+            logger.debug("Successfully initialized Azure OpenAI client")
+        except Exception as e:
+            logger.error(f"Failed to initialize Azure OpenAI client: {str(e)}")
+            if isinstance(e, ValueError):
+                raise
+            raise ValueError(f"Failed to initialize Azure OpenAI client: {str(e)}")
+    return _azure_client
 
 def get_file_chat_client() -> Optional[AzureOpenAIChatWithFiles]:
     global _file_chat_client
@@ -47,7 +101,6 @@ def get_search_chat_client(model_type: str) -> Optional[AzureOpenAISearchChat]:
             logger.error(f"Failed to initialize search chat client: {str(e)}")
     return _search_chat_client
 
-
 def get_azure_response(
     messages: List[Dict[str, str]],
     deployment_name: Optional[str] = None,
@@ -67,246 +120,216 @@ def get_azure_response(
     use_code_interpreter: bool = False
 ) -> Union[Dict[str, Any], str, Generator]:
     try:
-        # Check if we should use file-based operations
-        if (file_ids or vector_store_id or use_code_interpreter) and model_type in ['gpt-4o', 'o1']:
-            file_client = get_file_chat_client()
-            if not file_client:
-                raise ValueError("File operations requested but file client not available")
+        # Add detailed debug logging
+        logger.debug("Starting Azure API request with parameters:")
+        logger.debug(f"Deployment name: {deployment_name}")
+        logger.debug(f"API endpoint: {api_endpoint}")
+        logger.debug(f"API version: {api_version}")
+        logger.debug(f"Model type: {model_type}")
+        logger.debug(f"Messages count: {len(messages)}")
+        logger.debug(f"API key length: {len(api_key) if api_key else 0}")
 
-            # Handle code interpreter
-            if use_code_interpreter and file_ids:
-                return file_client.chat_with_code_interpreter(
-                    messages=messages,
-                    file_ids=file_ids,
-                    temperature=1.0  # Fixed for these models
-                )
-
-            # Handle vector store search
-            if vector_store_id:
-                search_client = get_search_chat_client(model_type)
-                if not search_client:
-                    raise ValueError("Search operations requested but search client not available")
-
-                return search_client.chat_with_search(
-                    messages=messages,
-                    query_type="vector",
-                    temperature=1.0,  # Fixed for these models
-                    max_tokens=max_completion_tokens or (25000 if model_type == 'o1' else 16384),
-                    top_n=5,
-                    strictness=3
-                )
-
-        # Validate parameters for regular API call
-        if not deployment_name or not api_endpoint or not api_key or not api_version:
-            raise ValueError("Missing required parameters")
-
-        # Ensure api_endpoint ends with '/'
-        if not api_endpoint.endswith('/'):
-            api_endpoint += '/'
-
-        # Log incoming parameters
-        logger.debug("API call parameters - endpoint: %s, deployment: %s, version: %s",
-                    api_endpoint, deployment_name, api_version)
-
-        # Parse the endpoint URL to handle various formats
-        from urllib.parse import urlparse
-
-        # Log detailed debugging information
-        logger.debug("Initial API endpoint: %s", api_endpoint)
-        logger.debug("Deployment name: %s", deployment_name)
-        logger.debug("API version: %s", api_version)
-
-        # Parse the base endpoint URL (should be like https://xxx.openai.azure.com)
-        parsed = urlparse(api_endpoint)
-
-        # Extract the base endpoint (just the scheme and netloc)
-        base_endpoint = f"{parsed.scheme}://{parsed.netloc}"
-        logger.debug("Base endpoint: %s", base_endpoint)
-
-        # Construct the endpoint URL following Azure OpenAI API format
-        endpoint = (f"{base_endpoint}/openai/deployments/{deployment_name}/chat/completions"
-                   f"?api-version={api_version}")
-
-        logger.debug("Final endpoint URL: %s", endpoint)
-        headers = {
-            "Content-Type": "application/json",
-            "api-key": api_key,
-        }
-        # Prepare the payload based on model requirements
-        payload = {
-            "messages": messages,
-            "stream": stream,
-        }
-
-        # Add file_ids to payload if provided
-        if file_ids:
-            payload["file_ids"] = file_ids
-
-        # Import os for environment variables
-        import os
-
-        # Set model-specific parameters
-        if model_type == 'o1':
-            # O1 model requirements
-            payload.update({
-                "temperature": 1.0,  # Fixed at 1.0 for O1
-                "max_completion_tokens": min(max_completion_tokens or 25000, 25000),  # Max 25000 for O1
-                "reasoning_effort": reasoning_effort,  # low, medium, high
-                "store_completion": store_completion
-            })
-            if response_format:
-                payload["response_format"] = response_format
-
-            # Add search capabilities if enabled
-            if os.getenv("USE_AZURE_SEARCH", "false").lower() == "true":
-                search_client = get_search_chat_client(model_type)
-                if search_client:
-                    search_params = search_client.search_extension.get_search_parameters(
-                        query_type="vector",
-                        top_n=5,
-                        strictness=3
-                    )
-                    payload["data_sources"] = [search_params]
-
-        elif model_type == 'gpt-4o':
-            # GPT-4o requirements
-            payload.update({
-                "temperature": 1.0,  # Fixed at 1.0 for GPT-4o
-                "max_tokens": min(max_completion_tokens or 16384, 16384)  # Max 16384 for GPT-4o
-            })
-            if response_format:
-                payload["response_format"] = response_format
-
-            # Add search capabilities if enabled
-            if os.getenv("USE_AZURE_SEARCH", "false").lower() == "true":
-                search_client = get_search_chat_client(model_type)
-                if search_client:
-                    search_params = search_client.search_extension.get_search_parameters(
-                        query_type="vector",
-                        top_n=5,
-                        strictness=3
-                    )
-                    payload["data_sources"] = [search_params]
-
-        else:
-            # Default handling for other models
-            payload.update({
-                "temperature": 1.0,  # Default temperature
-                "max_tokens": max_completion_tokens or 256  # Default max tokens
-            })
-
-        # Ensure proper API version for models that support vector search
-        if model_type in ['o1', 'gpt-4o']:
-            api_version = '2025-01-01-preview'
-
-        logger.debug("Making API call to %s with parameters: %s", endpoint, payload)
-
-        # Make the API call using requests
-        response = requests.post(
-            endpoint,
-            headers=headers,
-            json=payload,
-            timeout=timeout_seconds,
-            stream=stream,  # Enable streaming if requested
-        )
+        # Validate required parameters
+        if not all([deployment_name, api_endpoint, api_key, api_version]):
+            missing = []
+            if not deployment_name: missing.append("deployment_name")
+            if not api_endpoint: missing.append("api_endpoint")
+            if not api_key: missing.append("api_key")
+            if not api_version: missing.append("api_version")
+            raise ValueError(f"Missing required parameters: {', '.join(missing)}")
 
         try:
-            # Check for HTTP errors
-            response.raise_for_status()
-        except requests.exceptions.HTTPError as http_err:
-            error_content = response.text
-            try:
-                error_json = response.json()
-                error_details = error_json.get('error', {})
-                error_code = error_details.get('code', '')
-                error_message = error_details.get('message', '')
+            # Initialize Azure OpenAI client
+            client = get_azure_client(api_key, api_endpoint, api_version)
 
-                logger.error("Azure OpenAI API error: %s - %s", error_code, error_message)
-                logger.error("Full response: %s", error_content)
+            # Log successful client initialization
+            logger.debug("Successfully initialized Azure OpenAI client")
 
-                if error_code == '404':
-                    raise Exception(
-                        f"Resource not found. Please verify the deployment name '{deployment_name}' "
-                        f"exists and the endpoint URL is correct: {base_endpoint}"
-                    )
-                elif error_code == '401':
-                    raise Exception(
-                        "Authentication failed. Please verify your API key is correct and not expired."
-                    )
-                elif error_code == '429':
-                    raise Exception(
-                        "Rate limit exceeded. Please try again later or reduce your request frequency."
-                    )
-                else:
-                    raise Exception(f"Azure OpenAI API error: {error_message}")
+            # Prepare the completion parameters
+            completion_params = {
+                "model": deployment_name,
+                "messages": messages,
+                "stream": stream
+            }
 
-            except ValueError as json_err:
-                logger.error("Failed to parse error response: %s", str(json_err))
-                logger.error("Raw response: %s", error_content)
-                raise Exception(f"Invalid response from Azure OpenAI API: {error_content}")
-        except Exception as err:
-            logger.error("Error occurred during API request: %s", str(err))
-            raise Exception(f"Error occurred during API request: {str(err)}")
+            # Get model capabilities
+            model_caps = Model.PROVIDER_CAPABILITIES.get(model_type, {})
 
-        if stream:
-            # Return a generator that yields the response chunks
-            def generate():
-                for line in response.iter_lines():
-                    if line:
-                        decoded_line = line.decode('utf-8').strip()
-                        if decoded_line == "":
-                            continue
-                        if decoded_line.startswith('data:'):
-                            data_str = decoded_line[len('data:'):].strip()
-                        else:
-                            data_str = decoded_line
-                        if data_str == '[DONE]':
-                            break
-                        else:
+            # Set base parameters using model capabilities
+            completion_params.update({
+                "temperature": 1.0 if model_caps.get("fixed_temperature") else 0.7,
+                "max_tokens": min(
+                    max_completion_tokens or model_caps.get("max_tokens", 16384),
+                    model_caps.get("max_tokens", 16384)
+                )
+            })
+
+            # Add model-specific parameters based on capabilities
+            if model_caps.get("requires_reasoning_effort"):
+                completion_params.update({
+                    "reasoning_effort": reasoning_effort,
+                    "store_completion": store_completion
+                })
+
+            # Add response format if supported
+            if model_caps.get("supports_json_mode") and response_format:
+                completion_params["response_format"] = response_format
+
+            # Handle streaming capability
+            if stream and not model_caps.get("streaming", True):
+                logger.warning(f"Streaming not supported for model type {model_type}, falling back to non-streaming")
+                stream = False
+                completion_params["stream"] = False
+
+            # Log the final parameters
+            logger.debug(f"Using model capabilities: {json.dumps(model_caps, indent=2)}")
+
+            logger.debug(f"Completion parameters: {json.dumps(completion_params, indent=2)}")
+
+            # Validate messages format
+            if not isinstance(messages, list):
+                raise ValueError("Messages must be a list")
+            for msg in messages:
+                if not isinstance(msg, dict) or 'role' not in msg or 'content' not in msg:
+                    raise ValueError("Invalid message format")
+
+            # Validate and sanitize messages
+            sanitized_messages = []
+            for msg in messages:
+                if not isinstance(msg, dict):
+                    raise ValueError(f"Invalid message format: {msg}")
+                if 'role' not in msg or 'content' not in msg:
+                    raise ValueError(f"Message missing required fields: {msg}")
+                if msg['role'] not in ['system', 'user', 'assistant']:
+                    raise ValueError(f"Invalid message role: {msg['role']}")
+                if not isinstance(msg['content'], str):
+                    raise ValueError(f"Message content must be string: {msg}")
+
+                # Sanitize content
+                sanitized_content = msg['content'].strip()
+                if not sanitized_content:
+                    continue  # Skip empty messages
+
+                sanitized_messages.append({
+                    'role': msg['role'],
+                    'content': sanitized_content
+                })
+
+            if not sanitized_messages:
+                raise ValueError("No valid messages provided")
+
+            completion_params['messages'] = sanitized_messages
+
+            # Make the API call
+            if stream:
+                stream_response = client.chat.completions.create(**completion_params)
+                def generate():
+                    try:
+                        current_content = ""
+                        last_error = None
+                        consecutive_errors = 0
+                        MAX_RETRIES = 3
+
+                        for chunk in stream_response:
                             try:
-                                data = json.loads(data_str)
-                                # Ensure consistent format with non-streaming response
-                                if "choices" in data and len(data["choices"]) > 0:
-                                    choice = data["choices"][0]
-                                    if "delta" in choice:
-                                        # Convert delta format to match non-streaming format
-                                        delta = choice["delta"]
-                                        if "content" in delta:
-                                            choice["message"] = {"content": delta["content"]}
-                                            del choice["delta"]
-                                yield data
-                            except json.JSONDecodeError:
-                                logger.error("Failed to parse JSON: %s", data_str)
+                                if not hasattr(chunk.choices[0], 'delta'):
+                                    logger.warning("Received chunk without delta")
+                                    continue
+
+                                delta = chunk.choices[0].delta
+
+                                # Reset error counter on successful chunk
+                                consecutive_errors = 0
+
+                                # Handle system messages in stream
+                                if hasattr(delta, 'role') and delta.role == 'system':
+                                    continue
+
+                                # Handle content updates
+                                if hasattr(delta, 'content') and delta.content is not None:
+                                    current_content += delta.content
+                                    yield {
+                                        "choices": [{
+                                            "message": {
+                                                "content": delta.content,
+                                                "role": "assistant"
+                                            },
+                                            "finish_reason": None,
+                                            "index": 0
+                                        }],
+                                        "created": int(datetime.now().timestamp()),
+                                        "model": completion_params['model']
+                                    }
+
+                                # Handle end of stream
+                                if hasattr(chunk.choices[0], 'finish_reason') and chunk.choices[0].finish_reason:
+                                    yield {
+                                        "choices": [{
+                                            "message": {
+                                                "content": current_content,
+                                                "role": "assistant"
+                                            },
+                                            "finish_reason": chunk.choices[0].finish_reason,
+                                            "index": 0
+                                        }],
+                                        "created": int(datetime.now().timestamp()),
+                                        "model": completion_params['model']
+                                    }
+
+                            except Exception as chunk_error:
+                                logger.error(f"Error processing chunk: {str(chunk_error)}")
+                                consecutive_errors += 1
+                                last_error = chunk_error
+
+                                if consecutive_errors >= MAX_RETRIES:
+                                    raise Exception(f"Too many consecutive errors: {str(last_error)}")
                                 continue
-            return generate()
-        else:
-            # Handle non-streaming response
-            json_response = response.json()
-            if not json_response.get("choices"):
-                logger.error("API returned unexpected response: %s", json_response)
-                raise ValueError("API returned no choices")
 
-            # Extract content
-            choice = json_response["choices"][0]
-            if "message" in choice and "content" in choice["message"]:
-                content = choice["message"]["content"]
-            elif "text" in choice:
-                content = choice["text"]
+                    except Exception as e:
+                        logger.error(f"Error in stream processing: {str(e)}")
+                        # Yield error message to client
+                        yield {
+                            "error": str(e),
+                            "choices": [{
+                                "message": {
+                                    "content": f"An error occurred during streaming: {str(e)}",
+                                    "role": "assistant"
+                                },
+                                "finish_reason": "error",
+                                "index": 0
+                            }],
+                            "created": int(datetime.now().timestamp()),
+                            "model": completion_params['model']
+                        }
+                return generate()
             else:
-                logger.error("API response format is unexpected: %s", json_response)
-                raise ValueError("API response in unexpected format: no 'message' or 'text' field")
+                response = client.chat.completions.create(**completion_params)
 
-            if not content:
-                raise ValueError("API returned empty content")
+                # Validate response
+                if not response:
+                    raise ValueError("Empty response from API")
+                if not hasattr(response, 'choices') or not response.choices:
+                    raise ValueError("API returned no choices")
+                if not hasattr(response.choices[0], 'message'):
+                    raise ValueError("Invalid response format: missing message")
+                if not hasattr(response.choices[0].message, 'content'):
+                    raise ValueError("Invalid response format: missing content")
+                if not response.choices[0].message.content.strip():
+                    raise ValueError("Empty response content")
 
-            logger.debug("Received response: %s", content[:100])
-            return content
+                return response.choices[0].message.content
 
+        except Exception as client_error:
+            logger.error(f"Error with Azure OpenAI client: {str(client_error)}")
+            # Log additional error details if available
+            if hasattr(client_error, 'response'):
+                logger.error(f"Response status: {client_error.response.status_code}")
+                logger.error(f"Response body: {client_error.response.text}")
+            raise
 
     except Exception as e:
-        logger.error("Unexpected error: %s", str(e))
+        logger.error(f"Unexpected error in get_azure_response: {str(e)}")
         raise Exception(f"An unexpected error occurred: {str(e)}")
-
 
 def scrape_data(query: str) -> str:
     """
@@ -330,7 +353,6 @@ def scrape_data(query: str) -> str:
     else:
         raise ValueError("Invalid query type")
 
-
 def scrape_weather(location: str) -> str:
     """
     Scrapes weather information for the given location from Google Search.
@@ -349,16 +371,11 @@ def scrape_weather(location: str) -> str:
             "Chrome/91.0.4472.124 Safari/537.36"
         )
     }
-    logger.debug(f"Request headers for {url}: {headers}")
     try:
         response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()  # Raise an exception for bad status codes
-        logger.debug(f"Response status code for {url}: {response.status_code}")
-        logger.debug(f"Response content snippet for {url}: {response.text[:200]}")
+        response.raise_for_status()
     except requests.exceptions.RequestException as e:
-        logger.error("Error during web request for weather: %s", str(e))
-        logger.debug(f"Failed URL: {url}")
-        logger.debug(f"Request headers: {headers}")
+        logger.error(f"Error during web request for weather: {str(e)}")
         return "Could not retrieve weather information due to a network error."
 
     soup = BeautifulSoup(response.text, "html.parser")
@@ -368,7 +385,6 @@ def scrape_weather(location: str) -> str:
     else:
         logger.warning("Could not find weather information in the page.")
         return f"Could not retrieve weather information for {location}."
-
 
 def scrape_search(search_term: str) -> str:
     """
@@ -388,25 +404,18 @@ def scrape_search(search_term: str) -> str:
             "Chrome/91.0.4472.124 Safari/537.36"
         )
     }
-    logger.debug(f"Request headers for {url}: {headers}")
     try:
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
-        logger.debug(f"Response status code for {url}: {response.status_code}")
-        logger.debug(f"Response content snippet for {url}: {response.text[:200]}")
     except requests.exceptions.RequestException as e:
-        logger.error("Error during web request for search: %s", str(e))
-        logger.debug(f"Failed URL: {url}")
-        logger.debug(f"Request headers: {headers}")
+        logger.error(f"Error during web request for search: {str(e)}")
         return "Could not retrieve search results due to a network error."
 
     soup = BeautifulSoup(response.text, "html.parser")
-    # This selector is Google-dependent and may vary over time.
     results = soup.find_all("div", class_="BNeawe s3v9rd AP7Wnd")
     search_results = [result.text for result in results[:3]]
 
     return "Search results:\n" + "\n".join(search_results)
-
 
 def upload_file_to_azure(file_content: bytes, file_name: str, content_type: str) -> Optional[str]:
     """
