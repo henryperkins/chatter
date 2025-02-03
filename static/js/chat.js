@@ -394,7 +394,8 @@
                     'X-Chat-ID': window.CHAT_CONFIG.chatId,
                     'Accept': 'text/event-stream',
                     'X-CSRFToken': window.CHAT_CONFIG.csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Cache-Control': 'no-cache'
                 }
             });
             logDebug('Stream response status:', response.status);
