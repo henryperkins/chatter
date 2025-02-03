@@ -1,7 +1,10 @@
+──────────────────────────────
+File: chat.html
+──────────────────────────────
 {% extends "base.html" %}
 
 {% block extra_head %}
-<!-- Add styles -->
+<!-- Additional styles -->
 <style>
     /* Sending state styles */
     .sending #send-button {
@@ -25,7 +28,9 @@
     }
 
     @keyframes spin {
-        to { transform: rotate(360deg); }
+        to {
+            transform: rotate(360deg);
+        }
     }
 
     /* Prism syntax highlighting */
@@ -41,6 +46,7 @@
         word-wrap: normal;
         line-height: 1.5;
         tab-size: 4;
+        -webkit-hyphens: none;
         hyphens: none;
     }
 
@@ -51,12 +57,12 @@
         border-radius: 0.3em;
     }
 
-    :not(pre) > code[class*="language-"],
+    :not(pre)>code[class*="language-"],
     pre[class*="language-"] {
         background: #2d2d2d;
     }
 
-    :not(pre) > code[class*="language-"] {
+    :not(pre)>code[class*="language-"] {
         padding: .1em;
         border-radius: .3em;
         white-space: normal;
@@ -146,12 +152,14 @@
 {% block main_classes %}h-[calc(100vh-7rem)] flex{% endblock %}
 
 {% block chat_tabs %}
-<div class="fixed w-full top-0 z-[1200] bg-gradient-to-b from-white/95 to-gray-50/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-sm safe-area-top">
-    <div class="chat-tabs flex overflow-x-auto border-b border-gray-200/50 dark:border-gray-700/50 px-2">
+<div
+    class="fixed w-full top-0 z-[1090] bg-gradient-to-b from-white/95 to-gray-50/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-sm safe-area-top">
+    <div
+        class="chat-tabs flex overflow-x-auto border-b border-gray-200/50 dark:border-gray-700/50 px-2 scrollbar-thin scrollbar-thumb-gray-400/50 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600/50 dark:hover:scrollbar-thumb-gray-600 scrollbar-track-transparent">
         <!-- New Chat Button -->
-        <button class="flex items-center gap-2 px-4 py-2 border-r border-t border-l border-gray-200/50 dark:border-gray-700/50 bg-gray-100/80 dark:bg-gray-700/80 hover:bg-gray-200/80 dark:hover:bg-gray-600/80 transition-all duration-200 rounded-t-md"
-                id="new-chat-btn"
-                aria-label="Start new chat" role="button">
+        <button
+            class="flex items-center gap-2 px-4 py-2 border-r border-t border-l border-gray-200/50 dark:border-gray-700/50 bg-gray-100/80 dark:bg-gray-700/80 hover:bg-gray-200/80 dark:hover:bg-gray-700/80 transition-all duration-200 rounded-t-md"
+            id="new-chat-btn" aria-label="Start new chat" role="button">
             <i class="fas fa-plus text-xs text-gray-600 dark:text-gray-300"></i>
             <span class="text-gray-600 dark:text-gray-300">New Tab</span>
         </button>
@@ -159,11 +167,15 @@
         <!-- Chat Tabs -->
         {% for conversation in conversations|sort(attribute='timestamp', reverse=True) %}
         <div class="group">
-            <button class="flex items-center gap-2 px-4 py-2 border-r border-t border-l border-gray-200/50 dark:border-gray-700/50 {% if conversation.id == chat_id %}bg-white dark:bg-gray-800 border-b-0 relative mb-[-1px] rounded-t-md{% else %}bg-gray-100/80 dark:bg-gray-700/80 hover:bg-gray-200/80 dark:hover:bg-gray-600/80 rounded-t-md{% endif %} transition-all duration-200"
-                    data-chat-id="{{ conversation.id }}"
-                    onclick="window.location.href='{{ url_for('chat.chat_interface', chat_id=conversation.id) }}'">
+            <button
+                class="flex items-center gap-2 px-4 py-2 border-r border-t border-l border-gray-200/50 dark:border-gray-700/50 {% if conversation.id == chat_id %}bg-white dark:bg-gray-800 border-b-0 relative mb-[-1px] rounded-t-md{% else %}bg-gray-100/80 dark:bg-gray-700/80 hover:bg-gray-200/80 dark:hover:bg-gray-600/80 rounded-t-md{% endif %} transition-all duration-200"
+                data-chat-id="{{ conversation.id }}"
+                data-href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
+                onclick="window.location.href=this.dataset.href">
                 <span class="truncate max-w-[200px]">{{ conversation.title | e }}</span>
-                <button class="ml-2 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400" data-chat-id="{{ conversation.id }}" title="Delete chat" aria-label="Delete chat">
+                <button onclick="event.stopPropagation()"
+                    class="ml-2 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400"
+                    data-chat-id="{{ conversation.id }}" title="Delete chat" aria-label="Delete chat">
                     <i class="fas fa-times text-xs"></i>
                 </button>
             </button>
@@ -172,23 +184,26 @@
     </div>
 
     <!-- Chat Controls -->
-    <div class="flex items-center gap-2 px-4 py-2 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 mt-1">
+    <div
+        class="flex items-center gap-2 px-4 py-2 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 mt-1">
         <!-- Model Selection -->
         {% if models %}
         <div class="relative flex-1 max-w-xs">
             <select id="model-select" data-original-value="{{ current_model.id if current_model else '' }}"
-                    class="w-full h-8 px-2 pr-8 text-sm border border-gray-300/50 dark:border-gray-600/50 rounded-lg shadow-soft focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:bg-gray-800/90 dark:text-gray-200 appearance-none cursor-pointer touch-manipulation bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm transition-all duration-300 hover:border-primary-500 dark:hover:border-primary-400">
+                title="Select AI model"
+                class="w-full h-8 px-2 pr-8 text-sm border border-gray-300/50 dark:border-gray-600/50 rounded-lg shadow-soft focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:bg-gray-800/90 dark:text-gray-200 appearance-none cursor-pointer touch-manipulation bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm transition-all duration-300 hover:border-primary-500 dark:hover:border-primary-400">
                 {% for model in models %}
                 <option value="{{ model.id }}"
-                        data-requires-o1-handling="{{ 'true' if model.requires_o1_handling else 'false' }}"
-                        data-supports-streaming="{{ 'true' if model.supports_streaming else 'false' }}"
-                        data-max-completion-tokens="{{ model.max_completion_tokens }}"
-                        {% if current_model and model.id == current_model.id %}selected{% endif %}>
+                    data-requires-o1-handling="{{ 'true' if model.requires_o1_handling else 'false' }}"
+                    data-supports-streaming="{{ 'true' if model.supports_streaming else 'false' }}"
+                    data-max-completion-tokens="{{ model.max_completion_tokens }}" {% if current_model and
+                    model.id==current_model.id %}selected{% endif %}>
                     {{ model.name }}{% if model.is_default %} (Default){% endif %}
                 </option>
                 {% endfor %}
             </select>
-            <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500 dark:text-gray-400">
+            <div
+                class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500 dark:text-gray-400">
                 <i class="fas fa-chevron-down"></i>
             </div>
         </div>
@@ -198,12 +213,12 @@
         {% if current_user.role == 'admin' %}
         <div class="flex items-center gap-1">
             <a href="{{ url_for('model.add_model_page') }}"
-               class="p-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200">
+                class="p-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200">
                 <i class="fas fa-plus-circle"></i>
             </a>
             <button id="edit-model-btn"
-                    class="p-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
-                    aria-label="Edit current model settings">
+                class="p-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
+                aria-label="Edit current model settings">
                 <i class="fas fa-edit"></i>
             </button>
         </div>
@@ -211,8 +226,8 @@
 
         <!-- Edit Title Button -->
         <button id="edit-title-btn"
-                class="p-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
-                aria-label="Edit chat title">
+            class="p-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
+            aria-label="Edit chat title">
             <i class="fas fa-edit"></i>
         </button>
     </div>
@@ -220,327 +235,199 @@
 {% endblock %}
 
 {% block content %}
-<div class="flex flex-col h-[100dvh] w-full overflow-hidden bg-white/95 dark:bg-gray-950/95 safe-area-inset touch-manipulation dark-mode-transition backdrop-blur-sm relative pt-[100px]">
+<div
+    class="flex flex-col h-[100dvh] w-full overflow-hidden bg-white/95 dark:bg-gray-950/95 safe-area-inset touch-manipulation dark-mode-transition backdrop-blur-sm relative pt-[120px]">
     <!-- Main Chat Area -->
-    <div class="flex-1 flex flex-col overflow-hidden h-full pb-safe dark-mode-transition bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+    <div
+        class="flex-1 flex flex-col overflow-hidden h-full pb-safe dark-mode-transition bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
         <!-- Messages Area -->
         <div id="chat-box"
-              class="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 min-h-[200px] pb-40 scrollbar-thin scrollbar-thumb-gray-400/50 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600/50 dark:hover:scrollbar-thumb-gray-600 scrollbar-track-transparent bg-gradient-to-b from-white/50 to-gray-50/50 dark:from-gray-900/50 dark:to-gray-800/50 backdrop-blur-sm"
-              role="log" aria-live="polite">
-             <div class="max-w-4xl mx-auto w-full">
-            {% if messages %}
+            class="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 min-h-[200px] pb-40 scrollbar-thin scrollbar-thumb-gray-400/50 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600/50 dark:hover:scrollbar-thumb-gray-600 scrollbar-track-transparent bg-gradient-to-b from-white/50 to-gray-50/50 dark:from-gray-900/50 dark:to-gray-800/50 backdrop-blur-sm"
+            role="log" aria-live="polite">
+            <div class="max-w-4xl mx-auto w-full">
+                {% if messages %}
                 {% for message in messages %}
-                    {% if message.role == 'assistant' %}
-                    <!-- Assistant message -->
-                    <div class="flex w-full mt-6 space-x-3 sm:space-x-4 px-2 sm:px-0 max-w-3xl mx-auto">
-                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-md" role="img"
-                             aria-label="Assistant avatar">
-                            <i class="fas fa-robot text-lg"></i>
+                {% if message.role == 'assistant' %}
+                <!-- Assistant message -->
+                <div class="flex w-full mt-6 space-x-3 sm:space-x-4 px-2 sm:px-0 max-w-3xl mx-auto">
+                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-md"
+                        role="img" aria-label="Assistant avatar">
+                        <i class="fas fa-robot text-lg"></i>
+                    </div>
+                    <div class="relative flex-1 group">
+                        <!-- Action Buttons -->
+                        <div
+                            class="absolute right-3 top-3 flex items-center space-x-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <button
+                                class="copy-button p-2 rounded-lg bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
+                                title="Copy to clipboard"
+                                data-raw-content="{{ message.raw_content|default(message.content)|e }}"
+                                aria-label="Copy message to clipboard">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                            {% if loop.last %}
+                            <button
+                                class="regenerate-button p-2 rounded-lg bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
+                                title="Regenerate response" aria-label="Regenerate response">
+                                <i class="fas fa-redo-alt"></i>
+                            </button>
+                            {% endif %}
                         </div>
-                        <div class="relative flex-1 group">
-                            <!-- Action Buttons -->
-                            <div class="absolute right-3 top-3 flex items-center space-x-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                <button
-                                    class="copy-button p-2 rounded-lg bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
-                                    title="Copy to clipboard"
-                                    data-raw-content="{{ message.raw_content|default(message.content)|e }}"
-                                    aria-label="Copy message to clipboard">
-                                    <i class="fas fa-copy"></i>
-                                </button>
-                                {% if loop.last %}
-                                <button
-                                    class="regenerate-button p-2 rounded-lg bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
-                                    title="Regenerate response"
-                                    aria-label="Regenerate response">
-                                    <i class="fas fa-redo-alt"></i>
-                                </button>
-                                {% endif %}
-                            </div>
 
-                            <!-- Message Content -->
-                            <div class="bg-white/95 dark:bg-gray-800/95 p-5 sm:p-6 rounded-2xl shadow-lg group hover:shadow-xl transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:-translate-y-1">
-                                <div class="prose dark:prose-invert prose-base sm:prose-lg max-w-none overflow-x-auto !w-full !break-words prose-headings:font-semibold prose-p:text-gray-700 dark:prose-p:text-gray-300 prose-pre:bg-gray-50 dark:prose-pre:bg-gray-900/50 prose-pre:shadow-md"
-                                     data-role="assistant-message"
-                                     data-content="{{ message.content | e }}">
-                                    <!-- Content will be rendered by client-side JavaScript -->
-                                </div>
-                                {% if message.metadata and message.metadata.has_attachments %}
-                                <div class="mt-4 space-y-2">
-                                    <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Attached Files:</div>
-                                    {% for attachment in message.metadata.attachments %}
-                                    <div class="flex items-center space-x-2 bg-gray-50 dark:bg-gray-700/50 p-2 rounded-lg">
-                                        <div class="flex-shrink-0">
-                                            <i class="fas fa-file-alt text-blue-500"></i>
-                                        </div>
-                                        <div class="flex-1 min-w-0">
-                                            <div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                                {{ attachment.name }}
-                                            </div>
-                                            <div class="text-xs text-gray-500 dark:text-gray-400">
-                                                Click to expand
-                                            </div>
-                                        </div>
-                                        <button class="toggle-file-content p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                                                data-file-name="{{ attachment.name }}"
-                                                aria-label="Toggle file content">
-                                            <i class="fas fa-chevron-down"></i>
-                                        </button>
-                                    </div>
-                                    <div class="file-content hidden ml-6 mt-2 bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
-                                        <pre class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{{ attachment.content }}</pre>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-                                {% endif %}
+                        <!-- Message Content -->
+                        <div
+                            class="bg-white/95 dark:bg-gray-800/95 p-5 sm:p-6 rounded-2xl shadow-lg group hover:shadow-xl transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:-translate-y-1">
+                            <div class="prose dark:prose-invert prose-base sm:prose-lg max-w-none overflow-x-auto !w-full !break-words prose-headings:font-semibold prose-p:text-gray-700 dark:prose-p:text-gray-300 prose-pre:bg-gray-50 dark:prose-pre:bg-gray-900/50 prose-pre:shadow-md"
+                                data-role="assistant-message" data-content="{{ message.content | e }}">
+                                <!-- Content will be rendered by client-side JavaScript -->
                             </div>
-                            <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                            {% if message.metadata and message.metadata.has_attachments %}
+                            <div class="mt-4 space-y-2">
+                                <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Attached Files:</div>
+                                {% for attachment in message.metadata.attachments %}
+                                <div class="flex items-center space-x-2 bg-gray-50 dark:bg-gray-700/50 p-2 rounded-lg">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-file-alt text-blue-500"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                            {{ attachment.name }}
+                                        </div>
+                                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                                            Click to expand
+                                        </div>
+                                    </div>
+                                    <button
+                                        class="toggle-file-content p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                                        data-file-name="{{ attachment.name }}" aria-label="Toggle file content">
+                                        <i class="fas fa-chevron-down"></i>
+                                    </button>
+                                </div>
+                                <div class="file-content hidden ml-6 mt-2 bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
+                                    <pre
+                                        class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{{ attachment.content }}</pre>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                            {{ message.timestamp }}
+                        </span>
+                    </div>
+                </div>
+                {% elif message.role == 'user' %}
+                <!-- User message -->
+                <div class="flex w-full mt-6 space-x-3 sm:space-x-4 max-w-2xl ml-auto justify-end">
+                    <div class="relative order-2">
+                        <div
+                            class="bg-gradient-to-r from-primary-600/95 to-secondary-600/95 dark:from-primary-500/95 dark:to-secondary-500/95 text-white p-5 sm:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
+                            <p class="text-base sm:text-lg leading-relaxed break-words overflow-x-auto font-medium">{{
+                                message.content }}</p>
+                        </div>
+                        <div class="flex items-center justify-end mt-2 space-x-2">
+                            <span class="text-sm text-gray-500 dark:text-gray-400">
                                 {{ message.timestamp }}
                             </span>
-                        </div>
-                    </div>
-                    {% elif message.role == 'user' %}
-                    <!-- User message -->
-                    <div class="flex w-full mt-6 space-x-3 sm:space-x-4 max-w-2xl ml-auto justify-end">
-                        <div class="relative order-2">
-                            <div class="bg-gradient-to-r from-primary-600/95 to-secondary-600/95 dark:from-primary-500/95 dark:to-secondary-500/95 text-white p-5 sm:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
-                                <p class="text-base sm:text-lg leading-relaxed break-words overflow-x-auto font-medium">{{ message.content }}</p>
-                            </div>
-                            <div class="flex items-center justify-end mt-2 space-x-2">
-                                <span class="text-sm text-gray-500 dark:text-gray-400">
-                                    {{ message.timestamp }}
-                                </span>
-                                <div class="flex-shrink-0 h-5 w-5 rounded-full bg-gradient-to-br from-primary-500/30 to-secondary-500/30 dark:from-primary-400/30 dark:to-secondary-400/30"></div>
+                            <div
+                                class="flex-shrink-0 h-5 w-5 rounded-full bg-gradient-to-br from-primary-500/30 to-secondary-500/30 dark:from-primary-400/30 dark:to-secondary-400/30">
                             </div>
                         </div>
-                        <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gradient-to-br from-primary-500/20 to-secondary-500/20 dark:from-primary-400/20 dark:to-secondary-400/20 order-1 shadow-md" role="img"
-                             aria-label="User avatar"></div>
                     </div>
-                    {% endif %}
+                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gradient-to-br from-primary-500/20 to-secondary-500/20 dark:from-primary-400/20 dark:to-secondary-400/20 order-1 shadow-md"
+                        role="img" aria-label="User avatar"></div>
+                </div>
+                {% endif %}
                 {% endfor %}
-            {% else %}
-            <div class="text-center text-gray-500 dark:text-gray-400 mt-8">
-                <p class="text-lg">This is a new chat. Start typing to begin!</p>
-                <p class="text-sm mt-2">Your messages are end-to-end encrypted</p>
+                {% else %}
+                <div class="text-center text-gray-500 dark:text-gray-400 mt-8">
+                    <p class="text-lg">This is a new chat. Start typing to begin!</p>
+                    <p class="text-sm mt-2">Your messages are end-to-end encrypted</p>
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
-             </div>
         </div>
 
         <!-- Token Usage Display -->
         <div id="token-usage"
-              class="px-4 sm:px-6 py-2 bg-white/90 dark:bg-gray-800/90 border-t border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
-            <div class="max-w-4xl mx-auto">
-                <div class="flex flex-col gap-2">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <span id="tokens-used" aria-label="Tokens used" class="text-sm text-gray-600 dark:text-gray-400">0 tokens used</span>
-                            <span id="tokens-limit" aria-label="Token limit" class="text-sm text-gray-500">/0 max</span>
-                        </div>
-                        <div class="token-breakdown flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
-                            <span class="flex items-center gap-1" title="User tokens">
-                                <i class="fas fa-user"></i>
-                                <span id="user-tokens" aria-label="User tokens">0</span>
-                            </span>
-                            <span class="flex items-center gap-1" title="Assistant tokens">
-                                <i class="fas fa-robot"></i>
-                                <span id="assistant-tokens" aria-label="Assistant tokens">0</span>
-                            </span>
-                            <span class="flex items-center gap-1" title="System tokens">
-                                <i class="fas fa-cog"></i>
-                                <span id="system-tokens" aria-label="System tokens">0</span>
-                            </span>
-                            <span class="flex items-center gap-1" title="File tokens">
-                                <i class="fas fa-file"></i>
-                                <span id="file-tokens" aria-label="File tokens">0</span>
-                            </span>
-                            <button id="refresh-stats"
-                                    class="p-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
-                                    aria-label="Refresh token usage">
-                                <i class="fas fa-sync-alt"></i>
-                            </button>
-                        </div>
+            class="sticky bottom-16 px-4 sm:px-6 py-2 bg-white/90 dark:bg-gray-800/90 border-t border-gray-200/50 dark:border-gray-700/50 text-sm text-gray-600 dark:text-gray-300">
+            <!-- Placeholder: token usage info shown here -->
+            Tokens used: <span id="token-count">0</span>
+        </div>
+
+        <!-- Chat Input Area -->
+        <div id="chat-input"
+            class="px-4 sm:px-6 py-4 border-t border-gray-200/50 dark:border-gray-700/50 bg-white dark:bg-gray-900">
+            <form id="chat-form" method="post" enctype="multipart/form-data">
+                <textarea name="message" id="message" rows="3"
+                    class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="Type your message here..."></textarea>
+                <div class="flex items-center justify-between mt-2">
+                    <div>
+                        <input type="file" name="files[]" id="file-upload" class="hidden">
+                        <label for="file-upload" class="cursor-pointer text-primary-600 hover:underline">
+                            <i class="fas fa-paperclip"></i> Attach File
+                        </label>
                     </div>
-                    <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden shadow-inner">
-                        <div id="token-progress" class="bg-blue-600 h-1.5 rounded-full transition-all duration-300 ease-out" style="width: 0%"
-                             role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
-                    </div>
+                    <button type="submit" id="send-button"
+                        class="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500">Send</button>
                 </div>
-            </div>
-        </div>
-
-        <!-- File Upload Area -->
-        <div id="uploaded-files"
-             class="hidden px-4 py-2 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-            <div class="flex justify-between items-center mb-2">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                    Uploaded Files
-                </h3>
-                <div id="total-size" class="text-sm text-gray-500 dark:text-gray-400"></div>
-            </div>
-            <div id="file-list" class="space-y-2"></div>
-            <div id="file-errors" class="space-y-1 mt-2"></div>
-        </div>
-
-        <!-- Input Area -->
-        <div class="input-area sticky bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 border-t border-gray-200/50 dark:border-gray-700/50 px-4 sm:px-6 py-4 z-50 safe-area-bottom transition-all duration-300 shadow-xl dark-mode-transition backdrop-blur-sm">
-            <div class="max-w-4xl mx-auto flex items-center gap-4">
-                <!-- Upload Button -->
-                <button id="upload-button"
-                        class="flex items-center justify-center w-12 h-12 min-w-touch min-h-touch rounded-xl bg-gray-100/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 hover:bg-gray-200/80 dark:hover:bg-gray-700/80 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 backdrop-blur-sm hover:scale-105 active:scale-95 dark-mode-transition shadow-md hover:shadow-lg"
-                        aria-label="Upload files">
-                    <i class="fas fa-upload text-xl"></i>
-                </button>
-
-                <!-- Message Input Container -->
-                <div class="flex-1 relative">
-                    <textarea id="message-input"
-                              class="w-full px-4 py-3 resize-none border-2 border-gray-200/50 dark:border-gray-700/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white/90 dark:bg-gray-800/90 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 text-base leading-relaxed shadow-lg transition-all duration-300 hover:border-primary-400 dark:hover:border-primary-400 dark-mode-transition backdrop-blur-sm"
-                              placeholder="Type your message..."
-                              rows="1"
-                              style="min-height: 48px; max-height: 200px;"
-                              enterkeyhint="send"></textarea>
-                    <div class="absolute right-3 bottom-2 text-xs text-gray-400 dark:text-gray-500 pointer-events-none select-none">
-                        Press <kbd class="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded-md shadow-sm">⏎</kbd> to send
-                    </div>
-                </div>
-
-                <!-- New Chat Button -->
-                <button id="new-chat-btn"
-                        class="flex items-center justify-center w-12 h-12 min-w-[48px] min-h-[48px] rounded-xl bg-gray-100/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-300 hover:bg-gray-200/80 dark:hover:bg-gray-700/80 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 backdrop-blur-sm hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
-                        aria-label="Start new chat">
-                    <i class="fas fa-plus text-xl"></i>
-                </button>
-
-                <!-- Send Button -->
-                <button id="send-button"
-                        class="flex items-center justify-center w-12 h-12 min-w-[48px] min-h-[48px] rounded-xl bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-500 hover:to-secondary-500 active:from-primary-700 active:to-secondary-700 text-white transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
-                        aria-label="Send message">
-                    <i class="fas fa-paper-plane text-xl"></i>
-                </button>
-            </div>
+            </form>
         </div>
     </div>
 </div>
+{% endblock %}
 
-<!-- Drop Zone -->
-<div id="drop-zone"
-     class="fixed inset-0 bg-gray-900/60 dark:bg-black/60 backdrop-blur-md z-modal items-center justify-center transition-all duration-300 ease-in-out hidden dark-mode-transition"
-     role="dialog" aria-label="File drop zone">
-    <div class="bg-white/90 dark:bg-gray-800/90 p-8 rounded-xl shadow-soft text-center max-w-md mx-auto mt-20 transform transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:shadow-lg dark-mode-transition">
-        <div class="text-blue-500 text-6xl mb-4">
-            <i class="fas fa-file-upload"></i>
-        </div>
-        <p class="text-xl font-semibold text-gray-800 dark:text-gray-100 mb-2">Drop files to upload</p>
-        <p class="text-gray-500 dark:text-gray-400">or click to select files</p>
-        <div class="mt-4 text-sm text-gray-500 dark:text-gray-400">
-            Supported formats: PDF, Images, Text
-        </div>
-        <div class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-            Max file size: 10MB, Total: 50MB
-        </div>
-    </div>
+<!-- Chat Configuration Data -->
+<div id="chat-config"
+    data-chat-id="{{ chat_id }}"
+    data-csrf-token="{{ csrf_token() }}"
+    data-models='{{ models|tojson|safe if models else "[]" }}'
+    data-current-model='{{ current_model|tojson|safe if current_model else "null" }}'
+    data-user-id="{{ current_user.id }}"
+    class="hidden">
 </div>
 
-<!-- Mobile upload controls -->
-<div id="mobile-upload-controls"
-     class="md:hidden fixed bottom-20 right-4 z-[1000] transition-transform duration-300 transform hover:scale-105"
-     style="display: none;">
-    <button class="p-3 bg-gradient-to-r from-primary-600 to-secondary-600 hover:from-primary-700 hover:to-secondary-700 active:from-primary-800 active:to-secondary-800 dark:from-primary-500 dark:to-secondary-500 dark:hover:from-primary-600 dark:hover:to-secondary-600 dark:active:from-primary-700 dark:active:to-secondary-700 text-white rounded-full shadow-soft hover:shadow-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transform hover:scale-105 active:scale-95 dark-mode-transition"
-            onclick="fileUploadManager.showMobileUploadMenu()"
-            aria-label="Upload files">
-        <i class="fas fa-upload text-xl"></i>
-    </button>
-</div>
+{% block scripts %}
+    {{ super() }}
 
-<!-- Mobile upload menu -->
-<div id="mobile-upload-menu"
-     class="fixed bottom-0 left-0 w-full bg-white/90 dark:bg-gray-800/90 shadow-soft transform translate-y-full transition-all duration-300 ease-in-out rounded-t-xl z-[1000] backdrop-blur-md border-t border-gray-200/50 dark:border-gray-700/50 dark-mode-transition"
-     style="display: none;">
-    <div class="p-4 safe-area-inset space-y-4 dark-mode-transition">
-        <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Upload Files</h3>
-            <button onclick="fileUploadManager.hideMobileUploadMenu()"
-                    class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                    aria-label="Close menu">
-                <i class="fas fa-times text-xl"></i>
-            </button>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-            <button class="p-4 bg-gray-100/80 dark:bg-gray-700/80 rounded-lg hover:bg-gray-200/80 dark:hover:bg-gray-600/80 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 backdrop-blur-sm hover:scale-[1.02] active:scale-[0.98] shadow-soft hover:shadow-md group dark-mode-transition"
-                    onclick="fileUploadManager.triggerFileInput('camera')">
-                <i class="fas fa-camera text-2xl mb-2 text-primary-500 group-hover:text-primary-600 transition-colors"></i>
-                <span class="block text-sm text-gray-900 dark:text-gray-100">Take Photo</span>
-            </button>
-            <button class="p-4 bg-gray-100/80 dark:bg-gray-700/80 rounded-lg hover:bg-gray-200/80 dark:hover:bg-gray-600/80 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 backdrop-blur-sm hover:scale-[1.02] active:scale-[0.98] shadow-soft hover:shadow-md group dark-mode-transition"
-                    onclick="fileUploadManager.triggerFileInput('gallery')">
-                <i class="fas fa-images text-2xl mb-2 text-success-500 group-hover:text-success-600 transition-colors"></i>
-                <span class="block text-sm text-gray-900 dark:text-gray-100">From Gallery</span>
-            </button>
-            <button class="p-4 bg-gray-100/80 dark:bg-gray-700/80 rounded-lg hover:bg-gray-200/80 dark:hover:bg-gray-600/80 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 backdrop-blur-sm hover:scale-[1.02] active:scale-[0.98] shadow-soft hover:shadow-md group dark-mode-transition"
-                    onclick="fileUploadManager.triggerFileInput('files')">
-                <i class="fas fa-file text-2xl mb-2 text-secondary-500 group-hover:text-secondary-600 transition-colors"></i>
-                <span class="block text-sm text-gray-900 dark:text-gray-100">Files</span>
-            </button>
-            <button class="p-4 bg-gray-100/80 dark:bg-gray-700/80 rounded-lg hover:bg-gray-200/80 dark:hover:bg-gray-600/80 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 backdrop-blur-sm hover:scale-[1.02] active:scale-[0.98] shadow-soft hover:shadow-md group dark-mode-transition"
-                    onclick="fileUploadManager.showCloudProviders()">
-                <i class="fas fa-cloud text-2xl mb-2 text-blue-400"></i>
-                <span class="block text-sm text-gray-900 dark:text-gray-100">Cloud</span>
-            </button>
-        </div>
-    </div>
-</div>
+    <!-- Chat Interface Scripts -->
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 
-<!-- Upload Progress -->
-<div id="upload-progress"
-     class="hidden fixed bottom-20 right-4 bg-white/90 dark:bg-gray-800/90 rounded-lg shadow-soft hover:shadow-lg p-4 w-64 transition-all duration-300 transform translate-y-0 z-[1000] backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 dark-mode-transition"
-     role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-    <div class="text-sm mb-3 text-gray-800 dark:text-gray-100 flex items-center justify-between">
-        <span>Uploading files...</span>
-        <span class="text-xs text-gray-500 dark:text-gray-400" id="upload-percentage">0%</span>
-    </div>
-    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-        <div id="upload-progress-bar"
-             class="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
-             style="width: 0%"></div>
-    </div>
-</div>
+    <!-- Initialize Chat Interface -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const configEl = document.getElementById('chat-config');
+            if (!configEl) {
+                console.error('Chat configuration element not found');
+                return;
+            }
 
-<!-- Feedback Message -->
-<div id="feedback-message"
-     class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-soft hover:shadow-lg z-[1000] max-w-md w-full text-center transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 bg-white/90 dark:bg-gray-800/90 dark-mode-transition">
-</div>
+            try {
+                // Initialize chat configuration
+                window.CHAT_CONFIG = {
+                    chatId: configEl.dataset.chatId,
+                    csrfToken: configEl.dataset.csrfToken,
+                    models: JSON.parse(configEl.dataset.models),
+                    currentModel: JSON.parse(configEl.dataset.currentModel)
+                };
 
-<!-- Store current model data -->
-<div id="model-data" style="display: none;" data-model='{{ current_model | tojson if current_model else "null" }}'></div>
+                // Initialize token usage manager
+                if (window.TokenUsageManager) {
+                    window.tokenUsageManager = new TokenUsageManager(window.CHAT_CONFIG);
+                }
 
-<!-- Configuration -->
-<script>
-    console.log('Initializing CHAT_CONFIG');
-    const modelDataEl = document.getElementById('model-data');
-    const currentModel = modelDataEl ? JSON.parse(modelDataEl.dataset.model) : null;
-
-    window.CHAT_CONFIG = {
-        chatId: "{{ chat_id }}",
-        editModelUrl: "{{ url_for('model.edit_model', model_id=0) }}".replace('0', ''),
-        maxFileSize: parseInt("{{ config.get('MAX_FILE_SIZE', 10 * 1024 * 1024) }}"),
-        maxFiles: parseInt("{{ config.get('MAX_FILES', 5) }}"),
-        maxMessageLength: parseInt("{{ config.get('MAX_MESSAGE_LENGTH', 1000) }}"),
-        allowedFileTypes: JSON.parse('{{ config.get("ALLOWED_FILE_TYPES", ["text/plain", "application/pdf", "image/jpeg", "image/png"]) | tojson | safe }}'),
-        csrfToken: "{{ csrf_token() }}",
-        userId: "{{ current_user.id }}",
-        userRole: "{{ current_user.role }}",
-        models: JSON.parse('{{ models | tojson | safe }}'),
-        currentModel: JSON.parse('{{ current_model | tojson | safe if current_model else "null" }}')
-    };
-    console.log('CHAT_CONFIG initialized:', window.CHAT_CONFIG);
-</script>
-
-<!-- Chat-specific libraries -->
-<script src="{{ url_for('static', filename='js/markdown-it.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/dompurify.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/prism.js') }}"></script>
-<script src="{{ url_for('static', filename='js/markdown-it-bundle.js') }}"></script>
-
-<!-- Main chat script -->
-<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+                // Initialize file upload manager
+                if (window.FileUploadManager) {
+                    window.fileUploadManager = new FileUploadManager(
+                        window.CHAT_CONFIG.chatId,
+                        configEl.dataset.userId,
+                        document.getElementById('file-upload')
+                    );
+                }
+            } catch (error) {
+                console.error('Error initializing chat interface:', error);
+            }
+        });
+    </script>
 {% endblock %}
