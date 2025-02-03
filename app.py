@@ -18,7 +18,7 @@ from typing import Optional, Tuple, Union
 # Configure logging before importing other modules that might log messages
 logger = logging.getLogger(__name__)
 
-from flask import Flask, jsonify, redirect, url_for, request, session, g, current_app
+from flask import Flask, jsonify, redirect, url_for, request, session, g, current_app, render_template
 from flask_login import current_user, logout_user
 from flask_wtf.csrf import CSRFError
 from flask.cli import with_appcontext
