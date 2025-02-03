@@ -303,10 +303,11 @@ class Model:
                 # Handle API key decryption using centralized utility
                 from utils.encryption import decrypt_api_key, EncryptionError
 
+                from config import Config
                 encrypted_key = model_dict.get("api_key", "")
                 if encrypted_key:
                     try:
-                        model_dict["api_key"] = decrypt_api_key(encrypted_key)
+                        model_dict["api_key"] = decrypt_api_key(encrypted_key, Config.ENCRYPTION_KEY)
                     except EncryptionError as e:
                         logger.error(str(e))
                         model_dict["api_key"] = ""
