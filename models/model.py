@@ -307,9 +307,58 @@ class Model:
                 encrypted_key = model_dict.get("api_key", "")
                 if encrypted_key:
                     try:
-                        model_dict["api_key"] = decrypt_api_key(encrypted_key, Config.ENCRYPTION_KEY)
+<<<<<<< HEAD
+                        # Check if key needs re-encryption
+                        if encrypted_key.startswith("NEEDS_REENCRYPTION:"):
+                            # Strip the prefix and decrypt
+                            old_encrypted = encrypted_key[len("NEEDS_REENCRYPTION:"):]
+                            try:
+                                # Attempt to decrypt with current key
+                                decrypted = decrypt_api_key(old_encrypted)
+                                # Re-encrypt with new consistent method
+                                from utils.encryption import encrypt_api_key
+                                new_encrypted = encrypt_api_key(decrypted)
+                                # Update in database
+                                db.execute(
+                                    text("UPDATE models SET api_key = :new_key WHERE id = :id"),
+                                    {"new_key": new_encrypted, "id": model_id}
+                                )
+                                db.commit()
+                                model_dict["api_key"] = decrypted
+                            except Exception as e:
+                                logger.error(f"Failed to re-encrypt API key for model {model_id}: {str(e)}")
+                                model_dict["api_key"] = ""
+                        else:
+                            # Normal decryption for already properly encrypted keys
+                            model_dict["api_key"] = decrypt_api_key(encrypted_key)
+>>>>>>> c4c569433f1edd3540b2dff3834c0a63ebd7a916
+=======
+                        # Check if key needs re-encryption
+                        if encrypted_key.startswith("NEEDS_REENCRYPTION:"):
+                            # Strip the prefix and decrypt
+                            old_encrypted = encrypted_key[len("NEEDS_REENCRYPTION:"):]
+                            try:
+                                # Attempt to decrypt with current key
+                                decrypted = decrypt_api_key(old_encrypted)
+                                # Re-encrypt with new consistent method
+                                from utils.encryption import encrypt_api_key
+                                new_encrypted = encrypt_api_key(decrypted)
+                                # Update in database
+                                db.execute(
+                                    text("UPDATE models SET api_key = :new_key WHERE id = :id"),
+                                    {"new_key": new_encrypted, "id": model_id}
+                                )
+                                db.commit()
+                                model_dict["api_key"] = decrypted
+                            except Exception as e:
+                                logger.error(f"Failed to re-encrypt API key for model {model_id}: {str(e)}")
+                                model_dict["api_key"] = ""
+                        else:
+                            # Normal decryption for already properly encrypted keys
+                            model_dict["api_key"] = decrypt_api_key(encrypted_key)
+>>>>>>> c4c569433f1edd3540b2dff3834c0a63ebd7a916
                     except EncryptionError as e:
-                        logger.error(str(e))
+                        logger.error(f"Failed to decrypt API key for model {model_id}: {str(e)}")
                         model_dict["api_key"] = ""
                 else:
                     model_dict["api_key"] = ""

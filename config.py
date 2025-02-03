@@ -89,22 +89,31 @@ class Config:
     if not ENCRYPTION_KEY:
         raise ValueError("ENCRYPTION_KEY environment variable is required")
 
-    # Ensure encryption key is properly formatted for Fernet
-    try:
-        # Try to decode as base64 first
-        try:
-            decoded = base64.b64decode(ENCRYPTION_KEY, validate=True)
-            if len(decoded) == 32:
-                ENCRYPTION_KEY = ENCRYPTION_KEY
-        except Exception:
-            # If not valid base64 or not 32 bytes, hash it
-            key_bytes = hashlib.sha256(ENCRYPTION_KEY.encode()).digest()
-            ENCRYPTION_KEY = base64.b64encode(key_bytes).decode()
+    # Always hash and encode the encryption key consistently
+    # This ensures the same key processing regardless of input format
+    import base64
+    import hashlib
+    from cryptography.fernet import Fernet
 
-        logger.info("Encryption key validated and properly formatted")
-    except Exception as e:
-        logger.error(f"Error validating encryption key: {str(e)}")
-        raise
+    # Convert the key to 32 bytes using SHA-256
+    key_bytes = hashlib.sha256(ENCRYPTION_KEY.encode()).digest()
+    # Base64 encode for Fernet
+    ENCRYPTION_KEY = base64.b64encode(key_bytes).decode()
+    logger.info("Encryption key processed for Fernet usage")
+>>>>>>> c4c569433f1edd3540b2dff3834c0a63ebd7a916
+=======
+    # Always hash and encode the encryption key consistently
+    # This ensures the same key processing regardless of input format
+    import base64
+    import hashlib
+    from cryptography.fernet import Fernet
+
+    # Convert the key to 32 bytes using SHA-256
+    key_bytes = hashlib.sha256(ENCRYPTION_KEY.encode()).digest()
+    # Base64 encode for Fernet
+    ENCRYPTION_KEY = base64.b64encode(key_bytes).decode()
+    logger.info("Encryption key processed for Fernet usage")
+>>>>>>> c4c569433f1edd3540b2dff3834c0a63ebd7a916
 
     # Add explicit Azure configuration
     AZURE_API_KEY = os.getenv("AZURE_OPENAI_KEY")
