@@ -503,7 +503,7 @@ def init_app_components(app: Flask) -> None:
 
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix="/auth")
-    app.register_blueprint(chat_routes, url_prefix="/chat")
+    app.register_blueprint(chat_routes)  # No prefix - routes defined explicitly
     app.register_blueprint(model_bp)
     app.register_blueprint(provider_bp)
 

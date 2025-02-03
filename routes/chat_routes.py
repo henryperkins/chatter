@@ -800,7 +800,12 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             "requires_o1_handling": m.requires_o1_handling,
             "supports_streaming": m.supports_streaming,
             "max_completion_tokens": m.max_completion_tokens,
-            "provider_id": m.provider_id
+            "provider_id": m.provider_id,
+            "api_version": m.api_version,
+            "deployment_name": m.deployment_name,
+            "description": m.description,
+            "temperature": m.temperature,
+            "max_tokens": m.max_tokens
         })
 
     conversations = Chat.get_user_chats(current_user.id)

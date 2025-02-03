@@ -237,6 +237,16 @@ File: chat.html
 {% block content %}
 <div
     class="flex flex-col h-[100dvh] w-full overflow-hidden bg-white/95 dark:bg-gray-950/95 safe-area-inset touch-manipulation dark-mode-transition backdrop-blur-sm relative pt-[120px]">
+    
+    <!-- Chat Configuration -->
+    <div id="chat-config" 
+        data-chat-id="{{ chat_id }}"
+        data-csrf-token="{{ csrf_token() }}"
+        data-models='{{ models|tojson|safe }}'
+        data-current-model='{{ current_model|tojson|safe if current_model else 'null' }}'
+        data-user-id="{{ current_user.id }}"
+        class="hidden">
+    </div>
     <!-- Main Chat Area -->
     <div
         class="flex-1 flex flex-col overflow-hidden h-full pb-safe dark-mode-transition bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
@@ -378,15 +388,6 @@ File: chat.html
 </div>
 {% endblock %}
 
-<!-- Chat Configuration Data -->
-<div id="chat-config" 
-    data-chat-id="{{ chat_id }}"
-    data-csrf-token="{{ csrf_token() }}"
-    data-models='{{ models|tojson|safe }}'
-    data-current-model='{{ current_model|tojson|safe }}'
-    data-user-id="{{ current_user.id }}"
-    class="hidden">
-</div>
 
 {% block scripts %}
     {{ super() }}
