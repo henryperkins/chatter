@@ -792,17 +792,16 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     models = Model.get_all()
     models_serialized = []
     for m in models:
-        models_serialized.append(
-            {
-                "id": m.id,
-                "name": m.name,
-                "is_default": m.is_default,
-                "model_type": m.model_type,
-                "requires_o1_handling": m.requires_o1_handling,
-                "supports_streaming": m.supports_streaming,
-                "max_completion_tokens": m.max_completion_tokens,
-            }
-        )
+        models_serialized.append({
+            "id": m.id,
+            "name": m.name,
+            "is_default": m.is_default,
+            "model_type": m.model_type,
+            "requires_o1_handling": m.requires_o1_handling,
+            "supports_streaming": m.supports_streaming,
+            "max_completion_tokens": m.max_completion_tokens,
+            "provider_id": m.provider_id
+        })
 
     conversations = Chat.get_user_chats(current_user.id)
     today = datetime.now().strftime("%Y-%m-%d")

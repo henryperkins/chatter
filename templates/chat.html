@@ -379,11 +379,11 @@ File: chat.html
 {% endblock %}
 
 <!-- Chat Configuration Data -->
-<div id="chat-config"
+<div id="chat-config" 
     data-chat-id="{{ chat_id }}"
     data-csrf-token="{{ csrf_token() }}"
-    data-models='{{ models|tojson|safe if models else "[]" }}'
-    data-current-model='{{ current_model|tojson|safe if current_model else "null" }}'
+    data-models='{{ models|tojson|safe }}'
+    data-current-model='{{ current_model|tojson|safe }}'
     data-user-id="{{ current_user.id }}"
     class="hidden">
 </div>
@@ -408,9 +408,14 @@ File: chat.html
                 window.CHAT_CONFIG = {
                     chatId: configEl.dataset.chatId,
                     csrfToken: configEl.dataset.csrfToken,
-                    models: JSON.parse(configEl.dataset.models),
-                    currentModel: JSON.parse(configEl.dataset.currentModel)
+                    models: JSON.parse(configEl.dataset.models || '[]'),
+                    currentModel: JSON.parse(configEl.dataset.currentModel || 'null'),
+                    userId: configEl.dataset.userId
                 };
+
+                if (!window.CHAT_CONFIG.models || !window.CHAT_CONFIG.models.length) {
+                    console.warn('No models configured');
+                }
 
                 // Initialize token usage manager
                 if (window.TokenUsageManager) {
@@ -421,7 +426,7 @@ File: chat.html
                 if (window.FileUploadManager) {
                     window.fileUploadManager = new FileUploadManager(
                         window.CHAT_CONFIG.chatId,
-                        configEl.dataset.userId,
+                        window.CHAT_CONFIG.userId,
                         document.getElementById('file-upload')
                     );
                 }
