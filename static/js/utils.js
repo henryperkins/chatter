@@ -44,10 +44,24 @@ class FetchError extends Error {
  * @returns {string} CSRF token
  */
 function getCSRFToken() {
+    // Try meta tag first
     const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
-    const csrfToken = csrfTokenMetaTag ? csrfTokenMetaTag.getAttribute('content') || '' : '';
-    console.debug('Retrieved CSRF token from meta tag:', csrfToken);
-    return csrfToken;
+    if (csrfTokenMetaTag && csrfTokenMetaTag.getAttribute('content')) {
+        const token = csrfTokenMetaTag.getAttribute('content');
+        console.debug('Retrieved CSRF token from meta tag');
+        return token;
+    }
+
+    // Try form input as fallback
+    const csrfTokenInput = document.querySelector('input[name="csrf_token"]');
+    if (csrfTokenInput && csrfTokenInput.value) {
+        const token = csrfTokenInput.value;
+        console.debug('Retrieved CSRF token from form input');
+        return token;
+    }
+
+    console.warn('No CSRF token found in meta tag or form input');
+    return '';
 }
 
 /**
@@ -61,15 +75,20 @@ async function fetchWithCSRF(url, options = {}) {
     const csrfToken = getCSRFToken();
     const headers = {
         'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRFToken': csrfToken,  // Always include in headers
         ...options.headers
     };
 
-    // Include CSRF token
-    if (!(options.body instanceof FormData)) {
-        headers['X-CSRFToken'] = csrfToken;
-    } else {
-        // If body is FormData, append the token instead
+    // Also include token in FormData if present
+    if (options.body instanceof FormData) {
         options.body.append('csrf_token', csrfToken);
+    } else if (options.body && typeof options.body === 'object') {
+        // If body is JSON object, include token
+        options.body = JSON.stringify({
+            ...JSON.parse(options.body),
+            csrf_token: csrfToken
+        });
+        headers['Content-Type'] = 'application/json';
     }
 
     try {
