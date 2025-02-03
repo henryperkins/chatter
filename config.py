@@ -88,11 +88,17 @@ class Config:
         raise ValueError("ENCRYPTION_KEY environment variable is required")
 
     # Ensure encryption key is properly formatted for Fernet
-    from utils.encryption import validate_encryption_key
     try:
-        # Validate and format the encryption key
-        key_bytes = validate_encryption_key(ENCRYPTION_KEY)
-        ENCRYPTION_KEY = key_bytes.decode()
+        # Try to decode as base64 first
+        try:
+            decoded = base64.b64decode(ENCRYPTION_KEY, validate=True)
+            if len(decoded) == 32:
+                ENCRYPTION_KEY = ENCRYPTION_KEY
+        except Exception:
+            # If not valid base64 or not 32 bytes, hash it
+            key_bytes = hashlib.sha256(ENCRYPTION_KEY.encode()).digest()
+            ENCRYPTION_KEY = base64.b64encode(key_bytes).decode()
+
         logger.info("Encryption key validated and properly formatted")
     except Exception as e:
         logger.error(f"Error validating encryption key: {str(e)}")
