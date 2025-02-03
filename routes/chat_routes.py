@@ -318,11 +318,11 @@ def new_chat_route() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 # 3) Separate route for handle_chat (POST) => /chat/ with blueprint prefix
 ##############################################################################
 
-@chat_routes.route("/", methods=["POST"])
+@chat_routes.route("/chat/send", methods=["POST"]) 
 @login_required
 @limiter.limit(CHAT_RATE_LIMIT)
 def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
-    """POST /chat/ - Handle chat messages (either streaming or normal)."""
+    """POST /chat/send - Handle chat messages (either streaming or normal)."""
     try:
         logger.info(
             "Chat request received - IP: %s, User-Agent: %s, User: %s",
