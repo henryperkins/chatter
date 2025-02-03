@@ -503,9 +503,9 @@ def init_app_components(app: Flask) -> None:
 
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix="/auth")
-    app.register_blueprint(chat_routes)
-    app.register_blueprint(model_bp, url_prefix="/models")
-    app.register_blueprint(provider_bp, url_prefix="/providers")
+    app.register_blueprint(chat_routes, url_prefix="/chat")
+    app.register_blueprint(model_bp)
+    app.register_blueprint(provider_bp)
 
     # Initialize file routes
     init_file_routes(app)

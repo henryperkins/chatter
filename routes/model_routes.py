@@ -39,7 +39,7 @@ from models.model import Model
 logger = logging.getLogger(__name__)
 
 # Define the Blueprint for model routes
-bp = Blueprint("model", __name__)
+bp = Blueprint("model", __name__, url_prefix="/models")
 
 
 # Helper Functions

@@ -19,7 +19,7 @@ from forms import ProviderForm
 logger = logging.getLogger(__name__)
 
 # Create blueprint
-bp = Blueprint("provider", __name__)
+bp = Blueprint("provider", __name__, url_prefix="/providers")
 
 @bp.route("/providers/add", methods=["GET", "POST"])
 @login_required
