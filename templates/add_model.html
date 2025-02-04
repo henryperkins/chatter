@@ -274,17 +274,17 @@
 {% block scripts %}
 {{ super() }}
 <script>
-    // Debug logging function
-    function logDebug(message, data = null) {
-        console.log(`[Add Model Debug] ${message}`, data || '');
-    }
+    window.addModelDebug = {
+        logDebug(message, data = null) {
+            console.log(`[Add Model Debug] ${message}`, data || '');
+        },
+        logError(message, error = null) {
+            console.error(`[Add Model Error] ${message}`, error || '');
+        }
+    };
 
-    // Error logging function
-    function logError(message, error = null) {
-        console.error(`[Add Model Error] ${message}`, error || '');
-    }
-
-    document.addEventListener("DOMContentLoaded", function() {
+    // Move initialization to dedicated script file
+    document.addEventListener("DOMContentLoaded", () => {
         logDebug('DOM Content Loaded');
 
         const form = document.getElementById("add-model-form");

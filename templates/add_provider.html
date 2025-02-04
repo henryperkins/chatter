@@ -103,13 +103,5 @@
 
 {% block scripts %}
 {{ super() }}
-<script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const form = document.getElementById("add-provider-form");
-        if (form) {
-            form.classList.add('provider-form');
-            form.dataset.submitText = "Add Provider";
-        }
-    });
-</script>
+<script src="{{ url_for('static', filename='js/add-provider.js') }}"></script>
 {% endblock scripts %}
