@@ -91,7 +91,7 @@ window.utils = {
         if (!container) {
             container = document.createElement('div');
             container.id = 'feedback-container';
-            container.className = 'fixed z-[1200] flex flex-col items-center space-y-2';
+            container.className = 'fixed z-[1300] flex flex-col items-center space-y-2';
             document.body.appendChild(container);
         }
 
