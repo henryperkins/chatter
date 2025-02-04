@@ -292,6 +292,26 @@ def register_cli_commands(app):
         except Exception as e:
             print(f"Error checking model: {str(e)}")
 
+    @app.cli.command("fix-deployment-name")
+    def fix_deployment_name_command():
+        """Fix the deployment name typo."""
+        try:
+            with db_session() as db:
+                query = text("""
+                    UPDATE models 
+                    SET deployment_name = 'gpt-deployment'
+                    WHERE deployment_name = 'gpt-deploymente'
+                    RETURNING id
+                """)
+                result = db.execute(query)
+                db.commit()
+                if result.rowcount > 0:
+                    print("Successfully fixed deployment name")
+                else:
+                    print("No models needed fixing")
+        except Exception as e:
+            print(f"Error fixing deployment name: {str(e)}")
+
 
 def create_app() -> Flask:
     if hasattr(Flask, "_already_configured"):
