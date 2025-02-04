@@ -202,7 +202,7 @@ pre {
 
     /* Enhanced mobile message spacing */
     #chat-box {
-        @apply px-2 py-2 pb-24 space-y-3;
+        @apply px-2 py-2 pb-16 space-y-3;
         -webkit-overflow-scrolling: touch;
     }
 
