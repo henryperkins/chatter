@@ -214,17 +214,18 @@ def create_default_model(db: Session) -> Optional[int]:
         cipher_suite = Fernet(encryption_key.encode())
         encrypted_api_key = cipher_suite.encrypt(config_instance.AZURE_OPENAI_KEY.encode()).decode()
 
+        config = Config()  # Create config instance
         model = Model(
             provider_id=provider_id,
-            name=Config.MODEL_NAME,
-            deployment_name=Config.DEFAULT_DEPLOYMENT_NAME,
+            name=config.MODEL_NAME,
+            deployment_name=config.DEFAULT_DEPLOYMENT_NAME,
             description="Azure OpenAI GPT-4 model with streaming support",
-            api_endpoint=Config.DEFAULT_API_ENDPOINT.rstrip("/"),
+            api_endpoint=config.DEFAULT_API_ENDPOINT.rstrip("/"),
             api_key=encrypted_api_key,
-            api_version=Config.AZURE_API_VERSION,
-            temperature=Config.DEFAULT_TEMPERATURE,
+            api_version=config.AZURE_API_VERSION,
+            temperature=config.DEFAULT_TEMPERATURE,
             max_tokens=128000,
-            max_completion_tokens=min(Config.MAX_TOKENS, 16384),
+            max_completion_tokens=min(config.MAX_TOKENS, 16384),
             model_type="azure",
             requires_o1_handling=False,
             supports_streaming=True,
