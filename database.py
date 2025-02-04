@@ -187,10 +187,11 @@ def create_default_model(session: Session) -> Optional[int]:
         else:
             provider_id = provider.id
 
-        key_bytes = hashlib.sha256(Config.ENCRYPTION_KEY.encode()).digest()
+        config_instance = Config()  # create a Config instance
+        key_bytes = hashlib.sha256(config_instance.ENCRYPTION_KEY.encode()).digest()
         encryption_key = base64.b64encode(key_bytes).decode()
         cipher_suite = Fernet(encryption_key.encode())
-        encrypted_api_key = cipher_suite.encrypt(Config.AZURE_API_KEY.encode()).decode()
+        encrypted_api_key = cipher_suite.encrypt(config_instance.AZURE_OPENAI_KEY.encode()).decode()
 
         model = Model(
             provider_id=provider_id,
