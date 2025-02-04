@@ -63,6 +63,9 @@ def create_client(
     if not api_endpoint or not api_key:
         raise ValueError("API endpoint and key are required")
     import openai
+    logger.debug(f"Creating client with API endpoint: {api_endpoint}")
+    logger.debug(f"API version: {api_version}")
+    logger.debug(f"Timeout: {timeout}")
     openai.api_type = "azure"
     openai.api_base = api_endpoint.rstrip("/")
     openai.api_version = api_version

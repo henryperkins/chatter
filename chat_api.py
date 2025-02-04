@@ -234,6 +234,10 @@ def get_azure_response(
             # Decrypt the stored API key
             logger.debug(f"Decrypted API key length: {len(api_key)}")
             api_key = decrypt_api_key(api_key, encryption_key)
+            logger.debug(f"Decrypted API key length: {len(api_key)}")
+            logger.debug(f"Using API endpoint: {api_endpoint}")
+            logger.debug(f"Using deployment name: {deployment_name}")
+            logger.debug(f"Using API version: {api_version}")
 
         client = _chat_client.get_azure_client(api_key, api_endpoint, api_version)
         # Assuming Model.PROVIDER_CAPABILITIES is available via your model import.
