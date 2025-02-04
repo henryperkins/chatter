@@ -91,12 +91,12 @@ window.utils = {
         if (!container) {
             container = document.createElement('div');
             container.id = 'feedback-container';
-            container.className = 'fixed z-[9999] flex flex-col items-center space-y-2';
+            container.className = 'fixed z-[1200] flex flex-col items-center space-y-2';
             document.body.appendChild(container);
         }
 
         const positionClasses = {
-            top: 'top-4 left-1/2 transform -translate-x-1/2',
+            top: 'top-24 left-1/2 transform -translate-x-1/2',
             bottom: 'bottom-4 left-1/2 transform -translate-x-1/2',
             'top-right': 'top-4 right-4',
             'bottom-right': 'bottom-4 right-4'
