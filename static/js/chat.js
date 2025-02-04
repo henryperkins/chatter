@@ -160,6 +160,7 @@
 
         // Process message if provided as an object (e.g., from an API)
                 const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
+                let messageDiv;
                 if (!existingDiv) {
                     messageDiv = document.createElement('div');
                     messageDiv.className = 'flex w-full mt-4 space-x-3 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl animate-slide-up';
