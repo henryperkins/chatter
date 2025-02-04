@@ -65,6 +65,8 @@ CREATE TABLE models (
     requires_o1_handling BOOLEAN NOT NULL DEFAULT FALSE,
     supports_streaming BOOLEAN NOT NULL DEFAULT FALSE,
     api_version TEXT NOT NULL,
+    reasoning_effort TEXT NOT NULL DEFAULT 'medium',
+    store_completion BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     version INTEGER NOT NULL DEFAULT 1,
     UNIQUE (provider_id, name)

@@ -287,12 +287,12 @@ class Model:
                         provider_id, name, deployment_name, description, api_endpoint, api_key,
                         api_version, temperature, max_tokens, max_completion_tokens,
                         model_type, requires_o1_handling, supports_streaming, is_default,
-                        reasoning_effort, store_completion, created_at
+                        created_at
                     ) VALUES (
                         :provider_id, :name, :deployment_name, :description, :api_endpoint, :api_key,
                         :api_version, :temperature, :max_tokens, :max_completion_tokens,
                         :model_type, :requires_o1_handling, :supports_streaming, :is_default,
-                        :reasoning_effort, :store_completion, NOW()
+                        NOW()
                     )
                     RETURNING id
                     """
