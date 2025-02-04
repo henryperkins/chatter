@@ -1,4 +1,3 @@
-// static/js/utils.js
 
 class FetchError extends Error {
     constructor(message, status, data) {
@@ -9,52 +8,67 @@ class FetchError extends Error {
     }
 }
 
-// Attach to window object immediately
 window.utils = {
     getCSRFToken() {
-        const token = document.querySelector('meta[name="csrf-token"]')?.content;
-        if (!token) {
-            console.warn('CSRF token not found');
-        }
-        return token;
+        return document.querySelector('meta[name="csrf-token"]')?.content || '';
     },
 
     async fetchWithCSRF(url, options = {}) {
         try {
             const csrfToken = this.getCSRFToken();
-            const headers = {
+            const defaultHeaders = {
                 'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': csrfToken,
-                ...options.headers
+                'X-CSRFToken': csrfToken
             };
 
-            if (options.body && !(options.body instanceof FormData)) {
-                headers['Content-Type'] = 'application/json';
-                if (typeof options.body === 'object') {
-                    options.body = JSON.stringify({
-                        ...JSON.parse(JSON.stringify(options.body)),
+            // Only add Azure token if it exists
+            if (window.CHAT_CONFIG?.azureToken) {
+                defaultHeaders['X-Azure-Token'] = window.CHAT_CONFIG.azureToken;
+            }
+
+            // Properly handle request body and content type
+            let finalBody = options.body;
+            if (finalBody && !(finalBody instanceof FormData)) {
+                if (typeof finalBody === 'object') {
+                    finalBody = JSON.stringify({
+                        ...finalBody,
                         csrf_token: csrfToken
                     });
+                    defaultHeaders['Content-Type'] = 'application/json';
                 }
             }
 
+            const finalHeaders = {
+                ...defaultHeaders,
+                ...options.headers
+            };
+
             const response = await fetch(url, {
                 ...options,
-                headers,
+                body: finalBody,
+                headers: finalHeaders,
                 credentials: 'same-origin'
             });
 
             let data;
             const contentType = response.headers.get('content-type');
-            if (contentType?.includes('application/json')) {
-                data = await response.json();
-            } else {
-                data = await response.text();
+            try {
+                if (contentType?.includes('application/json')) {
+                    data = await response.json();
+                } else {
+                    data = await response.text();
+                }
+            } catch (parseError) {
+                throw new FetchError(
+                    'Failed to parse response',
+                    response.status,
+                    await response.text()
+                );
             }
 
             if (!response.ok) {
                 throw new FetchError(
-                    data.error || `HTTP error! status: ${response.status}`,
+                    typeof data === 'object' && data.error ? data.error : `Request failed with status ${response.status}`,
                     response.status,
                     data
                 );
@@ -62,8 +76,10 @@ window.utils = {
 
             return data;
         } catch (error) {
-            console.error('Fetch error:', error);
-            throw error;
+            if (error instanceof FetchError) {
+                throw error;
+            }
+            throw new FetchError(error.message, 0, null);
         }
     },
 
@@ -101,7 +117,7 @@ window.utils = {
             hover:scale-105 max-w-md backdrop-blur-sm
         `;
         messageElement.innerHTML = `
-            <span class="flex-grow">${message}</span>
+            <span class="flex-grow">${this.sanitizeHTML(message)}</span>
             <button class="ml-3 focus:outline-none hover:opacity-75" aria-label="Dismiss">
                 <i class="fas fa-times"></i>
             </button>
@@ -112,9 +128,11 @@ window.utils = {
         const dismiss = () => {
             messageElement.classList.add('opacity-0', 'scale-95');
             setTimeout(() => {
-                container.removeChild(messageElement);
-                if (container.children.length === 0) {
-                    document.body.removeChild(container);
+                if (messageElement.parentNode) {
+                    messageElement.parentNode.removeChild(messageElement);
+                }
+                if (container.children.length === 0 && container.parentNode) {
+                    container.parentNode.removeChild(container);
                 }
             }, 300);
         };
@@ -124,12 +142,14 @@ window.utils = {
         if (type !== 'error' && duration > 0) {
             setTimeout(dismiss, duration);
         }
+
+        return dismiss;
     },
 
     async checkAuth() {
         try {
             const response = await this.fetchWithCSRF('/auth/check');
-            return response.authenticated === true;
+            return response?.authenticated === true;
         } catch (error) {
             console.error('Auth check failed:', error);
             return false;
@@ -150,74 +170,101 @@ window.utils = {
 
     throttle(func, limit) {
         let inThrottle;
-        return function(...args) {
+        let lastFunc;
+        let lastRan;
+        return function (...args) {
             if (!inThrottle) {
                 func.apply(this, args);
+                lastRan = Date.now();
                 inThrottle = true;
-                setTimeout(() => inThrottle = false, limit);
+            } else {
+                clearTimeout(lastFunc);
+                lastFunc = setTimeout(() => {
+                    if ((Date.now() - lastRan) >= limit) {
+                        func.apply(this, args);
+                        lastRan = Date.now();
+                    }
+                }, limit - (Date.now() - lastRan));
             }
         };
     },
 
     formatDate(dateString) {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        if (!dateString) return '';
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return '';
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch (e) {
+            console.error('Date formatting error:', e);
+            return '';
+        }
     },
 
-    copyToClipboard(text) {
-        return navigator.clipboard.writeText(text)
-            .then(() => this.showFeedback('Copied to clipboard!', 'success'))
-            .catch(err => {
-                console.error('Failed to copy:', err);
-                this.showFeedback('Failed to copy to clipboard', 'error');
-            });
+    async copyToClipboard(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            this.showFeedback('Copied to clipboard!', 'success');
+        } catch (err) {
+            console.error('Copy failed:', err);
+            this.showFeedback('Failed to copy to clipboard', 'error');
+            throw err;
+        }
     },
 
     async withLoading(element, callback, options = {}) {
         const originalContent = element.innerHTML;
         const loadingText = options.loadingText || 'Loading...';
         const loadingClass = options.loadingClass || 'opacity-50 cursor-wait';
+        const loadingClasses = loadingClass.split(' ');
 
         try {
             element.disabled = true;
-            element.classList.add(...loadingClass.split(' '));
+            element.classList.add(...loadingClasses);
             element.innerHTML = `
                 <span class="inline-flex items-center">
                     <svg class="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    ${loadingText}
+                    ${this.sanitizeHTML(loadingText)}
                 </span>
             `;
 
-            const result = await callback();
-            return result;
+
+
+const result = await callback();
+return result;
         } finally {
-            element.disabled = false;
-            element.classList.remove(...loadingClass.split(' '));
-            element.innerHTML = originalContent;
-        }
+    if (element) {
+        element.disabled = false;
+        element.classList.remove(...loadingClasses);
+        element.innerHTML = originalContent;
+    }
+}
     },
 
-    validateForm(formElement, validationRules = {}) {
-        const errors = {};
-        const formData = new FormData(formElement);
+validateForm(formElement, validationRules = {}) {
+    const errors = {};
+    if (!formElement) return { isValid: false, errors: { form: 'Form not found' } };
 
-        for (const [fieldName, rules] of Object.entries(validationRules)) {
-            const value = formData.get(fieldName);
+    const formData = new FormData(formElement);
 
-            if (rules.required && !value) {
-                errors[fieldName] = 'This field is required';
-                continue;
-            }
+    for (const [fieldName, rules] of Object.entries(validationRules)) {
+        const value = formData.get(fieldName);
 
+        if (rules.required && !value) {
+            errors[fieldName] = 'This field is required';
+            continue;
+        }
+
+        if (value) {
             if (rules.minLength && value.length < rules.minLength) {
                 errors[fieldName] = `Must be at least ${rules.minLength} characters`;
             }
@@ -237,88 +284,104 @@ window.utils = {
                 }
             }
         }
-
-        return {
-            isValid: Object.keys(errors).length === 0,
-            errors
-        };
-    },
-
-    showValidationErrors(errors, formElement) {
-        // Remove existing error messages
-        formElement.querySelectorAll('.error-message').forEach(el => el.remove());
-        formElement.querySelectorAll('.error-field').forEach(el => {
-            el.classList.remove('error-field', 'border-red-500');
-        });
-
-        // Add new error messages
-        for (const [fieldName, message] of Object.entries(errors)) {
-            const field = formElement.querySelector(`[name="${fieldName}"]`);
-            if (field) {
-                field.classList.add('error-field', 'border-red-500');
-
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'error-message text-red-500 text-sm mt-1';
-                errorDiv.textContent = message;
-
-                field.parentNode.insertBefore(errorDiv, field.nextSibling);
-            }
-        }
-    },
-
-    formatBytes(bytes, decimals = 2) {
-        if (bytes === 0) return '0 Bytes';
-
-        const k = 1024;
-        const dm = decimals < 0 ? 0 : decimals;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-    },
-
-    sanitizeHTML(html) {
-        const div = document.createElement('div');
-        div.textContent = html;
-        return div.innerHTML;
-    },
-
-    parseJSON(jsonString, fallback = null) {
-        try {
-            return JSON.parse(jsonString);
-        } catch (e) {
-            console.error('JSON parse error:', e);
-            return fallback;
-        }
-    },
-
-    getQueryParam(param) {
-        const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get(param);
-    },
-
-    setQueryParam(param, value) {
-        const urlParams = new URLSearchParams(window.location.search);
-        if (value === null) {
-            urlParams.delete(param);
-        } else {
-            urlParams.set(param, value);
-        }
-        window.history.replaceState({}, '', `${window.location.pathname}?${urlParams}`);
-    },
-
-    handleError(error) {
-        console.error('Error:', error);
-
-        let message = 'An unexpected error occurred';
-
-        if (error instanceof FetchError) {
-            message = error.message;
-        } else if (error instanceof Error) {
-            message = error.message;
-        }
-
-        this.showFeedback(message, 'error');
     }
+
+    return {
+        isValid: Object.keys(errors).length === 0,
+        errors
+    };
+},
+
+showValidationErrors(errors, formElement) {
+    if (!formElement) return;
+
+    // Remove existing error messages
+    formElement.querySelectorAll('.error-message').forEach(el => el.remove());
+    formElement.querySelectorAll('.error-field').forEach(el => {
+        el.classList.remove('error-field', 'border-red-500');
+    });
+
+    // Add new error messages
+    Object.entries(errors).forEach(([fieldName, message]) => {
+        const field = formElement.querySelector(`[name="${fieldName}"]`);
+        if (field) {
+            field.classList.add('error-field', 'border-red-500');
+
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message text-red-500 text-sm mt-1';
+            errorDiv.textContent = message;
+
+            field.parentNode.insertBefore(errorDiv, field.nextSibling);
+        }
+    });
+},
+
+formatBytes(bytes, decimals = 2) {
+    if (!bytes || bytes === 0) return '0 Bytes';
+
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+},
+
+sanitizeHTML(html) {
+    if (!html) return '';
+    const div = document.createElement('div');
+    div.textContent = html;
+    return div.innerHTML;
+},
+
+parseJSON(jsonString, fallback = null) {
+    if (!jsonString) return fallback;
+    try {
+        return JSON.parse(jsonString);
+    } catch (e) {
+        console.error('JSON parse error:', e);
+        return fallback;
+    }
+},
+
+getQueryParam(param) {
+    if (!param) return null;
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(param);
+},
+
+setQueryParam(param, value) {
+    if (!param) return;
+    const urlParams = new URLSearchParams(window.location.search);
+    if (value === null || value === undefined) {
+        urlParams.delete(param);
+    } else {
+        urlParams.set(param, value);
+    }
+    const newUrl = `${window.location.pathname}${urlParams.toString() ? '?' + urlParams.toString() : ''}`;
+    window.history.replaceState({}, '', newUrl);
+},
+
+handleError(error) {
+    console.error('Error:', error);
+
+    let message = 'An unexpected error occurred';
+    let type = 'error';
+
+    if (error instanceof FetchError) {
+        message = error.message;
+        type = error.status >= 500 ? 'error' : 'warning';
+    } else if (error instanceof Error) {
+        message = error.message;
+    }
+
+    this.showFeedback(message, type);
+    return { message, type };
+}
 };
+
+// Export for module environments
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = window.utils;
+}

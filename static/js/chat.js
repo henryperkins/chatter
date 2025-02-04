@@ -60,6 +60,72 @@
     }
 
     /* =====================================================
+       AZURE PARAMETER & MESSAGE BUILDERS
+    ===================================================== */
+    /**
+     * Build a message array including a system message and the user message.
+     * @param {string} messageText - The text entered by the user.
+     * @param {object} model - The current model configuration.
+     * @returns {Array} - An array of message objects.
+     */
+    function buildMessageArray(messageText, model) {
+        const messages = [];
+        messages.push({
+            role: 'system',
+            content: model.system_message || 'You are a helpful assistant.'
+        });
+        messages.push({ role: 'user', content: messageText });
+        return messages;
+    }
+
+    /**
+     * Validate model parameters and build the Azure parameters object.
+     * @param {object} model - The current model configuration.
+     * @param {Array} messages - The messages array.
+     * @returns {object} - An object containing all parameters for Azure.
+     */
+    function buildAzureParameters(model, messages) {
+        // Validate required Azure model properties
+        if (!model.deployment_name || !model.api_version) {
+            throw new Error('Invalid Azure model configuration');
+        }
+        const temperature = (model.temperature !== undefined) ? model.temperature : 1.0;
+        if (temperature < 0 || temperature > 2) {
+            throw new Error('Temperature must be between 0 and 2');
+        }
+        const top_p = (model.top_p !== undefined) ? model.top_p : 1;
+        if (top_p < 0 || top_p > 1) {
+            throw new Error('top_p must be between 0 and 1');
+        }
+        const presence_penalty = (model.presence_penalty !== undefined) ? model.presence_penalty : 0;
+        if (presence_penalty < -2 || presence_penalty > 2) {
+            throw new Error('presence_penalty must be between -2 and 2');
+        }
+        const frequency_penalty = (model.frequency_penalty !== undefined) ? model.frequency_penalty : 0;
+        if (frequency_penalty < -2 || frequency_penalty > 2) {
+            throw new Error('frequency_penalty must be between -2 and 2');
+        }
+        const azureParams = {
+            messages: messages,
+            max_tokens: model.max_tokens || 32000,
+            temperature: temperature,
+            top_p: top_p,
+            frequency_penalty: frequency_penalty,
+            presence_penalty: presence_penalty,
+            stop: model.stop_sequences || null,
+            stream: true,
+            n: (model.n && Number.isInteger(model.n) && model.n > 0) ? Math.min(model.n, 128) : 1,
+            logprobs: model.logprobs !== undefined ? model.logprobs : undefined,
+            best_of: (model.best_of && Number.isInteger(model.best_of)) ? model.best_of : undefined,
+            user: window.CHAT_CONFIG.userId || 'anonymous'
+        };
+        if (model.response_format) {
+            azureParams.response_format = { type: model.response_format };
+        }
+        return azureParams;
+    }
+
+    /* =====================================================
        MESSAGE RENDERING FUNCTIONS
     ===================================================== */
     /**
@@ -328,31 +394,42 @@
        RESPONSE HANDLING: STREAMING & NORMAL RESPONSES
     ===================================================== */
     /**
-     * Updated streaming response handler
+     * Handle streaming response from the server.
+     * Parses each line as JSON and updates the assistant message.
      */
     async function handleStreamingResponse(formData) {
         let reader;
         let messageDiv = null;
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
             const response = await fetch('/chat/send', {  // Updated URL
                 method: 'POST',
                 body: formData,
                 headers: {
                     'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                    'X-Azure-Token': window.CHAT_CONFIG.azureToken,
+                    'api-key': window.CHAT_CONFIG.azureToken,
+                    'X-Request-ID': (crypto.randomUUID && crypto.randomUUID()) || Date.now().toString(),
+                    'X-Azure-Operation': 'chat-completion',
                     'Accept': 'text/event-stream',
-                    'X-CSRFToken': window.CHAT_CONFIG.csrfToken,
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive'
+                },
+                signal: controller.signal
             });
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorData = await response.json();
+                throw new Error(errorData.error?.message || `Azure OpenAI Error: ${response.status}`);
             }
 
             reader = response.body.getReader();
             const decoder = new TextDecoder();
             let accumulatedResponse = '';
 
+            // Create a new assistant message container
             messageDiv = document.createElement('div');
             messageDiv.className =
                 'flex w-full mt-4 space-x-3 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl animate-slide-up';
@@ -369,18 +446,30 @@
 
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
-                        const data = line.slice(6);
+                        const data = line.slice(6).trim();
                         if (data === '[DONE]') {
                             streaming = false;
-                        }
-                        if (data.startsWith('[ERROR]')) {
+                        } else if (data.startsWith('[ERROR]')) {
                             throw new Error(data.slice(7).trim());
-                        }
-                        try {
-                            accumulatedResponse += data;
-                            await appendAssistantMessage(accumulatedResponse, true, messageDiv);
-                        } catch (error) {
-                            console.error('Error processing stream chunk:', error);
+                        } else {
+                            try {
+                                const parsed = JSON.parse(data);
+                                if (parsed.choices && parsed.choices[0]) {
+                                    const delta = parsed.choices[0].delta;
+                                    if (delta) {
+                                        if (delta.content) {
+                                            accumulatedResponse += delta.content;
+                                        }
+                                        // Handle function calls if provided
+                                        if (delta.function_call) {
+                                            handleFunctionCall(delta.function_call);
+                                        }
+                                        await appendAssistantMessage(accumulatedResponse, true, messageDiv);
+                                    }
+                                }
+                            } catch (e) {
+                                console.error('Error parsing streaming chunk:', e);
+                            }
                         }
                     }
                 }
@@ -414,7 +503,7 @@
     let modelChangeInProgress = false;
 
     /**
-     * Updated model change handler
+     * Handle model changes.
      */
     async function handleModelChange() {
         if (modelChangeInProgress) return;
@@ -468,7 +557,7 @@
     }
 
     /**
-     * Updated new chat creation
+     * Create a new chat.
      */
     async function createNewChat() {
         try {
@@ -494,6 +583,9 @@
         }
     }
 
+    /**
+     * Send a message using Azure OpenAI parameters.
+     */
     async function sendMessage() {
         if (!window.utils) {
             console.error('Utils not initialized');
@@ -522,55 +614,41 @@
             // Show typing indicator
             showTypingIndicator();
 
-            // Get current model info
+            // Get current model info and validate model configuration
             const modelSelect = document.getElementById('model-select');
             const modelId = modelSelect?.value;
             const model = window.CHAT_CONFIG.models?.find(m => m.id === parseInt(modelId));
-
-            if (!modelId || !model) {
-                window.utils.showFeedback('No model selected', 'error');
+            if (!model) {
+                window.utils.showFeedback('Invalid Azure model configuration', 'error');
                 return;
             }
 
+            // Build messages array (including a system message)
+            const messages = buildMessageArray(messageText, model);
+
+            // Build Azure parameters using model and messages
+            const azureParams = buildAzureParameters(model, messages);
+
+            // Build FormData payload: append each parameter (stringifying objects)
             const formData = new FormData();
-            formData.append('message', messageText);
-            formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
-            formData.append('model_id', model.id);
-
-            // Add model-specific parameters
-            formData.append('deployment_name', model.deployment_name);
-            formData.append('api_version', model.api_version);
-            formData.append('model_type', model.model_type);
-
-            // Add metadata
-            const metadata = {
-                timestamp: new Date().toISOString(),
-                model_max_tokens: model.max_tokens || 32000,
-                requires_o1: model.requires_o1_handling || false,
-                deployment_name: model.deployment_name,
-                api_version: model.api_version || '2024-12-01-preview',
-                temperature: model.temperature || 1.0,
-                max_tokens: model.max_tokens || 32000
-            };
-            formData.append('metadata', JSON.stringify(metadata));
-
-            const response = await window.utils.fetchWithCSRF('/chat/send', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Chat-ID': window.CHAT_CONFIG.chatId,
-                    'X-Requested-With': 'XMLHttpRequest'
+            for (const key in azureParams) {
+                if (azureParams[key] !== undefined && azureParams[key] !== null) {
+                    formData.append(key, typeof azureParams[key] === 'object' ? JSON.stringify(azureParams[key]) : azureParams[key]);
                 }
-            });
-
-            if (!response.success) {
-                throw new Error(response.error || 'Failed to send message');
             }
+            // Also append the CSRF token if required by your backend
+            formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
+
+            // Send the message via streaming fetch
+            await handleStreamingResponse(formData);
 
             // Clear input and update UI
             messageInput.value = '';
             appendUserMessage(messageText);
-            appendAssistantMessage(response.message);
+
+            // In case the final response is non-streamed, you could also call:
+            // const response = await window.utils.fetchWithCSRF('/chat/send', { ... });
+            // appendAssistantMessage(response.message);
 
             // Update token usage
             if (window.tokenUsageManager) {

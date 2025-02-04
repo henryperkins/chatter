@@ -103,7 +103,8 @@
     <div id="chat-config" data-chat-id="{{ chat_id if chat_id else '' }}" data-csrf-token="{{ csrf_token() }}"
         data-models='{{ models|tojson|safe }}'
         data-current-model='{{ current_model|tojson|safe if current_model else "null" }}'
-        data-user-id="{{ current_user.id }}" class="hidden" data-debug="true">
+        data-user-id="{{ current_user.id }}" class="hidden" data-debug="true"
+        data-azure-token="{{ azure_token if azure_token else '' }}">
     </div>
 
     <!-- Main Chat Area -->
@@ -292,6 +293,8 @@
                 currentModel: JSON.parse(configEl.dataset.currentModel || 'null'),
                 userId: configEl.dataset.userId,
                 debug: configEl.dataset.debug === 'true'
+,
+                azureToken: configEl.dataset.azureToken
             };
 
             if (!window.CHAT_CONFIG.models || !window.CHAT_CONFIG.models.length) {

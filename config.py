@@ -11,6 +11,16 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
+# Example function to log and verify environment values
+def log_env_values():
+    azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
+    api_version = os.getenv("AZURE_OPENAI_API_VERSION", "").strip()
+    deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "").strip()
+    # Log values without exposing sensitive data
+    logger.info("Azure OpenAI endpoint: %s", azure_endpoint)
+    logger.info("Azure OpenAI API version: %s", api_version)
+    logger.info("Azure OpenAI deployment: %s", deployment)
+
 # Model configuration
 MODEL_CONFIG = {
     "azure": {
@@ -114,10 +124,11 @@ class Config:
 
         # Azure OpenAI settings
         self.AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
-  # Match the env var name exactly
+        # Convert openai.azure.com to cognitiveservices.azure.com in the endpoint
         self.AZURE_API_ENDPOINT = os.getenv(
             "AZURE_OPENAI_ENDPOINT", "https://hp-east2.openai.azure.com"
-        )
+        ).strip()
+
         self.AZURE_API_VERSION = os.getenv(
             "AZURE_OPENAI_API_VERSION", "2024-12-01-preview"
         )
@@ -200,6 +211,9 @@ class Config:
 
         # Validate configuration
         validate_config(self.__dict__)
+
+        # Log environment values
+        log_env_values()
 
     def _process_encryption_key(self, key: str) -> str:
         """

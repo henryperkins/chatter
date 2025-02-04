@@ -54,9 +54,7 @@ token_logger = get_logger("token_usage")
 
 # File Constants
 MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", default=str(10 * 1024 * 1024)))  # 10 MB
-MAX_TOTAL_FILE_SIZE = int(
-    os.getenv("MAX_TOTAL_FILE_SIZE", default=str(50 * 1024 * 1024))
-)  # 50 MB
+MAX_TOTAL_FILE_SIZE = int(os.getenv("MAX_TOTAL_FILE_SIZE", default=str(50 * 1024 * 1024)))  # 50 MB
 ALLOWED_EXTENSIONS = {"txt", "pdf", "docx", "md"}
 
 # Token & Model Constants
@@ -73,25 +71,59 @@ CHAT_RATE_LIMIT = "60 per minute"
 chat_routes = Blueprint("chat", __name__, url_prefix="/chat")
 limiter = Limiter(key_func=get_remote_address)
 
-# Attempt to get token encoding
-try:
-    encoding = tiktoken.encoding_for_model(DEFAULT_MODEL)
-except KeyError:
-    logger.warning(
-        "Model '%s' not found. Falling back to 'cl100k_base'.", DEFAULT_MODEL
-    )
-    encoding = tiktoken.get_encoding("cl100k_base")
+# ----------------------------------------------------------------------------
+# Token Encoding Initialization with Fallback
+# ----------------------------------------------------------------------------
+def get_token_encoder(model_name: str = DEFAULT_MODEL):
+    try:
+        return tiktoken.encoding_for_model(model_name)
+    except KeyError:
+        logger.warning(f"Model '{model_name}' not found. Using 'cl100k_base'.")
+        return tiktoken.get_encoding("cl100k_base")
 
+# Initialize token encoding
+encoding = get_token_encoder()
 
+# ----------------------------------------------------------------------------
+# Optional: Model Configuration Validation
+# ----------------------------------------------------------------------------
+# MODEL_CONFIG is assumed to be defined elsewhere. If not, you may define it here.
+# For example:
+# MODEL_CONFIG = {
+#     "gpt-4": { "max_tokens": 8192 },
+#     "o1-preview": { "max_tokens": 8300 },
+# }
+def validate_model_config(model_config: Dict[str, Any]) -> None:
+    """
+    Validate model configuration and enforce model-specific requirements.
+    Uses the standardized MODEL_CONFIG based on model_type.
+    """
+    model_type = model_config.get("model_type")
+    if not model_type:
+        raise ValueError("model_type is required")
+
+    # Use MODEL_CONFIG if available
+    model_caps = globals().get("MODEL_CONFIG", {}).get(model_type)
+    if not model_caps:
+        raise ValueError(f"Unsupported model_type: {model_type}")
+
+    # Filter out system messages if present
+    messages = model_config.get("messages", [])
+    if messages:
+        model_config["messages"] = [
+            msg for msg in messages if msg.get("role") != "system"
+        ]
+
+# ----------------------------------------------------------------------------
+# Upload Folder Initialization
+# ----------------------------------------------------------------------------
 def init_upload_folder() -> None:
     """Initialize the secure upload folder if it doesn't exist."""
     upload_folder = os.getenv("UPLOAD_FOLDER", "uploads")
     if not os.path.exists(upload_folder):
         os.makedirs(upload_folder, exist_ok=True)
 
-
 init_upload_folder()
-
 
 ##############################################################################
 # Validation / Helper Functions
@@ -104,36 +136,42 @@ def validate_chat_access(chat_id: Optional[str]) -> bool:
         return False
     return Chat.can_access_chat(chat_id, current_user.id, current_user.role)
 
-
 def validate_model(model: Optional[Any]) -> Optional[str]:
     """
-    Validate a model's configuration, e.g. max_completion_tokens in range.
+    Validate a model's configuration.
     Returns None if valid; otherwise returns an error message.
     """
     if not model:
         return "No model configured for this chat."
 
     try:
+        # Validate that max_completion_tokens exists and is numeric
         max_completion_tokens = getattr(model, "max_completion_tokens", None)
-        if not isinstance(max_completion_tokens, int):
-            try:
-                max_completion_tokens = int(max_completion_tokens)
-            except (TypeError, ValueError):
-                return "max_completion_tokens must be a valid integer"
+        if max_completion_tokens is None:
+            return "max_completion_tokens is required"
 
-        if not isinstance(max_completion_tokens, int) or max_completion_tokens < 1:
+        try:
+            max_completion_tokens = int(max_completion_tokens)
+        except (TypeError, ValueError):
+            return "max_completion_tokens must be a valid integer"
+
+        if max_completion_tokens < 1:
             return "max_completion_tokens must be at least 1"
 
         # Check provider capabilities
-        provider = Provider.get_by_id(model.provider_id)
-        provider_max = (
-            provider.capabilities.get("max_tokens", 16384) if provider else 16384
-        )
+        provider = Provider.get_by_id(getattr(model, "provider_id", None))
+        if not provider:
+            return "Invalid provider configuration"
 
-        # Check for o1-preview model
-        model_type = getattr(model, "model_type", "").lower()
+        provider_max = provider.capabilities.get("max_tokens", 16384)
+
+        # Check that model_type is provided
+        model_type = getattr(model, "model_type", "")
+        if not model_type:
+            return "model_type is required"
+
         requires_o1 = getattr(model, "requires_o1_handling", False)
-        is_o1_preview = model_type == "o1-preview" and requires_o1
+        is_o1_preview = model_type.lower() == "o1-preview" and requires_o1
 
         if is_o1_preview:
             if max_completion_tokens > 8300:
@@ -148,7 +186,6 @@ def validate_model(model: Optional[Any]) -> Optional[str]:
         logger.error(f"Model validation error: {str(e)}")
         return f"Invalid model configuration: {str(e)}"
 
-
 def get_model_token_limit(model_obj: Any) -> int:
     """
     Safely retrieve the model's max_tokens, or fallback to 16384.
@@ -158,13 +195,12 @@ def get_model_token_limit(model_obj: Any) -> int:
         return max_tokens
     return 16384
 
-
 def truncate_content(text: str, max_tokens: int, truncation_note: str) -> str:
     """
     Truncate the given text to `max_tokens` and append a note if truncated.
     """
     try:
-        tok = tiktoken.encoding_for_model(DEFAULT_MODEL)
+        tok = get_token_encoder(DEFAULT_MODEL)
     except KeyError:
         logger.warning("Model '%s' not found. Using 'cl100k_base'.", DEFAULT_MODEL)
         tok = tiktoken.get_encoding("cl100k_base")
@@ -175,7 +211,6 @@ def truncate_content(text: str, max_tokens: int, truncation_note: str) -> str:
     truncated_tokens = tokens[:allowed]
     truncated_text = tok.decode(truncated_tokens)
     return truncated_text + truncation_note
-
 
 def validate_chat_request(request_data) -> Dict[str, Any]:
     """
@@ -205,7 +240,6 @@ def validate_chat_request(request_data) -> Dict[str, Any]:
     except Exception as e:
         logger.error("Request validation error: %s", str(e), exc_info=True)
         return {"valid": False, "error": "Request validation failed"}
-
 
 ##############################################################################
 # 1) Chat Interface Pages
@@ -250,6 +284,16 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         model_name = model_obj.name if model_obj else "Default Model"
         current_model = model_obj
 
+        # Get Azure token
+        azure_token = None
+        if model_obj and model_obj.api_key:
+            try:
+                from utils.encryption import decrypt_api_key
+                encryption_key = os.getenv("ENCRYPTION_KEY", "")
+                azure_token = decrypt_api_key(model_obj.api_key, encryption_key)
+            except Exception as e:
+                logger.error("Error decrypting Azure token: %s", str(e))
+
         return cast(
             FlaskResponse,
             render_template(
@@ -264,12 +308,12 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                 now=datetime.now,
                 today=datetime.now().strftime("%Y-%m-%d"),
                 yesterday=(datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
+                azure_token=azure_token,
             ),
         )
     except Exception as e:
         logger.error("Error initializing chat interface: %s", str(e))
         return make_response(jsonify({"error": "Internal server error"}), 500)
-
 
 @chat_routes.route("/chat_interface", methods=["GET"])
 @login_required
@@ -337,6 +381,17 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             )
         chat_title = chat.title
         model_name = model_obj.name if model_obj else "Default Model"
+
+        # Get Azure token
+        azure_token = None
+        if model_obj and model_obj.api_key:
+            try:
+                from utils.encryption import decrypt_api_key
+                encryption_key = os.getenv("ENCRYPTION_KEY", "")
+                azure_token = decrypt_api_key(model_obj.api_key, encryption_key)
+            except Exception as e:
+                logger.error("Error decrypting Azure token: %s", str(e))
+
         current_model = model_obj
     except Exception as e:
         logger.error("Error retrieving model for chat %s: %s", chat_id, str(e))
@@ -410,9 +465,9 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             now=datetime.now,
             today=today,
             yesterday=yesterday,
+            azure_token=azure_token,
         ),
     )
-
 
 ##############################################################################
 # 2) Create a New Chat (Replaces /new_chat)
@@ -431,7 +486,6 @@ def new_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     except Exception as e:
         logger.error(f"Error creating new chat: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
-
 
 ##############################################################################
 # 3) Send a Chat Message (Replaces the Old handle_chat Route)
@@ -526,12 +580,10 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         logger.error(f"Chat handling error: {str(e)}", exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
-
 def stream_response(chat_id: str, history: list, model_obj: Model) -> FlaskResponse:
     """
     Handle Server-Sent Events (SSE) streaming response from Azure / LLM.
     """
-
     def generate():
         try:
             response_generator = get_azure_response(
@@ -546,13 +598,28 @@ def stream_response(chat_id: str, history: list, model_obj: Model) -> FlaskRespo
 
             accumulated = ""
             for chunk in response_generator:
-                if "choices" in chunk and chunk["choices"]:
-                    content = chunk["choices"][0].get("delta", {}).get("content", "")
-                    if content:
-                        accumulated += content
-                        yield f"data: {content}\n\n"
+                # Validate chunk format
+                if not isinstance(chunk, dict):
+                    continue
 
-            # Save final assistant message
+                choices = chunk.get("choices", [])
+                if not choices or not isinstance(choices, list):
+                    continue
+
+                first_choice = choices[0]
+                if not isinstance(first_choice, dict):
+                    continue
+
+                delta = first_choice.get("delta", {})
+                if not isinstance(delta, dict):
+                    continue
+
+                content = delta.get("content", "")
+                if content:
+                    accumulated += content
+                    yield f"data: {content}\n\n"
+
+            # Save final assistant message if accumulated
             if accumulated:
                 conversation_manager.add_message(
                     chat_id=chat_id,
@@ -573,7 +640,6 @@ def stream_response(chat_id: str, history: list, model_obj: Model) -> FlaskRespo
     response.headers["X-Accel-Buffering"] = "no"
     return response
 
-
 def normal_response(
     chat_id: str, history: list, model_obj: Model
 ) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
@@ -590,7 +656,26 @@ def normal_response(
             api_version=model_obj.api_version,
             stream=False,
         )
-        content = response["choices"][0]["message"]["content"]
+
+        # Proper response validation
+        if not isinstance(response, dict):
+            raise ValueError("Invalid response format from API")
+
+        choices = response.get("choices")
+        if not choices or not isinstance(choices, list):
+            raise ValueError("No choices in API response")
+
+        first_choice = choices[0]
+        if not isinstance(first_choice, dict):
+            raise ValueError("Invalid choice format in API response")
+
+        message = first_choice.get("message")
+        if not message or not isinstance(message, dict):
+            raise ValueError("Invalid message format in API response")
+
+        content = message.get("content")
+        if content is None:
+            raise ValueError("No content in API response")
 
         # Save to conversation
         conversation_manager.add_message(
@@ -615,7 +700,6 @@ def normal_response(
     except Exception as e:
         logger.error(f"Normal response error: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
-
 
 ##############################################################################
 # 4) Stats & Utility Routes
@@ -650,7 +734,6 @@ def get_chat_stats(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, in
         logger.error(f"Error getting chat stats: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
-
 @chat_routes.route("/update_model", methods=["POST"])
 @login_required
 def update_model() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
@@ -676,7 +759,6 @@ def update_model() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         logger.error(f"Error updating model: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
-
 @chat_routes.route("/get_chat_context/<chat_id>")
 @login_required
 def get_chat_context(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
@@ -695,7 +777,6 @@ def get_chat_context(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, 
         logger.error("Error getting chat context: %s", e)
         return jsonify({"error": "Failed to get chat context"}), 500
 
-
 @chat_routes.route("/delete_chat/<chat_id>", methods=["DELETE"])
 @login_required
 def delete_chat(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
@@ -713,7 +794,6 @@ def delete_chat(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]
     except Exception as e:
         logger.error("Error deleting chat %s: %s", chat_id, e)
         return jsonify({"error": "Failed to delete chat"}), 500
-
 
 @chat_routes.route("/scrape", methods=["POST"])
 @login_required
@@ -736,7 +816,6 @@ def scrape_route() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     except Exception as ex:
         logger.error("Error during scraping: %s", str(ex))
         return jsonify({"error": "An error occurred during scraping"}), 500
-
 
 @chat_routes.route("/update_chat_title/<chat_id>", methods=["POST"])
 @login_required

@@ -25,7 +25,6 @@ logger = get_logger(__name__)
 # Type alias for clarity
 ModelDict = Dict[str, Any]
 
-
 @dataclass
 class Model:
     """

@@ -2,35 +2,38 @@
 
 import logging
 import os
-import uuid
-from datetime import datetime
 from typing import Optional, List, Dict, Union, Generator, Any
-
 import requests
 from openai import AzureOpenAI
+from openai.types.chat import ChatCompletion, ChatCompletionChunk
+from openai.types.chat.chat_completion import Choice, ChatCompletionMessage
+from openai.types.chat.chat_completion_chunk import ChoiceDelta
 
 from logging_config import get_logger
 from utils.encryption import decrypt_api_key
-import base64
-import hashlib
-from config import Config
-from azure_config import validate_model_config, create_client
 
 logger = get_logger("chat_api")
 
 # Type aliases
-ResponseType = Union[Dict[str, Any], str, Generator[Dict[str, Any], None, None]]
+ResponseType = Union[ChatCompletion, str, Generator[ChatCompletionChunk, None, None]]
 Message = Dict[str, str]
 ChatResponse = Dict[str, Any]
+
+
+class ChatAPIError(Exception):
+    """Base exception for chat API errors."""
+
+    def __init__(self, message: str, status_code: int = 500):
+        self.message = message
+        self.status_code = status_code
+        super().__init__(self.message)
 
 
 class ChatClient:
     """Manages chat interactions with Azure OpenAI API."""
 
     def __init__(self):
-        self._azure_client = None
-        self._file_chat_client = None
-        self._search_chat_client = None
+        self._azure_client: Optional[AzureOpenAI] = None
         self._user_agent = (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -40,167 +43,29 @@ class ChatClient:
     def get_azure_client(
         self, api_key: str, api_endpoint: str, api_version: str
     ) -> AzureOpenAI:
-        """
-        Get or create an Azure OpenAI client using create_client from azure_config.
-        """
-        if self._azure_client is None:
-            self._azure_client = create_client(
-                api_key=api_key, api_endpoint=api_endpoint, api_version=api_version
-            )
-        return self._azure_client
-
-    def get_file_chat_client(self) -> Optional[Any]:
-        """
-        Get or create file chat client.
-        """
-        if self._file_chat_client is None and os.getenv("AZURE_OPENAI_ENDPOINT"):
-            try:
-                from azure_file_manager import AzureOpenAIChatWithFiles
-
-                self._file_chat_client = AzureOpenAIChatWithFiles(
-                    endpoint=os.getenv("AZURE_OPENAI_ENDPOINT", ""),
-                    api_key=os.getenv("AZURE_OPENAI_KEY", ""),
-                    deployment_id=os.getenv("AZURE_OPENAI_DEPLOYMENT", ""),
-                )
-            except Exception as e:
-                logger.error(f"Failed to initialize file chat client: {str(e)}")
-        return self._file_chat_client
-
-    def get_search_chat_client(self, model_type: str) -> Optional[Any]:
-        """
-        Get or create search chat client.
-        """
-        if self._search_chat_client is None and os.getenv("AZURE_SEARCH_ENDPOINT"):
-            try:
-                from azure_search_client import create_search_client
-
-                self._search_chat_client = create_search_client(model_type)
-            except Exception as e:
-                logger.error(f"Failed to initialize search chat client: {str(e)}")
-        return self._search_chat_client
-
-    def validate_messages(self, messages: List[Message]) -> List[Message]:
-        """
-        Validate and sanitize chat messages.
-        """
-        if not isinstance(messages, list):
-            raise ValueError("Messages must be a list")
-
-        sanitized = []
-        for msg in messages:
-            if not isinstance(msg, dict):
-                raise ValueError(f"Invalid message format: {msg}")
-            if "role" not in msg or "content" not in msg:
-                raise ValueError(f"Message missing required fields: {msg}")
-            if msg["role"] not in ["system", "user", "assistant"]:
-                raise ValueError(f"Invalid message role: {msg['role']}")
-            if not isinstance(msg["content"], str):
-                raise ValueError(f"Message content must be string: {msg}")
-
-            content = msg["content"].strip()
-            if content:
-                sanitized.append({"role": msg["role"], "content": content})
-
-        if not sanitized:
-            raise ValueError("No valid messages provided")
-        return sanitized
-
-    def handle_stream_response(
-        self, stream_response, model: str
-    ) -> Generator[ChatResponse, None, None]:
-        """
-        Process streaming response from API.
-        """
-        current_content = ""
-        consecutive_errors = 0
-        MAX_RETRIES = 3
+        """Get or create an Azure OpenAI client."""
+        if not api_key or not api_endpoint or not api_version:
+            raise ChatAPIError("Missing required API configuration", 400)
 
         try:
-            for chunk in stream_response:
-                try:
-                    if not hasattr(chunk.choices[0], "delta"):
-                        continue
-
-                    delta = chunk.choices[0].delta
-                    consecutive_errors = 0
-
-                    if hasattr(delta, "role") and delta.role == "system":
-                        continue
-
-                    if hasattr(delta, "content") and delta.content:
-                        current_content += delta.content
-                        yield self._create_response(
-                            delta.content, model, current_content
-                        )
-
-                    if chunk.choices[0].finish_reason:
-                        yield self._create_response(
-                            current_content,
-                            model,
-                            current_content,
-                            chunk.choices[0].finish_reason,
-                        )
-
-                except Exception as e:
-                    consecutive_errors += 1
-                    if consecutive_errors >= MAX_RETRIES:
-                        raise Exception(f"Too many consecutive errors: {str(e)}")
+            if not self._azure_client:
+                self._azure_client = AzureOpenAI(
+                    api_key=api_key,
+                    azure_endpoint=api_endpoint,
+                    api_version=api_version,
+                )
+            return self._azure_client
         except Exception as e:
-            yield self._create_error_response(str(e), model)
-
-    def _create_response(
-        self,
-        content: str,
-        model: str,
-        full_content: str = "",
-        finish_reason: Optional[str] = None,
-    ) -> ChatResponse:
-        """
-        Create a standardized chat response.
-        """
-        return {
-            "choices": [
-                {
-                    "message": {"content": content, "role": "assistant"},
-                    "finish_reason": finish_reason,
-                    "index": 0,
-                }
-            ],
-            "created": int(datetime.now().timestamp()),
-            "model": model,
-        }
-
-    def _create_error_response(self, error_message: str, model: str) -> ChatResponse:
-        """
-        Create a standardized error response.
-        """
-        return {
-            "error": error_message,
-            "choices": [
-                {
-                    "message": {
-                        "content": f"An error occurred: {error_message}",
-                        "role": "assistant",
-                    },
-                    "finish_reason": "error",
-                    "index": 0,
-                }
-            ],
-            "created": int(datetime.now().timestamp()),
-            "model": model,
-        }
-
-
-_chat_client = ChatClient()
+            raise ChatAPIError(f"Failed to create Azure client: {str(e)}", 500)
 
 
 def get_azure_response(
     messages: List[Message],
-    deployment_name: Optional[str] = None,
-    max_completion_tokens: Optional[int] = None,
-    api_endpoint: Optional[str] = None,
-    api_key: Optional[str] = None,
-    api_version: Optional[str] = None,
+    deployment_name: str,
+    max_completion_tokens: int,
+    api_endpoint: str,
+    api_key: str,
+    api_version: str,
     model_type: Optional[str] = None,
     requires_o1_handling: bool = False,
     reasoning_effort: str = "medium",
@@ -208,60 +73,52 @@ def get_azure_response(
     response_format: Optional[Dict[str, Any]] = None,
     timeout_seconds: int = 600,
     stream: bool = False,
-    file_ids: Optional[List[str]] = None,
-    vector_store_id: Optional[str] = None,
-    use_code_interpreter: bool = False,
 ) -> ResponseType:
     """
     Get response from Azure OpenAI API.
     """
     try:
-        required_params = {
-            "deployment_name": deployment_name,
-            "api_endpoint": api_endpoint,
-            "api_key": api_key,
-            "api_version": api_version,
-        }
-        missing = [k for k, v in required_params.items() if not v]
-        if missing:
-            raise ValueError(f"Missing required parameters: {', '.join(missing)}")
+        # Validate required parameters
+        if not all([messages, deployment_name, api_endpoint, api_key, api_version]):
+            raise ChatAPIError("Missing required parameters", 400)
 
-        if api_key:
-            # Recreate the encryption key (same as used in create_default_model)
-            config_instance = Config()  # create a Config instance
-            key_bytes = hashlib.sha256(config_instance.ENCRYPTION_KEY.encode()).digest()
-            encryption_key = base64.b64encode(key_bytes).decode()
-            # Decrypt the stored API key
-            logger.debug(f"Encrypted API key length: {len(api_key)}")
-            api_key = decrypt_api_key(api_key, encryption_key)
-            logger.debug(f"Decrypted API key length: {len(api_key)}")
-            logger.debug(f"Using API endpoint: {api_endpoint}")
-            logger.debug(f"Using deployment name: {deployment_name}")
-            logger.debug(f"Using API version: {api_version}")
+        # Validate messages format
+        if not isinstance(messages, list) or not all(
+            isinstance(m, dict) and "role" in m and "content" in m for m in messages
+        ):
+            raise ChatAPIError("Invalid messages format", 400)
 
-            # Validate decrypted key
-            if not api_key or len(api_key) < 32:
-                raise ValueError("Invalid API key after decryption")
+        # Decrypt API key if needed
+        try:
+            if api_key:
+                encryption_key = os.getenv("ENCRYPTION_KEY", "")
+                api_key = decrypt_api_key(api_key, encryption_key)
+        except Exception as e:
+            raise ChatAPIError(f"API key decryption failed: {str(e)}", 500)
 
-        client = _chat_client.get_azure_client(api_key, api_endpoint, api_version)
-        # Assuming Model.PROVIDER_CAPABILITIES is available via your model import.
-        from models.model import Model
+        # Create client
+        client = AzureOpenAI(
+            api_key=api_key,
+            azure_endpoint=api_endpoint,
+            api_version=api_version,
+            timeout=timeout_seconds,
+        )
 
-        model_caps = Model.PROVIDER_CAPABILITIES.get(model_type, {})
-        sanitized_messages = _chat_client.validate_messages(messages)
-
+        # Prepare completion parameters
         completion_params = {
             "model": deployment_name,
-            "messages": sanitized_messages,
+            "messages": messages,
+            "max_tokens": max_completion_tokens,
             "stream": stream,
-            "temperature": 1.0 if model_caps.get("fixed_temperature") else 0.7,
-            "max_tokens": min(
-                max_completion_tokens or model_caps.get("max_tokens", 16384),
-                model_caps.get("max_tokens", 16384),
-            ),
         }
 
-        if model_caps.get("requires_reasoning_effort"):
+        # Add optional parameters if provided
+        if response_format:
+            if not isinstance(response_format, dict) or "type" not in response_format:
+                raise ChatAPIError("Invalid response_format structure", 400)
+            completion_params["response_format"] = response_format
+
+        if requires_o1_handling:
             completion_params.update(
                 {
                     "reasoning_effort": reasoning_effort,
@@ -269,90 +126,104 @@ def get_azure_response(
                 }
             )
 
-        if model_caps.get("supports_json_mode") and response_format:
-            completion_params["response_format"] = response_format
+        try:
+            # Make API call
+            response = client.chat.completions.create(**completion_params)
 
-        if stream and not model_caps.get("streaming", True):
-            logger.warning(f"Streaming not supported for model type {model_type}")
-            stream = False
-            completion_params["stream"] = False
+            if stream:
+                return handle_streaming_response(response)
+            return handle_normal_response(response)
 
-        response = client.chat.completions.create(**completion_params)
+        except Exception as e:
+            error_msg = str(e)
+            if "timeout" in error_msg.lower():
+                raise ChatAPIError("Request timed out", 504)
+            if "rate limit" in error_msg.lower():
+                raise ChatAPIError("Rate limit exceeded", 429)
+            raise ChatAPIError(f"API request failed: {error_msg}", 500)
 
-        if stream:
-            return _chat_client.handle_stream_response(response, deployment_name)
-
-        if not response or not response.choices:
-            raise ValueError("Empty response from API")
-
-        return response.choices[0].message.content
-
-    except Exception as e:
-        logger.error(f"Error in get_azure_response: {str(e)}")
+    except ChatAPIError:
         raise
+    except Exception as e:
+        raise ChatAPIError(f"Unexpected error: {str(e)}", 500)
 
 
-def upload_file_to_azure(
-    file_content: bytes, file_name: str, content_type: str
-) -> Optional[str]:
-    """
-    Upload file to Azure Blob Storage.
-    """
+def handle_streaming_response(
+    response: Generator[ChatCompletionChunk, None, None]
+) -> Generator[ChatCompletionChunk, None, None]:
+    """Handle streaming response from the API."""
     try:
-        connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-        container_name = os.getenv("AZURE_STORAGE_CONTAINER")
+        for chunk in response:
+            if not isinstance(chunk, ChatCompletionChunk):
+                continue
 
-        if not connection_string or not container_name:
-            logger.error("Azure Storage configuration missing")
-            return None
+            # Validate chunk structure
+            if not hasattr(chunk, "choices") or not chunk.choices:
+                continue
 
-        from azure.storage.blob import BlobServiceClient
+            choice = chunk.choices[0]
+            if not isinstance(choice, Choice) or not hasattr(choice, "delta"):
+                continue
 
-        blob_service_client = BlobServiceClient.from_connection_string(
-            connection_string
-        )
-        container_client = blob_service_client.get_container_client(container_name)
-        blob_name = f"{uuid.uuid4()}-{file_name}"
-        blob_client = container_client.get_blob_client(blob_name)
+            delta = choice.delta
+            if not isinstance(delta, ChoiceDelta):
+                continue
 
-        blob_client.upload_blob(
-            file_content,
-            blob_type="BlockBlob",
-            content_settings={"content_type": content_type},
-        )
-
-        logger.info(f"Successfully uploaded file {file_name}")
-        return blob_name
+            yield chunk
 
     except Exception as e:
-        logger.error(f"Error uploading file: {str(e)}")
-        return None
+        raise ChatAPIError(f"Error processing stream: {str(e)}", 500)
+
+
+def handle_normal_response(response: ChatCompletion) -> ChatCompletion:
+    """Handle normal (non-streaming) response from the API."""
+    try:
+        if not isinstance(response, ChatCompletion):
+            raise ChatAPIError("Invalid response type from API", 500)
+
+        if not hasattr(response, "choices") or not response.choices:
+            raise ChatAPIError("No choices in API response", 500)
+
+        choice = response.choices[0]
+        if not isinstance(choice, Choice):
+            raise ChatAPIError("Invalid choice type in response", 500)
+
+        message = choice.message
+        if not isinstance(message, ChatCompletionMessage):
+            raise ChatAPIError("Invalid message type in response", 500)
+
+        return response
+
+    except ChatAPIError:
+        raise
+    except Exception as e:
+        raise ChatAPIError(f"Error processing response: {str(e)}", 500)
+
 
 def scrape_data(query: str) -> str:
     """
     Scrape data from external resources based on the provided query.
-
-    Args:
-        query (str): The search query or URL to scrape data from
-
-    Returns:
-        str: The scraped content or search results
-
-    Raises:
-        ValueError: If the query is invalid or empty
-        Exception: For other errors during scraping
     """
+    if not query or not isinstance(query, str):
+        raise ChatAPIError("Invalid query provided", 400)
+
     try:
-        if not query or not isinstance(query, str):
-            raise ValueError("Invalid query provided")
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/91.0.4472.124 Safari/537.36"
+            )
+        }
 
-        headers = {"User-Agent": _chat_client._user_agent}
-        response = requests.get(query, headers=headers, timeout=30)
+        response = requests.get(query, headers=headers, timeout=30, verify=True)
+
         response.raise_for_status()
-
         return response.text
 
+    except requests.Timeout:
+        raise ChatAPIError("Request timed out", 504)
     except requests.RequestException as e:
-        logger.error(f"Error scraping data: {str(e)}")
-        raise ValueError(f"Failed to fetch data: {str(e)}")
-
+        raise ChatAPIError(f"Request failed: {str(e)}", 502)
+    except Exception as e:
+        raise ChatAPIError(f"Scraping error: {str(e)}", 500)

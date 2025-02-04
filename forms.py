@@ -59,7 +59,6 @@ class NullableIntegerField(IntegerField):
         else:
             self.data = None
 
-
 class NullableFloatField(FloatField):
     """
     A custom FloatField that treats empty or invalid input as None.
@@ -73,7 +72,6 @@ class NullableFloatField(FloatField):
                 self.data = None
         else:
             self.data = None
-
 
 # ------------------------------------------------------------------------
 # LoginForm
@@ -137,7 +135,6 @@ class LoginForm(FlaskForm):
             raise ValidationError(
                 "Unable to process login at this time. Please try again later."
             )
-
 
 # ------------------------------------------------------------------------
 # RegistrationForm
@@ -267,7 +264,6 @@ class RegistrationForm(FlaskForm):
             logger.error(f"Error validating password: {str(e)}")
             raise ValidationError("Unable to validate password at this time")
 
-
 # ------------------------------------------------------------------------
 # ResetPasswordForm
 # ------------------------------------------------------------------------
@@ -296,7 +292,6 @@ class ResetPasswordForm(FlaskForm):
     )
     submit = SubmitField("Reset Password")
 
-
 # ------------------------------------------------------------------------
 # ForgotPasswordForm
 # ------------------------------------------------------------------------
@@ -313,7 +308,6 @@ class ForgotPasswordForm(FlaskForm):
         ],
     )
     submit = SubmitField("Reset Password")
-
 
 # ------------------------------------------------------------------------
 # ProviderForm
@@ -459,7 +453,6 @@ class ProviderForm(FlaskForm):
         description="Check if this is an Azure OpenAI provider"
     )
 
-
 # ------------------------------------------------------------------------
 # ModelForm
 # ------------------------------------------------------------------------
@@ -530,16 +523,6 @@ class ModelForm(FlaskForm):
         self.is_edit = kwargs.pop('is_edit', False)
         self.provider_validation_rules = {}  # Initialize here
 
-        # Handle both dict and MultiDict inputs
-        if args and isinstance(args[0], (dict, list)):
-            from werkzeug.datastructures import MultiDict
-            if isinstance(args[0], dict):
-                # Convert dict to MultiDict
-                args = (MultiDict(args[0]),) + args[1:]
-            elif isinstance(args[0], list):
-                # Convert list of tuples to MultiDict
-                args = (MultiDict(args[0]),) + args[1:]
-
         super().__init__(*args, **kwargs)
 
         # Log initialization
@@ -573,6 +556,11 @@ class ModelForm(FlaskForm):
                 "render_kw": getattr(self.deployment_name, 'render_kw', {}) if hasattr(self, 'deployment_name') else None
             }
         })
+
+        # Set default False for unchecked booleans
+        for field in ['requires_o1_handling', 'supports_streaming', 'is_default']:
+            if field not in self.data:
+                setattr(self, field, False)
 
     def load_provider_validation_rules(self):
         """
@@ -631,22 +619,6 @@ class ModelForm(FlaskForm):
         # Store the rules
         self.provider_validation_rules = rules
 
-    def process_formdata(self, valuelist):
-        """Handle both form and JSON data processing"""
-        if valuelist:
-            from werkzeug.datastructures import MultiDict
-            if isinstance(valuelist, dict):
-                # Convert dict to MultiDict
-                valuelist = MultiDict(valuelist)
-            elif isinstance(valuelist, list):
-                # Convert list of tuples to MultiDict
-                valuelist = MultiDict(valuelist)
-            elif not isinstance(valuelist, MultiDict):
-                # Handle other cases
-                valuelist = MultiDict(valuelist)
-
-        super().process_formdata(valuelist)
-
     def setup_edit_mode(self):
         """Modify form behavior for edit mode"""
         if self.is_edit:
@@ -664,8 +636,8 @@ class ModelForm(FlaskForm):
             with db_session() as session:
                 providers = session.execute(
                     text("SELECT id, name FROM providers ORDER BY name")
-                ).fetchall()
-                self.provider_id.choices = [(p.id, p.name) for p in providers]
+                ).mappings().fetchall()
+                self.provider_id.choices = [(p['id'], p['name']) for p in providers]
         except Exception as e:
             logger.error(f"Error loading providers: {str(e)}")
             self.provider_id.choices = []
@@ -833,16 +805,6 @@ class ModelForm(FlaskForm):
             if int(field.data) != current_version:
                 raise ValidationError("This model was modified by another user. Please refresh.")
 
-    def process_formdata(self, valuelist):
-        """Ensure proper boolean handling for checkboxes"""
-        super().process_formdata(valuelist)
-
-        # Set default False for unchecked booleans
-        for field in ['requires_o1_handling', 'supports_streaming', 'is_default']:
-            if field not in self.data:
-                setattr(self, field, False)
-
-
 # ------------------------------------------------------------------------
 # DefaultModelForm
 # ------------------------------------------------------------------------
@@ -877,9 +839,9 @@ class DefaultModelForm(FlaskForm):
                         LIMIT 1
                         """
                     )
-                ).scalar()
+                ).fetchone()
                 if provider:
-                    self.provider_id.data = provider
+                    self.provider_id.data = provider['id']
                 else:
                     # Create Azure provider if not found
                     from models.provider import Provider
