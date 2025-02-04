@@ -10,6 +10,10 @@ import requests
 from openai import AzureOpenAI
 
 from logging_config import get_logger
+from utils.encryption import decrypt_api_key
+import base64
+import hashlib
+from config import Config
 from azure_config import validate_model_config, create_client
 
 logger = get_logger("chat_api")
@@ -221,6 +225,13 @@ def get_azure_response(
         missing = [k for k, v in required_params.items() if not v]
         if missing:
             raise ValueError(f"Missing required parameters: {', '.join(missing)}")
+
+        if api_key:
+            # Recreate the encryption key (same as used in create_default_model)
+            key_bytes = hashlib.sha256(Config.ENCRYPTION_KEY.encode()).digest()
+            encryption_key = base64.b64encode(key_bytes).decode()
+            # Decrypt the stored API key
+            api_key = decrypt_api_key(api_key, encryption_key)
 
         client = _chat_client.get_azure_client(api_key, api_endpoint, api_version)
         # Assuming Model.PROVIDER_CAPABILITIES is available via your model import.
