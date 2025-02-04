@@ -1,3 +1,5 @@
+"""Logging configuration module."""
+
 import logging
 import os
 import json
@@ -6,49 +8,93 @@ import sys
 from logging.handlers import RotatingFileHandler
 from concurrent_log_handler import ConcurrentRotatingFileHandler
 from datetime import datetime
+from typing import Dict, Any
 
-# Log directory and file setup
-LOG_DIR = "logs"
-if not os.path.exists(LOG_DIR):
-    os.makedirs(LOG_DIR)
+# Constants
+LOG_DIRS = {
+    "base": "logs",
+    "api": "logs/api",
+    "http": "logs/http",
+    "user": "logs/user",
+    "error": "logs/error",
+}
 
-# Create subdirectories for different log types
-API_LOG_DIR = os.path.join(LOG_DIR, "api")
-HTTP_LOG_DIR = os.path.join(LOG_DIR, "http")
-USER_LOG_DIR = os.path.join(LOG_DIR, "user")
-ERROR_LOG_DIR = os.path.join(LOG_DIR, "error")
+LOG_FORMATS = {
+    "standard": "%(asctime)s - %(levelname)s - %(name)s - [%(filename)s:%(lineno)d] - %(message)s",
+    "user": "%(asctime)s - %(levelname)s - %(name)s - [%(filename)s:%(lineno)d] - %(message)s",
+    "json": {
+        "timestamp": "%(asctime)s",
+        "level": "%(levelname)s",
+        "logger": "%(name)s",
+        "file": "%(filename)s",
+        "line": "%(lineno)d",
+        "message": "%(message)s",
+        "request_id": "%(request_id)s",
+        "user_id": "%(user_id)s",
+    },
+}
 
-for directory in [API_LOG_DIR, HTTP_LOG_DIR, USER_LOG_DIR, ERROR_LOG_DIR]:
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-
-# Standardized logging format configurations
-STANDARD_FORMAT = "%(asctime)s - %(levelname)s - %(name)s - [%(filename)s:%(lineno)d] - %(message)s"
-USER_FORMAT = "%(asctime)s - %(levelname)s - %(name)s - [%(filename)s:%(lineno)d] - %(message)s"
-JSON_FORMAT = {
-    "timestamp": "%(asctime)s",
-    "level": "%(levelname)s",
-    "logger": "%(name)s",
-    "file": "%(filename)s",
-    "line": "%(lineno)d",
-    "message": "%(message)s",
-    "request_id": "%(request_id)s",
-    "user_id": "%(user_id)s",
-    "duration": "%(duration_ms)s"
+HANDLER_CONFIG = {
+    "app": {
+        "dir": LOG_DIRS["base"],
+        "level": logging.INFO,
+        "maxBytes": 20 * 1024 * 1024,
+        "backupCount": 10,
+    },
+    "token_usage": {
+        "dir": LOG_DIRS["base"],
+        "level": logging.DEBUG,
+        "maxBytes": 10 * 1024 * 1024,
+        "backupCount": 5,
+    },
+    "chat_api": {
+        "dir": LOG_DIRS["api"],
+        "level": logging.INFO,
+        "maxBytes": 10 * 1024 * 1024,
+        "backupCount": 5,
+    },
+    "httpx": {
+        "dir": LOG_DIRS["http"],
+        "level": logging.WARNING,
+        "maxBytes": 10 * 1024 * 1024,
+        "backupCount": 5,
+    },
+    "httpcore": {
+        "dir": LOG_DIRS["http"],
+        "level": logging.WARNING,
+        "maxBytes": 10 * 1024 * 1024,
+        "backupCount": 5,
+    },
+    "user_actions": {
+        "dir": LOG_DIRS["user"],
+        "level": logging.INFO,
+        "maxBytes": 10 * 1024 * 1024,
+        "backupCount": 5,
+    },
+    "errors": {
+        "dir": LOG_DIRS["error"],
+        "level": logging.ERROR,
+        "maxBytes": 10 * 1024 * 1024,
+        "backupCount": 5,
+    },
+    "openai": {
+        "dir": LOG_DIRS["api"],
+        "level": logging.WARNING,
+        "maxBytes": 10 * 1024 * 1024,
+        "backupCount": 5,
+    },
 }
 
 
-# Enhanced JSON logging configuration
-class SafeFormatter(logging.Formatter):
-    def format(self, record):
-        # Add default values for missing keys
-        for key in ['user_id', 'request_id']:
-            if not hasattr(record, key):
-                setattr(record, key, 'none')
-        return super().format(record)
+class JsonFormatter(logging.Formatter):
+    """JSON formatter for structured logging."""
 
-class JsonFormatter(SafeFormatter):
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record as JSON."""
+        for key in ["user_id", "request_id"]:
+            if not hasattr(record, key):
+                setattr(record, key, "none")
+
         log_record = {
             "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S.%fZ"),
             "logger": record.name,
@@ -63,11 +109,9 @@ class JsonFormatter(SafeFormatter):
             "application": "chat_app",
             "pid": os.getpid(),
             "host": platform.node(),
+            "request_id": getattr(record, "request_id", "none"),
+            "user_id": getattr(record, "user_id", "none"),
         }
-
-        # Add request_id if available
-        if hasattr(record, "request_id"):
-            log_record["request_id"] = record.request_id
 
         if record.exc_info:
             log_record["exception"] = self.formatException(record.exc_info)
@@ -77,198 +121,98 @@ class JsonFormatter(SafeFormatter):
         return json.dumps(log_record)
 
 
-# Filter class for HTTP client logs
 class HttpClientFilter(logging.Filter):
-    def filter(self, record):
+    """Filter for HTTP client logs."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
         return record.levelno >= logging.WARNING
 
 
-def configure_logging():
-    # Clear existing handlers
+def create_rotating_handler(
+    log_dir: str,
+    name: str,
+    max_bytes: int,
+    backup_count: int,
+    use_concurrent: bool = True,
+) -> logging.Handler:
+    """Create a rotating file handler."""
+    os.makedirs(log_dir, exist_ok=True)
+    filename = os.path.join(
+        log_dir, f"{name}_{datetime.now().strftime('%Y-%m-%d')}.log"
+    )
+
+    handler_class = (
+        ConcurrentRotatingFileHandler if use_concurrent else RotatingFileHandler
+    )
+    return handler_class(
+        filename=filename,
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8",
+    )
+
+
+def configure_logger(
+    name: str,
+    config: Dict[str, Any],
+    formatter: logging.Formatter,
+    add_filter: bool = False,
+) -> logging.Logger:
+    """Configure a logger with specified settings."""
+    logger = logging.getLogger(name)
+    logger.setLevel(config["level"])
+    logger.propagate = False
+
+    handler = create_rotating_handler(
+        config["dir"], name, config["maxBytes"], config["backupCount"]
+    )
+    handler.setFormatter(formatter)
+
+    if add_filter:
+        handler.addFilter(HttpClientFilter())
+
+    logger.addHandler(handler)
+    return logger
+
+
+def configure_logging() -> None:
+    """Configure all logging for the application."""
+    if hasattr(configure_logging, "_configured"):
+        return
+
+    for directory in LOG_DIRS.values():
+        os.makedirs(directory, exist_ok=True)
+
+    is_production = os.getenv("FLASK_ENV") == "production"
+    formatter = (
+        JsonFormatter() if is_production else logging.Formatter(LOG_FORMATS["standard"])
+    )
+    user_formatter = logging.Formatter(LOG_FORMATS["user"])
+
     root_logger = logging.getLogger()
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
+    root_logger.setLevel(logging.INFO)
 
-    # Configure root logger with consistent levels
-    root_logger.setLevel(logging.INFO)  # Capture INFO and above logs
+    for name, config in HANDLER_CONFIG.items():
+        log_formatter = user_formatter if name == "user_actions" else formatter
+        add_filter = name in ["httpx", "httpcore"]
+        configure_logger(name, config, log_formatter, add_filter)
 
-    # Prevent propagation to ancestor loggers
-    root_logger.propagate = False
+    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
-    # Disable framework log propagation
-    logging.getLogger("werkzeug").propagate = False
-    logging.getLogger("flask").propagate = False
-
-    # Set consistent logging levels across all loggers
-    LOGGING_LEVELS = {
-        "": logging.INFO,  # Root logger
-        "sqlalchemy.engine": logging.WARNING,
-        "werkzeug": logging.WARNING,
-        "httpx": logging.WARNING,
-        "httpcore": logging.WARNING,
-        "openai": logging.WARNING,
-        "chat_api": logging.INFO,
-        "user_actions": logging.INFO,
-        "errors": logging.ERROR,
-        "token_usage": logging.DEBUG,
-        "database": logging.INFO
-    }
-
-    for logger_name, level in LOGGING_LEVELS.items():
-        logging.getLogger(logger_name).setLevel(level)
-
-if not logging.getLogger().handlers:
-    configure_logging()
-
-# Add console handler for development environment
-def configure_console_logging():
-    if os.getenv("FLASK_ENV") == "development":
-        # Use sys.stdout with UTF-8 encoding for console output
+    if not is_production and not root_logger.handlers:
         console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.DEBUG)
-        console_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
-        # Ensure UTF-8 encoding for Windows console
-        if sys.platform == 'win32':
-            sys.stdout.reconfigure(encoding='utf-8')
-        root_logger = logging.getLogger()
+        console_handler.setFormatter(formatter)
         root_logger.addHandler(console_handler)
 
-configure_console_logging()
+    configure_logging._configured = True
 
 
-# Ensure all loggers have handlers
-def ensure_logger_handlers(logger_name, handler, formatter):
-    logger = logging.getLogger(logger_name)
-    if not logger.handlers:
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.propagate = False
-
-
-# Application log handler with structured logging
-app_log_handler = ConcurrentRotatingFileHandler(
-    filename=os.path.join(LOG_DIR, f"app_{datetime.now().strftime('%Y-%m-%d')}.log"),
-    maxBytes=20 * 1024 * 1024,  # 20 MB
-    backupCount=10,
-    encoding="utf-8",
-    delay=False
-)
-
-# Use JSON formatter in production, standard in development
-if os.getenv("FLASK_ENV") == "production":
-    app_log_handler.setFormatter(JsonFormatter())
-else:
-    app_log_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
-
-# Add handler to root logger
-def configure_app_logging():
-    root_logger = logging.getLogger()
-    if not root_logger.handlers:
-        root_logger.addHandler(app_log_handler)
-
-configure_app_logging()
-
-# Configure JSON logging for production after handler is created
-if os.getenv("FLASK_ENV") == "production":
-    json_formatter = JsonFormatter()
-    app_log_handler.setFormatter(json_formatter)
-
-# Configure third-party library logging
-logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-logging.getLogger("werkzeug").setLevel(logging.WARNING)
-
-# Token usage logger configuration
-token_logger = logging.getLogger("token_usage")
-token_logger.setLevel(logging.DEBUG)  # Set to DEBUG to capture all token-related logs
-token_logger.propagate = False
-token_handler = RotatingFileHandler(
-    os.path.join(LOG_DIR, f"token_usage_{datetime.now().strftime('%Y-%m-%d')}.log"),
-    maxBytes=10 * 1024 * 1024,
-    backupCount=5,
-    encoding="utf-8"
-)
-token_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
-token_logger.addHandler(token_handler)
-
-# API logger configuration
-api_logger = logging.getLogger("chat_api")
-api_logger.setLevel(logging.INFO)
-api_logger.propagate = False
-api_handler = RotatingFileHandler(
-    os.path.join(API_LOG_DIR, f"api_{datetime.now().strftime('%Y-%m-%d')}.log"),
-    maxBytes=10 * 1024 * 1024,
-    backupCount=5,
-    encoding="utf-8"
-)
-api_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
-api_logger.addHandler(api_handler)
-
-# HTTP client logger configuration
-http_logger = logging.getLogger("httpx")
-http_logger.setLevel(logging.WARNING)
-http_logger.propagate = False
-http_handler = RotatingFileHandler(
-    os.path.join(HTTP_LOG_DIR, f"http_{datetime.now().strftime('%Y-%m-%d')}.log"),
-    maxBytes=10 * 1024 * 1024,
-    backupCount=5,
-    encoding="utf-8"
-)
-http_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
-http_handler.addFilter(HttpClientFilter())
-http_logger.addHandler(http_handler)
-
-# Configure httpcore logger similarly
-httpcore_logger = logging.getLogger("httpcore")
-httpcore_logger.setLevel(logging.WARNING)
-httpcore_handler = RotatingFileHandler(
-    os.path.join(HTTP_LOG_DIR, f"httpcore_{datetime.now().strftime('%Y-%m-%d')}.log"),
-    maxBytes=10 * 1024 * 1024,
-    backupCount=5,
-    encoding="utf-8"
-)
-httpcore_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
-httpcore_handler.addFilter(HttpClientFilter())
-httpcore_logger.addHandler(httpcore_handler)
-
-# User actions logger
-user_logger = logging.getLogger("user_actions")
-user_logger.setLevel(logging.INFO)
-user_handler = RotatingFileHandler(
-    os.path.join(
-        USER_LOG_DIR, f"user_actions_{datetime.now().strftime('%Y-%m-%d')}.log"
-    ),
-    maxBytes=10 * 1024 * 1024,
-    backupCount=5,
-    encoding="utf-8"
-)
-user_handler.setFormatter(logging.Formatter(USER_FORMAT))
-user_logger.addHandler(user_handler)
-
-# Error logger
-error_logger = logging.getLogger("errors")
-error_logger.setLevel(logging.ERROR)
-error_handler = RotatingFileHandler(
-    os.path.join(ERROR_LOG_DIR, f"errors_{datetime.now().strftime('%Y-%m-%d')}.log"),
-    maxBytes=10 * 1024 * 1024,
-    backupCount=5,
-    encoding="utf-8"
-)
-error_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
-error_logger.addHandler(error_handler)
-
-# OpenAI client logger
-openai_logger = logging.getLogger("openai")
-openai_logger.setLevel(logging.WARNING)
-openai_handler = RotatingFileHandler(
-    os.path.join(API_LOG_DIR, f"openai_{datetime.now().strftime('%Y-%m-%d')}.log"),
-    maxBytes=10 * 1024 * 1024,
-    backupCount=5,
-    encoding="utf-8"
-)
-openai_handler.setFormatter(logging.Formatter(STANDARD_FORMAT))
-openai_logger.addHandler(openai_handler)
-
-
-def get_logger(name):
-    """Helper function to get a logger with the proper configuration."""
+def get_logger(name: str) -> logging.Logger:
+    """Get a configured logger by name."""
+    if not hasattr(configure_logging, "_configured"):
+        configure_logging()
     return logging.getLogger(name)
+
+
+configure_logging()

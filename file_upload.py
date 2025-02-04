@@ -15,10 +15,12 @@ class FileUploadHandler:
         """
         Initialize the file upload handler with centralized configuration.
         """
-        self.ALLOWED_EXTENSIONS = Config.ALLOWED_FILE_EXTENSIONS
-        self.MAX_FILE_SIZE = Config.MAX_FILE_SIZE
-        self.MAX_TOTAL_SIZE = Config.MAX_TOTAL_FILE_SIZE
-        self.QUARANTINE_FOLDER = os.path.join(Config.UPLOAD_FOLDER, "quarantine")
+        self.config = Config()
+        self.ALLOWED_EXTENSIONS = self.config.ALLOWED_FILE_EXTENSIONS
+        self.MAX_FILE_SIZE = self.config.MAX_FILE_SIZE
+        self.MAX_TOTAL_SIZE = self.config.MAX_TOTAL_FILE_SIZE
+        self.QUARANTINE_FOLDER = os.path.join(self.config.UPLOAD_FOLDER, "quarantine")
+        self.MIME_TYPE_MAP = self.config.MIME_TYPE_MAP
         self.SCAN_TIMEOUT = 30  # seconds for virus scan
 
         # Ensure the quarantine folder exists
@@ -64,7 +66,7 @@ class FileUploadHandler:
             except ImportError:
                 # Fallback for when python-magic is not available
                 current_app.logger.debug("python-magic not available, using extension-based detection")
-                mime_type = Config.MIME_TYPE_MAP.get(ext, 'application/octet-stream')
+                mime_type = self.MIME_TYPE_MAP.get(ext, 'application/octet-stream')
 
             # Special handling for Python files and other text-based files
             if ext == 'py' or mime_type == 'application/octet-stream' or ext == 'md':
@@ -85,8 +87,9 @@ class FileUploadHandler:
                         return False, errors
                     pass
 
-            if mime_type not in Config.ALLOWED_MIME_TYPES and not any(
+            if mime_type not in self.config.ALLOWED_MIME_TYPES and not any(
                 mime_type.startswith(allowed_prefix)
+
                 for allowed_prefix in ['text/', 'application/json']
             ):
                 errors.append(f"MIME type {mime_type} not allowed")
@@ -94,7 +97,7 @@ class FileUploadHandler:
 
             # Verify MIME type matches extension for non-text files
             if not mime_type.startswith('text/'):
-                expected_mime = Config.MIME_TYPE_MAP.get(ext)
+                expected_mime = self.MIME_TYPE_MAP.get(ext)
                 if expected_mime and not mime_type.startswith(expected_mime):
                     errors.append(f"MIME type {mime_type} doesn't match extension .{ext}")
                     return False, errors
@@ -140,8 +143,8 @@ class FileUploadHandler:
             if not is_allowed:
                 error_msg = f"File validation failed for {file.filename}: {validation_errors}"
                 current_app.logger.error(error_msg)
-                current_app.logger.debug(f"Allowed extensions: {self.ALLOWED_EXTENSIONS}")
-                current_app.logger.debug(f"Allowed MIME types: {Config.ALLOWED_MIME_TYPES}")
+                current_app.logger.debug(f"Allowed extensions: {self.config.ALLOWED_FILE_EXTENSIONS}")
+                current_app.logger.debug(f"Allowed MIME types: {self.config.ALLOWED_MIME_TYPES}")
                 errors.append(error_msg)
                 continue
 
@@ -242,13 +245,13 @@ class FileUploadHandler:
         # Final fallback to extension-based detection
         if not mime:
             ext = file.filename.split(".")[-1].lower()
-            mime = Config.MIME_TYPE_MAP.get(ext, 'application/octet-stream')
+            mime = self.MIME_TYPE_MAP.get(ext, 'application/octet-stream')
             current_app.logger.debug(f"MIME type set from extension mapping: {mime}")
 
         file.seek(0)
 
         # Use MIME type map from centralized configuration
-        mime_map = Config.MIME_TYPE_MAP
+        mime_map = self.MIME_TYPE_MAP
         ext = file.filename.split(".")[-1].lower()
 
         # Special handling for Python files
@@ -393,7 +396,7 @@ class FileUploadHandler:
 
         saved_files = []
         errors = []
-        upload_folder = os.path.join(Config.UPLOAD_FOLDER, chat_id)
+        upload_folder = os.path.join(self.config.UPLOAD_FOLDER, chat_id)
         descriptions = descriptions or {}
 
         if not os.path.exists(upload_folder):
@@ -431,7 +434,7 @@ class FileUploadHandler:
                 # Final fallback to extension-based detection
                 if not mime_type:
                     ext = filename.rsplit(".", 1)[1].lower()
-                    mime_type = Config.MIME_TYPE_MAP.get(ext, 'application/octet-stream')
+                    mime_type = self.MIME_TYPE_MAP.get(ext, 'application/octet-stream')
                     current_app.logger.debug(f"MIME type set from extension mapping: {mime_type}")
 
                 file.seek(0)
@@ -573,7 +576,7 @@ class FileUploadHandler:
                     "details": errors,
                     "validation_info": {
                         "allowed_extensions": list(self.ALLOWED_EXTENSIONS),
-                        "allowed_mime_types": list(Config.ALLOWED_MIME_TYPES)
+                        "allowed_mime_types": list(self.config.ALLOWED_MIME_TYPES)
                     }
                 }), 400
 

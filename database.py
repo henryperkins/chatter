@@ -20,94 +20,62 @@ from flask import g, current_app, Flask
 import click
 import json
 import datetime
+from cryptography.fernet import Fernet
+import base64
+import hashlib
 
-# Track initialization state
-_initialized = False
+from config import Config
+from logging_config import get_logger
 
-def mark_initialized() -> None:
-    """Mark the database as initialized."""
-    global _initialized
-    _initialized = True
+logger = get_logger(__name__)
 
-def test_db_connection():
-    """Test database connection by executing a simple query."""
-    try:
-        # Use a fresh session to avoid any existing transaction state
-        db_state = get_db_state()
-        session_factory = cast(Optional[SessionFactory], db_state.get("Session"))
-        if not session_factory:
-            raise RuntimeError("Session factory is not initialized")
-
-        session = session_factory()
-        try:
-            # Execute test query without starting a transaction
-            result = session.execute(text("SELECT 1"))
-            value = result.scalar()
-            if value == 1:
-                logger.info("Database connection test successful")
-            else:
-                logger.error("Database connection test failed - unexpected result")
-        finally:
-            # Ensure session is closed
-            session.close()
-    except Exception as e:
-        logger.error("Database connection test failed: %s", str(e))
-        raise
-
-
-logger = logging.getLogger(__name__)
-
-# Type variables
+# Type variables and aliases
 T = TypeVar("T")
 F = TypeVar("F", bound=Callable[..., Any])
-
-# Type aliases
 DbState = Dict[str, Union[Engine, scoped_session, bool, None]]
 SessionFactory = scoped_session
 
-# Connection pool settings with environment variable fallbacks
-POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "5"))
-MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "10"))
-POOL_TIMEOUT: int = int(os.getenv("DB_POOL_TIMEOUT", "30"))
-POOL_PRE_PING: bool = os.getenv("DB_POOL_PRE_PING", "false").lower() == "true"  # Disable pre-ping
-POOL_RECYCLE: int = int(os.getenv("DB_POOL_RECYCLE", "1800"))  # 30 minutes
+_initialized = False
+
+POOL_SETTINGS = {
+    "POOL_SIZE": int(os.getenv("DB_POOL_SIZE", "5")),
+    "MAX_OVERFLOW": int(os.getenv("DB_MAX_OVERFLOW", "10")),
+    "POOL_TIMEOUT": int(os.getenv("DB_POOL_TIMEOUT", "30")),
+    "POOL_PRE_PING": os.getenv("DB_POOL_PRE_PING", "false").lower() == "true",
+    "POOL_RECYCLE": int(os.getenv("DB_POOL_RECYCLE", "1800")),
+}
+
 
 def create_db_engine(db_uri: str) -> Engine:
-    """Create SQLAlchemy engine with PostgreSQL-optimized settings."""
-    # Get the path to the SSL certificate
-    cert_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ca-certificate.crt")
-
-    # Create engine with SSL configuration
-    engine = create_engine(
+    """Create SQLAlchemy engine with optimized settings."""
+    return create_engine(
         db_uri,
-        future=True,  # Enable 2.0-style transaction behavior
+        future=True,
         poolclass=QueuePool,
-        pool_size=POOL_SIZE,
-        max_overflow=MAX_OVERFLOW,
-        pool_timeout=POOL_TIMEOUT,
-        pool_pre_ping=POOL_PRE_PING,
-        pool_recycle=POOL_RECYCLE,
-        pool_use_lifo=True,  # Better connection reuse
+        pool_size=POOL_SETTINGS["POOL_SIZE"],
+        max_overflow=POOL_SETTINGS["MAX_OVERFLOW"],
+        pool_timeout=POOL_SETTINGS["POOL_TIMEOUT"],
+        pool_pre_ping=POOL_SETTINGS["POOL_PRE_PING"],
+        pool_recycle=POOL_SETTINGS["POOL_RECYCLE"],
+        pool_use_lifo=True,
         isolation_level="READ COMMITTED",
-        execution_options={"autocommit": False},  # Explicit transaction control
-        connect_args={
-            "sslmode": "require"
-        },
+        execution_options={"autocommit": False},
+        connect_args={"sslmode": "require"},
         json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
     )
 
-    return engine
 
 def with_db_retries(
     max_attempts: int = 3, wait_seconds: float = 0.5
 ) -> Callable[[F], F]:
-    """Decorator to retry database operations on failure."""
+    """Decorator for database operation retries."""
+
     def decorator(func: F) -> F:
         @retry(
             stop=stop_after_attempt(max_attempts),
             wait=wait_fixed(wait_seconds),
             retry=retry_if_exception_type((OperationalError, InterfaceError)),
-            before_sleep=before_sleep_log(logger, logging.WARNING)
+            before_sleep=before_sleep_log(logger, logging.WARNING),
         )
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
@@ -123,539 +91,224 @@ def with_db_retries(
                 raise
 
         return cast(F, wrapper)
+
     return decorator
+
+
+def get_db_state(app: Optional[Flask] = None) -> DbState:
+    """Get database state dictionary."""
+    if not app:
+        app = current_app
+    if not hasattr(app, "_db_state"):
+        app._db_state = {"engine": None, "Session": None, "initialized": False}
+    return app._db_state
+
+
+def is_initialized() -> bool:
+    """Check if database is properly initialized."""
+    if not current_app:
+        return False
+    db_state = get_db_state()
+    return all(
+        [
+            db_state.get("engine") is not None,
+            db_state.get("Session") is not None,
+            db_state.get("initialized", False) is True,
+        ]
+    )
+
+
+@contextmanager
+def db_session(
+    app: Optional[Flask] = None, transactional: bool = False
+) -> Iterator[Session]:
+    """Unified database session context manager supporting transactional mode."""
+    db_state = get_db_state(app)
+    session_factory = db_state["Session"]
+    if not session_factory:
+        raise RuntimeError("Database not initialized")
+    session = session_factory()
+    try:
+        if transactional:
+            session.begin()
+        yield session
+        if transactional:
+            session.commit()
+    except Exception:
+        if transactional:
+            session.rollback()
+        raise
+    finally:
+        session.close()
+
 
 @with_db_retries()
 def execute_statement(
     db: Session, statement: str, params: Optional[Dict[str, Any]] = None
 ) -> CursorResult[Row[Any]]:
-    """Execute a single SQL statement with error handling using SQLAlchemy 2.0 patterns."""
+    """Execute a SQL statement with error handling."""
     try:
         with db.begin():
             return db.execute(text(statement), params or {})
     except SQLAlchemyError as e:
         raise RuntimeError(f"Database operation failed: {str(e)}") from e
 
-def get_db_state(app: Optional[Flask] = None) -> Dict[str, Union[Engine, scoped_session, bool, None]]:
-    """Get database state with explicit app reference"""
-    if not app:
-        from flask import current_app
-        app = current_app if current_app else None
 
-    if not app:
-        return {"engine": None, "Session": None, "initialized": False}
+def create_default_model(session: Session) -> Optional[int]:
+    """Create default provider and model if they don't exist."""
+    from models import Model, Provider
+    from config import Config
 
-    if not hasattr(app, "_db_state"):
-        app._db_state = {
-            "engine": None,
-            "Session": None,
-            "initialized": False
-        }
+    if session.query(Model).filter_by(is_default=True).count() > 0:
+        return None
 
-    return app._db_state
-
-def is_initialized() -> bool:
-    """Check if database is properly initialized."""
-    if not current_app:
-        return False
-
-    db_state = get_db_state()
-    return (
-        db_state.get("engine") is not None
-        and db_state.get("Session") is not None
-        and db_state.get("initialized", False) is True
-    )
-
-@contextmanager
-def db_session(app: Optional[Flask] = None) -> Iterator[Session]:
-    """Provide a database session scope."""
-    db_state = get_db_state(app)
-    session_factory = db_state["Session"]
-
-    if not session_factory:
-        raise RuntimeError("Database not initialized")
-
-    session = session_factory()
     try:
-        yield session
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-@contextmanager
-def db_transaction(app: Optional[Flask] = None) -> Iterator[Session]:
-    """Provide a transactional scope that remains open until explicit commit/rollback"""
-    db_state = get_db_state(app)
-    session_factory = db_state["Session"]
-
-    if not session_factory:
-        raise RuntimeError("Database not initialized")
-
-    session = session_factory()
-    try:
-        # Explicitly begin transaction
-        session.begin()
-        yield session
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-
-def init_db(db_uri: Optional[str] = None) -> None:
-    """Initialize PostgreSQL database with optimized settings."""
-    try:
-        if not current_app:
-            raise RuntimeError(
-                "Cannot initialize database outside of Flask application context"
+        provider = session.query(Provider).filter_by(slug="azure-openai").first()
+        if not provider:
+            provider = Provider(
+                name="Azure OpenAI",
+                slug="azure-openai",
+                api_base_url=Config.AZURE_API_ENDPOINT.rstrip("/"),
+                requires_authentication=True,
+                api_version_format="YYYY-MM-DD",
+                endpoint_pattern="https://{endpoint}/openai/deployments/{deployment}/chat/completions",
+                auth_type="api-key",
+                validation_rules=json.dumps(
+                    {
+                        "model_id": "^[a-zA-Z0-9-]{3,64}$",
+                        "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$",
+                    }
+                ),
+                capabilities=json.dumps(Config.MODEL_CAPABILITIES),
             )
+            session.add(provider)
+            session.commit()
+            provider_id = provider.id
+        else:
+            provider_id = provider.id
 
-        db_uri = db_uri or current_app.config["DATABASE_URI"]
-        if not db_uri:
-            raise ValueError(
-                "DATABASE_URI must be provided either directly or in app config"
-            )
+        key_bytes = hashlib.sha256(Config.ENCRYPTION_KEY.encode()).digest()
+        encryption_key = base64.b64encode(key_bytes).decode()
+        cipher_suite = Fernet(encryption_key.encode())
+        encrypted_api_key = cipher_suite.encrypt(Config.AZURE_API_KEY.encode()).decode()
 
-        # Get or create db state
-        db_state = get_db_state()
-
-        # Create fresh engine and store in state
-        engine = create_db_engine(db_uri)
-        db_state["engine"] = engine
-
-        # Execute schema in a single transaction
-        with engine.connect() as conn:
-            # Execute schema.sql
-            with current_app.open_resource("schema.sql") as f:
-                schema_sql = f.read().decode("utf8")
-                conn.execute(text(schema_sql))
-                logger.debug("Schema SQL executed successfully")
-            conn.commit()
-
-        # Create default model after schema execution
-        with db_session() as db:
-            create_default_model(db)
-            logger.info("Default model creation completed")
-
-        # Configure session factory with explicit transaction control
-        SessionLocal = scoped_session(
-            sessionmaker(
-                bind=engine,
-                autoflush=False,
-                expire_on_commit=False
-            ),
-            scopefunc=lambda: id(g) if hasattr(g, "_get_current_object") else None,
+        model = Model(
+            provider_id=provider_id,
+            name=Config.MODEL_NAME,
+            deployment_name=Config.DEFAULT_DEPLOYMENT_NAME,
+            description="Azure OpenAI GPT-4 model with streaming support",
+            api_endpoint=Config.DEFAULT_API_ENDPOINT.rstrip("/"),
+            api_key=encrypted_api_key,
+            api_version=Config.AZURE_API_VERSION,
+            temperature=Config.DEFAULT_TEMPERATURE,
+            max_tokens=128000,
+            max_completion_tokens=min(Config.MAX_TOKENS, 16384),
+            model_type="azure",
+            requires_o1_handling=False,
+            supports_streaming=True,
+            is_default=True,
         )
-        db_state["Session"] = SessionLocal
-        db_state["initialized"] = True
-        mark_initialized()
-
-        logger.info("Database initialization completed successfully")
+        Model.validate_model_config(model.__dict__)
+        session.add(model)
+        session.commit()
+        logger.info("Default model created successfully")
+        return model.id
 
     except Exception as e:
-        logger.error(f"Database initialization failed: {str(e)}", exc_info=True)
-        raise RuntimeError(
-            "Failed to initialize the database. Please check the database connection and try again."
-        ) from e
-    finally:
-        # Ensure database connection is closed
-        db_state = get_db_state()
-        if db_state.get("engine"):
-            db_state["engine"].dispose()
-            logger.debug("Closed database engine connection")
+        logger.error(f"Failed to create default model: {str(e)}")
+        session.rollback()
+        raise
+
+
+def init_app(app: Flask) -> None:
+    """Initialize database for the Flask application."""
+    global _initialized
+    if _initialized:
+        return
+
+    if not hasattr(app, "_db_state"):
+        app._db_state = {"engine": None, "Session": None, "initialized": False}
+
+    try:
+        app._db_state["engine"] = create_db_engine(app.config["DATABASE_URI"])
+
+        session_factory = sessionmaker(
+            bind=app._db_state["engine"],
+            autocommit=False,
+            autoflush=False,
+            expire_on_commit=False,
+        )
+        app._db_state["Session"] = scoped_session(session_factory)
+
+        with app._db_state["engine"].connect() as conn:
+            conn.execute(text("SELECT 1"))
+            conn.commit()
+
+        app._db_state["initialized"] = True
+        _initialized = True
+        logger.info("Database initialized successfully")
+
+    except Exception as e:
+        logger.error(f"Database initialization failed: {str(e)}")
+        raise
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
-    """Clean up database resources only at app teardown"""
+    """Clean up database resources."""
     global _initialized
     db_state = get_db_state()
 
     if not _initialized or not db_state.get("initialized"):
         return
 
-    logger.info("Initiating proper database shutdown")
-
     try:
-        # Dispose engine but keep configuration
         if engine := db_state.get("engine"):
-            logger.info(f"Disposing engine with {engine.pool.status()}")
             engine.dispose()
-            logger.info("Engine pool cleared")
-
-        # Reset initialization state without clearing config
         db_state.update({"initialized": False, "initializing": False})
         _initialized = False
-
     except Exception as e:
-        logger.error(f"Error during database shutdown: {str(e)}", exc_info=True)
-
-
-def init_db_command() -> None:
-    """Flask CLI command to initialize database."""
-    try:
-        init_db()
-        click.echo("Initialized the database.")
-    except Exception as e:
-        logger.error(f"Failed to initialize database: {str(e)}")
-        raise click.ClickException(f"Database initialization failed: {str(e)}")
-
-
-def create_default_model(db: Session) -> Optional[int]:
-    """Create default provider and model if they don't exist."""
-    from models import Model, Provider
-    from config import Config
-
-    # Check if default model exists
-    result = db.execute(text("SELECT COUNT(*) FROM models WHERE is_default = TRUE"))
-    default_exists = result.scalar_one()
-    if default_exists:
-        return None
-
-    try:
-        logger.info("Creating default provider and model")
-
-        # Check for existing Azure provider first
-        existing_provider = db.execute(
-            text("SELECT id FROM providers WHERE slug = 'azure-openai'")
-        ).scalar()
-
-        if existing_provider:
-            provider_id = existing_provider
-            logger.info("Using existing Azure OpenAI provider")
-        else:
-            # Create default provider
-            default_provider = {
-                "name": "Azure OpenAI",
-                "slug": "azure-openai",
-                "api_base_url": Config.AZURE_API_ENDPOINT.rstrip("/"),
-                "api_version_format": "2024-12-01-preview",
-                "auth_type": "api-key",
-                "endpoint_pattern": "https://{endpoint}/openai/deployments/{deployment}/chat/completions",
-                "validation_rules": json.dumps({
-                    "model_id": "^[a-zA-Z0-9-]{3,64}$",
-                    "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$"
-                }),
-                "capabilities": json.dumps({
-                    "azure": {
-                        "supports_streaming": True,
-                        "max_tokens": 16384,
-                        "token_overhead": 3,
-                        "endpoint_format": "https://{endpoint}/openai/deployments/{deployment}/chat/completions",
-                        "api_version": "2024-12-01-preview",
-                    },
-                    "o1-preview": {
-                        "fixed_temperature": True,
-                        "streaming": False,
-                        "max_tokens": 8300,
-                        "token_overhead": 3,
-                        "endpoint_format": "https://{endpoint}/openai/deployments/{deployment}/chat/completions",
-                        "api_version": "2024-12-01-preview",
-                    }
-                }),
-                "requires_authentication": True
-            }
-
-            # Insert provider and get ID
-            provider_query = text("""
-                INSERT INTO providers (
-                    name, slug, api_base_url, api_version_format,
-                    auth_type, endpoint_pattern, validation_rules,
-                    capabilities, requires_authentication
-                ) VALUES (
-                    :name, :slug, :api_base_url, :api_version_format,
-                    :auth_type, :endpoint_pattern, :validation_rules,
-                    :capabilities, :requires_authentication
-                )
-                RETURNING id
-            """)
-            result = db.execute(provider_query, default_provider)
-            provider_id = result.scalar_one()
-            db.commit()  # Commit the provider creation
-            logger.info(f"Created new Azure OpenAI provider with ID: {provider_id}")
-
-        # Create default model with proper encryption
-        from cryptography.fernet import Fernet
-        import base64
-        import hashlib
-
-        # Ensure encryption key is properly formatted
-        encryption_key = Config.ENCRYPTION_KEY
-        try:
-            # Validate it's proper base64
-            base64.b64decode(encryption_key, validate=True)
-        except Exception:
-            # If not valid base64, properly encode it
-            key_bytes = hashlib.sha256(encryption_key.encode()).digest()
-            encryption_key = base64.b64encode(key_bytes).decode()
-
-        # Create Fernet cipher with properly encoded key
-        cipher_suite = Fernet(encryption_key.encode())
-
-        # Encrypt API key
-        try:
-            encrypted_api_key = cipher_suite.encrypt(Config.AZURE_API_KEY.encode()).decode()
-        except Exception as e:
-            logger.error(f"Failed to encrypt API key: {e}")
-            raise ValueError("Failed to encrypt API key")
-
-        # Build API endpoint
-        api_endpoint = Config.DEFAULT_API_ENDPOINT.rstrip("/")
-
-        # Create parameters dictionary
-        params = {
-            "provider_id": int(provider_id),
-            "name": str(Config.MODEL_NAME),
-            "deployment_name": str(Config.DEFAULT_DEPLOYMENT_NAME),
-            "description": "Azure OpenAI GPT-4 model with streaming support",
-            "api_endpoint": str(api_endpoint),
-            "api_key": str(encrypted_api_key),
-            "api_version": str(Config.AZURE_API_VERSION),
-            "temperature": float(Config.DEFAULT_TEMPERATURE),
-            "max_tokens": int(128000),
-            "max_completion_tokens": int(Config.MAX_TOKENS),
-            "model_type": "azure",
-            "requires_o1_handling": bool(False),
-            "supports_streaming": bool(True),
-            "is_default": bool(True)
-        }
-
-        # Log the exact parameters being used
-        logger.info("Model parameters before SQL execution:")
-        for key, value in params.items():
-            if key != "api_key":  # Don't log the API key
-                logger.info(f"{key}: {type(value)} = {value}")
-
-        default_model = params
-
-        # Validate model configuration
-        from models.model import Model
-        Model.validate_model_config(default_model)
-
-        # Insert model with explicit parameter binding
-        model_query = text("""
-            INSERT INTO models (
-                provider_id, name, deployment_name, description, api_endpoint, api_key,
-                api_version, temperature, max_tokens, max_completion_tokens,
-                model_type, requires_o1_handling, supports_streaming, is_default
-            ) VALUES (
-                :provider_id, :name, :deployment_name, :description, :api_endpoint, :api_key,
-                :api_version, :temperature, :max_tokens, :max_completion_tokens,
-                :model_type, :requires_o1_handling, :supports_streaming, :is_default
-            )
-            RETURNING id
-        """)
-
-        # Execute query with parameters as a dictionary
-        result = db.execute(model_query, params)
-        model_id = result.scalar_one()
-        db.commit()  # Commit the model creation
-
-        logger.info("Default provider and model created successfully")
-        return model_id
-
-    except Exception as e:
-        logger.error(f"Failed to create default provider and model: {e}", exc_info=True)
-        raise
-
-
-def check_open_transactions() -> List[Dict[str, Any]]:
-    """Check for open transactions that might be stuck."""
-    try:
-        with db_session() as session:
-            result = session.execute(
-                text(
-                    """
-                SELECT pid, age(clock_timestamp(), query_start) as duration,
-                       state, query, application_name
-                FROM pg_stat_activity
-                WHERE state = 'idle in transaction'
-                AND datname = current_database()
-                AND age(clock_timestamp(), query_start) > interval '1 minute'
-            """
-                )
-            )
-            return [dict(row) for row in result.mappings()]
-    except Exception as e:
-        logger.error(f"Failed to check open transactions: {str(e)}")
-        return []
+        logger.error(f"Error during database shutdown: {str(e)}")
 
 
 def check_db_health() -> Dict[str, Any]:
-    """Perform comprehensive database health check."""
-    health_status = {
+    """Check database health status."""
+    health_data = {
         "status": "healthy",
-        "details": {},
-        "errors": [],
         "timestamp": datetime.datetime.utcnow().isoformat(),
+        "details": {},
     }
 
     try:
         with db_session() as session:
-            # Check database connectivity
-            result = session.execute(text("SELECT 1"))
-            if result.scalar() != 1:
-                health_status["status"] = "unhealthy"
-                health_status["errors"].append("Basic connectivity check failed")
-
-            # Get connection pool stats
+            session.execute(text("SELECT 1")).scalar()
             conn = session.connection().connection
-            pool_stats = {
+            health_data["details"]["pool"] = {
+                "size": conn.pool.size(),
                 "checked_out": conn.pool.checkedout(),
                 "checked_in": conn.pool.checkedin(),
                 "overflow": conn.pool.overflow(),
-                "size": conn.pool.size(),
-                "max_overflow": conn.pool.max_overflow(),
-                "timeout": conn.pool.timeout(),
-                "recycle": conn.pool.recycle(),
             }
-            health_status["details"]["pool"] = pool_stats
+            for query, key in [
+                (
+                    "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock'",
+                    "locked_queries",
+                ),
+                (
+                    "SELECT count(*) FROM pg_stat_activity WHERE state = 'idle in transaction' AND age(clock_timestamp(), query_start) > interval '1 minute'",
+                    "stuck_transactions",
+                ),
+            ]:
+                count = session.execute(text(query)).scalar()
+                if count > 0:
+                    health_data["status"] = "degraded"
+                    health_data["details"][key] = count
 
-            # Check for blocked queries
-            result = session.execute(
-                text(
-                    """
-                SELECT COUNT(*)
-                FROM pg_stat_activity
-                WHERE wait_event_type = 'Lock'
-                AND datname = current_database()
-            """
-                )
-            )
-            blocked_queries = result.scalar()
-            if blocked_queries > 0:
-                health_status["status"] = "degraded"
-                health_status["details"]["blocked_queries"] = blocked_queries
-
-            # Check replication status (if applicable)
-            try:
-                result = session.execute(
-                    text(
-                        """
-                    SELECT state, sync_state
-                    FROM pg_stat_replication
-                """
-                    )
-                )
-                replication_status = [dict(row) for row in result.mappings()]
-                if replication_status:
-                    health_status["details"]["replication"] = replication_status
-            except Exception:
-                pass  # Not a replication setup
-
-            # Check for long-running transactions
-            result = session.execute(
-                text(
-                    """
-                SELECT pid, age(clock_timestamp(), query_start) as duration, state, query
-                FROM pg_stat_activity
-                WHERE state != 'idle'
-                AND datname = current_database()
-                AND age(clock_timestamp(), query_start) > interval '30 seconds'
-            """
-                )
-            )
-            long_running = [dict(row) for row in result.mappings()]
-            if long_running:
-                health_status["status"] = "degraded"
-                health_status["details"]["long_running"] = long_running
-
-            # Check database size
-            result = session.execute(
-                text(
-                    """
-                SELECT pg_size_pretty(pg_database_size(current_database()))
-            """
-                )
-            )
-            health_status["details"]["size"] = result.scalar()
-
-            # Check connection stats
-            result = session.execute(
-                text(
-                    """
-                SELECT state, count(*)
-                FROM pg_stat_activity
-                WHERE datname = current_database()
-                GROUP BY state
-            """
-                )
-            )
-            health_status["details"]["connections"] = dict(result.fetchall())
-
-            # Check for open transactions
-            open_transactions = check_open_transactions()
-            if open_transactions:
-                health_status["status"] = "degraded"
-                health_status["details"]["open_transactions"] = open_transactions
-                logger.warning(f"Found {len(open_transactions)} open transactions")
+        return health_data
 
     except Exception as e:
-        health_status["status"] = "unhealthy"
-        health_status["errors"].append(f"Health check failed: {str(e)}")
-        logger.error(f"Database health check failed: {str(e)}", exc_info=True)
-
-    return health_status
-
-
-def init_app(app: Flask) -> None:
-    global _initialized
-    if _initialized:
-        return
-
-    logger.info("Initializing database with init_app(app)")
-
-    # Explicitly create app-bound state instead of using current_app
-    if not hasattr(app, "_db_state"):
-        app._db_state = {
-            "engine": None,
-            "Session": None,
-            "initialized": False,
-            "initializing": True,
+        logger.error(f"Health check failed: {str(e)}")
+        return {
+            "status": "unhealthy",
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "error": str(e),
         }
-
-    try:
-        # Create engine and session factory directly on app's state
-        app._db_state["engine"] = create_db_engine(app.config["DATABASE_URI"])
-        engine = app._db_state["engine"]
-
-        # Verify connection using raw connection without nested transactions
-        with engine.connect() as conn:
-            # Execute validation query without transaction management
-            result = conn.execute(text("SELECT 1"))
-            result.close()  # Explicitly close result
-            conn.commit()  # Commit any implicit transaction
-
-        # Create custom session class
-        class CustomSession(Session):
-            def __init__(self, *args, **kwargs):
-                kwargs.setdefault('autocommit', False)
-                kwargs.setdefault('autoflush', False)
-                super().__init__(*args, **kwargs)
-
-        # Create session factory with explicit transaction control
-        session_factory = sessionmaker(
-            class_=CustomSession,
-            bind=engine,
-            autocommit=False,  # Explicit control
-            autoflush=False,
-            expire_on_commit=False,
-            twophase=False,
-            info={
-                "isolation_level": "READ COMMITTED",
-                "autoflush": False
-            }
-        )
-        app._db_state["Session"] = scoped_session(session_factory)
-        app._db_state["initialized"] = True
-        _initialized = True
-
-        logger.info("Database initialized and verified for app %s", app.name)
-
-    except Exception as e:
-        app._db_state["initialized"] = False
-        logger.error("Database initialization failed for app %s: %s", app.name, str(e))
-        raise

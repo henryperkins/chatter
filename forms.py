@@ -36,7 +36,7 @@ from chat_utils import validate_password_strength
 import logging
 
 logger = logging.getLogger(__name__)
-from database import db_session, db_transaction, is_initialized
+from database import db_session, is_initialized
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +202,7 @@ class RegistrationForm(FlaskForm):
             return
 
         try:
-            with db_transaction() as db:
+            with db_session(transactional=True) as db:
                 # Check if username already exists
                 if db.execute(
                     text("SELECT 1 FROM users WHERE username = :uname"),

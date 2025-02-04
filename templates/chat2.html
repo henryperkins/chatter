@@ -56,8 +56,8 @@
                 <option value="{{ model.id }}"
                     data-requires-o1-handling="{{ 'true' if model.requires_o1_handling else 'false' }}"
                     data-supports-streaming="{{ 'true' if model.supports_streaming else 'false' }}"
-                    data-max-completion-tokens="{{ model.max_completion_tokens }}" {% if current_model and
-                    model.id|int==current_model.id|int %}selected{% endif %}>
+                    data-max-completion-tokens="{{ model.max_completion_tokens }}"
+                    {% if current_model and model.id|int == current_model.id|int %}selected{% endif %}>
                     {{ model.name }}{% if model.is_default %} (Default){% endif %}
                 </option>
                 {% endfor %}
@@ -99,13 +99,23 @@
 {% block content %}
 <div
     class="relative flex flex-col h-[100dvh] w-full overflow-hidden touch-manipulation bg-white/95 dark:bg-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm pt-[120px]">
-    <!-- Chat Configuration -->
-    <div id="chat-config" data-chat-id="{{ chat_id if chat_id else '' }}" data-csrf-token="{{ csrf_token() }}"
-        data-models='{{ models|tojson|safe }}'
-        data-current-model='{{ current_model|tojson|safe if current_model else "null" }}'
-        data-user-id="{{ current_user.id }}" class="hidden" data-debug="true">
-    </div>
 
+    <!-- Chat Configuration -->
+    <div id="chat-config"
+        data-chat-id="{{ chat_id if chat_id else '' }}"
+        data-csrf-token="{{ csrf_token() }}"
+        data-models='{{ models|tojson|safe }}'
+        data-current-model='{{ current_model|tojson|safe if current_model else 'null' }}'
+        data-user-id="{{ current_user.id }}"
+        class="hidden"
+        data-debug="true">
+    <script>
+        console.log('Chat config initialized with ID:', '{{ chat_id if chat_id else "none" }}');
+        if (!('{{ chat_id }}')) {
+            console.error('No chat ID available in template');
+        }
+    </script>
+    </div>
     <!-- Main Chat Area -->
     <div
         class="flex-1 flex flex-col h-full overflow-hidden pb-safe bg-white/95 dark:bg-gray-900/95 dark-mode-transition backdrop-blur-sm">
@@ -124,6 +134,7 @@
                         <i class="fas fa-robot text-lg"></i>
                     </div>
                     <div class="relative flex-1 group">
+                        <!-- Action Buttons -->
                         <div
                             class="absolute right-3 top-3 flex items-center space-x-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                             <button
@@ -142,10 +153,12 @@
                             {% endif %}
                         </div>
 
+                        <!-- Message Content -->
                         <div
                             class="bg-white dark:bg-gray-800 p-5 sm:p-6 rounded-2xl shadow-lg group hover:shadow-xl transition-all duration-300 backdrop-blur-sm border border-gray-200 dark:border-gray-700 hover:-translate-y-1">
                             <div class="prose dark:prose-invert prose-base sm:prose-lg max-w-none overflow-x-auto !w-full !break-words prose-headings:font-semibold prose-p:text-gray-800 dark:prose-p:text-gray-200 prose-pre:bg-gray-50 dark:prose-pre:bg-gray-900 prose-pre:shadow-md"
                                 data-role="assistant-message" data-content="{{ message.content | e }}">
+                                <!-- Content will be rendered by client-side JavaScript -->
                             </div>
                             {% if message.metadata and message.metadata.has_attachments %}
                             <div class="mt-4 space-y-2">
@@ -188,158 +201,6 @@
                     <div class="relative order-2">
                         <div
                             class="bg-gradient-to-r from-primary-600/95 to-secondary-600/95 dark:from-primary-500/95 dark:to-secondary-500/95 text-white p-5 sm:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
-                            <p class="text-base sm:text-lg leading-relaxed break-words overflow-x-auto font-medium">
-                                {{ message.content }}
-                            </p>
+                            <p class="text-base sm:text-lg leading-relaxed break-words overflow-x-auto font-medium">{{ message.content }}</p>
                         </div>
-                        <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1 text-right">
-                            {{ message.timestamp }}
-                        </span>
-                    </div>
-                    <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gradient-to-br from-primary-500/20 to-secondary-500/20 dark:from-primary-400/20 dark:to-secondary-400/20 order-1 shadow-md"
-                        role="img" aria-label="User avatar">
-                    </div>
-                </div>
-                {% endif %}
-{% endfor %}
-{% else %}
-<div class="text-center text-gray-500 dark:text-gray-400 mt-8">
-    <p class="text-lg">This is a new chat. Start typing to begin!</p>
-    <p class="text-sm mt-2">Your messages are end-to-end encrypted</p>
-</div>
-{% endif %}
-</div>
-</div>
-
-<!-- Token Usage Panel -->
-<div id="token-usage"
-    class="sticky bottom-16 px-4 sm:px-6 py-2 bg-white/90 dark:bg-gray-800/90 border-t border-gray-200/50 dark:border-gray-700/50 text-sm text-gray-600 dark:text-gray-300">
-    <div class="flex flex-col space-y-1">
-        <div class="flex items-center justify-between">
-            <span>
-                <span id="tokens-used">0</span>
-                <span id="tokens-limit" class="ml-1">/ 0 max</span>
-            </span>
-            <div class="flex items-center space-x-2">
-                <span id="token-percentage" class="text-xs">0%</span>
-                <button id="toggle-stats-btn"
-                    class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                    title="Toggle token usage statistics">
-                    <i class="fas fa-chart-bar"></i>
-                </button>
-            </div>
-        </div>
-        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-            <div id="token-progress" class="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
-                style="width: 0%">
-            </div>
-        </div>
-        <div id="token-breakdown"
-            class="hidden flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1 space-x-4">
-            <span>User: <span id="user-tokens">0</span></span>
-            <span>Assistant: <span id="assistant-tokens">0</span></span>
-            <span>System: <span id="system-tokens">0</span></span>
-        </div>
-    </div>
-</div>
-
-<!-- Chat Input Area -->
-<div id="chat-input"
-    class="px-4 sm:px-6 py-4 border-t border-gray-200/50 dark:border-gray-700/50 bg-white dark:bg-gray-900">
-    <form id="chat-form" method="post" enctype="multipart/form-data">
-        <textarea name="message" id="message-input" rows="3"
-            class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
-            placeholder="Type your message here..."></textarea>
-        <div class="flex items-center justify-between mt-2">
-            <div class="flex items-center space-x-2">
-                <input type="file" name="files[]" id="file-upload" class="hidden" multiple
-                    accept=".txt,.pdf,.doc,.docx,.md">
-                <label for="file-upload"
-                    class="cursor-pointer inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
-                    <i class="fas fa-paperclip mr-2"></i>
-                    Attach Files
-                </label>
-                <div id="file-list" class="text-sm text-gray-500 dark:text-gray-400"></div>
-            </div>
-            <button type="submit" id="send-button"
-                class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
-                <i class="fas fa-paper-plane mr-2"></i>
-                Send
-            </button>
-        </div>
-    </form>
-</div>
-</div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-{{ super() }}
-<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const configEl = document.getElementById('chat-config');
-        if (!configEl) {
-            console.error('Chat configuration element not found');
-            return;
-        }
-
-        try {
-            window.CHAT_CONFIG = {
-                chatId: configEl.dataset.chatId,
-                csrfToken: configEl.dataset.csrfToken,
-                models: JSON.parse(configEl.dataset.models || '[]'),
-                currentModel: JSON.parse(configEl.dataset.currentModel || 'null'),
-                userId: configEl.dataset.userId,
-                debug: configEl.dataset.debug === 'true'
-            };
-
-            if (!window.CHAT_CONFIG.models || !window.CHAT_CONFIG.models.length) {
-                console.warn('No models configured');
-            }
-
-            // Initialize token usage manager
-            if (window.TokenUsageManager) {
-                const tokenUsageContainer = document.getElementById('token-usage');
-                if (tokenUsageContainer && window.CHAT_CONFIG) {
-                    window.tokenUsageManager = new TokenUsageManager({
-                        chatId: window.CHAT_CONFIG.chatId
-                    });
-                    window.tokenUsageManager.initialize().catch(error => {
-                        console.error('Failed to initialize token usage manager:', error);
-                    });
-                } else {
-                    console.error('Token usage container not found');
-                }
-            }
-
-            // Initialize file upload manager
-            if (window.FileUploadManager) {
-                const fileUploadInput = document.getElementById('file-upload');
-                if (fileUploadInput) {
-                    window.fileUploadManager = new FileUploadManager(
-                        window.CHAT_CONFIG.chatId,
-                        window.CHAT_CONFIG.userId,
-                        fileUploadInput
-                    );
-                }
-            }
-
-            // Initialize markdown renderer
-            if (window.md) {
-                const messages = document.querySelectorAll('[data-role="assistant-message"]');
-                messages.forEach(message => {
-                    const content = message.dataset.content;
-                    if (content) {
-                        const rendered = window.md.render(content);
-                        message.innerHTML = DOMPurify.sanitize(rendered);
-                    }
-                });
-            }
-
-        } catch (error) {
-            console.error('Error initializing chat interface:', error);
-        }
-    });
-</script>
-{% endblock %}
+                        <div class="flex items-center justify-end mt-2 space-x

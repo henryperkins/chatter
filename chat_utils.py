@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 from werkzeug.utils import secure_filename as werkzeug_secure_filename
 import os
 import smtplib
@@ -154,25 +154,25 @@ def process_file(file) -> Tuple[str, str, int]:
     if mime_type.startswith('text/') or mime_type in ['application/json']:
         try:
             file_content = file.read().decode('utf-8')
-            
+
             # Use context monitor for intelligent file content compression
             truncated_content = context_monitor.compress_file_content(
                 file_content,
                 MAX_FILE_CONTENT_LENGTH
             )
-            
+
             # Track token usage
             token_count = count_file_tokens(truncated_content)
             context_monitor.track_token_usage(token_count)
-            
+
             # Cache the processed content
             cache_key = hash((filename, len(file_content)))
             context_manager.context_cache[cache_key] = truncated_content
-            
+
             # Check if content was truncated
             if len(truncated_content) < len(file_content):
                 logger.info(f"File {filename} was truncated from {len(file_content)} to {len(truncated_content)} characters")
-            
+
             return filename, truncated_content, token_count
         except UnicodeDecodeError as e:
             raise ValueError(f"Failed to decode file {filename}: {e}")
@@ -283,3 +283,43 @@ def send_verification_email(recipient_email: str, verification_token: str) -> No
     text = f"Please click the following link to verify your email: {verification_url}"
     html = f"<html><body><p>{text}</p><a href='{verification_url}'>{verification_url}</a></body></html>"
     send_email(subject, recipient_email, text, html)
+
+def process_uploaded_files(files: List[Any]) -> Tuple[List[str], List[Dict[str, str]], int, List[Dict[str, str]]]:
+    """
+    Process multiple uploaded files, validating and processing each one.
+
+    Args:
+        files: List of file objects from request.files
+
+    Returns:
+        Tuple containing:
+        - List of included filenames
+        - List of excluded files with error messages
+        - Total token count
+        - List of processed file contents with filenames
+
+    Raises:
+        ValueError: If no valid files are provided or if processing fails
+    """
+    if not files:
+        raise ValueError("No files provided")
+
+    included_files = []
+    excluded_files = []
+    total_tokens = 0
+    file_contents = []
+
+    for file in files:
+        try:
+            filename, content, token_count = process_file(file)
+            included_files.append(filename)
+            total_tokens += token_count
+            file_contents.append({
+                "filename": filename,
+                "content": content
+            })
+        except ValueError as e:
+            excluded_files.append({"filename": file.filename, "error": str(e)})
+            logger.warning(f"File excluded: {file.filename} - {str(e)}")
+
+    return included_files, excluded_files, total_tokens, file_contents

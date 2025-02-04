@@ -5,27 +5,28 @@ This module provides a Provider class for managing AI provider configurations, i
 - CRUD operations for provider records
 - Provider validation and configuration
 """
+
 import re
 import json
-import logging
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
 from sqlalchemy import text
 
 from database import db_session
 from utils.encryption import encrypt_api_key
+from logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
-# Type aliases for better readability
+# Type alias for clarity
 ProviderDict = Dict[str, Any]
 
-# Default Azure settings - preserves current behavior
+# Default Azure settings – preserves current behavior
 DEFAULT_SETTINGS = {
     "supports_streaming": True,
     "max_tokens": 16384,
     "api_version": "2023-07-01-preview",
-    "endpoint_pattern": "https://{deployment}.openai.azure.com/openai/deployments/{model}"
+    "endpoint_pattern": "https://{deployment}.openai.azure.com/openai/deployments/{model}",
 }
 
 # Default provider capabilities
@@ -39,9 +40,10 @@ DEFAULT_CAPABILITIES = {
     "features": [],
     "validation_rules": {
         "endpoint": r"^https://[a-zA-Z0-9-]+\.api\.[a-zA-Z0-9-]+\.[a-zA-Z0-9-]+/[a-zA-Z0-9-]+$",
-        "model_identifier": r"^[a-zA-Z0-9-]+$"
-    }
+        "model_identifier": r"^[a-zA-Z0-9-]+$",
+    },
 }
+
 
 class ProviderCapabilities:
     """Helper class for managing provider capabilities."""
@@ -70,32 +72,30 @@ class ProviderCapabilities:
 
     def get_endpoint_pattern(self) -> str:
         """Get the endpoint URL pattern."""
-        return self.capabilities.get("endpoint_pattern", DEFAULT_CAPABILITIES["endpoint_pattern"])
+        return self.capabilities.get(
+            "endpoint_pattern", DEFAULT_CAPABILITIES["endpoint_pattern"]
+        )
 
     def validate_model_config(self, config: Dict[str, Any]) -> List[str]:
         """Validate model configuration against provider capabilities."""
         errors = []
-
-        # Validate temperature
         temp_range = self.capabilities.get("temperature_range", {})
         if "temperature" in config:
             temp = config["temperature"]
             if temp < temp_range.get("min", 0.0) or temp > temp_range.get("max", 2.0):
-                errors.append(f"Temperature must be between {temp_range['min']} and {temp_range['max']}")
-
-        # Validate tokens
+                errors.append(
+                    f"Temperature must be between {temp_range['min']} and {temp_range['max']}"
+                )
         max_tokens = self.capabilities.get("max_tokens")
         if "max_tokens" in config and max_tokens:
             if config["max_tokens"] > max_tokens:
                 errors.append(f"Max tokens cannot exceed {max_tokens}")
-
-        # Validate model identifier
         if "model_identifier" in config:
             pattern = self.get_validation_rule("model_identifier")
             if pattern and not re.match(pattern, config["model_identifier"]):
                 errors.append("Invalid model identifier format")
-
         return errors
+
 
 @dataclass
 class Provider:
@@ -126,8 +126,8 @@ class Provider:
     api_base_url: str
     api_version_format: str
     auth_type: str = "api-key"
-    endpoint_pattern: str = field(default_factory=lambda: "")  # Will be set based on provider type
-    validation_rules: Dict[str, str] = field(default_factory=lambda: {})  # Will be set based on provider type
+    endpoint_pattern: str = field(default_factory=lambda: "")
+    validation_rules: Dict[str, str] = field(default_factory=lambda: {})
     requires_authentication: bool = field(default=True)
     capabilities: Dict[str, Any] = field(default_factory=dict)
     created_at: Optional[str] = None
@@ -137,24 +137,22 @@ class Provider:
     is_azure: bool = False
 
     def __post_init__(self):
-        """Set appropriate defaults based on provider type"""
-        # Parse capabilities from JSON if stored as a JSON string
+        """Set appropriate defaults based on provider type."""
         if isinstance(self.capabilities, str):
             self.capabilities = json.loads(self.capabilities)
-
-        # Set endpoint pattern and validation rules based on provider type
         if self.is_azure or "openai.azure.com" in self.api_base_url:
-            self.endpoint_pattern = "https://{endpoint}/openai/deployments/{deployment}/chat/completions"
+            self.endpoint_pattern = (
+                "https://{endpoint}/openai/deployments/{deployment}/chat/completions"
+            )
             self.validation_rules = {
                 "model_id": "^[a-zA-Z0-9-]{3,64}$",
-                "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$"
+                "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$",
             }
         else:
-            # OpenAI format
             self.endpoint_pattern = "https://api.openai.com/v1/chat/completions"
             self.validation_rules = {
-                "model_id": "^(gpt-4|gpt-3.5-turbo).*$",  # OpenAI model pattern
-                "api_version": "^v[0-9]+.*$"  # OpenAI version pattern
+                "model_id": "^(gpt-4|gpt-3.5-turbo).*$",
+                "api_version": "^v[0-9]+.*$",
             }
 
     def validate_model_id(self, model_id: str) -> bool:
@@ -168,12 +166,12 @@ class Provider:
         return bool(re.fullmatch(pattern, model_id))
 
     def format_model_endpoint(self, deployment: str, model: str) -> str:
-        """Format endpoint using provider's pattern"""
+        """Format endpoint using provider's pattern."""
         return self.endpoint_pattern.format(
             deployment=deployment,
             model=model,
             provider=self.slug,
-            api_version=self.api_version_format
+            api_version=self.api_version_format,
         )
 
     @staticmethod
@@ -193,22 +191,17 @@ class Provider:
         try:
             with db_session() as session:
                 logger.debug("Creating provider with data: %s", data)
-
-                # Check for existing provider with same name or slug
                 check_query = text(
                     """
                     SELECT name, slug
                     FROM providers
                     WHERE LOWER(name) = LOWER(:name)
                     OR LOWER(slug) = LOWER(:slug)
-                """
+                    """
                 )
                 existing = session.execute(
                     check_query,
-                    {
-                        "name": data["name"],
-                        "slug": data["slug"]
-                    },
+                    {"name": data["name"], "slug": data["slug"]},
                 ).fetchone()
 
                 if existing:
@@ -219,34 +212,29 @@ class Provider:
                     )
                     raise ValueError(f"A provider with this {field} already exists")
 
-                # Convert capabilities to JSON string
-                data = data.copy()  # Don't modify original dict
+                data = data.copy()
                 if isinstance(data.get("capabilities"), dict):
                     data["capabilities"] = json.dumps(data["capabilities"])
 
-                # Encrypt API key if provided
                 api_key = data.get("api_key")
                 if api_key:
                     api_key = encrypt_api_key(api_key)
 
-                # Determine provider type and set appropriate defaults
-                is_azure = data.get("is_azure", False) or "openai.azure.com" in data.get("api_base_url", "")
-                
-                # Set endpoint pattern based on provider type
+                is_azure = data.get(
+                    "is_azure", False
+                ) or "openai.azure.com" in data.get("api_base_url", "")
                 if is_azure:
                     endpoint_pattern = "https://{endpoint}/openai/deployments/{deployment}/chat/completions"
                     validation_rules = {
                         "model_id": "^[a-zA-Z0-9-]{3,64}$",
-                        "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$"
+                        "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$",
                     }
                 else:
                     endpoint_pattern = "https://api.openai.com/v1/chat/completions"
                     validation_rules = {
                         "model_id": "^(gpt-4|gpt-3.5-turbo).*$",
-                        "api_version": "^v[0-9]+.*$"
+                        "api_version": "^v[0-9]+.*$",
                     }
-
-                # Insert new provider with provider-specific settings
                 query = text(
                     """
                     INSERT INTO providers (
@@ -261,9 +249,8 @@ class Provider:
                         :api_key, :model_name, :deployment_name, :is_azure
                     )
                     RETURNING id
-                """
+                    """
                 )
-
                 result = session.execute(
                     query,
                     {
@@ -271,23 +258,29 @@ class Provider:
                         "slug": data["slug"],
                         "api_base_url": data["api_base_url"],
                         "capabilities": data.get("capabilities", "{}"),
-                        "requires_authentication": data.get("requires_authentication", True),
+                        "requires_authentication": data.get(
+                            "requires_authentication", True
+                        ),
                         "api_version_format": data.get("api_version_format"),
-                        "endpoint_pattern": data.get("endpoint_pattern", endpoint_pattern),
+                        "endpoint_pattern": data.get(
+                            "endpoint_pattern", endpoint_pattern
+                        ),
                         "auth_type": data.get("auth_type", "api-key"),
-                        "validation_rules": json.dumps(data.get("validation_rules", validation_rules)),
+                        "validation_rules": json.dumps(
+                            data.get("validation_rules", validation_rules)
+                        ),
                         "api_key": api_key,
                         "model_name": data.get("model_name"),
-                        "deployment_name": data.get("deployment_name") if is_azure else None,
-                        "is_azure": is_azure
-                    }
+                        "deployment_name": (
+                            data.get("deployment_name") if is_azure else None
+                        ),
+                        "is_azure": is_azure,
+                    },
                 )
                 provider_id = result.scalar()
-
                 if provider_id is None:
                     logger.error("Failed to create provider - no ID returned")
                     return None
-
                 logger.info("Provider created with ID: %d", provider_id)
                 return provider_id
 
@@ -310,13 +303,10 @@ class Provider:
             with db_session() as session:
                 query = text("SELECT * FROM providers WHERE id = :id")
                 row = session.execute(query, {"id": provider_id}).mappings().first()
-
                 if not row:
                     logger.warning("No provider found with ID %s", provider_id)
                     return None
-
                 return Provider(**dict(row))
-
         except Exception as e:
             logger.error("Error retrieving provider by ID %d: %s", provider_id, e)
             return None
@@ -353,13 +343,10 @@ class Provider:
             with db_session() as session:
                 query = text("SELECT * FROM providers WHERE slug = :slug")
                 row = session.execute(query, {"slug": slug}).mappings().first()
-
                 if not row:
                     logger.warning("No provider found with slug %s", slug)
                     return None
-
                 return Provider(**dict(row))
-
         except Exception as e:
             logger.error("Error retrieving provider by slug %s: %s", slug, e)
             return None

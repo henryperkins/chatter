@@ -1,36 +1,6 @@
 // static/js/utils.js
 
-/**
- * Extend the Window interface to include the utils property.
- * @typedef {Object} Utils
- * @property {() => string} getCSRFToken
- * @property {(url: string, options?: RequestInit) => Promise<{ response: Response, data: any }>} fetchWithCSRF
- * @property {(message: string, type?: string, options?: object) => void} showFeedback
- * @property {(formData: FormData) => object} formDataToObject
- * @property {(dateString: string) => string} formatDate
- * @property {(func: Function, wait: number) => Function} debounce
- * @property {(func: Function, limit: number) => Function} throttle
- * @property {(element: HTMLElement, options?: object) => void} showLoading
- * @property {(element: HTMLElement, originalContent: string) => void} hideLoading
- * @property {(element: HTMLElement, callback: Function, options?: object) => Promise<void>} withLoading
- */
-
-/**
- * @typedef {Window & { utils?: Utils }} CustomWindow
- */
-
-/** @type {CustomWindow} */
-const customWindow = window;
-
-/**
- * Custom error class for fetch errors.
- */
 class FetchError extends Error {
-    /**
-     * @param {string} message
-     * @param {number} status
-     * @param {any} data
-     */
     constructor(message, status, data) {
         super(message);
         this.name = 'FetchError';
@@ -39,293 +9,316 @@ class FetchError extends Error {
     }
 }
 
-/**
- * Retrieve the CSRF token from a meta tag named "csrf-token".
- * @returns {string} CSRF token
- */
-function getCSRFToken() {
-    // Try meta tag first
-    const csrfTokenMetaTag = document.querySelector('meta[name="csrf-token"]');
-    if (csrfTokenMetaTag && csrfTokenMetaTag.getAttribute('content')) {
-        const token = csrfTokenMetaTag.getAttribute('content');
-        console.debug('Retrieved CSRF token from meta tag');
-        return token;
-    }
-
-    // Try form input as fallback
-    const csrfTokenInput = document.querySelector('input[name="csrf_token"]');
-    if (csrfTokenInput && csrfTokenInput.value) {
-        const token = csrfTokenInput.value;
-        console.debug('Retrieved CSRF token from form input');
-        return token;
-    }
-
-    console.warn('No CSRF token found in meta tag or form input');
-    return '';
-}
-
-/**
- * Fetch data from a URL with a CSRF token in headers (or FormData).
- * Rejects if response is not OK or not JSON.
- * @param {string} url
- * @param {RequestInit} [options={}]
- * @returns {Promise<{ response: Response, data: any }>}
- */
-async function fetchWithCSRF(url, options = {}) {
-    const csrfToken = getCSRFToken();
-    const headers = {
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRFToken': csrfToken,  // Always include in headers
-        ...options.headers
-    };
-
-    // Also include token in FormData if present
-    if (options.body instanceof FormData) {
-        options.body.append('csrf_token', csrfToken);
-    } else if (options.body && typeof options.body === 'object') {
-        // If body is JSON object, include token
-        options.body = JSON.stringify({
-            ...JSON.parse(options.body),
-            csrf_token: csrfToken
-        });
-        headers['Content-Type'] = 'application/json';
-    }
-
-    try {
-        console.debug('Making request to:', url);
-        console.debug('Request options:', {
-            method: options.method,
-            headers,
-            body: options.body
-        });
-
-        const response = await fetch(url, {
-            ...options,
-            headers,
-            credentials: 'same-origin'
-        });
-
-        console.debug('Received response:', {
-            status: response.status,
-            statusText: response.statusText,
-            headers: Object.fromEntries(response.headers.entries())
-        });
-
-        const contentType = response.headers.get('content-type');
-        let data;
-
-        if (contentType && contentType.includes('application/json')) {
-            data = await response.json();
-            console.debug('Parsed JSON response:', data);
-        } else {
-            const text = await response.text();
-            console.debug('Raw response text:', text);
-            throw new FetchError(`Invalid response from server: ${text}`, response.status, text);
+// Attach to window object immediately
+window.utils = {
+    getCSRFToken() {
+        const token = document.querySelector('meta[name="csrf-token"]')?.content;
+        if (!token) {
+            console.warn('CSRF token not found');
         }
+        return token;
+    },
 
-        if (!response.ok) {
-            throw new FetchError(data.error || `HTTP error! status: ${response.status}`, response.status, data);
-        }
+    async fetchWithCSRF(url, options = {}) {
+        try {
+            const csrfToken = this.getCSRFToken();
+            const headers = {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrfToken,
+                ...options.headers
+            };
 
-        return data;
-    } catch (error) {
-        console.error('Error in fetchWithCSRF:', error);
+            if (options.body && !(options.body instanceof FormData)) {
+                headers['Content-Type'] = 'application/json';
+                if (typeof options.body === 'object') {
+                    options.body = JSON.stringify({
+                        ...JSON.parse(JSON.stringify(options.body)),
+                        csrf_token: csrfToken
+                    });
+                }
+            }
 
-        if (error instanceof FetchError) {
+            const response = await fetch(url, {
+                ...options,
+                headers,
+                credentials: 'same-origin'
+            });
+
+            let data;
+            const contentType = response.headers.get('content-type');
+            if (contentType?.includes('application/json')) {
+                data = await response.json();
+            } else {
+                data = await response.text();
+            }
+
+            if (!response.ok) {
+                throw new FetchError(
+                    data.error || `HTTP error! status: ${response.status}`,
+                    response.status,
+                    data
+                );
+            }
+
+            return data;
+        } catch (error) {
+            console.error('Fetch error:', error);
             throw error;
         }
+    },
 
-        throw new Error('An unexpected error occurred.');
-    }
-}
+    showFeedback(message, type = 'success', options = {}) {
+        const { duration = 5000, position = 'top' } = options;
+        let container = document.getElementById('feedback-container');
 
-/**
- * Display a feedback message (success, error, etc.) at the top of the page.
- * @param {string} message
- * @param {string} [type="success"]
- * @param {object} [options={}]
- */
-function showFeedback(message, type = 'success', options = {}) {
-    const { duration = 5000, position = 'top' } = options;
-    let feedbackMessage = document.getElementById('feedback-message');
-
-    // Create an element if one doesn't exist
-    if (!feedbackMessage) {
-        feedbackMessage = document.createElement('div');
-        feedbackMessage.id = 'feedback-message';
-        feedbackMessage.setAttribute('role', 'alert');
-        feedbackMessage.setAttribute('aria-live', 'assertive');
-        document.body.appendChild(feedbackMessage);
-    }
-
-    // Position classes
-    const positionClasses = {
-        top: 'top-4 left-1/2 transform -translate-x-1/2',
-        bottom: 'bottom-4 left-1/2 transform -translate-x-1/2',
-        'top-right': 'top-4 right-4',
-        'bottom-right': 'bottom-4 right-4'
-    };
-
-    // Color classes
-    const colorClasses = {
-        success: 'bg-green-500 text-white',
-        error: 'bg-red-500 text-white',
-        warning: 'bg-yellow-500 text-black',
-        info: 'bg-blue-500 text-white'
-    };
-
-    feedbackMessage.innerHTML = `
-        <div class="flex items-center justify-between p-4 rounded-lg shadow-lg max-w-md w-full text-center ${
-            colorClasses[type] || colorClasses.info
-        }">
-            <span>${message}</span>
-            <button id="feedback-close" class="ml-4 text-lg" aria-label="Close">&times;</button>
-        </div>
-    `;
-    feedbackMessage.className = `fixed z-50 ${positionClasses[position] || positionClasses.top}`;
-    feedbackMessage.classList.remove('hidden');
-
-    // Handle manual close
-    const closeButton = feedbackMessage.querySelector('#feedback-close');
-    if (closeButton) {
-        closeButton.addEventListener('click', () => {
-            feedbackMessage.classList.add('hidden');
-        });
-    }
-
-    // Auto-hide if not an error
-    if (type !== 'error' && duration > 0) {
-        setTimeout(() => {
-            feedbackMessage.classList.add('hidden');
-        }, duration);
-    }
-}
-
-/**
- * Convert a FormData object into a plain JS object.
- * @param {FormData} formData
- * @returns {object}
- */
-function formDataToObject(formData) {
-    const object = {};
-    for (const [key, value] of formData.entries()) {
-        object[key] = value;
-    }
-    return object;
-}
-
-/**
- * Format a date string like "2025-01-01" into a more readable form.
- * @param {string} dateString
- * @returns {string}
- */
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-    });
-}
-
-/**
- * Debounce a function to limit its rate of execution.
- * @param {Function} func
- * @param {number} wait
- * @returns {Function}
- */
-function debounce(func, wait) {
-    let timeout;
-    return function (...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), wait);
-    };
-}
-
-/**
- * Throttle a function to limit its frequency of execution.
- * @param {Function} func
- * @param {number} limit
- * @returns {Function}
- */
-function throttle(func, limit) {
-    let inThrottle;
-    return function (...args) {
-        if (!inThrottle) {
-            func.apply(this, args);
-            inThrottle = true;
-            setTimeout(() => (inThrottle = false), limit);
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'feedback-container';
+            container.className = 'fixed z-50 flex flex-col items-center space-y-2';
+            document.body.appendChild(container);
         }
-    };
-}
 
-/**
- * Show a loading spinner on a button element.
- * @param {HTMLElement} element
- * @param {object} [options={}]
- */
-function showLoading(element, options = {}) {
-    const { text = 'Loading...', size = '1.5rem' } = options;
-    element.disabled = true;
-    element.innerHTML = `
-        <div class="flex items-center justify-center">
-            <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"
-                 style="width: ${size}; height: ${size}"></div>
-            ${text ? `<span class="ml-2">${text}</span>` : ''}
-        </div>
-    `;
-}
+        const positionClasses = {
+            top: 'top-4 left-1/2 transform -translate-x-1/2',
+            bottom: 'bottom-4 left-1/2 transform -translate-x-1/2',
+            'top-right': 'top-4 right-4',
+            'bottom-right': 'bottom-4 right-4'
+        };
 
-/**
- * Hide a loading spinner, restoring the original content.
- * @param {HTMLElement} element
- * @param {string} originalContent
- */
-function hideLoading(element, originalContent) {
-    element.disabled = false;
-    element.innerHTML = originalContent;
-}
+        const colorClasses = {
+            success: 'bg-green-500 text-white',
+            error: 'bg-red-500 text-white',
+            warning: 'bg-yellow-500 text-black',
+            info: 'bg-blue-500 text-white'
+        };
 
-/**
- * Wrap a callback with loading spinner logic.
- * @param {HTMLElement} element
- * @param {Function} callback
- * @param {object} [options={}]
- * @returns {Promise<void>}
- */
-function withLoading(element, callback, options = {}) {
-    const originalContent = element.innerHTML;
-    showLoading(element, options);
-    return Promise.resolve(callback())
-        .finally(() => hideLoading(element, originalContent));
-}
+        container.className = `fixed z-50 flex flex-col items-center space-y-2 ${positionClasses[position]}`;
 
-// Attach functions to window.utils so they're globally available
-customWindow.utils = {
-    getCSRFToken,
-    fetchWithCSRF,
-    showFeedback,
-    formDataToObject,
-    formatDate,
-    debounce,
-    throttle,
-    showLoading,
-    hideLoading,
-    withLoading,
-    
-    /**
-     * Check if user is authenticated
-     * @returns {Promise<boolean>}
-     */
-    checkAuth: async function() {
+        const messageElement = document.createElement('div');
+        messageElement.className = `
+            flex items-center justify-between px-4 py-2 rounded-lg shadow-lg
+            ${colorClasses[type]} transition-all duration-300 transform
+            hover:scale-105 max-w-md backdrop-blur-sm
+        `;
+        messageElement.innerHTML = `
+            <span class="flex-grow">${message}</span>
+            <button class="ml-3 focus:outline-none hover:opacity-75" aria-label="Dismiss">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+
+        container.appendChild(messageElement);
+
+        const dismiss = () => {
+            messageElement.classList.add('opacity-0', 'scale-95');
+            setTimeout(() => {
+                container.removeChild(messageElement);
+                if (container.children.length === 0) {
+                    document.body.removeChild(container);
+                }
+            }, 300);
+        };
+
+        messageElement.querySelector('button').addEventListener('click', dismiss);
+
+        if (type !== 'error' && duration > 0) {
+            setTimeout(dismiss, duration);
+        }
+    },
+
+    async checkAuth() {
         try {
-            const response = await this.fetchWithCSRF('/auth/check', {
-                method: 'GET'
-            });
-            return response.ok;
+            const response = await this.fetchWithCSRF('/auth/check');
+            return response.authenticated === true;
         } catch (error) {
             console.error('Auth check failed:', error);
             return false;
         }
+    },
+
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    },
+
+    throttle(func, limit) {
+        let inThrottle;
+        return function(...args) {
+            if (!inThrottle) {
+                func.apply(this, args);
+                inThrottle = true;
+                setTimeout(() => inThrottle = false, limit);
+            }
+        };
+    },
+
+    formatDate(dateString) {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    },
+
+    copyToClipboard(text) {
+        return navigator.clipboard.writeText(text)
+            .then(() => this.showFeedback('Copied to clipboard!', 'success'))
+            .catch(err => {
+                console.error('Failed to copy:', err);
+                this.showFeedback('Failed to copy to clipboard', 'error');
+            });
+    },
+
+    async withLoading(element, callback, options = {}) {
+        const originalContent = element.innerHTML;
+        const loadingText = options.loadingText || 'Loading...';
+        const loadingClass = options.loadingClass || 'opacity-50 cursor-wait';
+
+        try {
+            element.disabled = true;
+            element.classList.add(...loadingClass.split(' '));
+            element.innerHTML = `
+                <span class="inline-flex items-center">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    ${loadingText}
+                </span>
+            `;
+
+            const result = await callback();
+            return result;
+        } finally {
+            element.disabled = false;
+            element.classList.remove(...loadingClass.split(' '));
+            element.innerHTML = originalContent;
+        }
+    },
+
+    validateForm(formElement, validationRules = {}) {
+        const errors = {};
+        const formData = new FormData(formElement);
+
+        for (const [fieldName, rules] of Object.entries(validationRules)) {
+            const value = formData.get(fieldName);
+
+            if (rules.required && !value) {
+                errors[fieldName] = 'This field is required';
+                continue;
+            }
+
+            if (rules.minLength && value.length < rules.minLength) {
+                errors[fieldName] = `Must be at least ${rules.minLength} characters`;
+            }
+
+            if (rules.maxLength && value.length > rules.maxLength) {
+                errors[fieldName] = `Must be no more than ${rules.maxLength} characters`;
+            }
+
+            if (rules.pattern && !new RegExp(rules.pattern).test(value)) {
+                errors[fieldName] = rules.patternMessage || 'Invalid format';
+            }
+
+            if (rules.custom && typeof rules.custom === 'function') {
+                const customError = rules.custom(value, formData);
+                if (customError) {
+                    errors[fieldName] = customError;
+                }
+            }
+        }
+
+        return {
+            isValid: Object.keys(errors).length === 0,
+            errors
+        };
+    },
+
+    showValidationErrors(errors, formElement) {
+        // Remove existing error messages
+        formElement.querySelectorAll('.error-message').forEach(el => el.remove());
+        formElement.querySelectorAll('.error-field').forEach(el => {
+            el.classList.remove('error-field', 'border-red-500');
+        });
+
+        // Add new error messages
+        for (const [fieldName, message] of Object.entries(errors)) {
+            const field = formElement.querySelector(`[name="${fieldName}"]`);
+            if (field) {
+                field.classList.add('error-field', 'border-red-500');
+
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message text-red-500 text-sm mt-1';
+                errorDiv.textContent = message;
+
+                field.parentNode.insertBefore(errorDiv, field.nextSibling);
+            }
+        }
+    },
+
+    formatBytes(bytes, decimals = 2) {
+        if (bytes === 0) return '0 Bytes';
+
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    },
+
+    sanitizeHTML(html) {
+        const div = document.createElement('div');
+        div.textContent = html;
+        return div.innerHTML;
+    },
+
+    parseJSON(jsonString, fallback = null) {
+        try {
+            return JSON.parse(jsonString);
+        } catch (e) {
+            console.error('JSON parse error:', e);
+            return fallback;
+        }
+    },
+
+    getQueryParam(param) {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(param);
+    },
+
+    setQueryParam(param, value) {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (value === null) {
+            urlParams.delete(param);
+        } else {
+            urlParams.set(param, value);
+        }
+        window.history.replaceState({}, '', `${window.location.pathname}?${urlParams}`);
+    },
+
+    handleError(error) {
+        console.error('Error:', error);
+
+        let message = 'An unexpected error occurred';
+
+        if (error instanceof FetchError) {
+            message = error.message;
+        } else if (error instanceof Error) {
+            message = error.message;
+        }
+
+        this.showFeedback(message, 'error');
     }
 };

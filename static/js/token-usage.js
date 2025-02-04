@@ -21,7 +21,7 @@ class TokenUsageManager {
         // Validate required elements
         if (this.validateElements()) {
             console.log('TokenUsageManager: Initialized successfully');
-            this.initialize();
+            // Don't call initialize() here, let the caller do it
         } else {
             console.error('TokenUsageManager: Failed to initialize - missing elements');
         }
@@ -79,8 +79,19 @@ class TokenUsageManager {
      * Perform the main setup steps: show the container, attach event listeners,
      * do an initial stats update, and start periodic updates.
      */
-    initialize() {
+    async initialize() {
         try {
+            // Wait for utils to be available
+            let attempts = 0;
+            while (!window.utils && attempts < 50) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
+            }
+
+            if (!window.utils) {
+                throw new Error('Utils not available after waiting');
+            }
+
             // Show token usage container (if hidden)
             if (this.elements.container) {
                 this.elements.container.classList.remove('hidden');
@@ -95,14 +106,16 @@ class TokenUsageManager {
             }
 
             // Initial stats update
-            this.updateStats();
+            await this.updateStats();
 
             // Start auto-updates every 30 seconds
             this.startPeriodicUpdates();
 
             console.log('TokenUsageManager: Initialization complete');
+            return true;
         } catch (error) {
             console.error('TokenUsageManager: Initialization failed:', error);
+            return false;
         }
     }
 
@@ -168,6 +181,11 @@ class TokenUsageManager {
      * Only runs if the panel is visible.
      */
     async updateStats() {
+        if (!window.utils) {
+            console.error('TokenUsageManager: Utils not available');
+            return;
+        }
+
         if (!this.elements.container) {
             console.error('TokenUsageManager: Container element not found');
             return;
@@ -278,6 +296,18 @@ class TokenUsageManager {
      * Show an error message briefly at the bottom of the token usage container.
      */
     showError(message) {
+        if (!window.utils) {
+            // Fallback error display if utils not available
+            if (this.elements.container) {
+                const errorElement = document.createElement('div');
+                errorElement.className = 'text-red-500 text-sm mt-2';
+                errorElement.textContent = message;
+                this.elements.container.appendChild(errorElement);
+                setTimeout(() => errorElement.remove(), 5000);
+            }
+            return;
+        }
+
         // Use utils.showFeedback for consistent error display
         window.utils.showFeedback(message, 'error', {
             duration: 5000,
