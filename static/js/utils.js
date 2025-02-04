@@ -44,6 +44,7 @@ window.utils = {
             };
 
             const response = await fetch(url, {
+                method: options.method || 'POST',  // Ensure POST is used by default
                 ...options,
                 body: finalBody,
                 headers: finalHeaders,

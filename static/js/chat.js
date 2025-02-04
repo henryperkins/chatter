@@ -461,7 +461,7 @@
         if (sendButton) sendButton.disabled = true;
 
         try {
-            const response = await window.utils.fetchWithCSRF('/chat/update_model', {  // Updated URL
+            const response = await window.utils.fetchWithCSRF('/chat/update_model', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -503,7 +503,7 @@
      */
     async function createNewChat() {
         try {
-            const response = await window.utils.fetchWithCSRF('/chat/new', {  // Updated URL
+            const response = await window.utils.fetchWithCSRF('/chat/new', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
