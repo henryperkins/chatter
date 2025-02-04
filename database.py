@@ -165,15 +165,48 @@ def create_default_model(db: Session) -> Optional[int]:
         return None
 
     try:
-        provider = db.query(Provider).filter_by(slug="azure-openai").first()
+        # Check if provider exists
+        provider = db.execute(
+            text("SELECT id, is_azure FROM providers WHERE slug = 'azure-openai'")
+        ).mappings().first()
+
         if provider:
             # Update existing provider
-            provider.is_azure = True
+            db.execute(
+                text("UPDATE providers SET is_azure = TRUE WHERE id = :id"),
+                {"id": provider["id"]}
+            )
             db.commit()
-            provider_id = provider.id
+            provider_id = provider["id"]
         else:
             # Create new provider
-            provider = Provider(
+            result = db.execute(text("""
+                INSERT INTO providers (
+                    name, slug, api_base_url, requires_authentication,
+                    api_version_format, endpoint_pattern, auth_type,
+                    validation_rules, capabilities, is_azure
+                ) VALUES (
+                    'Azure OpenAI',
+                    'azure-openai',
+                    :api_base_url,
+                    TRUE,
+                    'YYYY-MM-DD',
+                    'https://{endpoint}/openai/deployments/{deployment}/chat/completions',
+                    'api-key',
+                    :validation_rules,
+                    :capabilities,
+                    TRUE
+                ) RETURNING id
+            """), {
+                "api_base_url": Config.AZURE_API_ENDPOINT.rstrip("/"),
+                "validation_rules": json.dumps({
+                    "model_id": "^[a-zA-Z0-9-]{3,64}$",
+                    "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$",
+                }),
+                "capabilities": json.dumps(Config.MODEL_CAPABILITIES)
+            })
+            provider_id = result.scalar()
+            db.commit()
                 name="Azure OpenAI",
                 slug="azure-openai", 
                 api_base_url=Config.AZURE_API_ENDPOINT.rstrip("/"),
