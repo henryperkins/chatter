@@ -207,25 +207,6 @@ def create_default_model(db: Session) -> Optional[int]:
             })
             provider_id = result.scalar()
             db.commit()
-                name="Azure OpenAI",
-                slug="azure-openai", 
-                api_base_url=Config.AZURE_API_ENDPOINT.rstrip("/"),
-                requires_authentication=True,
-                api_version_format="YYYY-MM-DD",
-                endpoint_pattern="https://{endpoint}/openai/deployments/{deployment}/chat/completions",
-                auth_type="api-key",
-                validation_rules=json.dumps(
-                    {
-                        "model_id": "^[a-zA-Z0-9-]{3,64}$",
-                        "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$",
-                    }
-                ),
-                capabilities=json.dumps(Config.MODEL_CAPABILITIES),
-                is_azure=True,
-            )
-            db.add(provider)
-            db.commit()
-            provider_id = provider.id
 
         config_instance = Config()  # create a Config instance
         key_bytes = hashlib.sha256(config_instance.ENCRYPTION_KEY.encode()).digest()

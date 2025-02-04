@@ -232,12 +232,16 @@ def get_azure_response(
             key_bytes = hashlib.sha256(config_instance.ENCRYPTION_KEY.encode()).digest()
             encryption_key = base64.b64encode(key_bytes).decode()
             # Decrypt the stored API key
-            logger.debug(f"Decrypted API key length: {len(api_key)}")
+            logger.debug(f"Encrypted API key length: {len(api_key)}")
             api_key = decrypt_api_key(api_key, encryption_key)
             logger.debug(f"Decrypted API key length: {len(api_key)}")
             logger.debug(f"Using API endpoint: {api_endpoint}")
             logger.debug(f"Using deployment name: {deployment_name}")
             logger.debug(f"Using API version: {api_version}")
+
+            # Validate decrypted key
+            if not api_key or len(api_key) < 32:
+                raise ValueError("Invalid API key after decryption")
 
         client = _chat_client.get_azure_client(api_key, api_endpoint, api_version)
         # Assuming Model.PROVIDER_CAPABILITIES is available via your model import.
