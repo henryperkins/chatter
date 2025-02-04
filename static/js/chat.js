@@ -48,7 +48,6 @@
             chatBox.appendChild(indicator);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
-    }
 
     function removeTypingIndicator() {
         const indicator = document.getElementById('typing-indicator');
@@ -151,12 +150,6 @@
             attempts++;
         }
         if (!window.md || !window.DOMPurify) {
-            console.error('Required dependencies not available.');
-            const errorDiv = document.createElement('div');
-            errorDiv.innerHTML = '<p class="text-red-500">Error: Required dependencies not available. Please refresh the page.</p>';
-            chatBox.insertBefore(errorDiv, chatBox.firstChild);
-            return;
-        }
             console.error('Required dependencies not available.');
             const errorDiv = document.createElement('div');
             errorDiv.innerHTML = '<p class="text-red-500">Error: Required dependencies not available. Please refresh the page.</p>';
