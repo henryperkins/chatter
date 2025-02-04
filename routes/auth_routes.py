@@ -506,7 +506,7 @@ def test_create_user():
         return jsonify({"success": True, "user_id": user.id}), 200
     except Exception as e:
         logger.error(f"Test user creation failed: {str(e)}", exc_info=True)
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": False, "error": "An internal error has occurred."}), 500
 
 
 @bp.route("/logout")
