@@ -152,7 +152,7 @@ class Config:
         self.DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", "1.0"))
         self.DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", "16384"))
         self.DEFAULT_MAX_COMPLETION_TOKENS = int(
-            os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "16384")
+            os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "32000")
         )
         self.DEFAULT_REQUIRES_O1_HANDLING = bool(
             os.getenv("DEFAULT_REQUIRES_O1_HANDLING", False)

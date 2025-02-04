@@ -176,7 +176,7 @@ def validate_model_data(data: Dict[str, Any]) -> List[str]:
             errors.append("Deployment name is required for Azure OpenAI providers")
         elif not isinstance(data["deployment_name"], str):
             errors.append("Deployment name must be a string")
-        elif len(data["deployment_name"].strip()) == 0:
+        elif not data["deployment_name"].strip():
             errors.append("Deployment name cannot be empty for Azure OpenAI providers")
     elif data.get("deployment_name"):
         # For non-Azure providers, deployment_name should be empty

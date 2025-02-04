@@ -29,8 +29,8 @@ token_logger = get_logger("token_usage")
 
 # Configurable Environment Variables (with defaults)
 MAX_MESSAGES: int = int(os.getenv("MAX_MESSAGES", "20"))
-MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "32000"))  # Increased from 16384 to 32000
-MAX_MESSAGE_TOKENS: int = int(os.getenv("MAX_MESSAGE_TOKENS", "32000"))  # Increased from 8192
+MAX_TOKENS: int = int(os.getenv("MAX_TOKENS", "16384"))
+MAX_MESSAGE_TOKENS: int = int(os.getenv("MAX_MESSAGE_TOKENS", "8192"))
 MODEL_NAME: str = os.getenv("MODEL_NAME", "gpt-4")  # Model for token counting
 
 class ConversationManager:

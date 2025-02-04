@@ -27,7 +27,7 @@ def secure_filename(filename: str) -> str:
     Returns:
         str: A sanitized version of the filename.
     """
-    return werkzeug_secure_filename(filename)
+    return werkzeug_secure_filename(filename).replace(' ', '_')
 
 def generate_new_chat_id() -> str:
     """

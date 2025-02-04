@@ -107,7 +107,7 @@
         }
         const azureParams = {
             messages: messages,
-            max_tokens: model.max_tokens || 32000,
+            max_tokens: model.max_tokens || window.CHAT_CONFIG.defaultMaxTokens,
             temperature: temperature,
             top_p: top_p,
             frequency_penalty: frequency_penalty,
@@ -151,6 +151,12 @@
             attempts++;
         }
         if (!window.md || !window.DOMPurify) {
+            console.error('Required dependencies not available.');
+            const errorDiv = document.createElement('div');
+            errorDiv.innerHTML = '<p class="text-red-500">Error: Required dependencies not available. Please refresh the page.</p>';
+            chatBox.insertBefore(errorDiv, chatBox.firstChild);
+            return;
+        }
             console.error('Required dependencies not available.');
             const errorDiv = document.createElement('div');
             errorDiv.innerHTML = '<p class="text-red-500">Error: Required dependencies not available. Please refresh the page.</p>';
@@ -359,7 +365,7 @@
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
-            const response = await fetch('/chat/send', {  // Updated URL
+            const response = await fetch('/chat/send', {
                 method: 'POST',
                 body: formData,
                 headers: {
@@ -377,7 +383,12 @@
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-                const errorData = await response.json();
+                let errorData;
+                try {
+                    errorData = await response.json();
+                } catch (e) {
+                    errorData = { error: { message: 'Unknown error occurred' } };
+                }
                 throw new Error(errorData.error?.message || `Azure OpenAI Error: ${response.status}`);
             }
 
@@ -397,13 +408,13 @@
                 const { value, done } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value);
-                const lines = chunk.split('\n');
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n').filter(line => line.trim().startsWith('data: '));
 
                 for (const line of lines) {
                     if (line.startsWith('data: ')) {
                         const data = line.slice(6).trim();
-                        if (data === '[DONE]') {
+                        if (data === '[DONE]' || data.includes('[DONE]')) {
                             streaming = false;
                         } else if (data.startsWith('[ERROR]')) {
                             throw new Error(data.slice(7).trim());
