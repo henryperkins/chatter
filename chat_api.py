@@ -228,7 +228,8 @@ def get_azure_response(
 
         if api_key:
             # Recreate the encryption key (same as used in create_default_model)
-            key_bytes = hashlib.sha256(Config.ENCRYPTION_KEY.encode()).digest()
+            config_instance = Config()  # create a Config instance
+            key_bytes = hashlib.sha256(config_instance.ENCRYPTION_KEY.encode()).digest()
             encryption_key = base64.b64encode(key_bytes).decode()
             # Decrypt the stored API key
             api_key = decrypt_api_key(api_key, encryption_key)
