@@ -27,6 +27,9 @@ from flask_wtf.csrf import validate_csrf as flask_validate_csrf
 from werkzeug.exceptions import HTTPException
 import json
 from config import Config
+
+# Create a Config instance
+config_instance = Config()
 from models.provider import Provider
 from utils.encryption import encrypt_api_key, EncryptionError
 from decorators import admin_required
@@ -290,7 +293,7 @@ def create_model():
             "add_model.html",
             form=ModelForm(),
             provider=None,
-            DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS
+            DEFAULT_MAX_COMPLETION_TOKENS=config_instance.DEFAULT_MAX_COMPLETION_TOKENS
         )
 
     # Handle form data from both JSON and form submissions
