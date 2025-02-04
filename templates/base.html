@@ -217,25 +217,23 @@ File: base.html
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Third-party Libraries -->
+    <!-- Core Dependencies First -->
     <script src="{{ url_for('static', filename='js/axios.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dompurify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/markdown-it.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/markdown-it-bundle.js') }}"></script>
     <script src="{{ url_for('static', filename='js/prism.js') }}"></script>
 
-    <!-- Core Utilities -->
+    <!-- Core Utilities Next -->
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
-
-    <!-- Base Functionality -->
     <script src="{{ url_for('static', filename='js/base.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dark-mode.js') }}"></script>
     <script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>
     <script src="{{ url_for('static', filename='js/shared-validation.js') }}"></script>
 
-    <!-- Feature Modules -->
+    <!-- Feature Modules After -->
     <script src="{{ url_for('static', filename='js/token-usage.js') }}"></script>
     <script src="{{ url_for('static', filename='js/fileUpload.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chat-config.js') }}"></script>
 
     <!-- Initialize Markdown -->
     <script>

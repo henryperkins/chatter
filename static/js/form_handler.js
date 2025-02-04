@@ -2,12 +2,31 @@
 
 class ModelFormHandler {
     constructor() {
-        this.utils = window['utils'] || {};
+        this.initialized = false;
+        this.initPromise = this.init();
         this.requiredBooleanFields = [
             'requires_o1_handling', 
             'is_default', 
             'supports_streaming'
         ];
+    }
+
+    async init() {
+        if (this.initialized) return;
+
+        // Wait for utils to be available
+        let attempts = 0;
+        while (!window.utils && attempts < 50) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
+
+        if (!window.utils) {
+            throw new Error('Utils not available after waiting');
+        }
+
+        this.utils = window.utils;
+        this.initialized = true;
         this.initializeForms();
     }
 
