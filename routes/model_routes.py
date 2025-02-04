@@ -455,7 +455,7 @@ def create_model():
             "add_model.html",
             form=form,
             provider=provider,
-            DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS
+            DEFAULT_MAX_COMPLETION_TOKENS=config_instance.DEFAULT_MAX_COMPLETION_TOKENS
         )
     except EncryptionError as ee:
         logger.error("Encryption error creating model: %s", str(ee), exc_info=True)
@@ -465,7 +465,7 @@ def create_model():
             "add_model.html",
             form=form,
             provider=provider,
-            DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS
+            DEFAULT_MAX_COMPLETION_TOKENS=config_instance.DEFAULT_MAX_COMPLETION_TOKENS
         )
     except Exception as e:
         logger.error("Unexpected error creating model: %s", str(e), exc_info=True)
@@ -475,7 +475,7 @@ def create_model():
             "add_model.html",
             form=form,
             provider=provider,
-            DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS
+            DEFAULT_MAX_COMPLETION_TOKENS=config_instance.DEFAULT_MAX_COMPLETION_TOKENS
         )
 
 
@@ -796,7 +796,7 @@ def edit_model(model_id):
             form=form,
             model=model,
             provider=provider,
-            DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS
+            DEFAULT_MAX_COMPLETION_TOKENS=config_instance.DEFAULT_MAX_COMPLETION_TOKENS
         )
 
     except Exception as e:
