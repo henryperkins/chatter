@@ -206,6 +206,38 @@ def register_cli_commands(app):
             logger.error(f"Init failed: {e}")
             raise click.ClickException(str(e))
 
+    @app.cli.command("check-model")
+    def check_model_command():
+        """Check model configuration in database."""
+        try:
+            with db_session() as db:
+                result = db.execute(text("""
+                    SELECT 
+                        m.id as model_id,
+                        m.name as model_name,
+                        m.deployment_name,
+                        m.api_endpoint,
+                        LENGTH(m.api_key) as api_key_length,
+                        m.api_version,
+                        p.name as provider_name,
+                        p.slug as provider_slug,
+                        p.api_base_url,
+                        p.is_azure
+                    FROM models m
+                    JOIN providers p ON m.provider_id = p.id
+                    WHERE m.is_default = true;
+                """)).mappings().first()
+                
+                if result:
+                    print("\nModel Configuration:")
+                    print("-" * 50)
+                    for key, value in result.items():
+                        print(f"{key}: {value}")
+                else:
+                    print("\nNo default model found!")
+        except Exception as e:
+            print(f"Error checking model: {str(e)}")
+
 
 def create_app() -> Flask:
     if hasattr(Flask, "_already_configured"):
