@@ -737,5 +737,5 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', startChat);
+    document.addEventListener('app:ready', startChat);
 })();

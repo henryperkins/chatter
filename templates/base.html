@@ -218,6 +218,7 @@ File: base.html
     </main>
 
     <!-- Core Dependencies First -->
+    <script src="{{ url_for('static', filename='js/core.js') }}"></script>
     <script src="{{ url_for('static', filename='js/axios.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dompurify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/markdown-it.min.js') }}"></script>
@@ -234,6 +235,7 @@ File: base.html
     <script src="{{ url_for('static', filename='js/token-usage.js') }}"></script>
     <script src="{{ url_for('static', filename='js/fileUpload.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chat-config.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
 
     <!-- Initialize Markdown -->
     <script>
