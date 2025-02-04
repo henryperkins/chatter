@@ -232,6 +232,7 @@ def get_azure_response(
             key_bytes = hashlib.sha256(config_instance.ENCRYPTION_KEY.encode()).digest()
             encryption_key = base64.b64encode(key_bytes).decode()
             # Decrypt the stored API key
+            logger.debug(f"Decrypted API key length: {len(api_key)}")
             api_key = decrypt_api_key(api_key, encryption_key)
 
         client = _chat_client.get_azure_client(api_key, api_endpoint, api_version)

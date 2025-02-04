@@ -62,7 +62,12 @@ def create_client(
     """
     if not api_endpoint or not api_key:
         raise ValueError("API endpoint and key are required")
-    from openai import AzureOpenAI  # Import here to avoid circular dependency issues
+    import openai
+    openai.api_type = "azure"
+    openai.api_base = api_endpoint.rstrip("/")
+    openai.api_version = api_version
+    openai.api_key = api_key
+    from openai import AzureOpenAI
 
     return AzureOpenAI(
         azure_endpoint=str(api_endpoint).rstrip("/"),
