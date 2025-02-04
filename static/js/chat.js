@@ -161,6 +161,27 @@
 
         try {
             const renderedHtml = typeof message === 'string' ? window.md.render(message) : message.content;
+            const DOMPurifyOptions = {
+                ALLOWED_TAGS: [
+                    'p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote',
+                    'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'br',
+                    'table', 'thead', 'tbody', 'tr', 'th', 'td', 'del', 'input'
+                ],
+                ALLOWED_ATTRS: {
+                    'a': ['href', 'title', 'target', 'rel', 'class'],
+                    'span': ['class'],
+                    'code': ['class'],
+                    'pre': ['class'],
+                    'div': ['class', 'style'],
+                    'table': ['class'],
+                    'th': ['class'],
+                    'td': ['class'],
+                    'input': ['type', 'checked', 'disabled'],
+                    'li': ['class']
+                },
+                ADD_ATTR: ['target'],
+                FORCE_BODY: true
+            };
             const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
             let messageDiv;
             if (!existingDiv) {
@@ -424,7 +445,7 @@
                                         }
                                         // Handle function calls if provided
                                         if (delta.function_call) {
-                                            handleFunctionCall(delta.function_call);
+                                            console.warn('Function call handling not implemented:', delta.function_call);
                                         }
                                         await appendAssistantMessage(accumulatedResponse, true, messageDiv);
                                     }

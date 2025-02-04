@@ -431,7 +431,7 @@ class ConversationManager:
                     """
                     DELETE FROM messages
                     WHERE chat_id = :chat_id
-                    AND id != ALL(:keep_ids)
+                    AND id NOT IN :keep_ids
                     """
                 )
                 db.execute(query, {"chat_id": chat_id, "keep_ids": keep_ids})
