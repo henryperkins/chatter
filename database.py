@@ -168,6 +168,7 @@ def create_default_model(session: Session) -> Optional[int]:
             # Update existing provider
             provider.is_azure = True
             session.commit()
+            provider_id = provider.id
         else:
             # Create new provider
             provider = Provider(
@@ -189,8 +190,6 @@ def create_default_model(session: Session) -> Optional[int]:
             )
             session.add(provider)
             session.commit()
-            provider_id = provider.id
-        else:
             provider_id = provider.id
 
         config_instance = Config()  # create a Config instance
