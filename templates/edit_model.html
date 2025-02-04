@@ -21,7 +21,7 @@
                     class="w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200"
                     disabled>
                 {% for choice in form.provider_id.choices %}
-                    <option value="{{ choice[0] }}" {% if choice[0] == model.provider_id %}selected{% endif %}>
+                    <option value="{{ choice[0] }}" {% if choice[0] == form.provider_id.data %}selected{% endif %}>
                         {{ choice[1] }}
                     </option>
                 {% endfor %}
