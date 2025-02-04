@@ -198,12 +198,12 @@ def create_default_model(db: Session) -> Optional[int]:
                     TRUE
                 ) RETURNING id
             """), {
-                "api_base_url": Config.AZURE_API_ENDPOINT.rstrip("/"),
+                "api_base_url": Config().AZURE_API_ENDPOINT.rstrip("/"),
                 "validation_rules": json.dumps({
                     "model_id": "^[a-zA-Z0-9-]{3,64}$",
                     "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$",
                 }),
-                "capabilities": json.dumps(Config.MODEL_CAPABILITIES)
+                "capabilities": json.dumps(Config().MODEL_CAPABILITIES)
             })
             provider_id = result.scalar()
             db.commit()
