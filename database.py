@@ -165,11 +165,11 @@ def create_default_model(db: Session) -> Optional[int]:
         return None
 
     try:
-        provider = session.query(Provider).filter_by(slug="azure-openai").first()
+        provider = db.query(Provider).filter_by(slug="azure-openai").first()
         if provider:
             # Update existing provider
             provider.is_azure = True
-            session.commit()
+            db.commit()
             provider_id = provider.id
         else:
             # Create new provider
@@ -190,8 +190,8 @@ def create_default_model(db: Session) -> Optional[int]:
                 capabilities=json.dumps(Config.MODEL_CAPABILITIES),
                 is_azure=True,
             )
-            session.add(provider)
-            session.commit()
+            db.add(provider)
+            db.commit()
             provider_id = provider.id
 
         config_instance = Config()  # create a Config instance
@@ -217,14 +217,14 @@ def create_default_model(db: Session) -> Optional[int]:
             is_default=True,
         )
         Model.validate_model_config(model.__dict__)
-        session.add(model)
-        session.commit()
+        db.add(model)
+        db.commit()
         logger.info("Default model created successfully")
         return model.id
 
     except Exception as e:
         logger.error(f"Failed to create default model: {str(e)}")
-        session.rollback()
+        db.rollback()
         raise
 
 
