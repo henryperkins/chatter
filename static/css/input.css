@@ -202,6 +202,9 @@ pre {
 
     /* Enhanced mobile message spacing */
     #chat-box {
+        max-height: calc(100vh - 180px); /* adjust 180px as needed for header, navbar, etc. */
+    }
+    #chat-box {
         @apply px-2 py-2 pb-16 space-y-3;
         -webkit-overflow-scrolling: touch;
     }
