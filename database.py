@@ -154,12 +154,14 @@ def execute_statement(
         raise RuntimeError(f"Database operation failed: {str(e)}") from e
 
 
-def create_default_model(session: Session) -> Optional[int]:
+def create_default_model(db: Session) -> Optional[int]:
     """Create default provider and model if they don't exist."""
     from models import Model, Provider
     from config import Config
 
-    if session.query(Model).filter_by(is_default=True).count() > 0:
+    # Check if default model exists using raw SQL
+    result = db.execute(text("SELECT COUNT(*) FROM models WHERE is_default = TRUE")).scalar()
+    if result > 0:
         return None
 
     try:

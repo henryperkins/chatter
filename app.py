@@ -200,7 +200,8 @@ def register_cli_commands(app):
         logger.info("Starting database initialization...")
         try:
             init_db()
-            create_default_model(current_app)
+            with db_session() as db:
+                create_default_model(db)
             logger.info("Database initialization completed")
         except Exception as e:
             logger.error(f"Init failed: {e}")
