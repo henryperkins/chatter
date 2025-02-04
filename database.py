@@ -164,10 +164,15 @@ def create_default_model(session: Session) -> Optional[int]:
 
     try:
         provider = session.query(Provider).filter_by(slug="azure-openai").first()
-        if not provider:
+        if provider:
+            # Update existing provider
+            provider.is_azure = True
+            session.commit()
+        else:
+            # Create new provider
             provider = Provider(
                 name="Azure OpenAI",
-                slug="azure-openai",
+                slug="azure-openai", 
                 api_base_url=Config.AZURE_API_ENDPOINT.rstrip("/"),
                 requires_authentication=True,
                 api_version_format="YYYY-MM-DD",
@@ -221,6 +226,26 @@ def create_default_model(session: Session) -> Optional[int]:
         session.rollback()
         raise
 
+
+def init_db() -> None:
+    """Initialize the database schema."""
+    try:
+        # Get the schema file path
+        schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
+        
+        # Read schema file
+        with open(schema_path) as f:
+            schema = f.read()
+            
+        # Execute schema
+        with db_session() as db:
+            db.execute(text(schema))
+            db.commit()
+            logger.info("Database schema initialized successfully")
+            
+    except Exception as e:
+        logger.error(f"Database initialization failed: {str(e)}")
+        raise
 
 def init_app(app: Flask) -> None:
     """Initialize database for the Flask application."""
