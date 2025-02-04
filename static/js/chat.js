@@ -159,62 +159,6 @@
         }
 
         // Process message if provided as an object (e.g., from an API)
-        let processedMessage = message;
-        if (typeof message === 'object') {
-            if (message.choices && message.choices[0]) {
-                processedMessage = message.choices[0].message?.content || message.choices[0].text || processedMessage;
-            } else if (message.content) {
-                processedMessage = message.content;
-            }
-        }
-
-        let messageDiv = existingDiv;
-        const DOMPurifyOptions = {
-            ALLOWED_TAGS: [
-                'p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote',
-                'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'br',
-                'table', 'thead', 'tbody', 'tr', 'th', 'td'
-            ],
-            ALLOWED_ATTRS: {
-                'a': ['href', 'title', 'target', 'rel', 'class'],
-                'span': ['class'],
-                'code': ['class'],
-                'pre': ['class'],
-                'div': ['class', 'style'],
-                'table': ['class'],
-                'th': ['class'],
-                'td': ['class']
-            },
-            ADD_ATTR: ['target']
-        };
-
-        try {
-            if (messageDiv) {
-                // Update an existing element (useful for streaming updates)
-                const contentDiv = messageDiv.querySelector('[data-role="assistant-message"]');
-                if (contentDiv) {
-                    const renderedHtml = window.md.render(processedMessage);
-                    const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
-
-                    requestAnimationFrame(() => {
-                        contentDiv.innerHTML = sanitizedHtml;
-                        const copyButton = messageDiv.querySelector('.copy-button');
-                        if (copyButton) {
-                            copyButton.setAttribute('data-raw-content', processedMessage);
-                        }
-                        if (window.Prism) {
-                            requestAnimationFrame(() => {
-                                window.Prism.highlightAllUnder(contentDiv);
-                            });
-                        }
-                    });
-                }
-            } else {
-                // Create a new message element
-                messageDiv = document.createElement('div');
-                messageDiv.className =
-                    'flex w-full mt-4 space-x-3 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl animate-slide-up';
-                const renderedHtml = window.md.render(processedMessage);
                 const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
                 messageDiv.innerHTML = `
                     <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-soft" role="img" aria-label="Assistant avatar">
@@ -222,15 +166,14 @@
                     </div>
                     <div class="relative flex-1">
                         <div class="absolute right-2 top-2 flex items-center space-x-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                            <button class="copy-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft" title="Copy to clipboard" aria-label="Copy message to clipboard" data-raw-content="${processedMessage.replace(/"/g, '&quot;')}">
+                            <button class="copy-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft" title="Copy to clipboard" aria-label="Copy message to clipboard" data-raw-content="${processedMessage.replace(/"/g, '"')}">
                                 <i class="fas fa-copy"></i>
                             </button>
                             ${!isStreaming
                         ? `<button class="regenerate-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft" title="Regenerate response" aria-label="Regenerate response">
                                         <i class="fas fa-redo-alt"></i>
                                     </button>`
-                        : ''
-                    }
+                        : ''}
                         </div>
                         <div class="bg-gray-100/95 dark:bg-gray-800/95 p-5 rounded-r-lg rounded-bl-lg shadow-soft border border-gray-200/50 dark:border-gray-700/50">
                             <div class="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto" data-role="assistant-message">
@@ -246,7 +189,6 @@
                 if (window.Prism) {
                     window.Prism.highlightAllUnder(messageDiv.querySelector('[data-role="assistant-message"]'));
                 }
-            }
         } catch (error) {
             console.error('Error appending assistant message:', error);
             const errorDiv = document.createElement('div');
