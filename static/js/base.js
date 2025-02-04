@@ -230,7 +230,9 @@ class FontSizeManager {
 }
 
 // Initialize components when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('app:ready', async function() {
+    await window.App.waitForDependencies();
+
     // Initialize mobile menu
     const mobileMenu = new MobileMenuManager();
 
