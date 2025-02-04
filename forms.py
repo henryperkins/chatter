@@ -894,6 +894,9 @@ class DefaultModelForm(FlaskForm):
                                 "max_tokens": Config.DEFAULT_MAX_TOKENS,
                             },
                             "requires_authentication": True,
+                            "is_azure": True,
+                            "api_version_format": "YYYY-MM-DD-preview",
+                            "endpoint_pattern": "https://{endpoint}/openai/deployments/{deployment}/chat/completions",
                         }
                     )
                     self.provider_id.data = provider_id
