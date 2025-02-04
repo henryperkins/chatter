@@ -238,6 +238,59 @@ def register_cli_commands(app):
         except Exception as e:
             print(f"Error checking model: {str(e)}")
 
+    @app.cli.command("check-model-details")
+    def check_model_details_command():
+        """Check detailed model configuration in database."""
+        try:
+            with db_session() as db:
+                # Get model details
+                result = db.execute(text("""
+                    SELECT 
+                        m.id as model_id,
+                        m.name as model_name,
+                        m.deployment_name,
+                        m.api_endpoint,
+                        LENGTH(m.api_key) as api_key_length,
+                        m.api_version,
+                        p.name as provider_name,
+                        p.slug as provider_slug,
+                        p.api_base_url,
+                        p.is_azure,
+                        m.api_key as encrypted_key
+                    FROM models m
+                    JOIN providers p ON m.provider_id = p.id
+                    WHERE m.is_default = true;
+                """)).mappings().first()
+                
+                if result:
+                    print("\nModel Configuration:")
+                    print("-" * 50)
+                    for key, value in result.items():
+                        if key != 'encrypted_key':  # Don't print the actual encrypted key
+                            print(f"{key}: {value}")
+                    
+                    # Test decryption
+                    if result['encrypted_key']:
+                        from config import Config
+                        from utils.encryption import decrypt_api_key
+                        import base64
+                        import hashlib
+                        
+                        config_instance = Config()
+                        key_bytes = hashlib.sha256(config_instance.ENCRYPTION_KEY.encode()).digest()
+                        encryption_key = base64.b64encode(key_bytes).decode()
+                        
+                        try:
+                            decrypted_key = decrypt_api_key(result['encrypted_key'], encryption_key)
+                            print(f"\nAPI Key decryption test: {'SUCCESS' if decrypted_key else 'FAILED'}")
+                            print(f"Decrypted key length: {len(decrypted_key) if decrypted_key else 0}")
+                        except Exception as e:
+                            print(f"\nAPI Key decryption error: {str(e)}")
+                else:
+                    print("\nNo default model found!")
+        except Exception as e:
+            print(f"Error checking model: {str(e)}")
+
 
 def create_app() -> Flask:
     if hasattr(Flask, "_already_configured"):
