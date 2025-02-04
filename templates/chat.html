@@ -276,25 +276,28 @@
 {% block scripts %}
 {{ super() }}
 <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+<!-- Move config to a dedicated script -->
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
+    window.initializeChatConfig = () => {
         const configEl = document.getElementById('chat-config');
         if (!configEl) {
             console.error('Chat configuration element not found');
-            return;
+            return false;
         }
 
         try {
-            window.CHAT_CONFIG = {
+            const config = {
                 chatId: configEl.dataset.chatId,
                 csrfToken: configEl.dataset.csrfToken,
                 models: JSON.parse(configEl.dataset.models || '[]'),
                 currentModel: JSON.parse(configEl.dataset.currentModel || 'null'),
                 userId: configEl.dataset.userId,
-                debug: configEl.dataset.debug === 'true'
-,
+                debug: configEl.dataset.debug === 'true',
                 azureToken: configEl.dataset.azureToken
             };
+
+            window.CHAT_CONFIG = config;
+            return true;
 
             if (!window.CHAT_CONFIG.models || !window.CHAT_CONFIG.models.length) {
                 console.warn('No models configured');
