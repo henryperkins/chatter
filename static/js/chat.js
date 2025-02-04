@@ -158,46 +158,47 @@
             return;
         }
 
-        // Process message if provided as an object (e.g., from an API)
-                const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
-                let messageDiv;
-                if (!existingDiv) {
-                    messageDiv = document.createElement('div');
-                    messageDiv.className = 'flex w-full mt-4 space-x-3 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl animate-slide-up';
-                } else {
-                    messageDiv = existingDiv;
-                }
-                messageDiv.innerHTML = `
-                    <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-soft" role="img" aria-label="Assistant avatar">
-                        <i class="fas fa-robot text-sm"></i>
+        try {
+            const renderedHtml = typeof message === 'string' ? window.md.render(message) : message.content;
+            const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
+            let messageDiv;
+            if (!existingDiv) {
+                messageDiv = document.createElement('div');
+                messageDiv.className = 'flex w-full mt-4 space-x-3 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl animate-slide-up';
+            } else {
+                messageDiv = existingDiv;
+            }
+            messageDiv.innerHTML = `
+                <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-soft" role="img" aria-label="Assistant avatar">
+                    <i class="fas fa-robot text-sm"></i>
+                </div>
+                <div class="relative flex-1">
+                    <div class="absolute right-2 top-2 flex items-center space-x-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <button class="copy-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft" title="Copy to clipboard" aria-label="Copy message to clipboard" data-raw-content="${message.content.replace(/"/g, '&quot;')}">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                        ${!isStreaming
+                    ? `<button class="regenerate-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft" title="Regenerate response" aria-label="Regenerate response">
+                                    <i class="fas fa-redo-alt"></i>
+                                </button>`
+                    : ''}
                     </div>
-                    <div class="relative flex-1">
-                        <div class="absolute right-2 top-2 flex items-center space-x-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                            <button class="copy-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft" title="Copy to clipboard" aria-label="Copy message to clipboard" data-raw-content="${processedMessage.replace(/"/g, '"')}">
-                                <i class="fas fa-copy"></i>
-                            </button>
-                            ${!isStreaming
-                        ? `<button class="regenerate-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft" title="Regenerate response" aria-label="Regenerate response">
-                                        <i class="fas fa-redo-alt"></i>
-                                    </button>`
-                        : ''}
+                    <div class="bg-gray-100/95 dark:bg-gray-800/95 p-5 rounded-r-lg rounded-bl-lg shadow-soft border border-gray-200/50 dark:border-gray-700/50">
+                        <div class="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto" data-role="assistant-message">
+                            ${sanitizedHtml}
                         </div>
-                        <div class="bg-gray-100/95 dark:bg-gray-800/95 p-5 rounded-r-lg rounded-bl-lg shadow-soft border border-gray-200/50 dark:border-gray-700/50">
-                            <div class="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto" data-role="assistant-message">
-                                ${sanitizedHtml}
-                            </div>
-                        </div>
-                        <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
-                            ${new Date().toLocaleTimeString()}
-                        </span>
                     </div>
-                `;
-                if (!existingDiv) {
-                    chatBox.appendChild(messageDiv);
-                }
-                if (window.Prism) {
-                    window.Prism.highlightAllUnder(messageDiv.querySelector('[data-role="assistant-message"]'));
-                }
+                    <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                        ${new Date().toLocaleTimeString()}
+                    </span>
+                </div>
+            `;
+            if (!existingDiv) {
+                chatBox.appendChild(messageDiv);
+            }
+            if (window.Prism) {
+                window.Prism.highlightAllUnder(messageDiv.querySelector('[data-role="assistant-message"]'));
+            }
         } catch (error) {
             console.error('Error appending assistant message:', error);
             const errorDiv = document.createElement('div');
