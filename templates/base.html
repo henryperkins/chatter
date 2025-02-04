@@ -41,7 +41,7 @@ File: base.html
     {% block chat_tabs %}{% endblock %}
 
     <!-- Navbar - Adjusted z-index and positioning -->
-    <nav class="fixed w-full z-[1100] transition-all duration-300 ease-in-out backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border-b border-gray-200/80 dark:border-gray-700/80 shadow-soft {% block nav_classes %}top-0{% endblock %}"
+    <nav class="fixed w-full z-[1100] h-12 md:h-16 transition-all duration-300 ease-in-out backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border-b border-gray-200/80 dark:border-gray-700/80 shadow-soft {% block nav_classes %}top-0{% endblock %}"
         role="navigation">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div class="flex justify-between h-16">
@@ -152,7 +152,7 @@ File: base.html
 
     <!-- Mobile Menu -->
     <div id="mobile-menu"
-        class="fixed inset-y-0 left-0 w-64 bg-white/95 dark:bg-gray-800/95 shadow-soft transform -translate-x-full transition-transform duration-300 ease-in-out z-modal md:hidden backdrop-blur-md"
+        class="fixed inset-y-0 left-0 w-full sm:w-64 bg-white/95 dark:bg-gray-800/95 shadow-soft transform -translate-x-full transition-transform duration-300 ease-in-out z-modal md:hidden backdrop-blur-md"
         role="dialog" aria-modal="true" aria-label="Mobile navigation">
         <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-700">
             <span class="text-lg font-semibold text-gray-900 dark:text-gray-100">Menu</span>
