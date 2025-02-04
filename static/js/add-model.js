@@ -24,5 +24,5 @@
     window.initializeAddModel = initializeAddModelForm;
 
     // Auto-initialize on DOMContentLoaded
-    document.addEventListener('DOMContentLoaded', initializeAddModelForm);
+    document.addEventListener('app:ready', initializeAddModelForm);
 })();

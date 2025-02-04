@@ -236,7 +236,7 @@
 {% block scripts %}
 {{ super() }}
 <script>
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("app:ready", function() {
     // Initialize o1-preview constraints
     const requiresO1Checkbox = document.getElementById('requires_o1_handling');
     const maxCompletionInput = document.getElementById('max_completion_tokens');

@@ -14,5 +14,5 @@
     window.initializeProvider = initializeProviderForm;
 
     // Auto-initialize on DOMContentLoaded
-    document.addEventListener('DOMContentLoaded', initializeProviderForm);
+    document.addEventListener('app:ready', initializeProviderForm);
 })();

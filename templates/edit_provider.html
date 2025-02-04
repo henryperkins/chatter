@@ -104,7 +104,7 @@
 {% block scripts %}
 {{ super() }}
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
+    document.addEventListener("app:ready", function() {
         const form = document.getElementById("edit-provider-form");
         if (form) {
             form.classList.add('provider-form');
