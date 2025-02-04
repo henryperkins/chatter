@@ -180,6 +180,7 @@ def create_default_model(session: Session) -> Optional[int]:
                     }
                 ),
                 capabilities=json.dumps(Config.MODEL_CAPABILITIES),
+                is_azure=True,
             )
             session.add(provider)
             session.commit()
