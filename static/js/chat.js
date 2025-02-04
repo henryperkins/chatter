@@ -160,6 +160,12 @@
 
         // Process message if provided as an object (e.g., from an API)
                 const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
+                if (!existingDiv) {
+                    messageDiv = document.createElement('div');
+                    messageDiv.className = 'flex w-full mt-4 space-x-3 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl animate-slide-up';
+                } else {
+                    messageDiv = existingDiv;
+                }
                 messageDiv.innerHTML = `
                     <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-soft" role="img" aria-label="Assistant avatar">
                         <i class="fas fa-robot text-sm"></i>
@@ -185,7 +191,9 @@
                         </span>
                     </div>
                 `;
-                chatBox.appendChild(messageDiv);
+                if (!existingDiv) {
+                    chatBox.appendChild(messageDiv);
+                }
                 if (window.Prism) {
                     window.Prism.highlightAllUnder(messageDiv.querySelector('[data-role="assistant-message"]'));
                 }
@@ -222,8 +230,12 @@
             </div>
         `;
         const chatBox = document.getElementById('chat-box');
-        chatBox.appendChild(messageDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
+        if (chatBox) {
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        } else {
+            console.error('Chat box not found');
+        }
     }
 
     /**
