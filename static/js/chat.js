@@ -49,6 +49,8 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
+    }
+    
     function removeTypingIndicator() {
         const indicator = document.getElementById('typing-indicator');
         if (indicator && indicator.parentNode) {
