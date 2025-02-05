@@ -51,18 +51,43 @@ streaming_payload = {
     }
 }
 
+import sseclient
+
+def process_stream(response):
+    client = sseclient.SSEClient(response)
+    buffer = ""
+    
+    try:
+        for event in client.events():
+            if event.event == "error":
+                raise Exception(f"Stream error: {event.data}")
+                
+            if event.data == "[DONE]":
+                break
+                
+            try:
+                # Handle potential partial JSON chunks
+                buffer += event.data
+                if buffer.endswith("}"):
+                    json_response = json.loads(buffer)
+                    buffer = ""
+                    yield json_response
+            except json.JSONDecodeError:
+                continue  # Wait for complete JSON
+                
+    except Exception as e:
+        # Handle stream interruption
+        print(f"Stream error: {str(e)}")
+        raise
+
 with requests.post(
     f"{endpoint}?api-version={API_VERSION}",
     headers=headers,
     json=streaming_payload,
     stream=True
 ) as response:
-    for line in response.iter_lines():
-        if line:
-            if line.strip() == b"data: [DONE]":
-                break
-            json_response = json.loads(line.decode("utf-8").split("data: ")[1])
-            # Process streaming response
+    for chunk in process_stream(response):
+        # Process streaming response
 ```
 
 ### O1 Series Models Specific Features
@@ -88,8 +113,9 @@ vision_payload = {
                 {
                     "type": "image_url",
                     "image_url": {
-                        "url": "base64 or https url",
-                        "detail": "high"  # "auto", "low", "high"
+                        "url": f"data:image/{format};base64,{base64_string}" if is_base64 else url,
+                        "detail": "high",  # "auto", "low", "high"
+                        "format": format  # "png", "jpeg", etc.
                     }
                 }
             ]
@@ -204,17 +230,21 @@ payload = {
 payload = {
     "messages": [...],
     "response_format": {
-        "type": "json_schema",
-        "json_schema": {
-            "name": "person_info",
-            "description": "Person information schema",
-            "schema": {
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string"},
-                    "age": {"type": "number"}
+        "type": "json_object",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "The person's full name"
+                },
+                "age": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "The person's age in years"
                 }
-            }
+            },
+            "required": ["name"]
         }
     }
 }
@@ -260,11 +290,22 @@ assistant_payload = {
 
 ### 6. Error Handling
 ```python
-try:
-    response = requests.post(endpoint, headers=headers, json=payload)
-    response.raise_for_status()
-    
-    if response.status_code == 200:
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+import backoff
+
+def is_rate_limit_error(e):
+    return isinstance(e, requests.exceptions.HTTPError) and e.response.status_code == 429
+
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=4, max=60),
+    retry=retry_if_exception_type(is_rate_limit_error)
+)
+def make_api_request(endpoint, headers, payload):
+    try:
+        response = requests.post(endpoint, headers=headers, json=payload)
+        response.raise_for_status()
+        
         result = response.json()
         
         # Check for content filter flags
@@ -276,13 +317,24 @@ try:
         choices = result["choices"]
         usage = result["usage"]
         
-except requests.exceptions.RequestException as e:
-    error_response = e.response.json() if e.response else None
-    if error_response and "error" in error_response:
-        error = error_response["error"]
-        error_code = error.get("code")
-        error_message = error.get("message")
-        # Handle specific error codes
+        return result
+        
+    except requests.exceptions.HTTPError as e:
+        error_response = e.response.json() if e.response else None
+        if error_response and "error" in error_response:
+            error = error_response["error"]
+            error_code = error.get("code")
+            error_message = error.get("message")
+            
+            if e.response.status_code == 429:
+                retry_after = int(e.response.headers.get("Retry-After", 1))
+                raise backoff.expo(f"Rate limited. Retry after: {retry_after}s")
+                
+            elif e.response.status_code == 503:
+                raise backoff.expo("Service unavailable. Retrying...")
+                
+            # Handle other specific error codes
+            raise
 ```
 
 ### 7. Token Usage Monitoring
