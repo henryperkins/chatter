@@ -50,7 +50,7 @@
         }
 
     }
-    
+
     function removeTypingIndicator() {
         const indicator = document.getElementById('typing-indicator');
         if (indicator && indicator.parentNode) {
@@ -356,10 +356,10 @@
         try {
             const rawContent = button.dataset.rawContent || '';
             await navigator.clipboard.writeText(rawContent);
-            window.utils.showFeedback('Message copied to clipboard!', 'success');
+            window.showAlert('Message copied to clipboard!', 'success');
         } catch (err) {
             console.error('Clipboard copy failed:', err);
-            window.utils.showFeedback('Failed to copy message', 'error');
+            window.showAlert('Failed to copy message', 'error');
         }
     }
 
@@ -518,7 +518,7 @@
             }
 
             modelSelect.setAttribute('data-original-value', modelId);
-            window.utils.showFeedback('Model updated successfully', 'success');
+            window.showAlert('Model updated successfully', 'success');
 
             // Update token usage if available
             if (window.tokenUsageManager) {
@@ -531,7 +531,7 @@
             }
         } catch (error) {
             console.error('Error updating model:', error);
-            window.utils.showFeedback(error.message || 'Failed to update model', 'error');
+            window.showAlert(error.message || 'Failed to update model', 'error');
             modelSelect.value = originalValue;
         } finally {
             modelChangeInProgress = false;
@@ -562,7 +562,7 @@
             }
         } catch (error) {
             console.error('Error creating new chat:', error);
-            window.utils.showFeedback(error.message || 'Failed to create new chat', 'error');
+            window.showAlert(error.message || 'Failed to create new chat', 'error');
         }
     }
 
@@ -579,7 +579,7 @@
         const sendButton = document.getElementById('send-button');
 
         if (!messageInput || !sendButton) {
-            window.utils.showFeedback('Chat interface not properly initialized', 'error');
+            window.showAlert('Chat interface not properly initialized', 'error');
             return;
         }
 
@@ -590,7 +590,7 @@
             const messageText = messageInput.value.trim();
 
             if (!messageText) {
-                window.utils.showFeedback('Please enter a message', 'error');
+                window.showAlert('Please enter a message', 'error');
                 return;
             }
 
@@ -602,7 +602,7 @@
             const modelId = modelSelect?.value;
             const model = window.CHAT_CONFIG.models?.find(m => m.id === parseInt(modelId));
             if (!model) {
-                window.utils.showFeedback('Invalid Azure model configuration', 'error');
+                window.showAlert('Invalid Azure model configuration', 'error');
                 return;
             }
 
@@ -640,7 +640,7 @@
 
         } catch (error) {
             console.error('Error sending message:', error);
-            window.utils.showFeedback(error.message || 'Failed to send message', 'error');
+            window.showAlert(error.message || 'Failed to send message', 'error');
         } finally {
             sendButton.disabled = false;
             removeTypingIndicator();
@@ -733,7 +733,7 @@
             errorDiv.textContent = message;
             document.body.appendChild(errorDiv);
         } else {
-            window.utils.showFeedback(message, 'error');
+            window.showAlert(message, 'error');
         }
     }
 

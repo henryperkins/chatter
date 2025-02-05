@@ -9,11 +9,11 @@
 
 {% block nav_classes %}top-0 md:top-[84px]{% endblock %}
 
-{% block main_classes %}h-[calc(100vh-6rem)] flex md:h-[calc(100vh-7rem)]{% endblock %}
+{% block main_classes %}relative flex-1{% endblock %}
 
 {% block chat_tabs %}
 <div
-    class="fixed w-full top-16 md:top-20 z-[1090] bg-gradient-to-b from-white/95 to-gray-50/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-sm safe-area-top">
+    class="fixed w-full top-[56px] md:top-16 z-[1400] bg-gradient-to-b from-white/95 to-gray-50/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-sm safe-area-top">
     <div
         class="chat-tabs flex overflow-x-auto border-b border-gray-200/50 dark:border-gray-700/50 px-2 gap-4 scrollbar-thin scrollbar-thumb-gray-400/50 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600/50 dark:hover:scrollbar-thumb-gray-600 scrollbar-track-transparent">
         <!-- New Chat Button -->
@@ -45,7 +45,7 @@
 
     <!-- Chat Controls -->
     <div
-        class="relative z-[1200] flex items-center gap-2 px-4 py-2 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 mt-1">
+        class="relative z-[1300] flex items-center gap-2 px-4 py-2 bg-gray-50/80 dark:bg-gray-800/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-700/50 mt-1">
         <!-- Model Selection -->
         {% if models %}
         <div class="relative flex-1 max-w-xs">
@@ -97,7 +97,8 @@
 
 {% block content %}
 <div
-    class="relative flex flex-col h-[100dvh] w-full overflow-hidden touch-manipulation bg-white/95 dark:bg-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm mx-2 sm:mx-0 pt-[80px] md:pt-[140px]">
+ id="chat-container"
+    class="relative flex flex-col w-full h-full overflow-hidden touch-manipulation bg-white/95 dark:bg-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm mx-2 sm:mx-0 mt-[64px] md:mt-[84px]">
     <!-- Chat Configuration -->
     <div id="chat-config" data-chat-id="{{ chat_id if chat_id else '' }}" data-csrf-token="{{ csrf_token() }}"
         data-models='{{ models|tojson|safe }}'
@@ -108,10 +109,11 @@
 
     <!-- Main Chat Area -->
     <div
-        class="flex-1 flex flex-col h-full overflow-hidden pb-safe bg-white/95 dark:bg-gray-900/95 dark-mode-transition backdrop-blur-sm">
+ id="chat-main"
+        class="flex-1 flex flex-col overflow-hidden pb-safe bg-white/95 dark:bg-gray-900/95 dark-mode-transition backdrop-blur-sm">
         <!-- Messages Area -->
         <div id="chat-box"
-            class="flex-1 overflow-y-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 min-h-[200px] pb-40 scrollbar-thin scrollbar-thumb-gray-400/50 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600/50 dark:hover:scrollbar-thumb-gray-600 scrollbar-track-transparent bg-gradient-to-b from-white/50 to-gray-50/50 dark:from-gray-900/50 dark:to-gray-800/50 backdrop-blur-sm"
+            class="flex-1 overflow-y-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6 min-h-[200px] pb-40 scrollbar-thin scrollbar-thumb-gray-400/50 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600/50 dark:hover:scrollbar-thumb-gray-600 scrollbar-track-transparent bg-gradient-to-b from-white/50 to-gray-50/50 dark:from-gray-900/50 dark:to-gray-800/50 backdrop-blur-sm"
             role="log" aria-live="polite">
             <div class="max-w-4xl mx-auto w-full">
                 {% if messages %}
@@ -213,7 +215,7 @@
 
 <!-- Token Usage Panel -->
 <div id="token-usage"
-    class="sticky bottom-16 z-[1100] px-4 sm:px-6 py-2 bg-white/90 dark:bg-gray-800/90 border-t border-gray-200/50 dark:border-gray-700/50 text-sm text-gray-600 dark:text-gray-300">
+    class="fixed bottom-[72px] left-0 right-0 z-[1000] px-4 sm:px-6 py-2 bg-white/90 dark:bg-gray-800/90 border-t border-gray-200/50 dark:border-gray-700/50 text-sm text-gray-600 dark:text-gray-300">
     <div class="flex flex-col space-y-1">
         <div class="flex items-center justify-between">
             <span>
@@ -245,7 +247,7 @@
 
 <!-- Chat Input Area -->
 <div id="chat-input"
-    class="px-4 sm:px-6 py-4 border-t border-gray-200/50 dark:border-gray-700/50 bg-white dark:bg-gray-900">
+    class="fixed bottom-0 left-0 right-0 z-[1100] px-3 sm:px-6 py-3 sm:py-4 border-t border-gray-200/50 dark:border-gray-700/50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
     <form id="chat-form" method="post" enctype="multipart/form-data">
         <textarea name="message" id="message-input" rows="3"
             class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
