@@ -203,6 +203,22 @@ pre {
         @apply pb-safe px-2 safe-area-bottom;
     }
 
+    #chat-container {
+        margin-top: 196px; /* Adjusted for mobile */
+    }
+
+    #chat-box {
+        padding-bottom: 160px; /* Adjusted for mobile */
+    }
+
+    #token-usage {
+        bottom: 112px; /* Adjusted for mobile */
+    }
+
+    #chat-input {
+        padding: 16px; /* Adjusted padding for mobile */
+    }
+
     .mobile-menu {
         @apply top-16 w-[85%] max-w-[320px];
     }
@@ -300,6 +316,16 @@ pre {
 /* Dark mode transition */
 .dark-mode-transition {
     @apply transition-all duration-300 ease-in-out backdrop-blur-transition;
+}
+
+/* Z-index layers */
+.z-index-layers {
+    --z-nav: 1500;
+    --z-chat-tabs: 1400;
+    --z-chat-controls: 1300;
+    --z-dark-mode: 1200;
+    --z-chat-input: 1100;
+    --z-token-usage: 1000;
 }
 
 /* Dark mode specific transitions */
