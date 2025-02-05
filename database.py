@@ -254,6 +254,16 @@ def init_db() -> None:
             
         # Execute schema with drop statements first
         with db_session() as db:
+            # Check existing tables
+            result = db.execute(text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public'
+            """))
+            existing_tables = [row[0] for row in result]
+            if existing_tables:
+                logger.info(f"Found existing tables: {', '.join(existing_tables)}")
+            
             # Drop all existing tables in reverse dependency order
             db.execute(text("""
                 DROP TABLE IF EXISTS uploaded_files CASCADE;
@@ -265,10 +275,30 @@ def init_db() -> None:
             """))
             db.commit()
             
+            # Verify tables were dropped
+            result = db.execute(text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public'
+            """))
+            remaining_tables = [row[0] for row in result]
+            if remaining_tables:
+                logger.warning(f"Tables remaining after drop: {', '.join(remaining_tables)}")
+            else:
+                logger.info("All tables successfully dropped")
+            
             # Now create fresh schema
             db.execute(text(schema))
             db.commit()
-            logger.info("Database schema initialized successfully with fresh tables")
+            
+            # Verify new tables
+            result = db.execute(text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public'
+            """))
+            new_tables = [row[0] for row in result]
+            logger.info(f"Fresh tables created: {', '.join(new_tables)}")
             
     except Exception as e:
         logger.error(f"Database initialization failed: {str(e)}")
