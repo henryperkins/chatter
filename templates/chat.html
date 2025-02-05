@@ -13,7 +13,7 @@
 
 {% block chat_tabs %}
 <div
-    class="fixed w-full top-[56px] md:top-16 z-[1400] bg-gradient-to-b from-white/95 to-gray-50/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-sm safe-area-top">
+    class="fixed w-full top-14 md:top-16 z-[1400] bg-gradient-to-b from-white/95 to-gray-50/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-sm safe-area-top">
     <div
         class="chat-tabs flex overflow-x-auto border-b border-gray-200/50 dark:border-gray-700/50 px-2 gap-4 scrollbar-thin scrollbar-thumb-gray-400/50 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600/50 dark:hover:scrollbar-thumb-gray-600 scrollbar-track-transparent">
         <!-- New Chat Button -->
@@ -215,7 +215,7 @@
 
 <!-- Token Usage Panel -->
 <div id="token-usage"
-    class="fixed bottom-[72px] left-0 right-0 z-[1000] px-4 sm:px-6 py-2 bg-white/90 dark:bg-gray-800/90 border-t border-gray-200/50 dark:border-gray-700/50 text-sm text-gray-600 dark:text-gray-300">
+    class="fixed bottom-[88px] left-0 right-0 z-[1000] px-4 sm:px-6 py-2 bg-white/90 dark:bg-gray-800/90 border-t border-gray-200/50 dark:border-gray-700/50 text-sm text-gray-600 dark:text-gray-300">
     <div class="flex flex-col space-y-1">
         <div class="flex items-center justify-between">
             <span>
@@ -247,7 +247,7 @@
 
 <!-- Chat Input Area -->
 <div id="chat-input"
-    class="fixed bottom-0 left-0 right-0 z-[1100] px-3 sm:px-6 py-3 sm:py-4 border-t border-gray-200/50 dark:border-gray-700/50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+    class="fixed bottom-0 left-0 right-0 z-[1100] px-3 sm:px-6 py-3 sm:py-4 border-t border-gray-200/50 dark:border-gray-700/50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm safe-area-bottom">
     <form id="chat-form" method="post" enctype="multipart/form-data">
         <textarea name="message" id="message-input" rows="3"
             class="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700"
