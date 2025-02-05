@@ -98,7 +98,7 @@
 {% block content %}
 <div
  id="chat-container"
-    class="relative flex flex-col w-full h-full overflow-hidden touch-manipulation bg-white/95 dark:bg-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm mx-2 sm:mx-0 mt-[168px] md:mt-[196px]">
+    class="relative flex flex-col w-full h-full overflow-hidden touch-manipulation bg-white/95 dark:bg-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm mx-2 sm:mx-0 mt-[224px] md:mt-[256px]">
     <!-- Chat Configuration -->
     <div id="chat-config" data-chat-id="{{ chat_id if chat_id else '' }}" data-csrf-token="{{ csrf_token() }}"
         data-models='{{ models|tojson|safe }}'
