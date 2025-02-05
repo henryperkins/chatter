@@ -243,7 +243,7 @@ def create_default_model(db: Session) -> Optional[int]:
 
 
 def init_db() -> None:
-    """Initialize the database schema."""
+    """Initialize the database schema by dropping all existing tables and recreating them."""
     try:
         # Get the schema file path
         schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
@@ -252,11 +252,23 @@ def init_db() -> None:
         with open(schema_path) as f:
             schema = f.read()
             
-        # Execute schema
+        # Execute schema with drop statements first
         with db_session() as db:
+            # Drop all existing tables in reverse dependency order
+            db.execute(text("""
+                DROP TABLE IF EXISTS uploaded_files CASCADE;
+                DROP TABLE IF EXISTS messages CASCADE;
+                DROP TABLE IF EXISTS chats CASCADE;
+                DROP TABLE IF EXISTS models CASCADE;
+                DROP TABLE IF EXISTS providers CASCADE;
+                DROP TABLE IF EXISTS users CASCADE;
+            """))
+            db.commit()
+            
+            # Now create fresh schema
             db.execute(text(schema))
             db.commit()
-            logger.info("Database schema initialized successfully")
+            logger.info("Database schema initialized successfully with fresh tables")
             
     except Exception as e:
         logger.error(f"Database initialization failed: {str(e)}")
