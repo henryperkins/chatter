@@ -3,6 +3,13 @@
 @tailwind utilities;
 
 @layer components {
+    /* Remove pre-formatted text decorations */
+    pre::before,
+    pre::after {
+        content: none !important;
+        display: none !important;
+    }
+
     /* Layout components */
     .page-container {
         @apply min-h-screen flex flex-col;
