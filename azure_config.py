@@ -3,6 +3,7 @@
 import os
 from typing import Dict, Optional, Tuple, Any
 import requests
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from openai import AzureOpenAI
 from urllib.parse import urlparse, urlunparse
 
@@ -15,6 +16,7 @@ logger = get_logger(__name__)
 DEFAULT_API_VERSION = "2025-01-01-preview"
 DEFAULT_TIMEOUT = 30
 API_URL_PATTERN = "{endpoint}/openai/deployments/{deployment}/chat/completions"
+VALID_REASONING_EFFORTS = ["low", "medium", "high"]
 
 
 def validate_model_config(model_config: Dict[str, Any]) -> None:
@@ -41,24 +43,32 @@ def validate_model_config(model_config: Dict[str, Any]) -> None:
     if not model_caps:
         raise ValueError(f"Unsupported model_type: {model_type}")
 
-    # Validate numeric parameters with proper type conversion
-    if "temperature" in model_config:
-        try:
-            temp = float(model_config["temperature"])
-            if not 0 <= temp <= 2:
-                raise ValueError("Temperature must be between 0 and 2")
-            model_config["temperature"] = temp  # Store converted value
-        except (TypeError, ValueError):
-            raise ValueError("Temperature must be a number between 0 and 2")
+    # Check if model is o-series
+    is_o_series = model_type.startswith("o")
 
-    if "top_p" in model_config:
-        try:
-            top_p = float(model_config["top_p"])
-            if not 0 <= top_p <= 1:
-                raise ValueError("top_p must be between 0 and 1")
-            model_config["top_p"] = top_p  # Store converted value
-        except (TypeError, ValueError):
-            raise ValueError("top_p must be a number between 0 and 1")
+    if is_o_series:
+        # O-series specific validation
+        if "temperature" in model_config or "top_p" in model_config:
+            raise ValueError("temperature and top_p are not supported by o-series models")
+
+        # Validate reasoning_effort if provided
+        if "reasoning_effort" in model_config:
+            effort = model_config["reasoning_effort"]
+            if effort not in VALID_REASONING_EFFORTS:
+                raise ValueError(f"reasoning_effort must be one of {VALID_REASONING_EFFORTS}")
+    else:
+        # Legacy model validation
+        if "temperature" in model_config:
+            try:
+                temp = float(model_config["temperature"])
+                if not 0 <= temp <= 2:
+                    raise ValueError("Temperature must be between 0 and 2")
+                model_config["temperature"] = temp
+            except (TypeError, ValueError):
+                raise ValueError("Temperature must be a number between 0 and 2")
+
+        if "reasoning_effort" in model_config:
+            raise ValueError("reasoning_effort is only supported by o-series models")
 
     # Validate token parameters
     if "max_tokens" in model_config and "max_completion_tokens" in model_config:
@@ -89,6 +99,7 @@ def validate_model_config(model_config: Dict[str, Any]) -> None:
 def create_client(
     api_endpoint: str,
     api_key: str,
+    use_azure_ad: bool = False,
     api_version: str = DEFAULT_API_VERSION,
     timeout: int = DEFAULT_TIMEOUT,
 ) -> AzureOpenAI:
@@ -114,21 +125,32 @@ def create_client(
 
     logger.debug("Creating Azure OpenAI client with endpoint: %s", api_base)
 
-    try:
-        client = AzureOpenAI(
-            azure_endpoint=api_base,
-            api_key=api_key,
-            api_version=api_version.strip(),
-            timeout=timeout,
+    client_kwargs = {
+        "azure_endpoint": api_base,
+        "api_version": api_version.strip(),
+        "timeout": timeout,
+    }
+
+    if use_azure_ad:
+        token_provider = get_bearer_token_provider(
+            DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
         )
-        return client
+        client_kwargs["azure_ad_token_provider"] = token_provider
+    else:
+        client_kwargs["api_key"] = api_key
+
+    try:
+       client = AzureOpenAI(**client_kwargs)
+       logger.debug("Created Azure OpenAI client with %s auth",
+                     "Azure AD" if use_azure_ad else "API key")
+       return client
     except Exception as e:
         raise RuntimeError(f"Failed to create Azure OpenAI client: {str(e)}")
 
 
 def initialize_client_from_model(
     model_config: Dict[str, Any], timeout_seconds: int = DEFAULT_TIMEOUT
-) -> Tuple[AzureOpenAI, str, Optional[float], Optional[int], int, bool]:
+) -> Tuple[AzureOpenAI, str, Optional[float], Optional[int], int, bool, Optional[str]]:
     """
     Initialize Azure OpenAI client from model configuration.
     """
@@ -139,6 +161,7 @@ def initialize_client_from_model(
     api_endpoint = str(model_config["api_endpoint"])
     api_key = str(model_config["api_key"])
     deployment_name = str(model_config["deployment_name"])
+    use_azure_ad = bool(model_config.get("use_azure_ad", False))
     api_version = str(model_config["api_version"])
 
     # Handle temperature with proper type conversion
@@ -164,11 +187,19 @@ def initialize_client_from_model(
         except (TypeError, ValueError):
             raise ValueError("Invalid max_completion_tokens value")
 
+    # Handle reasoning effort for o-series models
+    reasoning_effort = None
+    if model_config.get("model_type", "").startswith("o"):
+        reasoning_effort = model_config.get("reasoning_effort", "medium")
+        if reasoning_effort not in VALID_REASONING_EFFORTS:
+            raise ValueError(f"Invalid reasoning_effort. Must be one of {VALID_REASONING_EFFORTS}")
+
     client = create_client(
         api_endpoint=api_endpoint,
         api_key=api_key,
+        use_azure_ad=use_azure_ad,
         api_version=api_version,
-        timeout=timeout_seconds,
+        timeout=timeout_seconds
     )
 
     requires_o1 = bool(model_config.get("requires_o1_handling", False))
@@ -180,6 +211,7 @@ def initialize_client_from_model(
         max_tokens,
         max_completion_tokens,
         requires_o1,
+        reasoning_effort
     )
 
 
@@ -206,21 +238,33 @@ def validate_api_endpoint(
         if not all([parsed.scheme, parsed.netloc, parsed.path]):
             return {"success": False, "error": "Invalid API endpoint URL format"}
 
+        # Determine if testing o-series model
+        is_o_series = any(deployment_name.startswith(prefix)
+                         for prefix in ["o1", "o3"])
+
         payload = {
             "messages": [{"role": "user", "content": "Test message"}],
-            "max_tokens": 1,
         }
 
-        # Add API version specific parameters
-        if api_version >= "2025-01-01-preview":
+        if is_o_series:
+            # O-series specific payload
             payload.update(
-                {
-                    "temperature": 1.0,
-                    "max_completion_tokens": 1,
-                    "response_format": {"type": "text"},
-                    "stream": False,
-                }
-            )
+{
+                "max_completion_tokens": 1,
+                "reasoning_effort": "low",
+                "response_format": {"type": "text"},
+                "stream": False
+            })
+        else:
+            # Legacy model payload
+            payload.update({
+                "max_tokens": 1,
+                "temperature": 1.0,
+                "top_p": 1.0,
+                "frequency_penalty": 0,
+                "presence_penalty": 0
+            })
+
 
         response = requests.post(
             url,
@@ -266,6 +310,7 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
 
     endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
     api_key = os.getenv("AZURE_OPENAI_KEY", "").strip()
+    use_azure_ad = os.getenv("AZURE_USE_AD_AUTH", "").lower() == "true"
     api_version = os.getenv("AZURE_OPENAI_API_VERSION", DEFAULT_API_VERSION).strip()
 
     if not endpoint or not api_key:
@@ -274,6 +319,7 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
     client = create_client(
         api_endpoint=endpoint,
         api_key=api_key,
+        use_azure_ad=use_azure_ad,
         api_version=api_version,
     )
 

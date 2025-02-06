@@ -111,24 +111,39 @@ class Model:
             "supports_code_interpreter": True,
             "api_version": "2025-01-01-preview",
         },
-        "o1": {
+        "o3-mini": {
             "fixed_temperature": True,
-            "streaming": False,
-            "max_tokens": 25000,
+            "streaming": True,
+            "max_tokens": 200000,
+            "max_completion_tokens": 100000,
             "supports_json_mode": True,
             "requires_reasoning_effort": True,
-            "supports_vector_search": True,
-            "supports_file_search": True,
-            "supports_code_interpreter": True,
             "api_version": "2025-01-01-preview",
             "default_reasoning_effort": "medium",
             "supports_completion_storage": True,
-            "vector_search_config": {
-                "max_chunks": 50,
-                "chunk_size": 1000,
-                "chunk_overlap": 100,
-                "default_strictness": 3,
-            },
+        },
+        "o1": {
+            "fixed_temperature": True,
+            "streaming": True,
+            "max_tokens": 200000,
+            "max_completion_tokens": 100000,
+            "supports_json_mode": True,
+            "requires_reasoning_effort": True,
+            "supports_vision": True,
+            "api_version": "2025-01-01-preview",
+            "default_reasoning_effort": "medium",
+            "supports_completion_storage": True,
+        },
+        "o1-mini": {
+            "fixed_temperature": True,
+            "streaming": True,
+            "max_tokens": 128000,
+            "max_completion_tokens": 65536,
+            "supports_json_mode": True,
+            "requires_reasoning_effort": True,
+            "api_version": "2024-12-01-preview",
+            "default_reasoning_effort": "medium",
+            "supports_completion_storage": True,
         },
         "gpt-3.5-turbo": {
             "fixed_temperature": False,
@@ -653,13 +668,31 @@ class Model:
                 config["max_completion_tokens"] = min(
                     max_tokens or model_caps["max_tokens"], model_caps["max_tokens"]
                 )
-        is_reasoning_model = model_type in ["o1-preview", "o3-mini"]
-        if is_reasoning_model:
+        # Handle o-series model validation
+        is_o_series = model_type.startswith("o")
+        if is_o_series:
+            # Validate reasoning effort
             reasoning_effort = config.get("reasoning_effort", "medium")
             if reasoning_effort not in ["low", "medium", "high"]:
                 raise ValueError("reasoning_effort must be one of: low, medium, high")
             config["reasoning_effort"] = reasoning_effort
             config["store_completion"] = bool(config.get("store_completion", False))
+
+            # Validate max completion tokens
+            max_completion_tokens = config.get("max_completion_tokens")
+            model_caps = Model.PROVIDER_CAPABILITIES.get(model_type, {})
+            if max_completion_tokens is not None:
+                max_allowed = model_caps.get("max_completion_tokens", 100000)
+                if not (1 <= max_completion_tokens <= max_allowed):
+                    raise ValueError(f"max_completion_tokens must be between 1 and {max_allowed} for {model_type}")
+                config["max_completion_tokens"] = max_completion_tokens
+
+            # Force temperature to 1.0 and remove unsupported parameters
+            config["temperature"] = 1.0
+            config.pop("max_tokens", None)
+            config.pop("top_p", None)
+            config.pop("frequency_penalty", None)
+            config.pop("presence_penalty", None)
         else:
             config["reasoning_effort"] = "medium"
             config["store_completion"] = False

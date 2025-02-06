@@ -41,19 +41,33 @@ class ChatClient:
         )
 
     def get_azure_client(
-        self, api_key: str, api_endpoint: str, api_version: str
+        self, api_key: str, api_endpoint: str, api_version: str,
+        use_azure_ad: bool = False
     ) -> AzureOpenAI:
         """Get or create an Azure OpenAI client."""
-        if not api_key or not api_endpoint or not api_version:
+        if not api_endpoint or not api_version:
             raise ChatAPIError("Missing required API configuration", 400)
+        if not api_key and not use_azure_ad:
+            raise ChatAPIError("Either API key or Azure AD auth is required", 400)
 
         try:
             if not self._azure_client:
-                self._azure_client = AzureOpenAI(
-                    api_key=api_key,
-                    azure_endpoint=api_endpoint,
-                    api_version=api_version,
-                )
+                client_kwargs = {
+                    "azure_endpoint": api_endpoint,
+                    "api_version": api_version,
+                }
+
+                if use_azure_ad:
+                    from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+                    token_provider = get_bearer_token_provider(
+                        DefaultAzureCredential(),
+                        "https://cognitiveservices.azure.com/.default"
+                    )
+                    client_kwargs["azure_ad_token_provider"] = token_provider
+                else:
+                    client_kwargs["api_key"] = api_key
+
+                self._azure_client = AzureOpenAI(**client_kwargs)
             return self._azure_client
         except Exception as e:
             raise ChatAPIError(f"Failed to create Azure client: {str(e)}", 500)
@@ -96,19 +110,20 @@ def get_azure_response(
         except Exception as e:
             raise ChatAPIError(f"API key decryption failed: {str(e)}", 500)
 
-        # Create client
-        client = AzureOpenAI(
+        # Create client with Azure AD support
+        chat_client = ChatClient()
+        use_azure_ad = os.getenv("AZURE_USE_AD_AUTH", "").lower() == "true"
+        client = chat_client.get_azure_client(
             api_key=api_key,
-            azure_endpoint=api_endpoint,
+            api_endpoint=api_endpoint,
             api_version=api_version,
-            timeout=timeout_seconds,
+            use_azure_ad=use_azure_ad
         )
 
         # Prepare completion parameters
         completion_params = {
             "model": deployment_name,
             "messages": messages,
-            "max_tokens": max_completion_tokens,
             "stream": stream,
         }
 
@@ -118,13 +133,15 @@ def get_azure_response(
                 raise ChatAPIError("Invalid response_format structure", 400)
             completion_params["response_format"] = response_format
 
-        if requires_o1_handling:
-            completion_params.update(
-                {
-                    "reasoning_effort": reasoning_effort,
-                    "store_completion": store_completion,
-                }
-            )
+        # Handle o-series model parameters
+        if model_type and model_type.startswith("o"):
+            completion_params.update({
+                "max_completion_tokens": max_completion_tokens,
+                "reasoning_effort": reasoning_effort,
+                "store_completion": store_completion
+            })
+        else:
+            completion_params["max_tokens"] = max_completion_tokens
 
         try:
             # Make API call

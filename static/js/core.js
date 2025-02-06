@@ -12,33 +12,24 @@ window.App = {
 
     async init() {
         if (this.initialized) return;
-        
+
         try {
-            // Initialize core dependencies with timeout
-            await Promise.race([
-                this.initializeMarkdown(),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Markdown initialization timeout')), 5000)
-                )
+            const timeout = 15000; // Increased timeout to 15 seconds
+
+            // Initialize all dependencies in parallel with timeout
+            await Promise.all([
+                this.initializeWithTimeout(this.initializeMarkdown(), 'Markdown', timeout),
+                this.initializeWithTimeout(this.initializePrism(), 'Prism', timeout),
+                this.initializeWithTimeout(this.initializeUtils(), 'Utils', timeout),
+                this.initializeWithTimeout(this.initializeDarkMode(), 'Dark Mode', timeout),
+                this.initializeWithTimeout(this.initializeTokenUsage(), 'Token Usage', timeout),
+                this.initializeWithTimeout(this.initializeFileUpload(), 'File Upload', timeout),
+                this.initializeWithTimeout(this.initializeChatConfig(), 'Chat Config', timeout)
             ]);
 
-            await Promise.race([
-                this.initializePrism(),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Prism initialization timeout')), 5000)
-                )
-            ]);
-
-            await Promise.race([
-                this.initializeUtils(),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Utils initialization timeout')), 5000)
-                )
-            ]);
-            
             // Set up global error handling
             this.setupErrorHandling();
-            
+
             this.initialized = true;
             document.dispatchEvent(new Event('app:ready'));
         } catch (error) {
@@ -70,7 +61,7 @@ window.App = {
                     return str; // Return plain text if language isn't supported
                 }
             });
-            
+
             this.dependencies.markdown = true;
             return true;
         } catch (error) {
@@ -83,7 +74,7 @@ window.App = {
         if (!window.Prism) {
             throw new Error('Prism not loaded');
         }
-        
+
         try {
             // Configure Prism options if needed
             window.Prism.manual = true; // Prevent automatic highlighting
@@ -99,7 +90,7 @@ window.App = {
         if (!window.utils) {
             throw new Error('Utils not loaded');
         }
-        
+
         try {
             // Verify essential utils methods exist
             const requiredMethods = ['fetchWithCSRF', 'showFeedback', 'sanitizeHTML'];
@@ -108,7 +99,7 @@ window.App = {
                     throw new Error(`Missing required utils method: ${method}`);
                 }
             }
-            
+
             this.dependencies.utils = true;
             return true;
         } catch (error) {
@@ -141,21 +132,21 @@ window.App = {
     async waitForDependencies(timeout = 10000) {
         return new Promise((resolve, reject) => {
             const start = Date.now();
-            
+
             const check = () => {
                 if (Object.values(this.dependencies).every(dep => dep)) {
                     resolve();
                     return;
                 }
-                
+
                 if (Date.now() - start > timeout) {
                     reject(new Error('Dependencies timeout'));
                     return;
                 }
-                
+
                 setTimeout(check, 100);
             };
-            
+
             check();
         });
     },
@@ -170,6 +161,71 @@ window.App = {
         errorDiv.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-[2000]';
         errorDiv.textContent = message;
         document.body.appendChild(errorDiv);
+    },
+
+    async initializeWithTimeout(promise, name, timeout) {
+        return Promise.race([
+            promise,
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error(`${name} initialization timeout`)), timeout)
+            )
+        ]);
+    },
+
+    async initializeDarkMode() {
+        if (typeof window.darkMode === 'undefined') {
+            throw new Error('Dark mode module not loaded');
+        }
+        try {
+            await window.darkMode.init();
+            this.dependencies.darkMode = true;
+            return true;
+        } catch (error) {
+            console.error('Dark mode initialization failed:', error);
+            throw error;
+        }
+    },
+
+    async initializeTokenUsage() {
+        if (typeof window.tokenUsage === 'undefined') {
+            throw new Error('Token usage module not loaded');
+        }
+        try {
+            await window.tokenUsage.init();
+            this.dependencies.tokenUsage = true;
+            return true;
+        } catch (error) {
+            console.error('Token usage initialization failed:', error);
+            throw error;
+        }
+    },
+
+    async initializeFileUpload() {
+        if (typeof window.fileUpload === 'undefined') {
+            throw new Error('File upload module not loaded');
+        }
+        try {
+            await window.fileUpload.init();
+            this.dependencies.fileUpload = true;
+            return true;
+        } catch (error) {
+            console.error('File upload initialization failed:', error);
+            throw error;
+        }
+    },
+
+    async initializeChatConfig() {
+        if (typeof window.chatConfig === 'undefined') {
+            throw new Error('Chat config module not loaded');
+        }
+        try {
+            await window.chatConfig.init();
+            this.dependencies.chatConfig = true;
+            return true;
+        } catch (error) {
+            console.error('Chat config initialization failed:', error);
+            throw error;
+        }
     }
 };
 

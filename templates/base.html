@@ -1,10 +1,14 @@
+
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#ffffff">
+    <!-- Theme color for supporting browsers (Chrome, Safari, etc.) - Not supported in Firefox or Opera -->
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#1f2937" media="(prefers-color-scheme: dark)">
+    <meta name="msapplication-TileColor" content="#ffffff">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="csrf-param" content="csrf_token">
     <title>{% block title %}Azure OpenAI Chat{% endblock %}</title>
@@ -241,10 +245,10 @@
 
     <!-- Core Dependencies First -->
     <script src="{{ url_for('static', filename='js/core.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/axios.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/dompurify.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/markdown-it.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/prism.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/axios.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/dompurify.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/markdown-it.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/prism.js') }}"></script>
 
     <!-- Core Utilities Next -->
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>

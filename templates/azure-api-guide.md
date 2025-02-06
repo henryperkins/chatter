@@ -1,0 +1,394 @@
+# Azure OpenAI reasoning models
+
+Azure OpenAI `o-series` models are designed to tackle reasoning and problem-solving tasks with increased focus and capability. These models spend more time processing and understanding the user's request, making them exceptionally strong in areas like science, coding, and math compared to previous iterations.
+
+**Key capabilities of the o-series models:**
+
+- Complex Code Generation: Capable of generating algorithms and handling advanced coding tasks to support developers.
+- Advanced Problem Solving: Ideal for comprehensive brainstorming sessions and addressing multifaceted challenges.
+- Complex Document Comparison: Perfect for analyzing contracts, case files, or legal documents to identify subtle differences.
+- Instruction Following and Workflow Management: Particularly effective for managing workflows requiring shorter contexts.
+
+## Availability
+
+ **For access to `o3-mini`, `o1`, and `o1-preview`, registration is required, and access will be granted based on Microsoft's eligibility criteria**.
+
+ Customers who previously applied and received access to `o1` or `o1-preview`, don't need to reapply as they are automatically on the wait-list for the latest model.
+
+Request access: [limited access model application](https://aka.ms/OAI/o1access)
+
+### Region availability
+
+| Model        | Region                                                                       | Limited access                                                  |
+|--------------|------------------------------------------------------------------------------|-----------------------------------------------------------------|
+| `o3-mini`    | East US2 (Global Standard) <br> Sweden Central (Global Standard)             | [Limited access model application](https://aka.ms/OAI/o1access) |
+| `o1`         | East US2 (Global Standard) <br> Sweden Central (Global Standard)             | [Limited access model application](https://aka.ms/OAI/o1access) |
+| `o1-preview` | See [models page](../concepts/models.md#global-standard-model-availability). | [Limited access model application](https://aka.ms/OAI/o1access) |
+| `o1-mini`    | See [models page](../concepts/models.md#global-standard-model-availability). | No access request needed                                        |
+
+## API & feature support
+
+| **Feature**                                                 |          **o3-mini**, **2025-01-31**           |             **o1**, **2024-12-17**             |                      **o1-preview**, **2024-09-12**                       |                        **o1-mini**, **2024-09-12**                        |
+|:------------------------------------------------------------|:----------------------------------------------:|:----------------------------------------------:|:-------------------------------------------------------------------------:|:-------------------------------------------------------------------------:|
+| **API Version**                                             | `2024-12-01-preview` <br> `2025-01-01-preview` | `2024-12-01-preview` <br> `2025-01-01-preview` | `2024-09-01-preview`  <br> `2024-10-01-preview` <br> `2024-12-01-preview` | `2024-09-01-preview`  <br> `2024-10-01-preview` <br> `2024-12-01-preview` |
+| **[Developer Messages](#developer-messages)**               |                       ✅                        |                       ✅                        |                                     -                                     |                                     -                                     |
+| **[Structured Outputs](./structured-outputs.md)**           |                       ✅                        |                       ✅                        |                                     -                                     |                                     -                                     |
+| **[Context Window](../concepts/models.md#o-series-models)** |      Input: 200,000 <br> Output: 100,000       |      Input: 200,000 <br> Output: 100,000       |                    Input: 128,000  <br> Output: 32,768                    |                    Input: 128,000  <br> Output: 65,536                    |
+| **[Reasoning effort](#reasoning-effort)**                   |                       ✅                        |                       ✅                        |                                     -                                     |                                     -                                     |
+| **[Vision Support](./gpt-with-vision.md)**                  |                       -                        |                       ✅                        |                                     -                                     |                                     -                                     |
+| Functions/Tools                                             |                       ✅                        |                       ✅                        |                                     -                                     |                                     -                                     |
+| `max_completion_tokens`<sup>*</sup>                         |                       ✅                        |                       ✅                        |                                     ✅                                     |                                     ✅                                     |
+| System Messages<sup>**</sup>                                |                       ✅                        |                       ✅                        |                                     -                                     |                                     -                                     |
+| Streaming                                                   |                       ✅                        |                       -                        |                                     -                                     |                                     -                                     |
+
+<sup>*</sup> Reasoning models will only work with the `max_completion_tokens` parameter. <br><br>
+<sup>**</sup>The latest o<sup>&#42;</sup> series model support system messages to make migration easier. When you use a system message with `o3-mini` and `o1` it will be treated as a developer message. You should not use both a developer message and a system message in the same API request.
+
+### Not Supported
+
+The following are currently unsupported with reasoning models:
+
+- Parallel tool calling
+- `temperature`, `top_p`, `presence_penalty`, `frequency_penalty`, `logprobs`, `top_logprobs`, `logit_bias`, `max_tokens`
+
+## Usage
+
+These models [don't currently support the same set of parameters](#api--feature-support) as other models that use the chat completions API.
+
+# [Python (Microsoft Entra ID)](#tab/python-secure)
+
+You'll need to upgrade your OpenAI client library for access to the latest parameters.
+
+```cmd
+pip install openai --upgrade
+```
+
+If you're new to using Microsoft Entra ID for authentication see [How to configure Azure OpenAI Service with Microsoft Entra ID authentication](../how-to/managed-identity.md).
+
+```python
+from openai import AzureOpenAI
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+
+token_provider = get_bearer_token_provider(
+    DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
+)
+
+client = AzureOpenAI(
+  azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT"),
+  azure_ad_token_provider=token_provider,
+  api_version="2024-12-01-preview"
+)
+
+response = client.chat.completions.create(
+    model="o1-new", # replace with the model deployment name of your o1-preview, or o1-mini model
+    messages=[
+        {"role": "user", "content": "What steps should I think about when writing my first Python API?"},
+    ],
+    max_completion_tokens = 5000
+
+)
+
+print(response.model_dump_json(indent=2))
+```
+
+# [Python (key-based auth)](#tab/python)
+
+You might need to upgrade your version of the OpenAI Python library to take advantage of the new parameters like `max_completion_tokens`.
+
+```cmd
+pip install openai --upgrade
+```
+
+```python
+
+from openai import AzureOpenAI
+
+client = AzureOpenAI(
+  azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT"),
+  api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+  api_version="2024-12-01-preview"
+)
+
+response = client.chat.completions.create(
+    model="o1-new", # replace with the model deployment name of your o1 deployment.
+    messages=[
+        {"role": "user", "content": "What steps should I think about when writing my first Python API?"},
+    ],
+    max_completion_tokens = 5000
+
+)
+
+print(response.model_dump_json(indent=2))
+```
+
+---
+
+**Output:**
+
+```json
+{
+  "id": "chatcmpl-AEj7pKFoiTqDPHuxOcirA9KIvf3yz",
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "logprobs": null,
+      "message": {
+        "content": "Writing your first Python API is an exciting step in developing software that can communicate with other applications. An API (Application Programming Interface) allows different software systems to interact with each other, enabling data exchange and functionality sharing. Here are the steps you should consider when creating your first Python API...truncated for brevity.",
+        "refusal": null,
+        "role": "assistant",
+        "function_call": null,
+        "tool_calls": null
+      },
+      "content_filter_results": {
+        "hate": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "protected_material_code": {
+          "filtered": false,
+          "detected": false
+        },
+        "protected_material_text": {
+          "filtered": false,
+          "detected": false
+        },
+        "self_harm": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "sexual": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "violence": {
+          "filtered": false,
+          "severity": "safe"
+        }
+      }
+    }
+  ],
+  "created": 1728073417,
+  "model": "o1-2024-12-17",
+  "object": "chat.completion",
+  "service_tier": null,
+  "system_fingerprint": "fp_503a95a7d8",
+  "usage": {
+    "completion_tokens": 1843,
+    "prompt_tokens": 20,
+    "total_tokens": 1863,
+    "completion_tokens_details": {
+      "audio_tokens": null,
+      "reasoning_tokens": 448
+    },
+    "prompt_tokens_details": {
+      "audio_tokens": null,
+      "cached_tokens": 0
+    }
+  },
+  "prompt_filter_results": [
+    {
+      "prompt_index": 0,
+      "content_filter_results": {
+        "custom_blocklists": {
+          "filtered": false
+        },
+        "hate": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "jailbreak": {
+          "filtered": false,
+          "detected": false
+        },
+        "self_harm": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "sexual": {
+          "filtered": false,
+          "severity": "safe"
+        },
+        "violence": {
+          "filtered": false,
+          "severity": "safe"
+        }
+      }
+    }
+  ]
+}
+```
+
+## Reasoning effort
+
+> [!NOTE]
+> Reasoning models have `reasoning_tokens` as part of `completion_tokens_details` in the model response. These are hidden tokens that aren't returned as part of the message response content but are used by the model to help generate a final answer to your request. `2024-12-01-preview` adds an additional new parameter `reasoning_effort` which can be set to `low`, `medium`, or `high` with the latest `o1` model. The higher the effort setting, the longer the model will spend processing the request, which will generally result in a larger number of `reasoning_tokens`.
+
+## Developer messages
+
+Functionally developer messages ` "role": "developer"` are the same as system messages.
+
+Adding a developer message to the previous code example would look as follows:
+
+# [Python (Microsoft Entra ID)](#tab/python-secure)
+
+You'll need to upgrade your OpenAI client library for access to the latest parameters.
+
+```cmd
+pip install openai --upgrade
+```
+
+If you're new to using Microsoft Entra ID for authentication see [How to configure Azure OpenAI Service with Microsoft Entra ID authentication](../how-to/managed-identity.md).
+
+```python
+from openai import AzureOpenAI
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+
+token_provider = get_bearer_token_provider(
+    DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
+)
+
+client = AzureOpenAI(
+  azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT"),
+  azure_ad_token_provider=token_provider,
+  api_version="2024-12-01-preview"
+)
+
+response = client.chat.completions.create(
+    model="o1-new", # replace with the model deployment name of your o1-preview, or o1-mini model
+    messages=[
+        {"role": "developer","content": "You are a helpful assistant."}, # optional equivalent to a system message for reasoning models
+        {"role": "user", "content": "What steps should I think about when writing my first Python API?"},
+    ],
+    max_completion_tokens = 5000
+
+)
+
+print(response.model_dump_json(indent=2))
+```
+
+# [Python (key-based auth)](#tab/python)
+
+You might need to upgrade your version of the OpenAI Python library to take advantage of the new parameters like `max_completion_tokens`.
+
+```cmd
+pip install openai --upgrade
+```
+
+```python
+
+from openai import AzureOpenAI
+
+client = AzureOpenAI(
+  azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT"),
+  api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+  api_version="2024-12-01-preview"
+)
+
+response = client.chat.completions.create(
+    model="o1-new", # replace with the model deployment name of your o1 deployment.
+    messages=[
+        {"role": "developer","content": "You are a helpful assistant."}, # optional equivalent to a system message for reasoning models
+        {"role": "user", "content": "What steps should I think about when writing my first Python API?"},
+    ],
+    max_completion_tokens = 5000
+)
+
+print(response.model_dump_json(indent=2))
+```
+
+---
+
+Actual Info:
+
+AZURE_OPENAI_API_KEY=BSTrjI2F4QUb7B8vYH3jJqteA4fHEVAa9HOJUvJg3awtqULIloRWJQQJ99BAACHYHv6XJ3w3AAABACOGUKSc
+Instance Name: azureopenai-east2-openai
+AZURE_API_ENDPOINT=https://azureopenai-east2-openai.openai.azure.com/
+Model Name / ID: azureml://registries/azure-openai/models/o1/versions/2024-12-17
+Full Endpoint: https://azureopenai-east2-openai.openai.azure.com/openai/deployments/o1-east2/chat/completions?api-version=2024-12-01-preview
+Deployment Namee: o1-east2
+API Version: 2025-01-01-preview
+
+```bash
+payload="{\"messages\":[{\"role\":\"developer\",\"content\":[{\"type\":\"text\",\"text\":\"You are an AI assistant that helps people find information.\"}]}],\"max_completion_tokens\":40000}"
+   curl "https://azureopenai-east2-openai.openai.azure.com/openai/deployments/o1-east2/chat/completions?api-version=2024-12-01-preview" \
+  -H "Content-Type: application/json" \
+  -H "api-key: YOUR_API_KEY" \
+  -d "$payload"
+```
+
+```python
+
+import os
+import base64
+from openai import AzureOpenAI
+
+endpoint = os.getenv("ENDPOINT_URL", "https://azureopenai-east2-openai.openai.azure.com/")
+deployment = os.getenv("DEPLOYMENT_NAME", "o1-east2")
+subscription_key = os.getenv("AZURE_OPENAI_API_KEY", "REPLACE_WITH_YOUR_KEY_VALUE_HERE")
+
+# Initialize Azure OpenAI Service client with key-based authentication
+client = AzureOpenAI(
+    azure_endpoint=endpoint,
+    api_key=subscription_key,
+    api_version="2024-12-01-preview",
+)
+
+
+IMAGE_PATH = "YOUR_IMAGE_PATH"
+encoded_image = base64.b64encode(open(IMAGE_PATH, 'rb').read()).decode('ascii')
+
+#Prepare the chat prompt
+chat_prompt = [
+    {
+        "role": "developer",
+        "content": [
+            {
+                "type": "text",
+                "text": "You are an AI assistant that helps people find information."
+            }
+        ]
+    }
+]
+
+# Include speech result if speech is enabled
+messages = chat_prompt
+
+# Generate the completion
+completion = client.chat.completions.create(
+    model=deployment,
+    messages=messages,
+    max_completion_tokens=40000,
+    stop=None,
+    stream=False
+)
+
+print(completion.to_json())
+
+```
+
+---
+
+https://azureopenai-east2-openai.openai.azure.com/openai/deployments/o3-mini/chat/completions?api-version=2024-12-01-preview
+azureml://registries/azure-openai/models/o3-mini/versions/2025-01-31
+o3-mini
+
+
+```
+# Azure OpenAI Service Configuration
+AZURE_OPENAI_API_KEY=BSTrjI2F4QUb7B8vYH3jJqteA4fHEVAa9HOJUvJg3awtqULIloRWJQQJ99BAACHYHv6XJ3w3AAABACOGUKSc
+AZURE_OPENAI_ENDPOINT=https://azureopenai-east2-openai.openai.azure.com/
+AZURE_OPENAI_DEPLOYMENT=o1-east2
+AZURE_OPENAI_API_VERSION=2024-12-01-preview
+
+# Optional parameters
+MODEL_NAME_ID=azureml://registries/azure-openai/models/o1/versions/2024-12-17
+MAX_COMPLETION_TOKENS=40000
+REASONING_EFFORT=high
+
+# Optional credentials for Azure Identity (if needed)
+AZURE_TENANT_ID=<Your_Tenant_ID>
+AZURE_CLIENT_ID=<Your_Client_ID>
+AZURE_CLIENT_SECRET=<Your_Client_Secret>
+```
+
