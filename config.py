@@ -12,15 +12,6 @@ from dotenv import load_dotenv
 logger = logging.getLogger(__name__)
 
 # Example function to log and verify environment values
-def log_env_values():
-    azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
-    api_version = os.getenv("AZURE_OPENAI_API_VERSION", "").strip()
-    deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "").strip()
-    # Log values without exposing sensitive data
-    logger.info("Azure OpenAI endpoint: %s", azure_endpoint)
-    logger.info("Azure OpenAI API version: %s", api_version)
-    logger.info("Azure OpenAI deployment: %s", deployment)
-
 # Model configuration
 MODEL_CONFIG = {
     "azure": {
@@ -95,11 +86,32 @@ class ApiError(Exception):
 class Config:
     """
     Application configuration.
+    Implements the singleton pattern to ensure only one instance exists.
     """
 
+    _instance = None
     MODEL_CAPABILITIES = MODEL_CONFIG  # Expose model config to other modules
 
+    @classmethod
+    def log_env_values(cls):
+        """Log non-sensitive environment values."""
+        azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
+        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "").strip()
+        deployment = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "").strip()
+        logger.info("Azure OpenAI endpoint: %s", azure_endpoint)
+        logger.info("Azure OpenAI API version: %s", api_version)
+        logger.info("Azure OpenAI deployment: %s", deployment)
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(Config, cls).__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+
     def __init__(self):
+        if self._initialized:
+            return
+        self._initialized = True
         # Load environment variables from .env file
         env_path = Path(os.path.dirname(os.path.abspath(__file__))) / ".env"
         if not env_path.exists():
@@ -212,8 +224,10 @@ class Config:
         # Validate configuration
         validate_config(self.__dict__)
 
-        # Log environment values
-        log_env_values()
+        # Log environment values only during first initialization
+        if not hasattr(Config, '_logged'):
+            self.log_env_values()
+            Config._logged = True
 
     def _process_encryption_key(self, key: str) -> str:
         """
