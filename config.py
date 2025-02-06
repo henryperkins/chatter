@@ -60,7 +60,7 @@ def validate_config(config: Dict[str, Any]) -> None:
     if not parsed.netloc or not parsed.path or parsed.path == "/":
         raise ValueError("Invalid DATABASE_URI: Missing host/port or database name")
 
-    required_vars = {"ENCRYPTION_KEY", "AZURE_OPENAI_KEY", "AZURE_DEPLOYMENT_NAME"}
+    required_vars = {"ENCRYPTION_KEY", "AZURE_OPENAI_KEY"}
     missing = [var for var in required_vars if not config.get(var)]
     if missing:
         raise ValueError(
