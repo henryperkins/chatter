@@ -386,7 +386,6 @@
                 body: formData,
                 headers: {
                     'X-Chat-ID': window.CHAT_CONFIG.chatId,
-                    'X-Azure-Token': window.CHAT_CONFIG.azureToken,
                     'api-key': window.CHAT_CONFIG.azureToken,
                     'X-Request-ID': (crypto.randomUUID && crypto.randomUUID()) || Date.now().toString(),
                     'X-Azure-Operation': 'chat-completion',
@@ -659,7 +658,10 @@
                     formData.append(key, typeof azureParams[key] === 'object' ? JSON.stringify(azureParams[key]) : azureParams[key]);
                 }
             }
-            // Also append the CSRF token if required by your backend
+            // Append Azure-specific parameters and CSRF token
+            formData.append('api_version', model.api_version);
+            formData.append('deployment_name', model.deployment_name);
+            formData.append('api_endpoint', model.api_base_url || model.api_endpoint);
             formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
 
             // Send the message via streaming fetch
