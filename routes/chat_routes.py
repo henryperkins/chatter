@@ -432,6 +432,7 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                 "description": m.description,
                 "temperature": m.temperature,
                 "max_tokens": m.max_tokens,
+                "api_endpoint": m.api_endpoint,
             }
         )
 
@@ -449,6 +450,9 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             "requires_o1_handling": current_model.requires_o1_handling,
             "supports_streaming": current_model.supports_streaming,
             "max_completion_tokens": current_model.max_completion_tokens,
+            "api_version": current_model.api_version,
+            "deployment_name": current_model.deployment_name,
+            "api_endpoint": current_model.api_endpoint,
         }
 
     return cast(
@@ -593,6 +597,10 @@ def stream_response(chat_id: str, history: list, model_obj: Model) -> FlaskRespo
                 api_endpoint=model_obj.api_endpoint,
                 api_key=model_obj.api_key,
                 api_version=model_obj.api_version,
+                model_type=model_obj.model_type,
+                requires_o1_handling=model_obj.requires_o1_handling,
+                reasoning_effort="medium",
+                store_completion=False,
                 stream=True,
             )
 
@@ -654,6 +662,10 @@ def normal_response(
             api_endpoint=model_obj.api_endpoint,
             api_key=model_obj.api_key,
             api_version=model_obj.api_version,
+            model_type=model_obj.model_type,
+            requires_o1_handling=model_obj.requires_o1_handling,
+            reasoning_effort="medium",
+            store_completion=False,
             stream=False,
         )
 

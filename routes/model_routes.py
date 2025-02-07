@@ -597,7 +597,7 @@ def add_model_page():
                 if 'max_tokens' in capabilities:
                     form.max_tokens.data = capabilities['max_tokens']
                     form.max_completion_tokens.data = min(
-                        Config.DEFAULT_MAX_COMPLETION_TOKENS,
+                        config_instance.DEFAULT_MAX_COMPLETION_TOKENS,
                         capabilities['max_tokens']
                     )
                     logger.debug("Set token limits", extra={
@@ -631,7 +631,7 @@ def add_model_page():
             "add_model.html",
             form=form,
             provider=provider,
-            DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS,
+            DEFAULT_MAX_COMPLETION_TOKENS=config_instance.DEFAULT_MAX_COMPLETION_TOKENS,
         )
 
     except Exception as e:
@@ -713,7 +713,7 @@ def edit_model(model_id):
                         form=form,
                         model=model,
                         provider=provider,
-                        DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS
+                        DEFAULT_MAX_COMPLETION_TOKENS=config_instance.DEFAULT_MAX_COMPLETION_TOKENS
                     )
 
             # Get provider capabilities
@@ -782,7 +782,7 @@ def edit_model(model_id):
                             form=form,
                             model=model,
                             provider=provider,
-                            DEFAULT_MAX_COMPLETION_TOKENS=Config.DEFAULT_MAX_COMPLETION_TOKENS
+                            DEFAULT_MAX_COMPLETION_TOKENS=config_instance.DEFAULT_MAX_COMPLETION_TOKENS
                         )
                     else:
                         flash(f"Validation error: {str(ve)}", "error")
