@@ -694,6 +694,28 @@
     ===================================================== */
     async function initializeInterface() {
         try {
+            // Prevent default form submission
+            const chatForm = document.getElementById('chat-form');
+            if (chatForm) {
+                chatForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    sendMessage();
+                });
+            }
+
+            // Initialize file upload manager
+            if (window.FileUploadManager && window.CHAT_CONFIG) {
+                const uploadButton = document.getElementById('file-upload');
+                if (!window.fileUploadManager) {
+                    window.fileUploadManager = new window.FileUploadManager(
+                        window.CHAT_CONFIG.chatId,
+                        window.CHAT_CONFIG.userId,
+                        uploadButton
+                    );
+                    await window.fileUploadManager.initializeFileUpload();
+                }
+            }
+
             // Initialize token usage manager
             if (window.TokenUsageManager) {
                 const tokenUsageContainer = document.getElementById('token-usage');

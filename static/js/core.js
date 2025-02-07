@@ -173,11 +173,11 @@ window.App = {
     },
 
     async initializeDarkMode() {
-        if (typeof window.darkMode === 'undefined') {
+        if (typeof window.DarkMode === 'undefined') {
             throw new Error('Dark mode module not loaded');
         }
         try {
-            await window.darkMode.init();
+            await window.DarkMode.init();
             this.dependencies.darkMode = true;
             return true;
         } catch (error) {
@@ -187,11 +187,17 @@ window.App = {
     },
 
     async initializeTokenUsage() {
-        if (typeof window.tokenUsage === 'undefined') {
+        if (typeof window.TokenUsageManager === 'undefined') {
             throw new Error('Token usage module not loaded');
         }
         try {
-            await window.tokenUsage.init();
+            window.tokenUsageManager = new window.TokenUsageManager({
+                chatId: window.CHAT_CONFIG?.chatId || 'default'
+            });
+            const success = await window.tokenUsageManager.initialize();
+            if (!success) {
+                throw new Error('Token usage initialization failed');
+            }
             this.dependencies.tokenUsage = true;
             return true;
         } catch (error) {
@@ -201,11 +207,15 @@ window.App = {
     },
 
     async initializeFileUpload() {
-        if (typeof window.fileUpload === 'undefined') {
+        if (typeof window.fileUploadManager === 'undefined') {
             throw new Error('File upload module not loaded');
         }
         try {
-            await window.fileUpload.init();
+            // Initialize the file upload manager
+            const success = await window.fileUploadManager.initializeFileUpload?.();
+            if (success === false) {
+                throw new Error('File upload initialization failed');
+            }
             this.dependencies.fileUpload = true;
             return true;
         } catch (error) {

@@ -26,7 +26,7 @@ window.FileUploadManager = class {
         ];
 
         // DOM elements (fall back to ID-based references if not passed)
-        this.uploadButton = uploadButton || document.getElementById('upload-button');
+        this.uploadButton = uploadButton || document.getElementById('file-upload');
         this.dropZone = document.getElementById('drop-zone');
         this.fileInput = document.getElementById('file-input');
         this.mobileUploadMenu = document.getElementById('mobile-upload-controls');
@@ -57,10 +57,23 @@ window.FileUploadManager = class {
             document.body.appendChild(this.fileInput);
         }
 
-        // Initialize
-        this.setupDragAndDrop();
-        this.setupEventListeners();
-        this.setupMobileUpload();
+        // Don't initialize in constructor, wait for explicit initialization
+        this.initialized = false;
+    }
+
+    async initializeFileUpload() {
+        if (this.initialized) return true;
+        
+        try {
+            this.setupDragAndDrop();
+            this.setupEventListeners();
+            this.setupMobileUpload();
+            this.initialized = true;
+            return true;
+        } catch (error) {
+            console.error('FileUploadManager initialization failed:', error);
+            return false;
+        }
     }
 
     setupMobileUpload() {

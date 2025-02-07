@@ -285,6 +285,7 @@
 
     // Move initialization to dedicated script file
     document.addEventListener("DOMContentLoaded", () => {
+        const { logDebug, logError } = window.addModelDebug;
         logDebug('DOM Content Loaded');
 
         const form = document.getElementById("add-model-form");

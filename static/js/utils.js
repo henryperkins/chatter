@@ -43,13 +43,20 @@ window.utils = {
                 ...options.headers
             };
 
-            const response = await fetch(url, {
-                method: options.method || 'POST',  // Ensure POST is used by default
-                ...options,
-                body: finalBody,
+            // Only include body for non-GET requests
+            const fetchOptions = {
+                method: options.method || 'POST',
                 headers: finalHeaders,
-                credentials: 'same-origin'
-            });
+                credentials: 'same-origin',
+                ...options
+            };
+
+            // Don't include body for GET requests
+            if (fetchOptions.method !== 'GET') {
+                fetchOptions.body = finalBody;
+            }
+
+            const response = await fetch(url, fetchOptions);
 
             let data;
             const contentType = response.headers.get('content-type');
