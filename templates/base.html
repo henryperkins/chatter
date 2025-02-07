@@ -212,7 +212,7 @@
     <!-- Main Content -->
     <!-- Alert Container -->
     <div id="alert-container"
-        class="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-[calc(100%-2rem)] sm:w-auto z-[1600] flex flex-col gap-4">
+        class="fixed top-20 left-1/2 transform -translate-x-1/2 w-[calc(100%-2rem)] sm:w-auto z-[2200] flex flex-col gap-4 pointer-events-none">
         <!-- Success Alert Template -->
         <template id="success-alert">
             <div class="bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 flex gap-3 rounded-lg p-4 mb-4 items-center backdrop-blur-sm border border-green-200/50 dark:border-green-800/50 shadow-lg">
@@ -225,11 +225,11 @@
         </template>
         <!-- Error Alert Template -->
         <template id="error-alert">
-            <div class="bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-300 flex gap-3 rounded-lg p-4 mb-4 items-center backdrop-blur-sm border border-red-200/50 dark:border-red-800/50 shadow-lg">
-                <i class="fas fa-exclamation-circle text-lg"></i>
-                <p class="text-sm font-medium"></p>
-                <button class="ml-auto hover:opacity-80 transition-opacity" onclick="this.parentElement.remove()">
-                    <i class="fas fa-times"></i>
+            <div class="pointer-events-auto bg-red-100/95 dark:bg-red-900/95 text-red-900 dark:text-red-100 flex gap-3 rounded-lg p-4 mb-4 items-center backdrop-blur-sm border-2 border-red-500/80 dark:border-red-500/80 shadow-xl hover:shadow-2xl transition-all duration-200 max-w-[90%] sm:max-w-lg mx-auto">
+                <i class="fas fa-exclamation-circle text-lg text-red-600 dark:text-red-400"></i>
+                <p class="text-sm font-semibold flex-1 leading-5"></p>
+                <button class="ml-auto p-1.5 hover:bg-red-200 dark:hover:bg-red-800/50 rounded-lg transition-colors" onclick="this.parentElement.remove()" aria-label="Dismiss">
+                    <i class="fas fa-times text-red-600 dark:text-red-400"></i>
                 </button>
             </div>
         </template>

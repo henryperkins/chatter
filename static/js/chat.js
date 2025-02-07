@@ -404,7 +404,47 @@
                 } catch (e) {
                     errorData = { error: { message: 'Unknown error occurred' } };
                 }
-                throw new Error(errorData.error?.message || `Azure OpenAI Error: ${response.status}`);
+                // Extract detailed error information
+                const errorDetail = errorData.error?.message ||
+                    errorData.error?.details?.[0]?.message ||
+                    errorData.message ||
+                    'Unknown error occurred';
+                
+                // Initialize error message
+                let errorMessage = '';
+                
+                // Format common Azure errors
+                if (response.status === 400) {
+                    // Handle specific 400 error cases
+                    if (errorDetail.toLowerCase().includes('invalid api key')) {
+                        errorMessage = '🔑 Invalid API Key: Please check your Azure OpenAI API key configuration.';
+                    } else if (errorDetail.toLowerCase().includes('deployment')) {
+                        errorMessage = '⚙️ Deployment Error: Please verify your Azure OpenAI deployment name and settings.';
+                    } else if (errorDetail.toLowerCase().includes('version')) {
+                        errorMessage = '📌 API Version Error: Please check your Azure OpenAI API version configuration.';
+                    } else {
+                        errorMessage = `⚠️ Configuration Error: ${errorDetail}. Please verify your Azure OpenAI settings.`;
+                    }
+                } else if (response.status === 401) {
+                    errorMessage = '🔒 Authentication Failed: Invalid API key or token. Please check your Azure OpenAI credentials.';
+                } else if (response.status === 403) {
+                    errorMessage = '🚫 Access Denied: Your account does not have permission to access this resource. Please verify your Azure OpenAI deployment settings.';
+                } else if (response.status === 429) {
+                    errorMessage = '⏳ Rate Limit Exceeded: Too many requests. Please try again in a few moments.';
+                } else {
+                    errorMessage = `❌ Azure OpenAI Error (${response.status}): ${errorDetail}`;
+                }
+                
+                // Enhanced error logging for debugging
+                console.group('Azure API Error');
+                console.error('Status:', response.status);
+                console.error('Error Message:', errorMessage);
+                console.error('Error Details:', errorData);
+                console.error('Request URL:', response.url);
+                console.error('Request Headers:', Array.from(response.headers.entries()));
+                console.groupEnd();
+                
+                throw new Error(errorMessage);
             }
 
             reader = response.body.getReader();
@@ -729,13 +769,35 @@
     }
 
     function showError(message) {
-        if (!window.utils) {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg';
-            errorDiv.textContent = message;
-            document.body.appendChild(errorDiv);
+        // Format authentication errors for better visibility
+        if (message.includes('Authentication Error')) {
+            message = message.replace('Authentication Error:', '🔑 Authentication Error:');
+        }
+        
+        // Always try to use the alert system first
+        if (window.showAlert) {
+            window.showAlert(message, 'error', 10000); // Show for 10 seconds
         } else {
-            window.showAlert(message, 'error');
+            // Fallback to basic error display
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'pointer-events-auto fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-100 dark:bg-red-900/50 text-red-900 dark:text-red-100 px-6 py-4 rounded-lg shadow-xl border-2 border-red-500/50 z-[2200] max-w-[90%] sm:max-w-lg';
+            errorDiv.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-exclamation-circle text-lg"></i>
+                    <p class="text-sm font-medium flex-1">${message}</p>
+                    <button onclick="this.parentElement.parentElement.remove()" class="hover:opacity-80 transition-opacity">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(errorDiv);
+            
+            // Auto-remove after 10 seconds
+            setTimeout(() => {
+                if (errorDiv.parentElement) {
+                    errorDiv.remove();
+                }
+            }, 10000);
         }
     }
 
