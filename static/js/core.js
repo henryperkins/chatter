@@ -173,11 +173,11 @@ window.App = {
     },
 
     async initializeDarkMode() {
-        if (typeof window.darkMode === 'undefined') {
+        if (typeof window.DarkMode === 'undefined') {
             throw new Error('Dark mode module not loaded');
         }
         try {
-            await window.darkMode.init();
+            await window.DarkMode.init();
             this.dependencies.darkMode = true;
             return true;
         } catch (error) {
@@ -191,7 +191,10 @@ window.App = {
             throw new Error('Token usage module not loaded');
         }
         try {
-            await window.tokenUsage.init();
+            await window.tokenUsage.init().catch(() => {
+                // Silently catch token usage errors on non-chat pages
+                console.log('Token usage not available on this page');
+            });
             this.dependencies.tokenUsage = true;
             return true;
         } catch (error) {
@@ -205,7 +208,10 @@ window.App = {
             throw new Error('File upload module not loaded');
         }
         try {
-            await window.fileUpload.init();
+            await window.fileUpload.init().catch(() => {
+                // Silently catch file upload errors on non-chat pages
+                console.log('File upload not available on this page');
+            });
             this.dependencies.fileUpload = true;
             return true;
         } catch (error) {
@@ -215,11 +221,15 @@ window.App = {
     },
 
     async initializeChatConfig() {
-        if (typeof window.chatConfig === 'undefined') {
+        if (typeof window.ChatConfig === 'undefined') {
             throw new Error('Chat config module not loaded');
         }
         try {
-            await window.chatConfig.init();
+            const config = window.ChatConfig.getInstance();
+            await config.init().catch(() => {
+                // Silently catch chat config errors on non-chat pages
+                console.log('Chat config not available on this page');
+            });
             this.dependencies.chatConfig = true;
             return true;
         } catch (error) {
