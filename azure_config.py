@@ -5,7 +5,7 @@ from typing import Dict, Optional, Tuple, Any
 import requests
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from openai import AzureOpenAI
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse
 
 from config import MODEL_CONFIG
 from logging_config import get_logger
@@ -102,8 +102,13 @@ def create_client(
     timeout: int = DEFAULT_TIMEOUT,
 ) -> AzureOpenAI:
     """
-    Create an Azure OpenAI client with validated configuration.
+    Create properly configured Azure OpenAI client with validated configuration.
+
+    This function validates the API endpoint, ensuring that it is a proper base URL
+    (without a deployments path) and appends the '/openai' segment if needed. It then
+    creates an AzureOpenAI client with either API key or Azure AD-based authentication.
     """
+    # Validate input parameters.
     if not api_endpoint or not isinstance(api_endpoint, str):
         raise ValueError("Invalid API endpoint")
     if not api_key or not isinstance(api_key, str):
@@ -111,20 +116,29 @@ def create_client(
     if not api_version or not isinstance(api_version, str):
         raise ValueError("Invalid API version")
 
-    # Clean and validate endpoint URL
-    api_base = api_endpoint.rstrip("/")
+    # Validate endpoint format: the endpoint should not include a deployments path.
+    logger.info("Validating API endpoint format")
+    if "/openai/deployments/" in api_endpoint:
+        logger.error("Invalid endpoint contains deployments path: %s", api_endpoint)
+        raise ValueError("Endpoint should be a base URL without deployments path")
+
+    # Clean and validate the endpoint URL.
+    api_endpoint = api_endpoint.rstrip("/")
     try:
-        parsed = urlparse(api_base)
+        parsed = urlparse(api_endpoint)
         if not all([parsed.scheme, parsed.netloc]):
             raise ValueError("Invalid API endpoint URL format")
-        api_base = urlunparse(parsed)  # Normalize URL
+        # Construct full endpoint URL: append '/openai' if the path does not already start with it.
+        if not parsed.path.startswith("/openai"):
+            api_endpoint = f"{api_endpoint}/openai"
     except Exception as e:
         raise ValueError(f"Invalid API endpoint URL: {str(e)}")
 
-    logger.debug("Creating Azure OpenAI client with endpoint: %s", api_base)
+    logger.debug("Creating Azure OpenAI client with endpoint: %s", api_endpoint)
 
+    # Prepare client configuration.
     client_kwargs = {
-        "azure_endpoint": api_base,
+        "azure_endpoint": api_endpoint,
         "api_version": api_version.strip(),
         "timeout": timeout,
     }
@@ -141,7 +155,7 @@ def create_client(
         client = AzureOpenAI(**client_kwargs)
         logger.debug(
             "Created Azure OpenAI client with %s auth",
-            "Azure AD" if use_azure_ad else "API key"
+            "Azure AD" if use_azure_ad else "API key",
         )
         return client
     except Exception as e:

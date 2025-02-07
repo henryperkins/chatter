@@ -2,7 +2,7 @@
 
 import os
 import logging
-from typing import Optional, TypeVar, Callable, Any, Dict, Union, cast, Iterator, List
+from typing import Optional, TypeVar, Callable, Any, Dict, Union, cast, Iterator
 from contextlib import contextmanager
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine, CursorResult, Row
@@ -16,15 +16,13 @@ from tenacity import (
     retry_if_exception_type,
     before_sleep_log,
 )
-from flask import g, current_app, Flask
-import click
+from flask import current_app, Flask
 import json
 import datetime
 from cryptography.fernet import Fernet
 import base64
 import hashlib
 
-from config import Config
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -147,16 +145,28 @@ def execute_statement(
     db: Session, statement: str, params: Optional[Dict[str, Any]] = None
 ) -> CursorResult[Row[Any]]:
     """Execute a SQL statement with error handling."""
+    import time  # Added for timing measurements
+    logger.debug("Executing SQL statement: %s", statement[:200])  # Truncated log
     try:
+        start_time = time.perf_counter()
         with db.begin():
-            return db.execute(text(statement), params or {})
+            result = db.execute(text(statement), params or {})
+            duration = time.perf_counter() - start_time
+            logger.info("SQL executed [%0.3f seconds]", duration)
+            return result
     except SQLAlchemyError as e:
+        logger.error(
+            "DB error in statement: %s\nParams: %s",
+            statement,
+            str(params)[:500],  # Limit parameter logging
+            exc_info=True
+        )
         raise RuntimeError(f"Database operation failed: {str(e)}") from e
 
 
 def create_default_model(db: Session) -> Optional[int]:
     """Create default provider and model if they don't exist."""
-    from models import Model, Provider
+    from models import Model
     from config import Config
 
     # Check if default model exists using raw SQL
@@ -247,23 +257,23 @@ def init_db() -> None:
     try:
         # Get the schema file path
         schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
-        
+
         # Read schema file
         with open(schema_path) as f:
             schema = f.read()
-            
+
         # Execute schema with drop statements first
         with db_session() as db:
             # Check existing tables
             result = db.execute(text("""
-                SELECT table_name 
-                FROM information_schema.tables 
+                SELECT table_name
+                FROM information_schema.tables
                 WHERE table_schema = 'public'
             """))
             existing_tables = [row[0] for row in result]
             if existing_tables:
                 logger.info(f"Found existing tables: {', '.join(existing_tables)}")
-            
+
             # Drop all existing tables in reverse dependency order
             db.execute(text("""
                 DROP TABLE IF EXISTS uploaded_files CASCADE;
@@ -274,11 +284,11 @@ def init_db() -> None:
                 DROP TABLE IF EXISTS users CASCADE;
             """))
             db.commit()
-            
+
             # Verify tables were dropped
             result = db.execute(text("""
-                SELECT table_name 
-                FROM information_schema.tables 
+                SELECT table_name
+                FROM information_schema.tables
                 WHERE table_schema = 'public'
             """))
             remaining_tables = [row[0] for row in result]
@@ -286,20 +296,20 @@ def init_db() -> None:
                 logger.warning(f"Tables remaining after drop: {', '.join(remaining_tables)}")
             else:
                 logger.info("All tables successfully dropped")
-            
+
             # Now create fresh schema
             db.execute(text(schema))
             db.commit()
-            
+
             # Verify new tables
             result = db.execute(text("""
-                SELECT table_name 
-                FROM information_schema.tables 
+                SELECT table_name
+                FROM information_schema.tables
                 WHERE table_schema = 'public'
             """))
             new_tables = [row[0] for row in result]
             logger.info(f"Fresh tables created: {', '.join(new_tables)}")
-            
+
     except Exception as e:
         logger.error(f"Database initialization failed: {str(e)}")
         raise
@@ -350,8 +360,8 @@ def close_db(e: Optional[BaseException] = None) -> None:
             engine.dispose()
         db_state.update({"initialized": False, "initializing": False})
         _initialized = False
-    except Exception as e:
-        logger.error(f"Error during database shutdown: {str(e)}")
+    except Exception:
+        logger.error("Error during database shutdown", exc_info=True)
 
 
 def check_db_health() -> Dict[str, Any]:

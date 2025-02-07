@@ -155,74 +155,114 @@ def validate_immutable_fields(model_id: int, data: dict) -> None:
 
 
 def validate_model_data(data: Dict[str, Any]) -> List[str]:
-    """Validate model data before creation/update."""
+    """Enhanced validation for model configuration."""
     errors = []
 
-    # Get provider first for validation context
-    provider = Provider.get_by_id(data.get("provider_id"))
-    if not provider:
-        errors.append("Invalid provider_id")
-        return errors
+    # If the model type is explicitly "azure", perform simplified Azure-specific validations.
+    if data.get("model_type") == "azure":
+        required_azure_fields = [
+            "api_endpoint",
+            "deployment_name",
+            "api_version",
+            "api_key",
+        ]
+        for field in required_azure_fields:
+            if not data.get(field):
+                errors.append(f"Missing required Azure field: {field}")
 
-    # Required fields with context-aware validation
-    base_required_fields = ["provider_id", "name", "api_endpoint", "api_key"]
-    for field in base_required_fields:
-        if not data.get(field):
-            errors.append(f"Missing required field: {field}")
+        if data.get("api_endpoint") and "openai.azure.com" not in data["api_endpoint"]:
+            errors.append("Azure endpoint must contain openai.azure.com")
 
-    # Special handling for deployment_name based on provider type
-    if provider.is_azure:
-        if not data.get("deployment_name"):
-            errors.append("Deployment name is required for Azure OpenAI providers")
-        elif not isinstance(data["deployment_name"], str):
-            errors.append("Deployment name must be a string")
-        elif not data["deployment_name"].strip():
-            errors.append("Deployment name cannot be empty for Azure OpenAI providers")
-    elif data.get("deployment_name"):
-        # For non-Azure providers, deployment_name should be empty
-        logger.warning("Deployment name provided for non-Azure provider", extra={
-            "provider": provider.name,
-            "deployment_name": data["deployment_name"]
-        })
+    # Otherwise, perform the original provider-based validations.
+    else:
+        # Retrieve the provider for context-aware validation.
+        provider = Provider.get_by_id(data.get("provider_id"))
+        if not provider:
+            errors.append("Invalid provider_id")
+            return errors
 
-    # Basic HTTPS validation
-    if data.get("api_endpoint"):
-        if not data["api_endpoint"].startswith("https://"):
-            errors.append("API endpoint must use HTTPS")
+        # Validate required base fields.
+        base_required_fields = ["provider_id", "name", "api_endpoint", "api_key"]
+        for field in base_required_fields:
+            if not data.get(field):
+                errors.append(f"Missing required field: {field}")
 
-        # Get provider's validation rules
-        validation_rules = provider.validation_rules
-        if isinstance(validation_rules, str):
-            validation_rules = json.loads(validation_rules)
-
-        # Dynamic API endpoint validation based on provider type
+        # Special handling for deployment_name based on the provider type.
         if provider.is_azure:
-            # Azure-specific validations
-            if not any(domain in data["api_endpoint"] for domain in ["openai.azure.com", "azure-api.net"]):
-                errors.append("Must use a valid Azure OpenAI domain (*.openai.azure.com or *.azure-api.net)")
-            if "/openai/deployments/" not in data["api_endpoint"]:
-                errors.append("Must include /openai/deployments/{deployment-name}")
-            if "api-version=" not in data["api_endpoint"]:
-                errors.append("Must include api-version query parameter")
-        else:
-            # OpenAI validations
-            if "openai.azure.com" in data["api_endpoint"] or "azure-api.net" in data["api_endpoint"]:
-                errors.append("Must use standard OpenAI endpoint for non-Azure providers")
-            # Validate OpenAI endpoint format
-            if not data["api_endpoint"].startswith("https://api.openai.com/v1"):
-                errors.append("OpenAI endpoints must use format: https://api.openai.com/v1/...")
+            if not data.get("deployment_name"):
+                errors.append("Deployment name is required for Azure OpenAI providers")
+            elif not isinstance(data["deployment_name"], str):
+                errors.append("Deployment name must be a string")
+            elif not data["deployment_name"].strip():
+                errors.append(
+                    "Deployment name cannot be empty for Azure OpenAI providers"
+                )
+        elif data.get("deployment_name"):
+            # Warn if deployment_name is provided for non-Azure providers.
+            logger.warning(
+                "Deployment name provided for non-Azure provider",
+                extra={
+                    "provider": provider.name,
+                    "deployment_name": data["deployment_name"],
+                },
+            )
 
-    # Validate model type specific requirements
-    if data.get("requires_o1_handling"):
-        if data.get("temperature", 1.0) != 1.0:
-            errors.append("o1 models require temperature=1.0")
-        if data.get("supports_streaming"):
-            errors.append("o1 models do not support streaming")
-        if data.get("max_completion_tokens", 0) > 32000:
-            errors.append("Must be between 1-32000 for o1-preview models")
+        # Basic API endpoint validation.
+        if data.get("api_endpoint"):
+            if not data["api_endpoint"].startswith("https://"):
+                errors.append("API endpoint must use HTTPS")
+
+            # Attempt to parse provider-specific validation rules if provided.
+            validation_rules = provider.validation_rules
+            if isinstance(validation_rules, str):
+                try:
+                    validation_rules = json.loads(validation_rules)
+                except Exception:
+                    errors.append("Invalid validation_rules format in provider")
+                    validation_rules = {}
+
+            # Dynamic API endpoint validation based on provider type.
+            if provider.is_azure:
+                if not any(
+                    domain in data["api_endpoint"]
+                    for domain in ["openai.azure.com", "azure-api.net"]
+                ):
+                    errors.append(
+                        "Must use a valid Azure OpenAI domain (*.openai.azure.com or *.azure-api.net)"
+                    )
+                if "/openai/deployments/" not in data["api_endpoint"]:
+                    errors.append("Must include /openai/deployments/{deployment-name}")
+                if "api-version=" not in data["api_endpoint"]:
+                    errors.append("Must include api-version query parameter")
+            else:
+                if (
+                    "openai.azure.com" in data["api_endpoint"]
+                    or "azure-api.net" in data["api_endpoint"]
+                ):
+                    errors.append(
+                        "Must use standard OpenAI endpoint for non-Azure providers"
+                    )
+                if not data["api_endpoint"].startswith("https://api.openai.com/v1"):
+                    errors.append(
+                        "OpenAI endpoints must use format: https://api.openai.com/v1/..."
+                    )
+
+        # Validate model type–specific requirements for o1 handling.
+        if data.get("requires_o1_handling"):
+            if data.get("temperature", 1.0) != 1.0:
+                errors.append("o1 models require temperature=1.0")
+            if data.get("supports_streaming"):
+                errors.append("o1 models do not support streaming")
+            if data.get("max_completion_tokens", 0) > 32000:
+                errors.append(
+                    "max_completion_tokens must be between 1 and 32000 for o1-preview models"
+                )
+
+    # Validate token limits for all models.
+    if data.get("max_completion_tokens", 0) > 128000:
+        errors.append("max_completion_tokens cannot exceed 128,000")
 
     return errors
-
 
 def check_model_exists(db, name: str, deployment_name: str, provider_id: int) -> bool:
     """Check if a model with the given name or deployment_name already exists for the provider."""
@@ -233,7 +273,6 @@ def check_model_exists(db, name: str, deployment_name: str, provider_id: int) ->
         {"name": name, "deployment_name": deployment_name, "provider_id": provider_id},
     ).scalar()
     return existing_model > 0
-
 
 
 # Routes

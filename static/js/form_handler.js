@@ -5,8 +5,8 @@ class ModelFormHandler {
         this.initialized = false;
         this.initPromise = this.init();
         this.requiredBooleanFields = [
-            'requires_o1_handling', 
-            'is_default', 
+            'requires_o1_handling',
+            'is_default',
             'supports_streaming'
         ];
     }
@@ -14,12 +14,23 @@ class ModelFormHandler {
     async init() {
         if (this.initialized) return;
 
-        // Wait for core app
-        await window.App.waitForDependencies();
-        
-        this.utils = window.utils;
-        this.initialized = true;
-        this.initializeForms();
+        // Wait for core app to be ready
+        return new Promise((resolve) => {
+            const initializeForm = () => {
+                this.utils = window.utils;
+                this.initialized = true;
+                this.initializeForms();
+                resolve();
+            };
+
+            if (window.App?.initialized) {
+                initializeForm();
+            } else {
+                document.addEventListener('app:ready', () => {
+                    initializeForm();
+                });
+            }
+        });
     }
 
     initializeForms() {
@@ -62,13 +73,13 @@ class ModelFormHandler {
 
             // Send request
             response = await this.sendFormRequest(actionUrl, data, csrfToken);
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const responseData = await response.json();
-            
+
             if (responseData.success) {
                 this.handleSuccess(responseData);
             } else {
@@ -83,7 +94,7 @@ class ModelFormHandler {
 
     processFormData(formData) {
         const data = {};
-        
+
         formData.forEach((value, key) => {
             data[key] = this.convertFormValue(key, value);
         });
@@ -149,7 +160,7 @@ class ModelFormHandler {
 
     handleSuccess(responseData) {
         this.utils.showFeedback(responseData.message || 'Model saved successfully', 'success');
-        
+
         if (responseData.redirect) {
             setTimeout(() => {
                 window.location.href = responseData.redirect;
@@ -159,14 +170,14 @@ class ModelFormHandler {
 
     handleErrors(form, responseData) {
         let errorMessage = 'Failed to save model';
-        
+
         if (responseData.error) {
             errorMessage = responseData.error;
         } else if (responseData.errors) {
             errorMessage = Object.entries(responseData.errors)
                 .map(([field, errors]) => `${this.fieldLabel(field)}: ${errors.join(', ')}`)
                 .join('. ');
-            
+
             this.displayFormErrors(form, responseData.errors);
         }
 
@@ -184,14 +195,14 @@ class ModelFormHandler {
             'requires_o1_handling': 'o1-preview Handling',
             'supports_streaming': 'Streaming Support'
         };
-        
+
         return labels[fieldName] || fieldName.replace(/_/g, ' ').capitalize();
     }
 
     displayFormErrors(form, errors) {
         // Clear previous errors
         form.querySelectorAll('.error-text').forEach(el => el.remove());
-        form.querySelectorAll('.border-red-500').forEach(el => 
+        form.querySelectorAll('.border-red-500').forEach(el =>
             el.classList.remove('border-red-500', 'dark:border-red-600')
         );
 
@@ -204,8 +215,8 @@ class ModelFormHandler {
                 input.classList.add('border-red-500', 'dark:border-red-600');
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'error-text text-red-500 dark:text-red-400 text-sm mt-1 space-y-1';
-                errorDiv.innerHTML = Array.isArray(messages) 
-                    ? messages.join('<br>') 
+                errorDiv.innerHTML = Array.isArray(messages)
+                    ? messages.join('<br>')
                     : messages;
                 container.appendChild(errorDiv);
             }

@@ -1,141 +1,111 @@
-/* remediated static/js/chat.js */
 (() => {
     'use strict';
 
-    /* =====================================================
-       CONFIGURATION & UTILITY FUNCTIONS
-    ===================================================== */
     const CONFIG = {
-        DEPENDENCY_TIMEOUT: 5000,      // ms to wait for globals
-        STREAM_UPDATE_INTERVAL: 100,   // ms between streaming updates
+        DEPENDENCY_TIMEOUT: 5000,
+        STREAM_UPDATE_INTERVAL: 100,
         MAX_DEPENDENCY_ATTEMPTS: 50,
-        DEBUG: true                    // Set false for production logging
+        DEBUG: true
     };
 
-    const logDebug = (...args) => {
-        if (CONFIG.DEBUG) console.debug(...args);
-    };
-
-    function showTypingIndicator() {
-        let indicator = document.getElementById('typing-indicator');
-        if (indicator && indicator.parentNode) {
-            indicator.parentNode.removeChild(indicator);
-        }
-        indicator = document.createElement('div');
-        indicator.id = 'typing-indicator';
-        indicator.className = 'flex w-full mt-4 space-x-3 max-w-3xl animate-slide-up';
-        indicator.setAttribute('role', 'status');
-        indicator.setAttribute('aria-label', 'Assistant is typing');
-        indicator.innerHTML = `
-            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-soft">
-                <i class="fas fa-robot text-sm"></i>
-            </div>
-            <div class="relative max-w-3xl">
-                <div class="bg-gray-100/95 dark:bg-gray-800/95 p-4 rounded-r-lg rounded-bl-lg shadow-soft border border-gray-200/50 dark:border-gray-700/50">
-                    <div class="typing-animation">
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                        <div class="dot"></div>
-                    </div>
-                </div>
-                <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
-                    ${new Date().toLocaleTimeString()}
-                </span>
-            </div>
-        `;
-        const chatBox = document.getElementById('chat-box');
-        if (chatBox) {
-            chatBox.appendChild(indicator);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
+    function logDebug() { }
+    function showTypingIndicator() { }
+    function removeTypingIndicator() { }
+    function buildMessageArray(text, model) {
+        return [{ role: 'system', content: 'System message' }, { role: 'user', content: text }];
     }
-
-    function removeTypingIndicator() {
-        const indicator = document.getElementById('typing-indicator');
-        if (indicator && indicator.parentNode) {
-            indicator.parentNode.removeChild(indicator);
-        } else {
-            console.warn('Typing indicator not found or already removed.');
-        }
-    }
-
-    /* =====================================================
-       AZURE PARAMETER & MESSAGE BUILDERS
-    ===================================================== */
-    /**
-     * Build a message array including a system message and the user message.
-     * @param {string} messageText - The text entered by the user.
-     * @param {object} model - The current model configuration.
-     * @returns {Array} - An array of message objects.
-     */
-    function buildMessageArray(messageText, model) {
-        const messages = [];
-        messages.push({
-            role: 'system',
-            content: model.system_message || 'You are a helpful assistant.'
-        });
-        messages.push({ role: 'user', content: messageText });
-        return messages;
-    }
-
-    /**
-     * Validate model parameters and build the Azure parameters object.
-     * @param {object} model - The current model configuration.
-     * @param {Array} messages - The messages array.
-     * @returns {object} - An object containing all parameters for Azure.
-     */
     function buildAzureParameters(model, messages) {
-        // Validate required Azure model properties
-        if (!model.deployment_name || !model.api_version) {
-            throw new Error('Invalid Azure model configuration');
-        }
-        const temperature = (model.temperature !== undefined) ? model.temperature : 1.0;
-        if (temperature < 0 || temperature > 2) {
-            throw new Error('Temperature must be between 0 and 2');
-        }
-        const top_p = (model.top_p !== undefined) ? model.top_p : 1;
-        if (top_p < 0 || top_p > 1) {
-            throw new Error('top_p must be between 0 and 1');
-        }
-        const presence_penalty = (model.presence_penalty !== undefined) ? model.presence_penalty : 0;
-        if (presence_penalty < -2 || presence_penalty > 2) {
-            throw new Error('presence_penalty must be between -2 and 2');
-        }
-        const frequency_penalty = (model.frequency_penalty !== undefined) ? model.frequency_penalty : 0;
-        if (frequency_penalty < -2 || frequency_penalty > 2) {
-            throw new Error('frequency_penalty must be between -2 and 2');
-        }
-        const azureParams = {
-            messages: messages,
-            max_tokens: model.max_tokens || window.CHAT_CONFIG.defaultMaxTokens,
-            temperature: temperature,
-            top_p: top_p,
-            frequency_penalty: frequency_penalty,
-            presence_penalty: presence_penalty,
-            stop: model.stop_sequences || null,
-            stream: true,
-            n: (model.n && Number.isInteger(model.n) && model.n > 0) ? Math.min(model.n, 128) : 1,
-            logprobs: model.logprobs !== undefined ? model.logprobs : undefined,
-            best_of: (model.best_of && Number.isInteger(model.best_of)) ? model.best_of : undefined,
-            user: window.CHAT_CONFIG.userId || 'anonymous'
-        };
+        const azureParams = {};
+        azureParams.user = window.CHAT_CONFIG.userId || 'anonymous';
         if (model.response_format) {
             azureParams.response_format = { type: model.response_format };
         }
         return azureParams;
     }
 
-    /* =====================================================
-       MESSAGE RENDERING FUNCTIONS
-    ===================================================== */
-    /**
-     * Append the assistant's message to the chat box.
-     * Uses markdown-it for rendering and DOMPurify for sanitization.
-     * @param {string|object} message - The message text or an API response object.
-     * @param {boolean} [isStreaming=false] - If true, indicates a partial update.
-     * @param {HTMLElement|null} existingDiv - An existing message element to update.
-     */
+    async function handleStreamingResponse(formData) {
+        let accumulatedContent = '';
+        let messageDiv = null;
+        let buffer = '';
+        try {
+            const jsonData = {};
+            for (const [key, value] of formData.entries()) {
+                try {
+                    jsonData[key] = JSON.parse(value);
+                } catch {
+                    if (value === 'true') jsonData[key] = true;
+                    else if (value === 'false') jsonData[key] = false;
+                    else if (!isNaN(value) && value !== '') jsonData[key] = Number(value);
+                    else jsonData[key] = value;
+                }
+            }
+            console.log('Sending chat request:', {
+                url: '/chat/send',
+                method: 'POST',
+                headers: {
+                    'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream'
+                },
+                body: jsonData
+            });
+            const response = await fetch('/chat/send', {
+                method: 'POST',
+                body: JSON.stringify(jsonData),
+                headers: {
+                    'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                    'api-key': window.CHAT_CONFIG.azureToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream',
+                    'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+                }
+            });
+            if (!response.ok) {
+                const text = await response.text();
+                console.error('Server error response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries([...response.headers]),
+                    body: text
+                });
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const events = buffer.split('\n\n');
+                buffer = events.pop() || '';
+                for (const event of events) {
+                    const match = event.match(/^data: (.*)/);
+                    if (!match) continue;
+                    try {
+                        const data = JSON.parse(match[1]);
+                        if (data.error) throw new Error(data.error);
+                        if (data.content) {
+                            accumulatedContent += data.content;
+                            if (!messageDiv) {
+                                messageDiv = document.createElement('div');
+                                document.getElementById('chat-box').appendChild(messageDiv);
+                            }
+                            await appendAssistantMessage({ content: accumulatedContent }, true, messageDiv);
+                        }
+                    } catch (e) {
+                        throw new Error(`Stream parsing error: ${e.message}`);
+                    }
+                }
+                const chatBox = document.getElementById('chat-box');
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        } catch (error) {
+            console.error('Streaming failed:', error);
+            showError(`API Error: ${error.message}`);
+            if (messageDiv) messageDiv.remove();
+        }
+    }
+
     async function appendAssistantMessage(message, isStreaming = false, existingDiv = null) {
         if (!message) return;
         logDebug('Appending assistant message:', message);
@@ -144,8 +114,6 @@
             console.error('Chat box not found');
             return;
         }
-
-        // Wait for markdown-it and DOMPurify to be ready
         let attempts = 0;
         while ((!window.md || !window.DOMPurify) && attempts < CONFIG.MAX_DEPENDENCY_ATTEMPTS) {
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -158,7 +126,6 @@
             chatBox.insertBefore(errorDiv, chatBox.firstChild);
             return;
         }
-
         try {
             const renderedHtml = typeof message === 'string' ? window.md.render(message) : message.content;
             const DOMPurifyOptions = {
@@ -196,7 +163,7 @@
                 </div>
                 <div class="relative flex-1">
                     <div class="absolute right-2 top-2 flex items-center space-x-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <button class="copy-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft" title="Copy to clipboard" aria-label="Copy message to clipboard" data-raw-content="${message.content.replace(/"/g, '&quot;')}">
+                        <button class="copy-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft" title="Copy to clipboard" aria-label="Copy message to clipboard" data-raw-content="${message.content ? message.content.replace(/\"/g, '&quot;') : ''}">
                             <i class="fas fa-copy"></i>
                         </button>
                         ${!isStreaming
@@ -227,22 +194,16 @@
             errorDiv.innerHTML = `<p class="text-red-500">Error creating message: ${error.message}</p>`;
             chatBox.appendChild(errorDiv);
         }
-
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    /**
-     * Append a user message to the chat.
-     * @param {string} message - The user's message.
-     */
     function appendUserMessage(message) {
         if (!message || typeof message !== 'string') {
             console.error('Invalid message content.');
             return;
         }
         const messageDiv = document.createElement('div');
-        messageDiv.className =
-            'flex w-full mt-4 space-x-3 max-w-[85%] sm:max-w-md md:max-w-2xl ml-auto justify-end animate-slide-up';
+        messageDiv.className = 'flex w-full mt-4 space-x-3 max-w-[85%] sm:max-w-md md:max-w-2xl ml-auto justify-end animate-slide-up';
         messageDiv.innerHTML = `
             <div>
                 <div class="relative bg-gradient-to-r from-primary-600/95 to-secondary-600/95 text-white p-4 rounded-l-lg rounded-br-lg shadow-soft hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 border border-primary-500/10">
@@ -262,14 +223,10 @@
         }
     }
 
-    /**
-     * Re-render any initial assistant messages (for server-side rendered content).
-     */
     async function renderInitialAssistantMessages() {
         const assistantMessageDivs = document.querySelectorAll('[data-role="assistant-message"]');
         if (!assistantMessageDivs.length) return;
         logDebug('Re-rendering existing messages:', assistantMessageDivs.length);
-
         let attempts = 0;
         while (!window.md && attempts < CONFIG.MAX_DEPENDENCY_ATTEMPTS) {
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -282,7 +239,6 @@
             });
             return;
         }
-
         assistantMessageDivs.forEach(div => {
             try {
                 const rawContent = div.getAttribute('data-content');
@@ -330,13 +286,10 @@
         logDebug('Finished re-rendering messages');
     }
 
-    /**
-     * Attach action button listeners (e.g., copy or regenerate).
-     */
     function attachActionButtonListeners() {
         const chatBox = document.getElementById('chat-box');
         if (!chatBox) return;
-        chatBox.addEventListener('click', async (event) => {
+        chatBox.addEventListener('click', async event => {
             const target = event.target.closest('button');
             if (!target) return;
             event.preventDefault();
@@ -365,201 +318,153 @@
 
     async function handleRegenerateMessage(target) {
         logDebug('Regenerate message triggered.');
-        // Implement regeneration logic here if desired.
-    }
-
-    /* =====================================================
-       RESPONSE HANDLING: STREAMING & NORMAL RESPONSES
-    ===================================================== */
-    /**
-     * Handle streaming response from the server.
-     * Parses each line as JSON and updates the assistant message.
-     */
-    async function handleStreamingResponse(formData) {
-        let reader;
-        let messageDiv = null;
         try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
-            const response = await fetch('/chat/send', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Chat-ID': window.CHAT_CONFIG.chatId,
-                    'api-key': window.CHAT_CONFIG.azureToken,
-                    'X-Request-ID': (crypto.randomUUID && crypto.randomUUID()) || Date.now().toString(),
-                    'X-Azure-Operation': 'chat-completion',
-                    'Accept': 'text/event-stream',
-                    'Cache-Control': 'no-cache',
-                    'Connection': 'keep-alive'
-                },
-                signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                let errorData;
-                try {
-                    errorData = await response.json();
-                } catch (e) {
-                    errorData = { error: { message: 'Unknown error occurred' } };
-                }
-                // Extract detailed error information
-                const errorDetail = errorData.error?.message ||
-                    errorData.error?.details?.[0]?.message ||
-                    errorData.message ||
-                    'Unknown error occurred';
-                
-                // Initialize error message
-                let errorMessage = '';
-                
-                // Format common Azure errors
-                if (response.status === 400) {
-                    // Handle specific 400 error cases
-                    if (errorDetail.toLowerCase().includes('invalid api key')) {
-                        errorMessage = '🔑 Invalid API Key: Please check your Azure OpenAI API key configuration.';
-                    } else if (errorDetail.toLowerCase().includes('deployment')) {
-                        errorMessage = '⚙️ Deployment Error: Please verify your Azure OpenAI deployment name and settings.';
-                    } else if (errorDetail.toLowerCase().includes('version')) {
-                        errorMessage = '📌 API Version Error: Please check your Azure OpenAI API version configuration.';
-                    } else {
-                        errorMessage = `⚠️ Configuration Error: ${errorDetail}. Please verify your Azure OpenAI settings.`;
-                    }
-                } else if (response.status === 401) {
-                    errorMessage = '🔒 Authentication Failed: Invalid API key or token. Please check your Azure OpenAI credentials.';
-                } else if (response.status === 403) {
-                    errorMessage = '🚫 Access Denied: Your account does not have permission to access this resource. Please verify your Azure OpenAI deployment settings.';
-                } else if (response.status === 429) {
-                    errorMessage = '⏳ Rate Limit Exceeded: Too many requests. Please try again in a few moments.';
-                } else {
-                    errorMessage = `❌ Azure OpenAI Error (${response.status}): ${errorDetail}`;
-                }
-                
-                // Enhanced error logging for debugging
-                console.group('Azure API Error');
-                console.error('Status:', response.status);
-                console.error('Error Message:', errorMessage);
-                console.error('Error Details:', errorData);
-                console.error('Request URL:', response.url);
-                console.error('Request Headers:', Array.from(response.headers.entries()));
-                console.groupEnd();
-                
-                throw new Error(errorMessage);
-            }
-
-            reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let accumulatedResponse = '';
-
-            // Create a new assistant message container
-            messageDiv = document.createElement('div');
-            messageDiv.className =
-                'flex w-full mt-4 space-x-3 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl animate-slide-up';
             const chatBox = document.getElementById('chat-box');
-            chatBox.appendChild(messageDiv);
-
-            let streaming = true;
-            while (streaming) {
-                const { value, done } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n').filter(line => line.trim().startsWith('data: '));
-
-                for (const line of lines) {
-                    if (line.startsWith('data: ')) {
-                        const data = line.slice(6).trim();
-                        if (data === '[DONE]' || data.includes('[DONE]')) {
-                            streaming = false;
-                        } else if (data.startsWith('[ERROR]')) {
-                            throw new Error(data.slice(7).trim());
-                        } else {
-                            try {
-                                const parsed = JSON.parse(data);
-                                if (parsed.choices && parsed.choices[0]) {
-                                    const delta = parsed.choices[0].delta;
-                                    if (delta) {
-                                        if (delta.content) {
-                                            accumulatedResponse += delta.content;
-                                        }
-                                        // Handle function calls if provided
-                                        if (delta.function_call) {
-                                            console.warn('Function call handling not implemented:', delta.function_call);
-                                        }
-                                        await appendAssistantMessage(accumulatedResponse, true, messageDiv);
-                                    }
-                                }
-                            } catch (e) {
-                                console.error('Error parsing streaming chunk:', e);
-                            }
-                        }
-                    }
-                }
+            if (!chatBox) return;
+            const userMessages = [...chatBox.querySelectorAll('div.justify-end')];
+            if (!userMessages.length) {
+                logDebug('No user messages found for regeneration.');
+                return;
             }
-
-            // Update token usage after streaming completes
-            if (window.tokenUsageManager) {
-                await window.tokenUsageManager.handleNewMessage();
+            const lastUserMessage = userMessages[userMessages.length - 1];
+            const lastUserPara = lastUserMessage.querySelector('p');
+            if (!lastUserPara) {
+                logDebug('No paragraph found in last user message.');
+                return;
             }
-
-        } catch (error) {
-            console.error('Streaming error:', error);
-            if (messageDiv) {
-                messageDiv.remove();
+            const lastUserText = lastUserPara.textContent;
+            const allMessages = Array.from(chatBox.children);
+            const lastUserIndex = allMessages.indexOf(lastUserMessage);
+            while (allMessages.length > lastUserIndex + 1) {
+                chatBox.removeChild(allMessages[lastUserIndex + 1]);
+                allMessages.splice(lastUserIndex + 1, 1);
             }
-            throw error;
-        } finally {
-            if (reader) {
-                try {
-                    await reader.cancel();
-                } catch (e) {
-                    console.error('Error canceling stream:', e);
-                }
+            const messageInput = document.getElementById('message-input');
+            if (messageInput) {
+                messageInput.value = lastUserText;
+            } else {
+                return;
             }
+            const sendButton = document.getElementById('send-button');
+            if (sendButton) {
+                sendButton.click();
+            }
+        } catch (err) {
+            console.error('Error during regeneration:', err);
+            window.showAlert('Failed to regenerate message', 'error');
         }
     }
 
-    /* =====================================================
-       CHAT CONTROL & EVENT HANDLERS
-    ===================================================== */
+    async function handleStreamingResponseAgain(formData) {
+        let accumulatedContent = '';
+        let messageDiv = null;
+        let buffer = '';
+        try {
+            const jsonData = {};
+            for (const [key, value] of formData.entries()) {
+                try {
+                    jsonData[key] = JSON.parse(value);
+                } catch {
+                    if (value === 'true') jsonData[key] = true;
+                    else if (value === 'false') jsonData[key] = false;
+                    else if (!isNaN(value) && value !== '') jsonData[key] = Number(value);
+                    else jsonData[key] = value;
+                }
+            }
+            console.log('Sending chat request:', {
+                url: '/chat/send',
+                method: 'POST',
+                headers: {
+                    'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream'
+                },
+                body: jsonData
+            });
+            const response = await fetch('/chat/send', {
+                method: 'POST',
+                body: JSON.stringify(jsonData),
+                headers: {
+                    'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                    'api-key': window.CHAT_CONFIG.azureToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream',
+                    'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+                }
+            });
+            if (!response.ok) {
+                const text = await response.text();
+                console.error('Server error response:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries([...response.headers]),
+                    body: text
+                });
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const events = buffer.split('\n\n');
+                buffer = events.pop() || '';
+                for (const event of events) {
+                    const match = event.match(/^data: (.*)/);
+                    if (!match) continue;
+                    try {
+                        const data = JSON.parse(match[1]);
+                        if (data.error) throw new Error(data.error);
+                        if (data.content) {
+                            accumulatedContent += data.content;
+                            if (!messageDiv) {
+                                messageDiv = document.createElement('div');
+                                document.getElementById('chat-box').appendChild(messageDiv);
+                            }
+                            await appendAssistantMessage({ content: accumulatedContent }, true, messageDiv);
+                        }
+                    } catch (e) {
+                        throw new Error(`Stream parsing error: ${e.message}`);
+                    }
+                }
+                const chatBox = document.getElementById('chat-box');
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        } catch (error) {
+            console.error('Streaming failed:', error);
+            showError(`API Error: ${error.message}`);
+            if (messageDiv) messageDiv.remove();
+        }
+    }
+
     let modelChangeInProgress = false;
 
-    /**
-     * Handle model changes.
-     */
     async function handleModelChange() {
         if (modelChangeInProgress) return;
-
         const modelSelect = document.getElementById('model-select');
         const sendButton = document.getElementById('send-button');
         const modelId = modelSelect.value;
         const originalValue = modelSelect.getAttribute('data-original-value');
-
         if (modelId === originalValue) return;
-
         modelChangeInProgress = true;
         if (sendButton) sendButton.disabled = true;
-
         try {
             const response = await window.utils.fetchWithCSRF('/chat/update_model', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     model_id: modelId,
                     chat_id: window.CHAT_CONFIG.chatId
                 })
             });
-
             if (!response.success) {
                 throw new Error(response.error || 'Failed to update model');
             }
-
             modelSelect.setAttribute('data-original-value', modelId);
             window.showAlert('Model updated successfully', 'success');
-
-            // Update token usage if available
             if (window.tokenUsageManager) {
                 const model = window.CHAT_CONFIG.models.find(m => m.id === parseInt(modelId));
                 if (model) {
@@ -578,9 +483,6 @@
         }
     }
 
-    /**
-     * Create a new chat.
-     */
     async function createNewChat() {
         try {
             const response = await window.utils.fetchWithCSRF('/chat/new', {
@@ -589,11 +491,9 @@
                     'Content-Type': 'application/json'
                 }
             });
-
             if (!response.success) {
                 throw new Error(response.error || 'Failed to create new chat');
             }
-
             if (response.chat_id) {
                 window.location.href = `/chat/?chat_id=${response.chat_id}`;
             } else {
@@ -605,38 +505,26 @@
         }
     }
 
-    /**
-     * Send a message using Azure OpenAI parameters.
-     */
     async function sendMessage() {
         if (!window.utils) {
             console.error('Utils not initialized');
             return;
         }
-
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
-
         if (!messageInput || !sendButton) {
             window.showAlert('Chat interface not properly initialized', 'error');
             return;
         }
-
         if (sendButton.disabled) return;
-
         try {
             sendButton.disabled = true;
             const messageText = messageInput.value.trim();
-
             if (!messageText) {
                 window.showAlert('Please enter a message', 'error');
                 return;
             }
-
-            // Show typing indicator
             showTypingIndicator();
-
-            // Get current model info and validate model configuration
             const modelSelect = document.getElementById('model-select');
             const modelId = modelSelect?.value;
             const model = window.CHAT_CONFIG.models?.find(m => m.id === parseInt(modelId));
@@ -644,42 +532,37 @@
                 window.showAlert('Invalid Azure model configuration', 'error');
                 return;
             }
-
-            // Build messages array (including a system message)
             const messages = buildMessageArray(messageText, model);
-
-            // Build Azure parameters using model and messages
             const azureParams = buildAzureParameters(model, messages);
-
-            // Build FormData payload: append each parameter (stringifying objects)
             const formData = new FormData();
             for (const key in azureParams) {
                 if (azureParams[key] !== undefined && azureParams[key] !== null) {
                     formData.append(key, typeof azureParams[key] === 'object' ? JSON.stringify(azureParams[key]) : azureParams[key]);
                 }
             }
-            // Append Azure-specific parameters and CSRF token
+
+            // Attach messages to the request
+            formData.append('messages', JSON.stringify(messages));
+
             formData.append('api_version', model.api_version);
             formData.append('deployment_name', model.deployment_name);
             formData.append('api_endpoint', model.api_base_url || model.api_endpoint);
             formData.append('csrf_token', window.CHAT_CONFIG.csrfToken);
-
-            // Send the message via streaming fetch
-            await handleStreamingResponse(formData);
-
-            // Clear input and update UI
+            try {
+                await handleStreamingResponse(formData);
+            } catch (error) {
+                console.error('Chat send error:', error);
+                if (error.response?.status === 400) {
+                    const text = await error.response.text();
+                    console.error('Server error response:', text);
+                }
+                throw error;
+            }
             messageInput.value = '';
             appendUserMessage(messageText);
-
-            // In case the final response is non-streamed, you could also call:
-            // const response = await window.utils.fetchWithCSRF('/chat/send', { ... });
-            // appendAssistantMessage(response.message);
-
-            // Update token usage
             if (window.tokenUsageManager) {
                 await window.tokenUsageManager.handleNewMessage();
             }
-
         } catch (error) {
             console.error('Error sending message:', error);
             window.showAlert(error.message || 'Failed to send message', 'error');
@@ -689,21 +572,15 @@
         }
     }
 
-    /* =====================================================
-       INTERFACE INITIALIZATION
-    ===================================================== */
     async function initializeInterface() {
         try {
-            // Prevent default form submission
             const chatForm = document.getElementById('chat-form');
             if (chatForm) {
-                chatForm.addEventListener('submit', (e) => {
+                chatForm.addEventListener('submit', e => {
                     e.preventDefault();
                     sendMessage();
                 });
             }
-
-            // Initialize file upload manager
             if (window.FileUploadManager && window.CHAT_CONFIG) {
                 const uploadButton = document.getElementById('file-upload');
                 if (!window.fileUploadManager) {
@@ -715,8 +592,6 @@
                     await window.fileUploadManager.initializeFileUpload();
                 }
             }
-
-            // Initialize token usage manager
             if (window.TokenUsageManager) {
                 const tokenUsageContainer = document.getElementById('token-usage');
                 if (tokenUsageContainer && window.CHAT_CONFIG && window.CHAT_CONFIG.chatId) {
@@ -729,12 +604,9 @@
                     console.warn('Token usage container not found');
                 }
             }
-
-            // Set up message input and send button
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
             if (messageInput && sendButton) {
-                // Debounce function
                 const debounce = (func, wait) => {
                     let timeout;
                     return function executedFunction(...args) {
@@ -746,35 +618,25 @@
                         timeout = setTimeout(later, wait);
                     };
                 };
-
-                // Debounced keydown handler
-                const debouncedKeydown = debounce((e) => {
+                const debouncedKeydown = debounce(e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
                         sendMessage();
                     }
                 }, 100);
-
                 messageInput.addEventListener('keydown', debouncedKeydown);
                 sendButton.addEventListener('click', sendMessage);
             }
-
-            // Set up model select
             const modelSelect = document.getElementById('model-select');
             if (modelSelect) {
                 modelSelect.addEventListener('change', handleModelChange);
             }
-
-            // Set up new chat button
             const newChatBtn = document.getElementById('new-chat-btn');
             if (newChatBtn) {
                 newChatBtn.addEventListener('click', createNewChat);
             }
-
-            // Set up action buttons and render messages
             attachActionButtonListeners();
             await renderInitialAssistantMessages();
-
         } catch (error) {
             console.error('Error during interface initialization:', error);
             throw error;
@@ -791,16 +653,12 @@
     }
 
     function showError(message) {
-        // Format authentication errors for better visibility
         if (message.includes('Authentication Error')) {
             message = message.replace('Authentication Error:', '🔑 Authentication Error:');
         }
-        
-        // Always try to use the alert system first
         if (window.showAlert) {
-            window.showAlert(message, 'error', 10000); // Show for 10 seconds
+            window.showAlert(message, 'error', 10000);
         } else {
-            // Fallback to basic error display
             const errorDiv = document.createElement('div');
             errorDiv.className = 'pointer-events-auto fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-100 dark:bg-red-900/50 text-red-900 dark:text-red-100 px-6 py-4 rounded-lg shadow-xl border-2 border-red-500/50 z-[2200] max-w-[90%] sm:max-w-lg';
             errorDiv.innerHTML = `
@@ -813,8 +671,6 @@
                 </div>
             `;
             document.body.appendChild(errorDiv);
-            
-            // Auto-remove after 10 seconds
             setTimeout(() => {
                 if (errorDiv.parentElement) {
                     errorDiv.remove();
