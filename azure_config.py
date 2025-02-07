@@ -79,9 +79,7 @@ def validate_model_config(model_config: Dict[str, Any]) -> None:
             max_completion = int(model_config["max_completion_tokens"])
             if max_completion < 256:
                 raise ValueError("max_completion_tokens must be >= 256")
-            model_config["max_completion_tokens"] = (
-                max_completion  # Store converted value
-            )
+            model_config["max_completion_tokens"] = max_completion  # Store converted value
         except (TypeError, ValueError):
             raise ValueError("max_completion_tokens must be an integer >= 256")
 
@@ -140,10 +138,12 @@ def create_client(
         client_kwargs["api_key"] = api_key
 
     try:
-       client = AzureOpenAI(**client_kwargs)
-       logger.debug("Created Azure OpenAI client with %s auth",
-                     "Azure AD" if use_azure_ad else "API key")
-       return client
+        client = AzureOpenAI(**client_kwargs)
+        logger.debug(
+            "Created Azure OpenAI client with %s auth",
+            "Azure AD" if use_azure_ad else "API key"
+        )
+        return client
     except Exception as e:
         raise RuntimeError(f"Failed to create Azure OpenAI client: {str(e)}")
 
@@ -239,8 +239,10 @@ def validate_api_endpoint(
             return {"success": False, "error": "Invalid API endpoint URL format"}
 
         # Determine if testing o-series model
-        is_o_series = any(deployment_name.startswith(prefix)
-                         for prefix in ["o1", "o3"])
+        is_o_series = any(
+            deployment_name.startswith(prefix)
+            for prefix in ["o1", "o3"]
+        )
 
         payload = {
             "messages": [{"role": "user", "content": "Test message"}],
@@ -248,8 +250,7 @@ def validate_api_endpoint(
 
         if is_o_series:
             # O-series specific payload
-            payload.update(
-{
+            payload.update({
                 "max_completion_tokens": 1,
                 "reasoning_effort": "low",
                 "response_format": {"type": "text"},
@@ -265,7 +266,6 @@ def validate_api_endpoint(
                 "presence_penalty": 0
             })
 
-
         response = requests.post(
             url,
             headers={"api-key": api_key, "Content-Type": "application/json"},
@@ -280,9 +280,7 @@ def validate_api_endpoint(
         try:
             error_data = response.json()
             if "error" in error_data:
-                error_message = (
-                    f"{error_message} - {error_data['error'].get('message', '')}"
-                )
+                error_message = f"{error_message} - {error_data['error'].get('message', '')}"
         except Exception:
             pass
 

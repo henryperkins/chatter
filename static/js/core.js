@@ -191,6 +191,7 @@ window.App = {
             throw new Error('Token usage module not loaded');
         }
         try {
+<<<<<<< HEAD
             window.tokenUsageManager = new window.TokenUsageManager({
                 chatId: window.CHAT_CONFIG?.chatId || 'default'
             });
@@ -198,6 +199,12 @@ window.App = {
             if (!success) {
                 throw new Error('Token usage initialization failed');
             }
+=======
+            await window.tokenUsage.init().catch(() => {
+                // Silently catch token usage errors on non-chat pages
+                console.log('Token usage not available on this page');
+            });
+>>>>>>> d22c5f968c9aa90e04c40199be4c7ade24a60498
             this.dependencies.tokenUsage = true;
             return true;
         } catch (error) {
@@ -211,11 +218,18 @@ window.App = {
             throw new Error('File upload module not loaded');
         }
         try {
+<<<<<<< HEAD
             // Initialize the file upload manager
             const success = await window.fileUploadManager.initializeFileUpload?.();
             if (success === false) {
                 throw new Error('File upload initialization failed');
             }
+=======
+            await window.fileUpload.init().catch(() => {
+                // Silently catch file upload errors on non-chat pages
+                console.log('File upload not available on this page');
+            });
+>>>>>>> d22c5f968c9aa90e04c40199be4c7ade24a60498
             this.dependencies.fileUpload = true;
             return true;
         } catch (error) {
@@ -225,11 +239,15 @@ window.App = {
     },
 
     async initializeChatConfig() {
-        if (typeof window.chatConfig === 'undefined') {
+        if (typeof window.ChatConfig === 'undefined') {
             throw new Error('Chat config module not loaded');
         }
         try {
-            await window.chatConfig.init();
+            const config = window.ChatConfig.getInstance();
+            await config.init().catch(() => {
+                // Silently catch chat config errors on non-chat pages
+                console.log('Chat config not available on this page');
+            });
             this.dependencies.chatConfig = true;
             return true;
         } catch (error) {
