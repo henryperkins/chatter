@@ -19,6 +19,7 @@ from flask import (
     session,
     url_for,
 )
+from werkzeug.datastructures import MultiDict
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import text
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -154,7 +155,7 @@ def login():
 @bp.route("/register", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
 def register():
-    """Handle user registrations with consistent JSON responses"""
+    """Handle user registrations with CSRF protection"""
     logger.info("Register route accessed - Method: %s", request.method)
     if current_user.is_authenticated:
         logger.info("User already authenticated, redirecting to chat interface")
@@ -165,7 +166,36 @@ def register():
     form = RegistrationForm()
 
     if request.method == "POST":
-        if not form.validate_on_submit():
+        # Handle both form-data and JSON submissions
+        if request.is_json:
+            json_data = request.get_json() or {}
+            # Get CSRF token from both JSON body and header
+            body_csrf = json_data.get('csrf_token')
+            header_csrf = request.headers.get('X-CSRFToken')
+            
+            # Use header CSRF if body CSRF is missing
+            csrf_token = body_csrf if body_csrf else header_csrf
+            
+            # Create form data with CSRF token
+            form_data = MultiDict({
+                'csrf_token': csrf_token,
+                'username': json_data.get('username', ''),
+                'email': json_data.get('email', ''),
+                'password': json_data.get('password', ''),
+                'confirm_password': json_data.get('confirm_password', '')
+            })
+            
+            # Create new form instance with the form data
+            form = RegistrationForm(formdata=form_data)
+
+        if not form.validate():
+            logger.error("Form validation failed", extra={
+                "errors": form.errors,
+                "csrf_token_present": bool(form.csrf_token.data),
+                "request_headers": dict(request.headers),
+                "content_type": request.content_type,
+                "is_json": request.is_json
+            })
             return json_response(
                 False, "Form validation failed", errors=form.errors, status_code=400
             )
