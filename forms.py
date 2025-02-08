@@ -856,11 +856,10 @@ class DefaultModelForm(FlaskForm):
         "Deployment Name",
         validators=[
             DataRequired(message="Deployment name is required."),
-        ]
-    )
             Length(max=50, message="Deployment name cannot exceed 50 characters."),
             Regexp(
                 r"^[a-zA-Z0-9_\-\s]+$",
                 message="Deployment name can only contain letters, numbers, spaces, underscores, and hyphens.",
-            )
-        ],
+            ),
+        ]
+    )
