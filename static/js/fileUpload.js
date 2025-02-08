@@ -1,4 +1,4 @@
-window.FileUploadManager = class {
+class FileUploadManager {
     constructor(chatId, userId, uploadButton) {
         // Basic properties
         this.chatId = chatId;
@@ -63,7 +63,7 @@ window.FileUploadManager = class {
 
     async initializeFileUpload() {
         if (this.initialized) return true;
-        
+
         try {
             this.setupDragAndDrop();
             this.setupEventListeners();
@@ -74,6 +74,54 @@ window.FileUploadManager = class {
             console.error('FileUploadManager initialization failed:', error);
             return false;
         }
+    }
+
+    clearFiles() {
+        // Clear the uploaded files array
+        this.uploadedFiles = [];
+
+        // Clear the UI
+        this.updateFileList();
+
+        // Clear file input
+        if (this.fileInput) {
+            this.fileInput.value = '';
+        }
+
+        // Reset any progress indicators
+        const progressElements = document.querySelectorAll('.file-progress');
+        progressElements.forEach(el => el.remove());
+
+        // Clear the file list display
+        if (this.uploadedFilesDiv) {
+            this.uploadedFilesDiv.innerHTML = '';
+        }
+
+        // Clear file list
+        const fileList = document.getElementById('file-list');
+        if (fileList) {
+            fileList.innerHTML = '';
+        }
+    }
+
+    updateFileList() {
+        const fileList = document.getElementById('file-list');
+        if (!fileList) return;
+
+        fileList.innerHTML = this.uploadedFiles.map(file => `
+            <div class="flex items-center space-x-2 text-sm">
+                <span class="text-gray-600 dark:text-gray-400">${file.name}</span>
+                <button onclick="window.fileUploadManager.removeFile('${file.name}')"
+                        class="text-red-500 hover:text-red-700 dark:hover:text-red-400">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    removeFile(fileName) {
+        this.uploadedFiles = this.uploadedFiles.filter(file => file.name !== fileName);
+        this.updateFileList();
     }
 
     setupMobileUpload() {
@@ -88,9 +136,106 @@ window.FileUploadManager = class {
         window.addEventListener('resize', () => this.updateMobileMenuVisibility());
     }
 
-    /**
-     * Validate an individual file for type, size, and duplication.
-     */
+    updateMobileMenuVisibility() {
+        if (this.mobileUploadMenu) {
+            this.mobileUploadMenu.style.display = window.innerWidth <= 640 ? 'block' : 'none';
+        }
+    }
+
+    setupEventListeners() {
+        // If the file input is present, handle change events (with debouncing)
+        if (this.fileInput) {
+            this.fileInput.style.display = 'none';
+            this.fileInput.addEventListener('change', window.utils.debounce((e) => {
+                const files = Array.from(e.target.files);
+                const { validFiles, errors } = this.processFiles(files);
+
+                errors.forEach(error => {
+                    this.showError(error.errors.join(', '), { filename: error.file });
+                });
+
+                if (validFiles.length > 0) {
+                    this.uploadedFiles.push(...validFiles);
+                    this.updateFileList();
+                }
+            }, 300));
+        }
+
+        // If the upload button is present, wire it to open the file dialog
+        if (this.uploadButton) {
+            this.uploadButton.addEventListener('click', () => {
+                if (this.fileInput && window.innerWidth > 640) {
+                    this.fileInput.click();
+                }
+            });
+        }
+
+        // Handle mobile upload menu
+        this.setupMobileUploadMenu();
+    }
+
+    setupMobileUploadMenu() {
+        const mobileMenu = document.getElementById('mobile-upload-menu');
+        if (!mobileMenu) return;
+
+        // Handle camera capture
+        const cameraBtn = mobileMenu.querySelector('[onclick*="camera"]');
+        if (cameraBtn) {
+            cameraBtn.onclick = () => this.triggerFileInput('image/*;capture=camera');
+        }
+
+        // Handle gallery selection
+        const galleryBtn = mobileMenu.querySelector('[onclick*="gallery"]');
+        if (galleryBtn) {
+            galleryBtn.onclick = () => this.triggerFileInput('image/*');
+        }
+
+        // Handle file selection
+        const filesBtn = mobileMenu.querySelector('[onclick*="files"]');
+        if (filesBtn) {
+            filesBtn.onclick = () => this.triggerFileInput(this.ALLOWED_FILE_TYPES.join(','));
+        }
+    }
+
+    triggerFileInput(accept) {
+        if (!this.fileInput) return;
+
+        // Handle special cases for mobile capture
+        if (accept === 'image/*;capture=camera' || accept === 'image/*') {
+            this.fileInput.accept = accept;
+        } else {
+            // Use our standard accept types for regular file selection
+            const acceptTypes = [
+                '.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.xml', '.yaml', '.yml',
+                '.pdf', '.doc', '.docx',
+                '.jpg', '.jpeg', '.png', '.gif', '.webp',
+                'text/*',
+                'application/json',
+                'application/pdf',
+                'image/*'
+            ].join(',');
+            this.fileInput.accept = acceptTypes;
+        }
+
+        // Trigger click
+        this.fileInput.click();
+    }
+
+    showError(message, file = null) {
+        let errorMessage = message;
+        if (file) {
+            const fileSize = file.size ? `(${(file.size / 1024 / 1024).toFixed(2)} MB)` : '';
+            const fileType = file.type || this.getMimeType(file.name) || 'unknown type';
+            errorMessage = `${file.name} ${fileSize}: ${message} [${fileType}]`;
+        }
+        window.utils.showFeedback(
+            errorMessage,
+            'error',
+            { duration: 7000, position: 'top' }
+        );
+        console.debug('File validation error:', { file, message });
+    }
+
     validateFile(file) {
         const errors = [];
 
@@ -150,6 +295,34 @@ window.FileUploadManager = class {
         return errors;
     }
 
+    processFiles(files) {
+        const validFiles = [];
+        const errors = [];
+
+        // Calculate current total size
+        const currentTotalSize = this.uploadedFiles.reduce((sum, file) => sum + file.size, 0);
+
+        for (const file of files) {
+            const fileErrors = this.validateFile(file);
+
+            // Skip invalid files
+            if (fileErrors.length > 0) {
+                errors.push({ file: file.name, errors: fileErrors });
+                continue;
+            }
+
+            // Check total limit if adding this file
+            if (currentTotalSize + file.size > this.MAX_TOTAL_SIZE) {
+                errors.push({ file: file.name, errors: ['Total size limit exceeded'] });
+                continue;
+            }
+
+            validFiles.push(file);
+        }
+
+        return { validFiles, errors };
+    }
+
     getMimeType(filename) {
         const ext = filename.split('.').pop().toLowerCase();
         const mimeTypes = {
@@ -187,7 +360,6 @@ window.FileUploadManager = class {
         return mimeType;
     }
 
-
     estimateFileTokens(file) {
         // Estimate tokens based on file size and type
         const charsPerToken = 4; // Conservative estimate
@@ -197,680 +369,50 @@ window.FileUploadManager = class {
         return baseTokens + 10;
     }
 
-    /**
-     * Update the visual progress bar for a given file.
-     */
-    showUploadProgress(file, progress) {
-        const progressElement = document.getElementById(`progress-${file.name}`);
-        if (progressElement) {
-            progressElement.style.width = `${progress}%`;
-            progressElement.textContent = `${Math.round(progress)}%`;
-        }
-    }
-
-    /**
-     * Display an error using the global feedback mechanism (if available).
-     */
-    showError(message, file = null) {
-        let errorMessage = message;
-        if (file) {
-            const fileSize = file.size ? `(${(file.size / 1024 / 1024).toFixed(2)} MB)` : '';
-            const fileType = file.type || this.getMimeType(file.name) || 'unknown type';
-            errorMessage = `${file.name} ${fileSize}: ${message} [${fileType}]`;
-        }
-        window.utils.showFeedback(
-            errorMessage,
-            'error',
-            { duration: 7000, position: 'top' }
-        );
-        console.debug('File validation error:', { file, message });
-    }
-
-    /**
-     * Check each file against validation rules and overall size limits.
-     */
-    processFiles(files) {
-        const validFiles = [];
-        const errors = [];
-
-        // Calculate current total size
-        const currentTotalSize = this.uploadedFiles.reduce((sum, file) => sum + file.size, 0);
-
-        for (const file of files) {
-            const fileErrors = this.validateFile(file);
-
-            // Skip invalid files
-            if (fileErrors.length > 0) {
-                errors.push({ file: file.name, errors: fileErrors });
-                continue;
-            }
-
-            // Check total limit if adding this file
-            if (currentTotalSize + file.size > this.MAX_TOTAL_SIZE) {
-                errors.push({ file: file.name, errors: ['Total size limit exceeded'] });
-                continue;
-            }
-
-            validFiles.push(file);
-        }
-
-        return { validFiles, errors };
-    }
-
-    /**
-     * Return a Font Awesome icon class based on file type.
-     */
-    getFileType(file) {
-        const type = file.type || this.getMimeType(file.name);
-
-        // Define type configurations
-        const typeConfigs = {
-            'application/pdf': {
-                icon: 'file-pdf',
-                bgColor: 'bg-red-100 dark:bg-red-900/30',
-                textColor: 'text-red-600 dark:text-red-400'
-            },
-            'image/': {
-                icon: 'file-image',
-                bgColor: 'bg-green-100 dark:bg-green-900/30',
-                textColor: 'text-green-600 dark:text-green-400'
-            },
-            'text/markdown': {
-                icon: 'file-alt',
-                bgColor: 'bg-purple-100 dark:bg-purple-900/30',
-                textColor: 'text-purple-600 dark:text-purple-400'
-            },
-            'text/': {
-                icon: 'file-alt',
-                bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-                textColor: 'text-blue-600 dark:text-blue-400'
-            },
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': {
-                icon: 'file-word',
-                bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-                textColor: 'text-blue-600 dark:text-blue-400'
-            },
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
-                icon: 'file-excel',
-                bgColor: 'bg-green-100 dark:bg-green-900/30',
-                textColor: 'text-green-600 dark:text-green-400'
-            },
-            'application/zip': {
-                icon: 'file-archive',
-                bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
-                textColor: 'text-yellow-600 dark:text-yellow-400'
-            }
-        };
-
-        // Find matching type configuration
-        for (const [typePrefix, config] of Object.entries(typeConfigs)) {
-            if (type.includes(typePrefix)) {
-                return config;
-            }
-        }
-
-        // Default configuration
-        return {
-            icon: 'file',
-            bgColor: 'bg-gray-100 dark:bg-gray-900/30',
-            textColor: 'text-gray-600 dark:text-gray-400'
-        };
-    }
-
-    getStatusIndicator(file) {
-        const indicators = [];
-
-        // Version badge
-        if (file.version) {
-            indicators.push(`
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
-                    <i class="fas fa-code-branch mr-1"></i>v${file.version}
-                </span>
-            `);
-        }
-
-        // Token count badge
-        if (file.token_count) {
-            indicators.push(`
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200">
-                    <i class="fas fa-calculator mr-1"></i>${file.token_count} tokens
-                </span>
-            `);
-        }
-
-        // Truncation warning
-        if (file.is_truncated) {
-            indicators.push(`
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200">
-                    <i class="fas fa-exclamation-triangle mr-1"></i>Truncated
-                </span>
-            `);
-        }
-
-        // Processing status
-        if (file.status === 'processing') {
-            indicators.push(`
-                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
-                    <i class="fas fa-spinner fa-spin mr-1"></i>Processing
-                </span>
-            `);
-        }
-
-        return indicators.join(' ');
-    }
-
-    formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    /**
-     * Update the on-page file list and storage usage bar.
-     */
-    renderFileList() {
-        const fileList = document.getElementById('file-list');
-        const totalSizeEl = document.getElementById('total-size');
-        if (!fileList || !totalSizeEl) return;
-
-        // Build the file list markup with enhanced UI
-        fileList.innerHTML = this.uploadedFiles.map((file, index) => {
-            const fileType = this.getFileType(file);
-            const statusIndicator = this.getStatusIndicator(file);
-            const fileSize = this.formatFileSize(file.size);
-            const uploadTime = file.uploadTime ? new Date(file.uploadTime).toLocaleString() : 'Not uploaded';
-
-            return `
-            <div class="file-item group p-4 bg-white dark:bg-gray-800 rounded-xl mb-3 shadow-md hover:shadow-lg transition-all duration-300 border border-gray-100 dark:border-gray-700">
-                <!-- Primary Section -->
-                <div class="flex items-start space-x-4">
-                    <!-- File Type Icon -->
-                    <div class="flex-shrink-0 w-12 h-12 rounded-lg ${fileType.bgColor} flex items-center justify-center">
-                        <i class="fas fa-${fileType.icon} text-2xl ${fileType.textColor}"></i>
-                    </div>
-
-                    <!-- Main Content -->
-                    <div class="flex-1 min-w-0">
-                        <!-- Header -->
-                        <div class="flex items-start justify-between">
-                            <div class="flex-1">
-                                <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 truncate group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors" title="${file.name}">
-                                    ${file.name}
-                                </h3>
-                                <div class="flex items-center space-x-2 mt-0.5">
-                                    ${statusIndicator}
-                                    <span class="text-sm text-gray-500 dark:text-gray-400">${fileSize}</span>
-                                </div>
-                            </div>
-
-                            <!-- Action Buttons -->
-                            <div class="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                <button onclick="window.fileUploadManager.showPreview(${index})"
-                                        class="p-2 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary-600 dark:hover:text-primary-400 transition-all duration-200"
-                                        aria-label="Preview file"
-                                        title="Preview file">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button onclick="window.fileUploadManager.removeFile(${index})"
-                                        class="p-2 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200"
-                                        aria-label="Remove file"
-                                        title="Remove file">
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Technical Info -->
-                        <div class="mt-2 grid grid-cols-2 gap-2 text-sm">
-                            <div class="flex items-center space-x-1 text-gray-600 dark:text-gray-400">
-                                <i class="fas fa-code text-xs"></i>
-                                <span>${file.mime_type || file.type}</span>
-                            </div>
-                            <div class="flex items-center space-x-1 text-gray-600 dark:text-gray-400">
-                                <i class="fas fa-clock text-xs"></i>
-                                <span>${uploadTime}</span>
-                            </div>
-                            ${file.token_count ? `
-                            <div class="flex items-center space-x-1 text-gray-600 dark:text-gray-400">
-                                <i class="fas fa-calculator text-xs"></i>
-                                <span>${file.token_count} tokens</span>
-                            </div>
-                            ` : ''}
-                            ${file.version ? `
-                            <div class="flex items-center space-x-1 text-gray-600 dark:text-gray-400">
-                                <i class="fas fa-code-branch text-xs"></i>
-                                <span>Version ${file.version}</span>
-                            </div>
-                            ` : ''}
-                        </div>
-
-                        <!-- Progress Bar -->
-                        <div class="mt-3">
-                            <div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
-                                <span>Upload Progress</span>
-                                <span id="progress-text-${file.name}">0%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                                <div id="progress-${file.name}"
-                                     class="bg-primary-600 dark:bg-primary-500 h-2 rounded-full transition-all duration-300 ease-out"
-                                     style="width: 0%"></div>
-                            </div>
-                        </div>
-
-                        <!-- Description -->
-                        <div class="mt-3">
-                            <label for="description-${index}" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-                            <textarea
-                                id="description-${index}"
-                                class="w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all duration-200"
-                                placeholder="Add a description..."
-                                rows="2"
-                                onchange="window.fileUploadManager.updateFileDescription(${index}, this.value)"
-                            >${file.description || ''}</textarea>
-                        </div>
-                    </div>
-                </div>
-            </div>`;
-        }).join('');
-
-        // Update total size display
-        const totalBytes = this.uploadedFiles.reduce((sum, file) => sum + file.size, 0);
-        const totalMB = (totalBytes / 1024 / 1024).toFixed(2);
-        const maxMB = (this.MAX_TOTAL_SIZE / 1024 / 1024).toFixed(2);
-        const percentage = Math.min((totalBytes / this.MAX_TOTAL_SIZE) * 100, 100);
-
-        totalSizeEl.innerHTML = `
-            <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-700 dark:text-gray-300">Storage Used</span>
-                <span class="font-medium">${totalMB} MB / ${maxMB} MB</span>
-            </div>
-            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mt-1">
-                <div class="bg-blue-500 h-2 rounded-full" style="width: ${percentage}%"></div>
-            </div>
-        `;
-
-        // Show/hide the entire upload section
-        if (this.uploadedFilesDiv) {
-            this.uploadedFilesDiv.classList.toggle('hidden', this.uploadedFiles.length === 0);
-        }
-    }
-
-    /**
-     * Remove a file from the list (by index) and re-render.
-     */
-    removeFile(index) {
-        this.uploadedFiles.splice(index, 1);
-        this.renderFileList();
-    }
-
-    /**
-     * Perform the actual upload of the files to the server (if any).
-     */
-    async uploadFiles(chatId) {
-        if (this.uploadedFiles.length === 0) {
-            window.utils.showFeedback('No files to upload', 'warning');
-            return;
-        }
-
-        const uploadBtn = this.uploadButton;
-        if (!uploadBtn) return;
-
-        try {
-            await window.utils.withLoading(uploadBtn, async () => {
-                const formData = new FormData();
-
-                // Add files and their descriptions
-                this.uploadedFiles.forEach(file => {
-                    formData.append('files[]', file);
-                    if (file.description) {
-                        formData.append(`description_${file.name}`, file.description);
-                    }
-                });
-
-                const response = await window.utils.fetchWithCSRF(`/api/files/upload/${chatId}`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.success) {
-                    // Keep track of uploaded files
-                    const uploadedFiles = response.saved_files.map(file => ({
-                        ...file,
-                        type: file.mime_type,
-                        uploadTime: file.upload_time,
-                        version: file.version || 1
-                    }));
-
-                    window.utils.showFeedback('Files uploaded successfully', 'success');
-
-                    // Emit custom event for chat interface with uploaded files
-                    window.dispatchEvent(new CustomEvent('filesUploaded', {
-                        detail: {
-                            files: uploadedFiles,
-                            totalSize: response.total_size
-                        }
-                    }));
-
-                    // Return uploaded files for further processing
-                    return uploadedFiles;
-                } else {
-                    throw new Error(response.error || 'Upload failed');
-                }
-            }, { text: 'Uploading...' });
-        } catch (error) {
-            this.showError(error.message);
-        }
-    }
-
-    /**
-     * Initialize drag-and-drop events (if dropZone is available).
-     */
     setupDragAndDrop() {
         if (!this.dropZone) return;
 
+        // Prevent default drag behaviors
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            this.dropZone.addEventListener(eventName, this.preventDefaults, false);
-        });
-
-        this.dropZone.addEventListener('dragenter', () => {
-            this.dropZone.classList.remove('hidden');
-        });
-
-        this.dropZone.addEventListener('dragleave', (e) => {
-            if (!e.relatedTarget || !this.dropZone.contains(e.relatedTarget)) {
-                this.dropZone.classList.add('hidden');
-            }
-        });
-
-        this.dropZone.addEventListener('drop', (e) => {
-            try {
-                this.dropZone.classList.add('hidden');
-                if (!e.dataTransfer?.files) {
-                    window.utils.showFeedback('No files dropped', 'error');
-                    return;
-                }
-                const files = Array.from(e.dataTransfer.files);
-                if (files.length === 0) {
-                    window.utils.showFeedback('No files dropped', 'error');
-                    return;
-                }
-                const { validFiles, errors } = this.processFiles(files);
-                if (errors.length > 0) {
-                    errors.forEach(err => window.utils.showFeedback(err.errors.join(', '), 'error'));
-                }
-                if (validFiles.length > 0) {
-                    this.uploadedFiles.push(...validFiles);
-                    this.renderFileList();
-                }
-            } catch (error) {
-                console.error('Error handling file drop:', error);
-                window.utils.showFeedback('Failed to process dropped files', 'error');
-            } finally {
-                this.dropZone.classList.add('hidden');
-            }
-        });
-    }
-
-    /**
-     * Prevent browser defaults on drag events to allow drop handling.
-     */
-    preventDefaults(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-
-    /**
-     * Set up file input and preview/close event listeners.
-     */
-    setupEventListeners() {
-        // If the file input is present, handle change events (with debouncing).
-        if (this.fileInput) {
-            this.fileInput.style.display = 'none';
-            this.fileInput.addEventListener('change', window.utils.debounce((e) => {
-                const files = Array.from(e.target.files);
-                const { validFiles, errors } = this.processFiles(files);
-
-                errors.forEach(error => {
-                    this.showError(error.errors.join(', '), { filename: error.file });
-                });
-
-                if (validFiles.length > 0) {
-                    this.uploadedFiles.push(...validFiles);
-                    this.renderFileList();
-                }
-            }, 300));
-        }
-
-        // If the upload button is present, wire it to open the file dialog
-        if (this.uploadButton) {
-            this.uploadButton.addEventListener('click', () => {
-                if (this.fileInput && window.innerWidth > 640) {
-                    this.fileInput.click();
-                }
+            this.dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
             });
-        }
-
-        // Close preview modal when clicking outside it
-        document.addEventListener('click', (e) => {
-            const previewModal = document.getElementById('file-preview-modal');
-            if (
-                previewModal &&
-                !previewModal.contains(e.target) &&
-                !e.target.closest('.file-item')
-            ) {
-                previewModal.classList.add('hidden');
-            }
+            document.body.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
         });
 
-        // Handle mobile upload menu
-        this.setupMobileUploadMenu();
-    }
+        // Highlight drop zone when dragging over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            this.dropZone.addEventListener(eventName, () => {
+                this.dropZone.classList.add('drag-active');
+            });
+        });
 
-    setupMobileUploadMenu() {
-        const mobileMenu = document.getElementById('mobile-upload-menu');
-        if (!mobileMenu) return;
+        ['dragleave', 'drop'].forEach(eventName => {
+            this.dropZone.addEventListener(eventName, () => {
+                this.dropZone.classList.remove('drag-active');
+            });
+        });
 
-        // Handle camera capture
-        const cameraBtn = mobileMenu.querySelector('[onclick*="camera"]');
-        if (cameraBtn) {
-            cameraBtn.onclick = () => this.triggerFileInput('image/*;capture=camera');
-        }
+        // Handle dropped files
+        this.dropZone.addEventListener('drop', (e) => {
+            const files = Array.from(e.dataTransfer.files);
+            const { validFiles, errors } = this.processFiles(files);
 
-        // Handle gallery selection
-        const galleryBtn = mobileMenu.querySelector('[onclick*="gallery"]');
-        if (galleryBtn) {
-            galleryBtn.onclick = () => this.triggerFileInput('image/*');
-        }
+            errors.forEach(error => {
+                this.showError(error.errors.join(', '), { filename: error.file });
+            });
 
-        // Handle file selection
-        const filesBtn = mobileMenu.querySelector('[onclick*="files"]');
-        if (filesBtn) {
-            filesBtn.onclick = () => this.triggerFileInput(this.ALLOWED_FILE_TYPES.join(','));
-        }
-    }
-
-    updateMobileMenuVisibility() {
-        if (this.mobileUploadMenu) {
-            this.mobileUploadMenu.style.display = window.innerWidth <= 640 ? 'block' : 'none';
-        }
-    }
-
-    /**
-     * Show a quick preview of an uploaded file in a modal.
-     */
-    updateFileDescription(index, description) {
-        if (this.uploadedFiles[index]) {
-            this.uploadedFiles[index].description = description;
-        }
-    }
-
-    showPreview(index) {
-        const file = this.uploadedFiles[index];
-        if (!file) return;
-
-        // Create or reuse a preview modal container
-        let previewModal = document.getElementById('file-preview-modal');
-        if (!previewModal) {
-            previewModal = document.createElement('div');
-            previewModal.id = 'file-preview-modal';
-            previewModal.className =
-                'fixed inset-0 bg-black/50 backdrop-blur-sm z-modal flex items-center justify-center p-4 hidden';
-            previewModal.innerHTML = `
-                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                    <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
-                        <div class="flex-1 mr-4">
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">${file.name}</h3>
-                            <div class="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                <span class="mr-3">${file.mime_type || file.type}</span>
-                                <span class="mr-3">${(file.size / 1024).toFixed(2)} KB</span>
-                                ${file.version ? `<span class="bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100 px-2 py-0.5 rounded text-xs">v${file.version}</span>` : ''}
-                            </div>
-                            ${file.uploadTime ? `<div class="text-sm text-gray-500 dark:text-gray-400 mt-1">Uploaded: ${new Date(file.uploadTime).toLocaleString()}</div>` : ''}
-                        </div>
-                        <button onclick="this.closest('#file-preview-modal').classList.add('hidden')"
-                                class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
-                                aria-label="Close preview">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="flex-1 overflow-auto" id="file-preview-content"></div>
-                    <div class="p-4 border-t border-gray-200 dark:border-gray-700">
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
-                        <textarea
-                            class="w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="Add a description..."
-                            rows="2"
-                            onchange="window.fileUploadManager.updateFileDescription(${index}, this.value)"
-                        >${file.description || ''}</textarea>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(previewModal);
-        }
-
-        const previewContent = document.getElementById('file-preview-content');
-        previewContent.innerHTML = this.getPreviewContent(file);
-        previewContent.className = 'flex-1 overflow-auto p-4';
-
-        previewModal.classList.remove('hidden');
-
-        // If it's a text/markdown file, load contents asynchronously
-        if (file.type === 'text/plain' || file.type === 'text/markdown') {
-            this.loadTextFileContent(file);
-        }
-    }
-
-    /**
-     * Return HTML snippet to preview the file based on type.
-     */
-    getPreviewContent(file) {
-        // For files that haven't been uploaded yet
-        if (!file.id) {
-            if (file.type.startsWith('image/')) {
-                return `<img src="${URL.createObjectURL(file)}" alt="Preview of ${file.name}" class="max-w-full h-auto rounded-lg">`;
-            } else if (file.type === 'application/pdf') {
-                return `
-                    <div class="h-[70vh]">
-                        <iframe src="${URL.createObjectURL(file)}" class="w-full h-full rounded-lg" title="PDF Preview"></iframe>
-                    </div>
-                `;
-            } else if (file.type === 'text/plain' || file.type === 'text/markdown') {
-                return `
-                    <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
-                        <pre class="whitespace-pre-wrap break-words text-sm">Loading...</pre>
-                    </div>
-                `;
+            if (validFiles.length > 0) {
+                this.uploadedFiles.push(...validFiles);
+                this.updateFileList();
             }
-        }
-
-        // For uploaded files, use the server preview route
-        if (file.id) {
-            if (file.type.startsWith('image/')) {
-                return `<img src="/api/files/preview/${file.id}" alt="Preview of ${file.name}" class="max-w-full h-auto rounded-lg">`;
-            } else if (file.type === 'application/pdf') {
-                return `
-                    <div class="h-[70vh]">
-                        <iframe src="/api/files/preview/${file.id}" class="w-full h-full rounded-lg" title="PDF Preview"></iframe>
-                    </div>
-                `;
-            } else if (file.type === 'text/plain' || file.type === 'text/markdown') {
-                return `
-                    <div class="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
-                        <pre class="whitespace-pre-wrap break-words text-sm">Loading...</pre>
-                    </div>
-                `;
-            }
-        }
-
-        // Default for unsupported types
-        return `
-            <div class="text-center py-8">
-                <i class="fas fa-file text-4xl text-gray-400 mb-4"></i>
-                <p class="text-gray-500 dark:text-gray-400">Preview not available for this file type</p>
-            </div>
-        `;
+        });
     }
+}
 
-    /**
-     * Asynchronously load text/markdown content from the selected file for preview.
-     */
-    async loadTextFileContent(file) {
-        const previewContent = document.getElementById('file-preview-content');
-        if (!previewContent) return;
-
-        try {
-            let text;
-            if (file.id) {
-                // For uploaded files, fetch from server
-                const response = await fetch(`/api/files/preview/${file.id}`);
-                if (!response.ok) throw new Error('Failed to fetch file content');
-                text = await response.text();
-            } else {
-                // For files not yet uploaded
-                text = await file.text();
-            }
-
-            const preElement = previewContent.querySelector('pre');
-            if (preElement) {
-                preElement.textContent = text;
-            }
-        } catch (error) {
-            console.error('Failed to load file content:', error);
-            if (previewContent.querySelector('pre')) {
-                previewContent.querySelector('pre').textContent = 'Failed to load file content';
-            }
-        }
-    }
-
-    triggerFileInput(accept) {
-        if (!this.fileInput) return;
-
-        // Handle special cases for mobile capture
-        if (accept === 'image/*;capture=camera' || accept === 'image/*') {
-            this.fileInput.accept = accept;
-        } else {
-            // Use our standard accept types for regular file selection
-            const acceptTypes = [
-                '.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.xml', '.yaml', '.yml',
-                '.pdf', '.doc', '.docx',
-                '.jpg', '.jpeg', '.png', '.gif', '.webp',
-                'text/*',
-                'application/json',
-                'application/pdf',
-                'image/*'
-            ].join(',');
-            this.fileInput.accept = acceptTypes;
-        }
-
-        // Trigger click
-        this.fileInput.click();
-    }
-
-};
-
-// Expose globally if needed
+// Expose to window
 window.FileUploadManager = FileUploadManager;

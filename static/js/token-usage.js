@@ -1,30 +1,32 @@
 class TokenUsageManager {
     constructor(config) {
+        // Prevent multiple instances
+        if (window.TokenUsageManager?.instance) {
+            console.log('TokenUsageManager: Returning existing instance');
+            return window.TokenUsageManager.instance;
+        }
+
         // Handle both config formats (just chatId or full CHAT_CONFIG)
         if (!config) {
-            console.error('TokenUsageManager: Missing configuration');
-            return;
+            throw new Error('TokenUsageManager: Missing configuration');
         }
 
         this.chatId = typeof config === 'object' ? config.chatId : config;
         if (!this.chatId || typeof this.chatId !== 'string') {
-            console.error('TokenUsageManager: Invalid or missing chatId in configuration:', config);
-            return;
+            throw new Error('TokenUsageManager: Invalid or missing chatId in configuration');
         }
-        console.log('TokenUsageManager: Initialized with chatId:', this.chatId, 'from config:', config);
 
         this.updateInterval = null;
+        this.retryCount = 0;
+        this.initialized = false;
 
         // Set up element references
         this.elements = this.initializeElements();
 
-        // Validate required elements
-        if (this.validateElements()) {
-            console.log('TokenUsageManager: Initialized successfully');
-            // Don't call initialize() here, let the caller do it
-        } else {
-            console.error('TokenUsageManager: Failed to initialize - missing elements');
-        }
+        // Store instance
+        window.TokenUsageManager.instance = this;
+
+        console.log('TokenUsageManager: New instance initialized with chatId:', this.chatId);
     }
 
     /**
@@ -81,15 +83,21 @@ class TokenUsageManager {
      */
     async initialize() {
         try {
-            // Wait for utils to be available
+            // Wait for dependencies to be available
             let attempts = 0;
-            while (!window.utils && attempts < 50) {
+            while ((!window.utils || !window.CHAT_CONFIG) && attempts < 50) {
                 await new Promise(resolve => setTimeout(resolve, 100));
                 attempts++;
             }
 
-            if (!window.utils) {
-                throw new Error('Utils not available after waiting');
+            if (!window.utils || !window.CHAT_CONFIG) {
+                throw new Error('Required dependencies not available after waiting');
+            }
+
+            // Validate chat ID matches config
+            if (this.chatId !== window.CHAT_CONFIG.chatId) {
+                console.warn('TokenUsageManager: Chat ID mismatch, updating to match config');
+                this.chatId = window.CHAT_CONFIG.chatId;
             }
 
             // Show token usage container (if hidden)
@@ -234,10 +242,15 @@ class TokenUsageManager {
 
             // Get file tokens if files are present
             let fileTokens = 0;
-            if (window.fileUploadManager?.uploadedFiles) {
-                fileTokens = window.fileUploadManager.uploadedFiles.reduce((sum, file) => {
-                    return sum + (file.tokenCount || Math.ceil(file.size / 4));
-                }, 0);
+            try {
+                if (window.fileUploadManager?.uploadedFiles?.length > 0) {
+                    fileTokens = window.fileUploadManager.uploadedFiles.reduce((sum, file) => {
+                        return sum + (file.tokenCount || Math.ceil(file.size / 4));
+                    }, 0);
+                }
+            } catch (error) {
+                console.error('TokenUsageManager: Error calculating file tokens:', error);
+                // Continue without file tokens rather than failing
             }
 
             // Combine message and file tokens
@@ -449,5 +462,7 @@ class TokenUsageManager {
     }
 }
 
-// Expose the class globally
-window.TokenUsageManager = TokenUsageManager;
+// Make the class available globally
+if (!window.TokenUsageManager) {
+    window.TokenUsageManager = TokenUsageManager;
+}

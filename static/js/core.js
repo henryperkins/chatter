@@ -231,7 +231,12 @@ window.App = {
             return true;
         } catch (error) {
             console.error('File upload initialization failed:', error);
-            throw error;
+            if (window.utils?.showFeedback) {
+                window.utils.showFeedback('File upload initialization failed. Some features may be unavailable.', 'warning');
+            }
+            // Still mark as initialized to prevent blocking app startup
+            this.dependencies.fileUpload = true;
+            return true;
         }
     },
 

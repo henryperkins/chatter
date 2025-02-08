@@ -154,11 +154,12 @@
             const originalXHR = window.XMLHttpRequest.prototype.open;
             window.XMLHttpRequest.prototype.open = function(...args) {
                 const startTime = performance.now();
+                const self = this;
                 this.addEventListener('load', () => {
-                    this.logApiCall('XHR complete', {
+                    window.monitoring.logApiCall('XHR complete', {
                         url: args[1],
                         duration: performance.now() - startTime,
-                        status: this.status
+                        status: self.status
                     });
                 });
                 return originalXHR.apply(this, args);

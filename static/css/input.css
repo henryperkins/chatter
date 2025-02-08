@@ -193,6 +193,36 @@ pre {
     padding-right: env(safe-area-inset-right);
 }
 
+/* Desktop layout adjustments to ensure the chat input bar is visible */
+@media (min-width: 768px) {
+  #chat-container {
+    margin-top: 84px !important;
+  }
+
+  #chat-box {
+    padding-bottom: 180px !important;
+    max-height: calc(100vh - 84px) !important;
+  }
+
+  #chat-input {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: var(--z-chat-input) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+    backdrop-filter: blur(8px) !important;
+    border-top: 1px solid rgba(229, 231, 235, 0.5) !important;
+    padding: 1rem !important;
+  }
+
+  #token-usage {
+    bottom: 100px !important;
+    z-index: var(--z-token-usage) !important;
+  }
+}
+
 /* Mobile optimizations */
 @media (max-width: 640px) {
     .chat-message {
@@ -266,6 +296,7 @@ pre {
     .message-content {
         @apply break-words;
         word-break: break-word;
+        -webkit-hyphens: auto;
         hyphens: auto;
     }
 
@@ -324,8 +355,8 @@ pre {
     --z-chat-tabs: 1400;
     --z-chat-controls: 1300;
     --z-dark-mode: 1200;
-    --z-chat-input: 1100;
-    --z-token-usage: 1000;
+    --z-chat-input: 2100;
+    --z-token-usage: 2000;
 }
 
 /* Dark mode specific transitions */
