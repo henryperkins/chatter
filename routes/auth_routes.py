@@ -3,6 +3,7 @@ Refined Flask Authentication Blueprint with improved password reset logic.
 """
 
 import logging
+import os
 from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 
