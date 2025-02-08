@@ -1,6 +1,7 @@
 import re
 import logging
 from flask_wtf import FlaskForm
+from flask import request
 
 from wtforms import (
     StringField,
@@ -143,7 +144,26 @@ class LoginForm(FlaskForm):
 class RegistrationForm(FlaskForm):
     """
     Form for user registration.
+    Inherits CSRF protection from FlaskForm.
     """
+    class Meta:
+        csrf = True  # Explicitly enable CSRF protection
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if request and request.is_json:
+            # For JSON requests, accept CSRF token from either body or header
+            token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
+            if token:
+                self.csrf_token.data = token
+
+    def validate_csrf_token(self, field):
+        """Custom CSRF validation for both form and JSON submissions"""
+        if request.is_json:
+            token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
+            if not token or token != field.data:
+                raise ValidationError('Invalid or missing CSRF token')
+        return super().validate_csrf_token(field)
 
     username = StringField(
         "Username",
@@ -814,59 +834,6 @@ class DefaultModelForm(FlaskForm):
     Form for editing the default model configuration during registration if it is invalid,
     specifically designed for o1-preview model configuration.
     """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Check for encryption key before form validation
-        from config import Config
-
-        if not getattr(Config, "ENCRYPTION_KEY", None):
-            logger.warning("ENCRYPTION_KEY environment variable not set")
-
-        # Set default temperature if None
-        if self.temperature.data is None:
-            self.temperature.data = 1.0
-
-        # Attempt to load or create the default Azure provider
-        try:
-            with db_session() as db:
-                provider = db.execute(
-                    text(
-                        """
-                        SELECT id
-                        FROM providers
-                        WHERE name = 'Azure OpenAI' OR slug = 'azure-openai'
-                        LIMIT 1
-                        """
-                    )
-                ).fetchone()
-                if provider:
-                    self.provider_id.data = provider['id']
-                else:
-                    # Create Azure provider if not found
-                    from models.provider import Provider
-
-                    provider_id = Provider.create(
-                        {
-                            "name": "Azure OpenAI",
-                            "slug": "azure-openai",
-                            "api_base_url": Config.DEFAULT_API_ENDPOINT,
-                            "capabilities": {
-                                "supports_streaming": True,
-                                "max_tokens": Config.DEFAULT_MAX_TOKENS,
-                            },
-                            "requires_authentication": True,
-                            "is_azure": True,
-                            "api_version_format": "YYYY-MM-DD-preview",
-                            "endpoint_pattern": "https://{endpoint}/openai/deployments/{deployment}/chat/completions",
-                        }
-                    )
-                    self.provider_id.data = provider_id
-        except Exception as e:
-            logger.error("Error setting up provider: %s", str(e))
-            # Default to 1 if database operations fail
-            self.provider_id.data = 1
-
     provider_id = SelectField(
         "Provider",
         validators=[DataRequired(message="Provider is required.")],
@@ -888,92 +855,6 @@ class DefaultModelForm(FlaskForm):
     deployment_name = StringField(
         "Deployment Name",
         validators=[
-            Optional(),
+            DataRequired(message="Deployment name is required."),
             Length(max=50, message="Deployment name cannot exceed 50 characters."),
-            Regexp(
-                r"^[a-zA-Z0-9_\-]+$",
-                message="Deployment name can only contain letters, numbers, underscores, and hyphens.",
-            ),
-        ],
-        default="o1-preview",
-    )
-    description = TextAreaField(
-        "Description",
-        validators=[
-            Optional(),
-            Length(max=500, message="Description cannot exceed 500 characters."),
-        ],
-        default="Azure OpenAI o1-preview model",
-    )
-    api_endpoint = URLField(
-        "API Endpoint",
-        validators=[
-            DataRequired(message="API endpoint is required."),
-            URL(message="Must be a valid URL."),
-            Regexp(
-                r"^https://[^/]+\.openai\.azure\.com/?$",
-                message="Must be a valid Azure OpenAI endpoint URL.",
-            ),
-        ],
-        default="https://openai-hp.openai.azure.com/",
-    )
-    api_key = StringField(
-        "API Key",
-        validators=[
-            DataRequired(message="API key is required."),
-            Length(min=32, message="API key must be at least 32 characters long."),
-        ],
-        default="9SPmgaBZ0tlnQrdRU0IxLsanKHZiEUMD2RASDEUhOchf6gyqRLWCJQQJ99BAACHYHv6XJ3w3AAABACOGKt5l",
-    )
-    temperature = NullableFloatField(
-        "Temperature",
-        validators=[Optional()],
-        default=1.0,
-        render_kw={"readonly": True},
-    )
-    max_tokens = NullableIntegerField(
-        "Max Tokens",
-        validators=[Optional()],
-        default=None,
-        render_kw={"readonly": True, "disabled": True},
-    )
-    max_completion_tokens = NullableIntegerField(
-        "Max Completion Tokens",
-        validators=[
-            DataRequired(message="Max completion tokens is required."),
-            NumberRange(
-                min=1, max=8300, message="Must be between 1 and 8300 for o1-preview."
-            ),
-        ],
-        default=8300,
-    )
-    requires_o1_handling = BooleanField(
-        "Requires o1-preview Handling",
-        default=True,
-        render_kw={"readonly": True, "checked": True, "disabled": True},
-    )
-    supports_streaming = BooleanField(
-        "Supports Streaming",
-        default=False,
-        render_kw={"readonly": True, "disabled": True},
-    )
-    api_version = StringField(
-        "API Version",
-        validators=[
-            DataRequired(message="API version is required."),
-            Length(max=20, message="API version cannot exceed 20 characters."),
-            Regexp(
-                r"^\d{4}-\d{2}-\d{2}-preview$",
-                message="API version must be in format YYYY-MM-DD-preview",
-            ),
-        ],
-        default="2024-12-01-preview",
-        render_kw={"readonly": True},
-    )
-    model_type = StringField(
-        "Model Type",
-        validators=[DataRequired(message="Model type is required.")],
-        default="o1-preview",
-        render_kw={"type": "hidden"},
-    )
-    submit = SubmitField("Save Configuration")
+            Regexp
