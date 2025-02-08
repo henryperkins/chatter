@@ -189,7 +189,7 @@ def register():
             form = RegistrationForm(formdata=form_data)
 
         if not form.validate():
-            logger.error("Form validation failed", extra={
+            logger.error("Form validation failed - details: %s", form.errors, extra={
                 "errors": form.errors,
                 "csrf_token_present": bool(form.csrf_token.data),
                 "request_headers": dict(request.headers),
