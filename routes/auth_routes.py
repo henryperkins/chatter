@@ -21,10 +21,7 @@ from flask import (
 )
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import text
-from werkzeug.security import (
-    check_password_hash,
-    generate_password_hash
-)
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from database import db_session
 from decorators import admin_required
@@ -42,13 +39,12 @@ logger = logging.getLogger(__name__)
 # Helper Functions
 # -----------------------
 
+
 def is_safe_url(target: str) -> bool:
     """Validate that a redirect URL is safe"""
     ref_url = urlparse(request.host_url)
     test_url = urlparse(urljoin(request.host_url, target))
-    return (
-        test_url.scheme in ("http", "https") and ref_url.netloc == test_url.netloc
-    )
+    return test_url.scheme in ("http", "https") and ref_url.netloc == test_url.netloc
 
 
 def json_response(
@@ -94,6 +90,7 @@ bp = Blueprint("auth", __name__)
 # -----------------------
 # Routes
 # -----------------------
+
 
 @bp.route("/manage_users", methods=["GET"])
 @login_required
@@ -167,7 +164,9 @@ def register():
 
     if request.method == "POST":
         if not form.validate_on_submit():
-            return json_response(False, "Form validation failed", errors=form.errors, status_code=400)
+            return json_response(
+                False, "Form validation failed", errors=form.errors, status_code=400
+            )
 
         try:
             user = User.create(
@@ -187,10 +186,7 @@ def register():
             return json_response(
                 True,
                 "Registration successful",
-                {
-                    "redirect": url_for("chat.chat_interface"),
-                    "user": user.to_dict()
-                },
+                {"redirect": url_for("chat.chat_interface"), "user": user.to_dict()},
             )
 
         except ValueError as e:
@@ -353,7 +349,9 @@ def reset_password(token: str):
                     },
                 )
                 return (
-                    jsonify({"success": False, "error": "Invalid or expired reset token."}),
+                    jsonify(
+                        {"success": False, "error": "Invalid or expired reset token."}
+                    ),
                     400,
                 )
 
@@ -368,12 +366,16 @@ def reset_password(token: str):
                     },
                 )
                 return (
-                    jsonify({"success": False, "error": "Invalid or expired reset token."}),
+                    jsonify(
+                        {"success": False, "error": "Invalid or expired reset token."}
+                    ),
                     400,
                 )
 
             # Ensure the token hasn't expired
-            if user["reset_token_expiry"].replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+            if user["reset_token_expiry"].replace(tzinfo=timezone.utc) < datetime.now(
+                timezone.utc
+            ):
                 logger.warning(
                     "Reset token has expired",
                     extra={
@@ -383,7 +385,9 @@ def reset_password(token: str):
                     },
                 )
                 return (
-                    jsonify({"success": False, "error": "Invalid or expired reset token."}),
+                    jsonify(
+                        {"success": False, "error": "Invalid or expired reset token."}
+                    ),
                     400,
                 )
 
@@ -398,7 +402,9 @@ def reset_password(token: str):
                     },
                 )
                 return (
-                    jsonify({"success": False, "error": "Invalid or expired reset token."}),
+                    jsonify(
+                        {"success": False, "error": "Invalid or expired reset token."}
+                    ),
                     400,
                 )
 
@@ -501,8 +507,11 @@ def test_create_user():
     """Test route for creating a user with hardcoded data."""
     try:
         user = User.create(
-            username="testuser", email="test@example.com", password="testpassword"
+            username=os.getenv("TEST_USERNAME"),
+            email=os.getenv("TEST_EMAIL"),
+            password=os.getenv("TEST_PASSWORD"),
         )
+        # import os
         return jsonify({"success": True, "user_id": user.id}), 200
     except Exception as e:
         logger.error(f"Test user creation failed: {str(e)}", exc_info=True)
