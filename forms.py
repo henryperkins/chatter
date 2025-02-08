@@ -159,9 +159,9 @@ class RegistrationForm(FlaskForm):
 
     def validate_csrf_token(self, field):
         """Custom CSRF validation for both form and JSON submissions"""
-        # (Opcional) Deshabilitar el chequeo de CSRF en peticiones JSON:
-        # if request.is_json:
-        #     return
+        if request.is_json:
+            # Omite la validación real si la petición es JSON
+            return
         return super().validate_csrf_token(field)
 
     username = StringField(
