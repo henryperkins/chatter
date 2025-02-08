@@ -16,6 +16,7 @@ import traceback
 import psutil
 import uuid
 import io
+import logging
 from datetime import timedelta, datetime
 from typing import Optional, Tuple, Union
 
@@ -29,6 +30,8 @@ from flask import (
     g,
     current_app,
     render_template,
+    send_from_directory,
+    make_response,
 )
 from flask_login import current_user, logout_user
 from flask_wtf.csrf import CSRFError
@@ -190,6 +193,18 @@ def init_app_components(app: Flask) -> None:
     app.static_folder = "static"
     app.static_url_path = "/static"
 
+    # Configure static file MIME types
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0 if app.config.get('DEBUG', False) else 3600
+
+    @app.route('/static/<path:filename>')
+    def serve_static(filename):
+        mimetype = None
+        if filename.endswith('.css'):
+            mimetype = 'text/css'
+        elif filename.endswith('.js'):
+            mimetype = 'application/javascript'
+        return send_from_directory(app.static_folder, filename, mimetype=mimetype)
+
 
 def register_cli_commands(app):
     @app.cli.command("init-db")
@@ -213,7 +228,7 @@ def register_cli_commands(app):
         try:
             with db_session() as db:
                 result = db.execute(text("""
-                    SELECT 
+                    SELECT
                         m.id as model_id,
                         m.name as model_name,
                         m.deployment_name,
@@ -228,7 +243,7 @@ def register_cli_commands(app):
                     JOIN providers p ON m.provider_id = p.id
                     WHERE m.is_default = true;
                 """)).mappings().first()
-                
+
                 if result:
                     print("\nModel Configuration:")
                     print("-" * 50)
@@ -246,7 +261,7 @@ def register_cli_commands(app):
             with db_session() as db:
                 # Get model details
                 result = db.execute(text("""
-                    SELECT 
+                    SELECT
                         m.id as model_id,
                         m.name as model_name,
                         m.deployment_name,
@@ -262,25 +277,25 @@ def register_cli_commands(app):
                     JOIN providers p ON m.provider_id = p.id
                     WHERE m.is_default = true;
                 """)).mappings().first()
-                
+
                 if result:
                     print("\nModel Configuration:")
                     print("-" * 50)
                     for key, value in result.items():
                         if key != 'encrypted_key':  # Don't print the actual encrypted key
                             print(f"{key}: {value}")
-                    
+
                     # Test decryption
                     if result['encrypted_key']:
                         from config import Config
                         from utils.encryption import decrypt_api_key
                         import base64
                         import hashlib
-                        
+
                         config_instance = Config()
                         key_bytes = hashlib.sha256(config_instance.ENCRYPTION_KEY.encode()).digest()
                         encryption_key = base64.b64encode(key_bytes).decode()
-                        
+
                         try:
                             decrypted_key = decrypt_api_key(result['encrypted_key'], encryption_key)
                             print(f"\nAPI Key decryption test: {'SUCCESS' if decrypted_key else 'FAILED'}")
@@ -298,7 +313,7 @@ def register_cli_commands(app):
         try:
             with db_session() as db:
                 query = text("""
-                    UPDATE models 
+                    UPDATE models
                     SET deployment_name = 'gpt-deployment'
                     WHERE deployment_name = 'gpt-deploymente'
                     RETURNING id
@@ -318,6 +333,7 @@ def create_app() -> Flask:
         return Flask._app_instance
 
     app = Flask(__name__)
+    app.secret_key = os.urandom(24)  # Set a secure secret key
     Flask._already_configured = True
     Flask._app_instance = app
 
@@ -409,12 +425,14 @@ def handle_csrf_error(e: CSRFError) -> Tuple[WerkzeugResponse, int]:
 
 @app.before_request
 def validate_request():
+    logger.debug("Processing request: %s %s", request.method, request.path)
     # Skip validation for static and auth endpoints
     if request.endpoint in [
         "static",
         "auth.login",
         "auth.register",
     ] or request.path.startswith("/static/"):
+        logger.debug("Skipping validation for endpoint: %s", request.endpoint)
         return
 
     # Set request context

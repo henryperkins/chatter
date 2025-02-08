@@ -82,11 +82,11 @@ def test_db_connection() -> None:
 
 # Connection pool settings
 POOL_SETTINGS = {
-    "POOL_SIZE": int(os.getenv("DB_POOL_SIZE", "5")),
-    "MAX_OVERFLOW": int(os.getenv("DB_MAX_OVERFLOW", "10")),
-    "POOL_TIMEOUT": int(os.getenv("DB_POOL_TIMEOUT", "30")),
-    "POOL_PRE_PING": os.getenv("DB_POOL_PRE_PING", "false").lower() == "true",
-    "POOL_RECYCLE": int(os.getenv("DB_POOL_RECYCLE", "1800")),
+    "POOL_SIZE": int(os.getenv("DB_POOL_SIZE", "10")),
+    "MAX_OVERFLOW": int(os.getenv("DB_MAX_OVERFLOW", "20")),
+    "POOL_TIMEOUT": int(os.getenv("DB_POOL_TIMEOUT", "60")),
+    "POOL_PRE_PING": True,  # Always check connection before using
+    "POOL_RECYCLE": int(os.getenv("DB_POOL_RECYCLE", "3600")),
 }
 
 
@@ -107,13 +107,17 @@ def create_db_engine(db_uri: str) -> Engine:
         isolation_level="READ COMMITTED",
         execution_options={"autocommit": False},
         connect_args={
-            "connect_timeout": 10,
+            "connect_timeout": 60,
             "keepalives": 1,
-            "keepalives_idle": 30,
-            "keepalives_interval": 10,
-            "keepalives_count": 5,
+            "keepalives_idle": 120,
+            "keepalives_interval": 30,
+            "keepalives_count": 15,
             "application_name": "chatter-app",
-            "options": "-c statement_timeout=30000 -c idle_in_transaction_session_timeout=60000",
+            "options": "-c statement_timeout=120000 -c idle_in_transaction_session_timeout=240000",
+            "sslmode": "verify-full",
+            "sslcert": None,
+            "sslkey": None,
+            "sslrootcert": "ca-certificate.crt",
         },
         json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
     )
@@ -551,8 +555,10 @@ def init_app(app: Flask) -> None:
         app._db_state = {"engine": None, "Session": None, "initialized": False, "initializing": True}
 
     try:
+        logger.info("Creating database engine with URI: %s", app.config["DATABASE_URI"])
         app._db_state["engine"] = create_db_engine(app.config["DATABASE_URI"])
         engine = app._db_state["engine"]
+        logger.info("Database engine created successfully")
 
         # Verify connection using raw connection
         with engine.connect() as conn:

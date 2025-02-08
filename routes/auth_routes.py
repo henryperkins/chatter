@@ -155,7 +155,9 @@ def login():
 @limiter.limit("5 per minute")
 def register():
     """Handle user registrations with consistent JSON responses"""
+    logger.info("Register route accessed - Method: %s", request.method)
     if current_user.is_authenticated:
+        logger.info("User already authenticated, redirecting to chat interface")
         return json_response(
             True, "Already logged in", {"redirect": url_for("chat.chat_interface")}
         )

@@ -113,14 +113,14 @@
         class="flex-1 flex flex-col overflow-hidden pb-safe bg-white/95 dark:bg-gray-900/95 dark-mode-transition backdrop-blur-sm">
         <!-- Messages Area -->
         <div id="chat-box"
-            class="flex-1 overflow-y-auto px-3 sm:px-6 py-4 sm:py-8 space-y-6 min-h-[200px] pb-40 scrollbar-thin scrollbar-thumb-gray-400/50 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600/50 dark:hover:scrollbar-thumb-gray-600 scrollbar-track-transparent bg-gradient-to-b from-white/50 to-gray-50/50 dark:from-gray-900/50 dark:to-gray-800/50 backdrop-blur-sm"
+            class="flex-1 overflow-y-auto px-3 sm:px-6 py-4 sm:py-8 space-y-8 min-h-[200px] scrollbar-thin scrollbar-thumb-gray-400/50 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600/50 dark:hover:scrollbar-thumb-gray-600 scrollbar-track-transparent bg-gradient-to-b from-white/50 to-gray-50/50 dark:from-gray-900/50 dark:to-gray-800/50 backdrop-blur-sm"
             role="log" aria-live="polite">
             <div class="max-w-4xl mx-auto w-full">
                 {% if messages %}
                 {% for message in messages %}
                 {% if message.role == 'assistant' %}
                 <!-- Assistant message -->
-                <div class="flex w-full mt-6 space-x-3 sm:space-x-4 px-2 sm:px-0 max-w-3xl mx-auto">
+                <div class="message-container assistant-message flex w-full space-x-3 sm:space-x-4 px-2 sm:px-0 max-w-3xl">
                     <div class="flex-shrink-0 h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-md"
                         role="img" aria-label="Assistant avatar">
                         <i class="fas fa-robot text-lg"></i>
@@ -186,7 +186,7 @@
                 </div>
                 {% elif message.role == 'user' %}
                 <!-- User message -->
-                <div class="flex w-full mt-6 space-x-3 sm:space-x-4 max-w-2xl ml-auto justify-end">
+                <div class="message-container user-message flex w-full space-x-3 sm:space-x-4 max-w-2xl justify-end">
                     <div class="relative order-2">
                         <div
                             class="bg-gradient-to-r from-primary-600/95 to-secondary-600/95 dark:from-primary-500/95 dark:to-secondary-500/95 text-white p-5 sm:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 backdrop-blur-sm">
