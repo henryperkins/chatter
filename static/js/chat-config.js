@@ -15,12 +15,16 @@
                 return this.initPromise;
             }
 
-            this.initPromise = new Promise((resolve, reject) => {
+            this.initPromise = new Promise((resolve) => {
                 try {
                     const configEl = document.getElementById('chat-config');
-                    if (!configEl) {
-                        console.warn('Chat configuration element not found. Skipping chat config initialization.');
-                        resolve({});
+
+                    // If we're not on a chat page, resolve with empty config
+                    if (!configEl || !document.getElementById('chat-container')) {
+                        this.config = {};
+                        this.initialized = true;
+                        window.CHAT_CONFIG = this.config;
+                        return resolve(this.config);
                     }
 
                     this.config = {
@@ -38,7 +42,11 @@
                     resolve(this.config);
                 } catch (error) {
                     console.error('Failed to initialize chat config:', error);
-                    reject(error);
+                    // Resolve with empty config on error rather than rejecting
+                    this.config = {};
+                    this.initialized = true;
+                    window.CHAT_CONFIG = this.config;
+                    resolve(this.config);
                 }
             });
 
