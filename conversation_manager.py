@@ -1,9 +1,7 @@
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, TypedDict
-from token_utils import MessageDict
 
-import tiktoken
 from tiktoken import get_encoding
 from sqlalchemy import text
 
@@ -65,7 +63,7 @@ class ConversationManager:
         # Always add markdown formatting request, even for models that don't use system messages
         markdown_request = {
             "role": "system" if include_system else "user",
-            "content": "Format your responses using markdown for better readability. Use standard markdown syntax for headers (#), lists (- or 1.), emphasis (* or _), etc. For code blocks, specify the language after the opening triple backticks (e.g., ```python, ```javascript, ```sql) to enable syntax highlighting. Only use triple backticks to enclose code blocks - do not wrap the entire response in a code block."
+            "content": "Formatting re-enabled - code output should be wrapped in markdown. Use standard markdown syntax for headers (#), lists (- or 1.), emphasis (* or _), etc. For code blocks, specify the language after the opening triple backticks (e.g., ```python, ```javascript, ```sql). Only use triple backticks to enclose code blocks – do not wrap the entire response in one giant code block."
         }
         context.append(markdown_request)
 
@@ -103,14 +101,14 @@ class ConversationManager:
         if isinstance(content, str) and "Here are the contents of the uploaded files:" in content:
             # Keep the full content including attachments for the model
             file_attachments = self._extract_file_attachments(content)
-            
+
             # Don't split the content - keep it as is for the model to process
             # This ensures the model sees both the message and file contents
             metadata = {
                 "has_attachments": True,
                 "attachments": file_attachments
             }
-            
+
         message_obj = {"role": role, "content": content}
         tokens = count_message_tokens(message_obj)
         logger.debug("Calculated %d tokens for message: %s", tokens, message_obj)
@@ -155,10 +153,10 @@ class ConversationManager:
     def _extract_file_attachments(self, content: str) -> List[Dict[str, str]]:
         """
         Extract file attachments from message content.
-        
+
         Args:
             content: The message content containing file attachments.
-            
+
         Returns:
             A list of dictionaries containing file name and content.
         """
@@ -329,10 +327,10 @@ class ConversationManager:
     def perform_linting(self, content: str) -> str:
         """
         Perform linting on the message content.
-        
+
         Args:
             content: The original message content.
-        
+
         Returns:
             The linted message content.
         """
@@ -350,7 +348,7 @@ class ConversationManager:
         result = []
         in_code_block = False
         language = ""
-        
+
         for line in lines:
             if line.startswith(code_block_delimiter):
                 if not in_code_block:
@@ -375,12 +373,12 @@ class ConversationManager:
                 else:
                     # Outside code block: normalize spacing
                     result.append(line.rstrip())
-        
+
         # Close any unclosed code block
         if in_code_block:
             result.append("```")
             result.append("")
-        
+
         return "\n".join(result).strip()
 
     def _fix_markdown_spacing(self, content: str) -> str:
@@ -390,17 +388,17 @@ class ConversationManager:
         lines = content.split("\n")
         result = []
         prev_line_empty = True
-        
+
         for line in lines:
             line = line.rstrip()
-            
+
             # Skip multiple empty lines
             if not line:
                 if not prev_line_empty:
                     result.append("")
                     prev_line_empty = True
                 continue
-            
+
             # Handle headers and lists
             if line.startswith(("#", "-", "*", "1.")):
                 if not prev_line_empty:
@@ -408,10 +406,10 @@ class ConversationManager:
                 result.append(line)
                 prev_line_empty = False
                 continue
-            
+
             result.append(line)
             prev_line_empty = False
-        
+
         return "\n".join(result).strip()
 
     def _remove_old_messages(self, chat_id: str, keep_ids: List[int]) -> None:
@@ -522,6 +520,7 @@ class ConversationManager:
 
         logger.debug("Final stats for chat %s: %s", chat_id, stats)
         return stats
+
 
 # Export an instance of ConversationManager
 conversation_manager = ConversationManager()

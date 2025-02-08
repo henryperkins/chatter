@@ -1,6 +1,5 @@
 """Module for Azure OpenAI API interaction and chat handling."""
 
-import logging
 import os
 from typing import Optional, List, Dict, Union, Generator, Any
 import requests
@@ -82,7 +81,7 @@ def get_azure_response(
     api_version: str,
     model_type: Optional[str] = None,
     requires_o1_handling: bool = False,
-    reasoning_effort: str = "medium",
+    reasoning_effort: str = "medium",  # Must be one of "low", "medium", or "high"
     store_completion: bool = False,
     response_format: Optional[Dict[str, Any]] = None,
     timeout_seconds: int = 600,
@@ -133,14 +132,21 @@ def get_azure_response(
                 raise ChatAPIError("Invalid response_format structure", 400)
             completion_params["response_format"] = response_format
 
-        # Handle o-series model parameters
-        if model_type and model_type.startswith("o"):
-            completion_params.update({
-                "max_completion_tokens": max_completion_tokens,
-                "reasoning_effort": reasoning_effort,
-                "store_completion": store_completion
-            })
+        # Handle o-series model parameters more comprehensively
+        # According to the new documentation, these models only support max_completion_tokens (not standard "max_tokens"),
+        # and we can optionally pass "reasoning_effort". Also ignore typical generation parameters (temperature, top_p, etc.).
+        if model_type and model_type.lower() in ["o1", "o1-mini", "o1-preview", "o3-mini"]:
+            # For O-series, rely on max_completion_tokens, reasoning_effort, developer messages, etc.
+            completion_params["max_completion_tokens"] = max_completion_tokens
+            completion_params["reasoning_effort"] = reasoning_effort  # can be "low", "medium", or "high"
+            completion_params["store_completion"] = store_completion
+
+            # Remove any typical generation parameters that might break O-series usage:
+            for param in ["temperature", "top_p", "presence_penalty", "frequency_penalty", "logprobs", "top_logprobs", "logit_bias"]:
+                if param in completion_params:
+                    del completion_params[param]
         else:
+            # For standard models, use max_tokens
             completion_params["max_tokens"] = max_completion_tokens
 
         try:

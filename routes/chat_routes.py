@@ -1,13 +1,11 @@
 import os
-import re
 import uuid
-import traceback
 from datetime import datetime, timedelta
-from typing import Union, Tuple, List, Dict, Any, Optional, cast
+from typing import Union, Tuple, Dict, Any, Optional, cast
 
+import json
 import bleach
 import tiktoken
-from werkzeug.utils import secure_filename
 from flask import (
     Response,
     Blueprint,
@@ -18,7 +16,6 @@ from flask import (
     render_template,
     session,
     make_response,
-    current_app,
 )
 from flask.wrappers import Response as FlaskResponse
 from flask_login import login_required, current_user
@@ -29,16 +26,13 @@ from sqlalchemy import text
 
 # Project Imports
 from chat_api import get_azure_response, scrape_data
+from azure_search_client import AzureOpenAI
 from chat_utils import (
-    allowed_file,
-    generate_chat_title,
     generate_new_chat_id,
-    process_file,
     process_uploaded_files,
-    count_tokens,
 )
 from conversation_manager import conversation_manager
-from database import db_session, is_initialized, get_db_state
+from database import db_session
 from models.chat import Chat
 from models.model import Model
 from models.provider import Provider
@@ -533,9 +527,11 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     This replaces the old /chat/send route from the original code.
     """
     try:
+        logger.info(f"handle_chat: form data keys = {list(request.form.keys())}, files = {len(request.files) if request.files else 0}")
         # Validate chat access
         chat_id = request.headers.get("X-Chat-ID") or session.get("chat_id")
         if not chat_id:
+            logger.info("No chat ID found in request header or session. Returning 400.")
             return jsonify({"error": "No chat ID provided"}), 400
 
         if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
@@ -654,9 +650,19 @@ def normal_response(
     chat_id: str, history: list, model_obj: Model
 ) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """
-    Handle normal (non-stream) response from the LLM API.
+    Handle normal (non-stream) response while honoring o-series constraints.
+    For o-series (e.g. o1, o3-mini), remove unsupported parameters (like temperature),
+    rely on 'max_completion_tokens', and optionally pass 'reasoning_effort' if set.
+    Developer messages can also be used in place of system if needed.
     """
     try:
+        # If this is an o-series model, remove typical temperature usage.
+        # Also allow 'reasoning_effort' if set, else default to 'medium'.
+        is_o_series = model_obj.model_type in ["o1", "o1-mini", "o1-preview", "o3-mini"]
+        reasoning_effort_value = "medium"
+        if hasattr(model_obj, "reasoning_effort") and model_obj.reasoning_effort:
+            reasoning_effort_value = model_obj.reasoning_effort
+
         response = get_azure_response(
             messages=history,
             deployment_name=model_obj.deployment_name,
@@ -666,7 +672,9 @@ def normal_response(
             api_version=model_obj.api_version,
             model_type=model_obj.model_type,
             requires_o1_handling=model_obj.requires_o1_handling,
-            reasoning_effort="medium",
+            # For o-series, extra param 'reasoning_effort' is possible.
+            reasoning_effort=reasoning_effort_value if is_o_series else None,
+            # If using an o-series, skip sending "temperature", "top_p", etc.
             store_completion=False,
             stream=False,
         )

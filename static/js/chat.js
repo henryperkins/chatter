@@ -543,6 +543,7 @@
 
             // Attach messages to the request
             formData.append('messages', JSON.stringify(messages));
+            formData.append('message', messageText);
 
             formData.append('api_version', model.api_version);
             formData.append('deployment_name', model.deployment_name);

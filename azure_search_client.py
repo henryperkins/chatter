@@ -8,7 +8,7 @@ supporting semantic, vector, and hybrid search capabilities.
 import os
 import time
 import logging
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Any
 import requests
 from functools import wraps
 
@@ -174,6 +174,59 @@ class AzureSearchChatExtension:
             }
 
         return params
+
+class AzureOpenAI:
+    def __init__(self, azure_endpoint, api_key, api_version):
+        self.azure_endpoint = azure_endpoint
+        self.api_key = api_key
+        self.api_version = api_version
+        self.chat = self.Chat(self.azure_endpoint, self.api_key, self.api_version)
+
+    class Chat:
+        def __init__(self, azure_endpoint, api_key, api_version):
+            self.azure_endpoint = azure_endpoint.rstrip("/")
+            self.api_key = api_key
+            self.api_version = api_version
+            self.completions = self.Completions(self.azure_endpoint, self.api_key, self.api_version)
+
+        class Completions:
+            def __init__(self, endpoint, api_key, api_version):
+                self.endpoint = endpoint
+                self.api_key = api_key
+                self.api_version = api_version
+
+            def create(self, model, messages, temperature, max_tokens, stream):
+                import requests
+                url = f"{self.endpoint}/openai/deployments/{model}/chat/completions?api-version={self.api_version}"
+                headers = {
+                    "Content-Type": "application/json",
+                    "api-key": self.api_key
+                }
+                payload = {
+                    "messages": messages,
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "stream": stream
+                }
+                response = requests.post(url, headers=headers, json=payload, stream=stream)
+                response.raise_for_status()
+                if stream:
+                    # Stream text in small chunks
+                    for chunk in response.iter_content(chunk_size=1024):
+                        if chunk:
+                            # Return partial text in a structure consistent with chat_routes.py
+                            yield {
+                                "choices": [
+                                    {
+                                        "delta": {
+                                            "content": chunk.decode('utf-8', errors='replace')
+                                        }
+                                    }
+                                ]
+                            }
+                else:
+                    # Non-streaming response
+                    yield response.json()
 
 class AzureOpenAISearchChat:
     """Handles chat completions with Azure Search integration"""

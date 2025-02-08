@@ -10,7 +10,7 @@
 
         async init() {
             if (this.initialized) return this.config;
-            
+
             if (this.initPromise) {
                 return this.initPromise;
             }
@@ -19,7 +19,8 @@
                 try {
                     const configEl = document.getElementById('chat-config');
                     if (!configEl) {
-                        throw new Error('Chat configuration element not found');
+                        console.warn('Chat configuration element not found. Skipping chat config initialization.');
+                        resolve({});
                     }
 
                     this.config = {
