@@ -4,10 +4,7 @@ window.App = {
         utils: false,
         markdown: false,
         prism: false,
-        darkMode: false,
-        tokenUsage: false,
-        fileUpload: false,
-        chatConfig: false
+        darkMode: false
     },
 
     async init() {
@@ -16,15 +13,12 @@ window.App = {
         try {
             const timeout = 15000; // Increased timeout to 15 seconds
 
-            // Initialize all dependencies in parallel with timeout
+            // Initialize core dependencies in parallel with timeout
             await Promise.all([
                 this.initializeWithTimeout(this.initializeMarkdown(), 'Markdown', timeout),
                 this.initializeWithTimeout(this.initializePrism(), 'Prism', timeout),
                 this.initializeWithTimeout(this.initializeUtils(), 'Utils', timeout),
-                this.initializeWithTimeout(this.initializeDarkMode(), 'Dark Mode', timeout),
-                this.initializeWithTimeout(this.initializeTokenUsage(), 'Token Usage', timeout),
-                this.initializeWithTimeout(this.initializeFileUpload(), 'File Upload', timeout),
-                this.initializeWithTimeout(this.initializeChatConfig(), 'Chat Config', timeout)
+                this.initializeWithTimeout(this.initializeDarkMode(), 'Dark Mode', timeout)
             ]);
 
             // Set up global error handling
@@ -182,78 +176,6 @@ window.App = {
             return true;
         } catch (error) {
             console.error('Dark mode initialization failed:', error);
-            throw error;
-        }
-    },
-
-    async initializeTokenUsage() {
-        if (typeof window.TokenUsageManager === 'undefined') {
-            throw new Error('Token usage module not loaded');
-        }
-        try {
-            if (window.CHAT_CONFIG?.chatId) {
-                window.tokenUsageManager = new window.TokenUsageManager({
-                    chatId: window.CHAT_CONFIG.chatId || 'default'
-                });
-                await window.tokenUsageManager.initialize();
-            } else {
-                // Not on a chat page, skip initialization
-                console.log('Token usage not available on this page');
-            }
-            this.dependencies.tokenUsage = true;
-            return true;
-        } catch (error) {
-            console.error('Token usage initialization failed:', error);
-            throw error;
-        }
-    },
-
-    async initializeFileUpload() {
-        if (typeof window.FileUploadManager === 'undefined') {
-            throw new Error('File upload module not loaded');
-        }
-        try {
-            if (window.CHAT_CONFIG?.chatId) {
-                const uploadButton = document.getElementById('file-upload');
-                if (uploadButton) {
-                    window.fileUploadManager = new window.FileUploadManager(
-                        window.CHAT_CONFIG.chatId,
-                        window.CHAT_CONFIG.userId,
-                        uploadButton
-                    );
-                    await window.fileUploadManager.initializeFileUpload();
-                }
-            } else {
-                // Not on a chat page, skip initialization
-                console.log('File upload not available on this page');
-            }
-            this.dependencies.fileUpload = true;
-            return true;
-        } catch (error) {
-            console.error('File upload initialization failed:', error);
-            if (window.utils?.showFeedback) {
-                window.utils.showFeedback('File upload initialization failed. Some features may be unavailable.', 'warning');
-            }
-            // Still mark as initialized to prevent blocking app startup
-            this.dependencies.fileUpload = true;
-            return true;
-        }
-    },
-
-    async initializeChatConfig() {
-        if (typeof window.ChatConfig === 'undefined') {
-            throw new Error('Chat config module not loaded');
-        }
-        try {
-            const config = window.ChatConfig.getInstance();
-            await config.init().catch(() => {
-                // Silently catch chat config errors on non-chat pages
-                console.log('Chat config not available on this page');
-            });
-            this.dependencies.chatConfig = true;
-            return true;
-        } catch (error) {
-            console.error('Chat config initialization failed:', error);
             throw error;
         }
     }

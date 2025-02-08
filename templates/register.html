@@ -141,62 +141,68 @@ document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('registration-form');
     const submitButton = document.getElementById('submit-button');
     let isSubmitting = false;
-
     if (form) {
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
             if (isSubmitting) return;
             isSubmitting = true;
-
             // Clear previous errors
             document.querySelectorAll('.error-text').forEach(el => el.textContent = '');
             document.getElementById('form-errors').classList.add('hidden');
-
             try {
                 submitButton.disabled = true;
                 document.getElementById('loading-spinner').classList.remove('hidden');
                 document.getElementById('button-text').textContent = 'Registering...';
-
                 const formData = new FormData(form);
+                const payload = {};
+                formData.forEach((value, key) => { payload[key] = value; });
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+                if (!csrfToken) {
+                    throw new Error('CSRF token not found');
+                }
+                
                 const response = await fetch(form.action, {
                     method: 'POST',
-                    body: formData,
                     headers: {
-                        'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content,
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                        'Cache-Control': 'no-cache'
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({
+                        ...payload,
+                        csrf_token: csrfToken
+                    })
                 });
-
-                const data = await response.json();
-                
-                if (response.ok) {
-                    // Handle successful registration
-                    if (data.data && data.data.redirect) {
-                        // Redirect to chat interface
-                        window.location.href = data.data.redirect;
+                const responseData = await response.json();
+                if (response.ok && responseData.success) {
+                    if (responseData.redirect) {
+                        window.location.href = responseData.redirect;
                     }
                 } else {
-                    // Handle field errors
-                    if (data.errors) {
-                        Object.entries(data.errors).forEach(([field, errors]) => {
+                    if (responseData.errors) {
+                        Object.entries(responseData.errors).forEach(([field, errors]) => {
                             const errorElement = document.getElementById(`${field}-error`);
                             if (errorElement) {
-                                errorElement.textContent = errors.join(', ');
+                                errorElement.textContent = Array.isArray(errors) ? errors.join(', ') : errors;
                                 errorElement.classList.remove('hidden');
                             }
                         });
                     }
-                    
-                    // Handle general errors
-                    if (data.message) {
+                    if (responseData.message) {
                         const formErrors = document.getElementById('form-errors');
-                        formErrors.textContent = data.message;
+                        formErrors.textContent = responseData.message;
                         formErrors.classList.remove('hidden');
+                    }
+                    if (!responseData.errors && !responseData.message) {
+                        throw new Error('Registration failed. Please check your input and try again.');
                     }
                 }
             } catch (error) {
-                utils.showFeedback('Registration failed. Please try again.', 'error');
+                console.error('Registration error:', error);
+                window.utils.handleError(error);
             } finally {
                 isSubmitting = false;
                 submitButton.disabled = false;
@@ -205,12 +211,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-
-    // Password visibility toggle function
     window.togglePasswordVisibility = function(fieldId) {
         const field = document.getElementById(fieldId);
         const icon = document.getElementById(`${fieldId}-toggle-icon`);
-
         if (field && icon) {
             if (field.type === 'password') {
                 field.type = 'text';
@@ -221,8 +224,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     };
-
-    // Clear error messages when input changes
     form.querySelectorAll('input').forEach(input => {
         input.addEventListener('input', () => {
             const errorElement = document.getElementById(`${input.id}-error`);
@@ -235,3 +236,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 {% endblock %}
+</final_file_content>

@@ -31,8 +31,7 @@ window.utils = {
             if (finalBody && !(finalBody instanceof FormData)) {
                 if (typeof finalBody === 'object') {
                     finalBody = JSON.stringify({
-                        ...finalBody,
-                        csrf_token: csrfToken
+                        ...finalBody
                     });
                     defaultHeaders['Content-Type'] = 'application/json';
                 }
