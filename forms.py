@@ -1,8 +1,11 @@
+import os
 import re
 import logging
-from flask_wtf import FlaskForm
-from flask import request
+from datetime import datetime
+from typing import Any
 
+from flask import current_app, request
+from flask_wtf import FlaskForm
 from wtforms import (
     StringField,
     PasswordField,
@@ -27,17 +30,13 @@ from wtforms.validators import (
     Optional,
     Regexp,
 )
-from typing import Any
 from sqlalchemy import text
 
+from database import db_session, is_initialized
+from chat_utils import validate_password_strength
+from utils.encryption import encrypt_api_key, EncryptionError
 from models.provider import Provider
 from models.model import Model
-from utils.encryption import encrypt_api_key, EncryptionError
-from chat_utils import validate_password_strength
-import logging
-
-logger = logging.getLogger(__name__)
-from database import db_session, is_initialized
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +48,7 @@ class NullableIntegerField(IntegerField):
     """
     A custom IntegerField that treats empty or invalid input as None.
     """
-
     def process_formdata(self, valuelist):
-        """Process form data for NullableIntegerField."""
         if valuelist and valuelist[0]:
             try:
                 self.data = int(valuelist[0])
@@ -64,7 +61,6 @@ class NullableFloatField(FloatField):
     """
     A custom FloatField that treats empty or invalid input as None.
     """
-
     def process_formdata(self, valuelist):
         if valuelist and valuelist[0]:
             try:
@@ -82,87 +78,72 @@ class LoginForm(FlaskForm):
     """
     Form for user login.
     """
+    class Meta:
+        csrf = True
+        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
 
     username = StringField(
         "Username",
-        validators=[
-            DataRequired(message="Username is required."),
-        ],
+        validators=[DataRequired(message="Username is required.")],
     )
     password = PasswordField(
         "Password",
-        validators=[
-            DataRequired(message="Password is required."),
-        ],
+        validators=[DataRequired(message="Password is required.")],
     )
     remember = BooleanField("Remember Me", default=False)
     submit = SubmitField("Login")
 
-    def __init__(self, *args, **kwargs):
-        if 'csrf_enabled' not in kwargs:
-            kwargs['csrf_enabled'] = True
-        super().__init__(*args, **kwargs)
-        if request and request.is_json:
-            token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
-            if token and hasattr(self, 'csrf_token'):
-                self.csrf_token.data = token
-
     def validate_username(self, field: Field) -> None:
         """
-        Check for too many failed login attempts before allowing another try.
+        Add account lockout checks and password spray protection.
         """
+        username = field.data.strip().lower()
+        ip_address = request.remote_addr
+
         try:
             with db_session() as db:
-                try:
-                    # Check recent failed attempts within the past 15 minutes
-                    recent_failures = db.execute(
-                        text(
-                            """
-                            SELECT COUNT(*)
-                            FROM login_attempts
+                # 1) Check if account is locked
+                locked_until = db.execute(
+                    text("""
+                        SELECT locked_until
+                        FROM user_accounts
+                        WHERE username = :username
+                    """),
+                    {"username": username}
+                ).scalar()
+
+                if locked_until and locked_until > datetime.utcnow():
+                    raise ValidationError("Account temporarily locked - please try again later.")
+
+                # 2) Check recent failed attempts for username or IP
+                recent_failures = db.execute(
+                    text("""
+                        SELECT COUNT(*)
+                        FROM login_attempts
+                        WHERE (username = :username OR ip_address = :ip)
+                        AND success = false
+                        AND attempted_at > NOW() - INTERVAL '15 minutes'
+                    """),
+                    {"username": username, "ip": ip_address}
+                ).scalar()
+
+                if recent_failures >= 5:
+                    # Lock the account for 15 minutes
+                    db.execute(
+                        text("""
+                            UPDATE user_accounts
+                            SET locked_until = NOW() + INTERVAL '15 minutes'
                             WHERE username = :username
-                            AND success = false
-                            AND attempted_at > NOW() - INTERVAL '15 minutes'
-                            """
-                        ),
-                        {"username": field.data.strip()},
-                    ).scalar()
+                        """),
+                        {"username": username}
+                    )
+                    raise ValidationError("Too many failed attempts - account locked for 15 minutes.")
 
-                    if recent_failures is not None and int(recent_failures) >= 5:
-                        raise ValidationError(
-                            "Too many failed login attempts. Please try again in 15 minutes."
-                        )
-                except Exception as table_error:
-                    # Handle case where login_attempts table doesn't exist yet
-                    if "relation" in str(table_error) and "does not exist" in str(table_error):
-                        logger.warning("Login attempts table does not exist - skipping rate limit check")
-                        return
-                    # Re-raise other database errors
-                    raise
+        except ValidationError:
+            raise
         except Exception as e:
-            logger.error(f"Error checking login attempts: {str(e)}")
-            # Don't expose internal errors to user
-            raise ValidationError(
-                "Unable to process login at this time. Please try again later."
-            )
-
-    def validate_csrf_token(self, field):
-        if request.is_json:
-            token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
-            if not token:
-                raise ValidationError('CSRF token missing')
-            if not field.current_token:
-                raise ValidationError('CSRF session token missing')
-            if not field.validate(token):
-                raise ValidationError('CSRF token invalid')
-            return True
-        if not field.data:
-            raise ValidationError('Missing CSRF token.')
-        if not field.current_token:
-            raise ValidationError('CSRF session token missing')
-        if not field.validate(field.data):
-            raise ValidationError('CSRF token invalid')
-        return True
+            logger.error(f"Security validation error: {str(e)}")
+            raise ValidationError("Login temporarily unavailable - please try again later.")
 
 # ------------------------------------------------------------------------
 # RegistrationForm
@@ -173,48 +154,31 @@ class RegistrationForm(FlaskForm):
     Form for user registration.
     Inherits CSRF protection from FlaskForm.
     """
+    class Meta:
+        csrf = True
+        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
+
     def __init__(self, *args, **kwargs):
-        # Enable CSRF protection by default
+        # Enable CSRF protection by default if not specified
         if 'csrf_enabled' not in kwargs:
             kwargs['csrf_enabled'] = True
         super().__init__(*args, **kwargs)
-        # Initialize csrf_token field if not present
+
+        # If csrf_token isn't defined, define it (some older WTForms setups)
         if not hasattr(self, "csrf_token"):
-            from wtforms import HiddenField
             self.csrf_token = HiddenField('CSRF Token')
+
+        # For JSON requests, accept CSRF token from either body or header
         if request and request.is_json:
-            # For JSON requests, accept CSRF token from either body or header
             token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
             if token and hasattr(self, 'csrf_token'):
                 self.csrf_token.data = token
-
-    def validate_csrf_token(self, field):
-        """Custom CSRF validation for both form and JSON submissions"""
-        if request.is_json:
-            token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
-            if not token:
-                raise ValidationError('CSRF token missing')
-            if not field.current_token:
-                raise ValidationError('CSRF session token missing')
-            if not field.validate(token):
-                raise ValidationError('CSRF token invalid')
-            return True
-        # For non-JSON requests, validate that a token is present
-        if not field.data:
-            raise ValidationError('Missing CSRF token.')
-        if not field.current_token:
-            raise ValidationError('CSRF session token missing')
-        if not field.validate(field.data):
-            raise ValidationError('CSRF token invalid')
-        return True
 
     username = StringField(
         "Username",
         validators=[
             DataRequired(message="Username is required."),
-            Length(
-                min=4, max=20, message="Username must be between 4 and 20 characters."
-            ),
+            Length(min=4, max=20, message="Username must be between 4 and 20 characters."),
             Regexp(
                 r"^[a-zA-Z0-9_]+$",
                 message="Username can only contain letters, numbers, and underscores.",
@@ -228,14 +192,18 @@ class RegistrationForm(FlaskForm):
             Email(message="Invalid email address."),
         ],
     )
+    # Enhanced minimum password length = 12
     password = PasswordField(
         "Password",
         validators=[
             DataRequired(message="Password is required."),
-            Length(min=8, message="Password must be at least 8 characters long."),
+            Length(min=12, message="Password must be at least 12 characters long."),
             Regexp(
-                r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*(),.?\":{}|<>]).+$",
-                message="Password must include uppercase, lowercase, digit, and special character.",
+                r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*]).{12,}$",
+                message=(
+                    "Password must include uppercase, lowercase, digit, "
+                    "and special character (from !@#$%^&*)."
+                ),
             ),
         ],
     )
@@ -251,7 +219,7 @@ class RegistrationForm(FlaskForm):
     def validate_username(self, field: Field) -> None:
         """
         Custom validator for username.
-        Checks if username or email is already taken, plus format checks.
+        Checks if username is already taken; also ensures format checks.
         """
         if not field.data:
             return
@@ -272,9 +240,7 @@ class RegistrationForm(FlaskForm):
 
             # Validate username format
             if field.data != username:
-                raise ValidationError(
-                    "Username cannot contain leading or trailing spaces."
-                )
+                raise ValidationError("Username cannot contain leading or trailing spaces.")
 
             if len(username) < 4:
                 raise ValidationError("Username must be at least 4 characters long.")
@@ -284,6 +250,8 @@ class RegistrationForm(FlaskForm):
                     "Username can only contain letters, numbers, and underscores."
                 )
 
+        except ValidationError:
+            raise
         except Exception as e:
             logger.error(f"Error validating username: {str(e)}", exc_info=True)
             raise ValidationError("An unexpected error occurred while validating the username. Please try again later.")
@@ -305,10 +273,9 @@ class RegistrationForm(FlaskForm):
                 ).fetchone():
                     raise ValidationError("This email address is already registered. Please use a different email or try logging in.")
 
+        except ValidationError:
+            raise
         except Exception as e:
-            if isinstance(e, ValidationError):
-                logger.error(f"Email validation failed: {str(e)}", exc_info=True)
-                raise e
             logger.error(f"Error validating email: {str(e)}", exc_info=True)
             raise ValidationError("An error occurred while validating the email. Please try again later.")
 
@@ -321,8 +288,8 @@ class RegistrationForm(FlaskForm):
 
         try:
             validate_password_strength(field.data)
-        except ValidationError as e:
-            raise e
+        except ValidationError as ve:
+            raise ve
         except Exception as e:
             logger.error(f"Error validating password: {str(e)}")
             raise ValidationError("Unable to validate password at this time")
@@ -335,6 +302,10 @@ class ResetPasswordForm(FlaskForm):
     """
     Form for resetting password.
     """
+    class Meta:
+        csrf = True
+        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
+
     password = PasswordField(
         "New Password",
         validators=[
@@ -363,6 +334,10 @@ class ForgotPasswordForm(FlaskForm):
     """
     Form for requesting a password reset.
     """
+    class Meta:
+        csrf = True
+        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
+
     email = StringField(
         "Email",
         validators=[
@@ -380,6 +355,10 @@ class ProviderForm(FlaskForm):
     """
     Form for creating or updating AI providers.
     """
+
+    class Meta:
+        csrf = True
+        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
 
     name = StringField(
         "Provider Name",
@@ -409,9 +388,9 @@ class ProviderForm(FlaskForm):
         "API Base URL",
         validators=[
             DataRequired(message="API base URL is required."),
-            URL(message="Must be a valid URL.")
+            URL(message="Must be a valid URL."),
         ],
-        description="Base URL for your OpenAI-compatible API (e.g., https://api.openai.com/v1)"
+        description="Base URL for your OpenAI-compatible API (e.g., https://api.openai.com/v1)",
     )
 
     requires_authentication = BooleanField("Requires Authentication", default=True)
@@ -421,25 +400,22 @@ class ProviderForm(FlaskForm):
         validators=[
             DataRequired(message="API path is required."),
             Length(max=255, message="API path cannot exceed 255 characters."),
-            Regexp(r"^/.*$", message="API path must start with /")
+            Regexp(r"^/.*$", message="API path must start with /"),
         ],
         default="/chat/completions",
-        description="API path that will be appended to the base URL. Defaults to /chat/completions for OpenAI compatibility."
+        description="API path appended to the base URL (defaults to /chat/completions).",
     )
 
     def validate_endpoint_pattern(self, field):
         """Validate the API path format."""
         try:
-            # Don't allow Azure OpenAI patterns
-            if 'azure' in self.slug.data.lower():
-                raise ValidationError("Azure OpenAI endpoints should be configured through the Azure provider type")
+            if "azure" in self.slug.data.lower():
+                raise ValidationError("Azure OpenAI endpoints should be configured via Azure provider type.")
 
-            # Ensure path starts with /
-            if not field.data.startswith('/'):
+            if not field.data.startswith("/"):
                 raise ValidationError("API path must start with /")
 
-            # Validate no double slashes
-            if '//' in field.data:
+            if "//" in field.data:
                 raise ValidationError("API path cannot contain double slashes")
 
         except ValidationError:
@@ -450,14 +426,11 @@ class ProviderForm(FlaskForm):
     def validate_api_base_url(self, field):
         """Validate the API base URL."""
         try:
-            # Don't allow Azure OpenAI URLs
-            if field.data and 'azure' in str(field.data).lower():
-                raise ValidationError("Azure OpenAI endpoints should be configured through the Azure provider type")
+            if field.data and "azure" in str(field.data).lower():
+                raise ValidationError("Azure OpenAI endpoints should be configured through the Azure provider type.")
 
-            # Remove trailing slash
             if field.data:
-                field.data = str(field.data).rstrip('/')
-
+                field.data = str(field.data).rstrip("/")
         except ValidationError:
             raise
         except Exception as e:
@@ -470,19 +443,19 @@ class ProviderForm(FlaskForm):
             Length(max=20, message="API version format cannot exceed 20 characters."),
             Regexp(
                 r"^\d{4}-\d{2}-\d{2}(?:-preview)?$",
-                message="API version format must be in format YYYY-MM-DD or YYYY-MM-DD-preview",
+                message="Must be YYYY-MM-DD or YYYY-MM-DD-preview",
             ),
         ],
-        default="2024-12-01-preview"
+        default="2024-12-01-preview",
     )
 
     api_key = PasswordField(
         "API Key",
         validators=[
             Optional(),
-            Length(min=32, message="API key must be at least 32 characters if provided.")
+            Length(min=32, message="API key must be at least 32 characters if provided."),
         ],
-        description="Provider-level API key (if using a shared key)"
+        description="Provider-level API key (if using a shared key)",
     )
 
     model_name = StringField(
@@ -495,7 +468,7 @@ class ProviderForm(FlaskForm):
                 message="Model name can only contain letters, numbers, spaces, underscores, and hyphens.",
             ),
         ],
-        description="Default model name for this provider"
+        description="Default model name for this provider",
     )
 
     deployment_name = StringField(
@@ -508,13 +481,13 @@ class ProviderForm(FlaskForm):
                 message="Deployment name can only contain letters, numbers, underscores, and hyphens.",
             ),
         ],
-        description="Default deployment name (Azure OpenAI only)"
+        description="Default deployment name (Azure OpenAI only)",
     )
 
     is_azure = BooleanField(
         "Azure OpenAI Provider",
         default=False,
-        description="Check if this is an Azure OpenAI provider"
+        description="Check if this is an Azure OpenAI provider",
     )
 
 # ------------------------------------------------------------------------
@@ -522,42 +495,47 @@ class ProviderForm(FlaskForm):
 # ------------------------------------------------------------------------
 
 class ModelForm(FlaskForm):
+    class Meta:
+        csrf = True
+        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
+
     name = StringField('Model Name', validators=[DataRequired(), Length(max=255)])
     deployment_name = StringField(
         'Deployment Name',
         validators=[Optional(), Length(max=255)],
-        description="Required for Azure OpenAI providers. Leave empty for other providers.",
-        render_kw={
-            "class": "w-full border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-gray-200"
-        }
+        description="Required for Azure OpenAI providers; leave empty for others."
     )
     description = TextAreaField('Description', validators=[Optional(), Length(max=500)])
     provider_id = SelectField('Provider', coerce=int, validators=[DataRequired()])
-    api_key = PasswordField('API Key', validators=[DataRequired(), Length(min=32, message="API key must be at least 32 characters.")])
-    model_type = SelectField('Model Type',
+    api_key = PasswordField(
+        'API Key',
+        validators=[DataRequired(), Length(min=32, message="API key must be at least 32 characters.")]
+    )
+    model_type = SelectField(
+        'Model Type',
         choices=[
             ('azure', 'Azure OpenAI (Standard)'),
             ('o1', 'Azure OpenAI (o1)'),
             ('o1-mini', 'Azure OpenAI (o1-mini)'),
             ('o1-preview', 'Azure OpenAI (o1-preview)'),
-            ('o3-mini', 'Azure OpenAI (o3-mini)')
+            ('o3-mini', 'Azure OpenAI (o3-mini)'),
         ],
         validators=[DataRequired()],
         description="Select the model type - o1/o3 models support advanced reasoning capabilities"
     )
-
-    reasoning_effort = SelectField('Reasoning Effort',
+    reasoning_effort = SelectField(
+        'Reasoning Effort',
         choices=[
             ('low', 'Low - Faster responses, fewer tokens'),
             ('medium', 'Medium - Balanced speed and reasoning (Default)'),
-            ('high', 'High - More thorough reasoning, more tokens')
+            ('high', 'High - More thorough reasoning, more tokens'),
         ],
         default='medium',
         validators=[Optional()],
         description="Controls how many reasoning tokens the model generates before responding"
     )
-
-    store = BooleanField('Store Completion',
+    store = BooleanField(
+        'Store Completion',
         default=False,
         description="Whether to store this completion for future reference"
     )
@@ -571,28 +549,30 @@ class ModelForm(FlaskForm):
     supports_streaming = BooleanField('Streaming Support')
     requires_o1_handling = BooleanField('Requires o1-preview Handling')
     model_family = StringField('Model Family', validators=[Optional(), Length(max=255)])
-    api_version = StringField('API Version', validators=[
-        DataRequired(message="API version is required."),
-        Length(max=20, message="API version cannot exceed 20 characters."),
-        Regexp(
-            r"^\d{4}-\d{2}-\d{2}(?:-preview)?$",
-            message="API version must be in format YYYY-MM-DD or YYYY-MM-DD-preview"
-        )
-    ], default="2024-12-01-preview")
+    api_version = StringField(
+        'API Version',
+        validators=[
+            DataRequired(message="API version is required."),
+            Length(max=20, message="API version cannot exceed 20 characters."),
+            Regexp(
+                r"^\d{4}-\d{2}-\d{2}(?:-preview)?$",
+                message="API version must be in format YYYY-MM-DD or YYYY-MM-DD-preview"
+            )
+        ],
+        default="2024-12-01-preview"
+    )
     version = HiddenField('Version')
-    api_endpoint = URLField('API Endpoint', validators=[
-        DataRequired(message="API endpoint is required."),
-        URL(message="Must be a valid URL."),
-    ])
+    api_endpoint = URLField(
+        'API Endpoint',
+        validators=[DataRequired(message="API endpoint is required."), URL(message="Must be a valid URL.")],
+    )
 
     def __init__(self, *args, **kwargs):
         self.is_edit = kwargs.pop('is_edit', False)
-        self._obj = kwargs.pop('obj', None)  # Store the model object if provided
-        self.provider_validation_rules = {}  # Initialize here
-
+        self._obj = kwargs.pop('obj', None)  # The Model object if editing
+        self.provider_validation_rules = {}
         super().__init__(*args, **kwargs)
 
-        # Log initialization
         logger.debug("Initializing ModelForm", extra={
             "is_edit": self.is_edit,
             "has_data": bool(args and args[0])
@@ -602,7 +582,6 @@ class ModelForm(FlaskForm):
         self.load_providers()
         self.load_provider_validation_rules()
 
-        # Get provider if available
         provider = None
         if self.provider_id.data:
             provider = Provider.get_by_id(self.provider_id.data)
@@ -612,32 +591,26 @@ class ModelForm(FlaskForm):
                 "is_azure": provider.is_azure if provider else None
             })
 
-        # Setup deployment_name field
+        # Configure deployment_name after we know the provider
         self.setup_deployment_name_field(provider)
 
-        # Log form state after initialization
         logger.debug("Form initialized", extra={
             "deployment_name_state": {
                 "value": self.deployment_name.data if hasattr(self, 'deployment_name') else None,
-                "required": getattr(self.deployment_name, 'flags', {}).required if hasattr(self, 'deployment_name') else None,
-                "render_kw": getattr(self.deployment_name, 'render_kw', {}) if hasattr(self, 'deployment_name') else None
+                "required": getattr(self.deployment_name, 'flags', {}).required if hasattr(self.deployment_name, 'flags') else None,
+                "render_kw": getattr(self.deployment_name, 'render_kw', {}) if hasattr(self.deployment_name, 'render_kw') else None
             }
         })
 
-        # Set default False for unchecked booleans
         for field in ['requires_o1_handling', 'supports_streaming', 'is_default']:
             if field not in self.data:
                 setattr(self, field, False)
 
     def load_provider_validation_rules(self):
-        """
-        Load validation rules based on the selected provider and update field requirements.
-        """
         provider_id = self.provider_id.data
         logger.debug("Loading provider validation rules", extra={"provider_id": provider_id})
 
         if not provider_id:
-            logger.debug("No provider_id, skipping validation rules")
             self.provider_validation_rules = {}
             return
 
@@ -647,7 +620,6 @@ class ModelForm(FlaskForm):
             self.provider_validation_rules = {}
             return
 
-        # Load validation rules
         try:
             rules = provider.validation_rules
             if isinstance(rules, str):
@@ -661,10 +633,9 @@ class ModelForm(FlaskForm):
             logger.error("Error loading validation rules", exc_info=True)
             rules = {}
 
-        # Update deployment_name field based on provider type
+        # If provider is Azure, make deployment_name required
         if provider.is_azure:
             logger.debug("Setting up Azure provider validation")
-            # Make deployment_name required for Azure
             self.deployment_name.validators = [DataRequired(), Length(max=255)]
             if hasattr(self.deployment_name, 'flags'):
                 self.deployment_name.flags.required = True
@@ -674,7 +645,6 @@ class ModelForm(FlaskForm):
             self.deployment_name.render_kw['aria-required'] = 'true'
         else:
             logger.debug("Setting up non-Azure provider validation")
-            # Make deployment_name optional for non-Azure
             self.deployment_name.validators = [Optional(), Length(max=255)]
             if hasattr(self.deployment_name, 'flags'):
                 self.deployment_name.flags.required = False
@@ -683,13 +653,13 @@ class ModelForm(FlaskForm):
             self.deployment_name.render_kw.pop('required', None)
             self.deployment_name.render_kw.pop('aria-required', None)
 
-        # Store the rules
         self.provider_validation_rules = rules
 
     def setup_edit_mode(self):
-        """Modify form behavior for edit mode"""
+        """
+        Modify form behavior for edit mode: make API key optional if editing.
+        """
         if self.is_edit:
-            # Make API key optional for edits
             self.api_key.validators = [
                 Optional(),
                 Length(min=32, message="API key must be at least 32 characters if provided.")
@@ -698,7 +668,9 @@ class ModelForm(FlaskForm):
             self.api_key.flags.required = False
 
     def load_providers(self):
-        """Dynamic provider loading with error handling"""
+        """
+        Populate provider_id choices from the database.
+        """
         try:
             with db_session() as session:
                 providers = session.execute(
@@ -708,74 +680,6 @@ class ModelForm(FlaskForm):
         except Exception as e:
             logger.error(f"Error loading providers: {str(e)}")
             self.provider_id.choices = []
-
-    def validate_max_completion_tokens(self, field):
-        """Enhanced validation with provider constraints"""
-        try:
-            value = int(field.data)
-        except (TypeError, ValueError):
-            raise ValidationError("Must be a valid integer")
-
-        provider = Provider.get_by_id(self.provider_id.data)
-        provider_max = provider.capabilities.get('max_tokens', 16384) if provider else 16384
-
-        if self.requires_o1_handling.data:
-            if not (1 <= value <= 25000):
-                raise ValidationError("Must be between 1-25000 for o1-preview models (OpenAI recommended)")
-        else:
-            if not (1 <= value <= provider_max):
-                raise ValidationError(f"Must be between 1-{provider_max} for this provider")
-
-    def validate_temperature(self, field):
-        """Temperature validation with o1-preview locking"""
-        if self.requires_o1_handling.data:
-            field.data = 1.0  # Force value for o1-preview
-            return
-
-        if field.data is None:
-            return
-
-        try:
-            temp = float(field.data)
-            if not (0 <= temp <= 2):
-                raise ValidationError("Must be between 0.0 and 2.0")
-        except ValueError:
-            raise ValidationError("Must be a valid number")
-
-    def validate_supports_streaming(self, field):
-        """Streaming validation with o1-preview constraint"""
-        if self.requires_o1_handling.data and field.data:
-            raise ValidationError("Streaming not supported for o1-preview models")
-
-    def process_api_key(self):
-        """Handle API key encryption and preservation"""
-        if self.is_edit and not self.api_key.data:
-            original_model = None
-            if self._obj and hasattr(self._obj, 'id'):
-                original_model = Model.get_by_id(self._obj.id)
-            if original_model:
-                self.api_key.data = original_model.api_key
-        elif self.api_key.data:
-            # Encrypt new key
-            try:
-                from flask import current_app
-                encryption_key = current_app.config.get('ENCRYPTION_KEY')
-                if not encryption_key:
-                    raise ValidationError("Encryption key not configured")
-                self.api_key.data = encrypt_api_key(self.api_key.data, encryption_key)
-            except EncryptionError as e:
-                logger.error(f"API key encryption failed: {str(e)}")
-                raise ValidationError("Failed to secure API key")
-
-    def validate_api_endpoint(self, field):
-        if not field.data:
-            return
-
-        pattern = self.provider_validation_rules.get('endpoint')
-        if pattern:
-            import re
-            if not re.match(pattern, field.data):
-                raise ValidationError("API endpoint does not match the required format specified by the provider.")
 
     def setup_deployment_name_field(self, provider=None):
         """
@@ -792,7 +696,6 @@ class ModelForm(FlaskForm):
             "is_azure": provider.is_azure if provider else None
         })
 
-        # Configure field attributes
         if not self.deployment_name.render_kw:
             self.deployment_name.render_kw = {}
 
@@ -807,10 +710,7 @@ class ModelForm(FlaskForm):
         else:
             self.deployment_name.validators = [Optional(), Length(max=255)]
             self.deployment_name.flags.required = False
-            self.deployment_name.render_kw.update({
-                'tabindex': '-1'
-            })
-            # Remove required attributes
+            self.deployment_name.render_kw.update({'tabindex': '-1'})
             self.deployment_name.render_kw.pop('required', None)
             self.deployment_name.render_kw.pop('aria-required', None)
 
@@ -818,28 +718,112 @@ class ModelForm(FlaskForm):
         """
         Enhanced validation for deployment_name field with detailed logging.
         """
-        from models.provider import Provider
-        provider = Provider.get_by_id(self.provider_id.data)
+        provider = Provider.get_by_id(self.provider_id.data) if self.provider_id.data else None
 
         if provider and provider.is_azure:
-            # For Azure providers, deployment_name is required
+            # Must have a deployment name
             if not field.data:
                 raise ValidationError("Deployment name is required for Azure OpenAI providers.")
 
-            # Validate pattern if one exists
             pattern = self.provider_validation_rules.get('model_id')
-            if pattern:
-                import re
-                if field.data and not re.match(pattern, field.data):
-                    raise ValidationError("Deployment name does not match the required format specified by the provider.")
+            if pattern and not re.match(pattern, field.data):
+                raise ValidationError("Deployment name does not match provider format requirements.")
         else:
-            # For non-Azure providers, deployment_name should be empty
+            # Non-Azure providers must not supply a deployment name
             if field.data:
-                field.data = ""  # Clear the field for non-Azure providers
+                raise ValidationError("Deployment names are only allowed for Azure providers.")
+
+    def validate_max_completion_tokens(self, field):
+        """
+        Enhanced validation with provider constraints.
+        """
+        try:
+            value = int(field.data)
+        except (TypeError, ValueError):
+            raise ValidationError("Must be a valid integer")
+
+        provider = Provider.get_by_id(self.provider_id.data)
+        provider_max = provider.capabilities.get('max_tokens', 16384) if provider else 16384
+
+        if self.requires_o1_handling.data:
+            if not (1 <= value <= 25000):
+                raise ValidationError("Must be between 1-25000 for o1-preview models (OpenAI recommended).")
+        else:
+            if not (1 <= value <= provider_max):
+                raise ValidationError(f"Must be between 1-{provider_max} for this provider.")
+
+    def validate_temperature(self, field):
+        """
+        Temperature validation with o1-preview locking.
+        """
+        if self.requires_o1_handling.data:
+            field.data = 1.0  # Force value for o1-preview
+            return
+
+        if field.data is None:
+            return
+
+        try:
+            temp = float(field.data)
+            if not (0 <= temp <= 2):
+                raise ValidationError("Must be between 0.0 and 2.0")
+        except ValueError:
+            raise ValidationError("Must be a valid number")
+
+    def validate_supports_streaming(self, field):
+        """
+        Streaming validation with o1-preview constraint.
+        """
+        if self.requires_o1_handling.data and field.data:
+            raise ValidationError("Streaming not supported for o1-preview models.")
+
+    def process_api_key(self):
+        """
+        Handle API key encryption with better error handling.
+        """
+        try:
+            # If editing and no new API key is supplied, preserve the old one.
+            if self.is_edit and not self.api_key.data and self._obj:
+                self.api_key.data = self._obj.api_key
                 return
 
+            if self.api_key.data:
+                if len(self.api_key.data) < 32:
+                    raise ValidationError("API key must be at least 32 characters.")
+
+                encryption_key = current_app.config.get('ENCRYPTION_KEY')
+                if not encryption_key:
+                    logger.critical("Encryption key missing in configuration.")
+                    raise ValidationError("System configuration error - please contact administrator.")
+
+                # Encrypt new key with optional versioning
+                version = current_app.config.get('ENCRYPTION_KEY_VERSION', 1)
+                self.api_key.data = encrypt_api_key(self.api_key.data, encryption_key, version)
+
+        except EncryptionError as e:
+            logger.error(f"API key encryption failed: {str(e)}")
+            raise ValidationError("Failed to secure API key - please try again.")
+        except ValidationError:
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error processing API key: {str(e)}")
+            raise ValidationError("Error processing credentials - please try again.")
+
+    def validate_api_endpoint(self, field):
+        if not field.data:
+            return
+
+        pattern = self.provider_validation_rules.get('endpoint')
+        if pattern:
+            if not re.match(pattern, field.data):
+                raise ValidationError(
+                    "API endpoint does not match the required format specified by the provider."
+                )
+
     def validate_version(self, field):
-        """Optimistic concurrency control"""
+        """
+        Optimistic concurrency control.
+        """
         if self.is_edit and self._obj and hasattr(self._obj, 'id') and field.data:
             model = Model.get_by_id(self._obj.id)
             if model and hasattr(model, 'version') and int(field.data) != model.version:
@@ -851,9 +835,13 @@ class ModelForm(FlaskForm):
 
 class DefaultModelForm(FlaskForm):
     """
-    Form for editing the default model configuration during registration if it is invalid,
-    specifically designed for o1-preview model configuration.
+    Form for editing the default model configuration during registration if invalid,
+    specifically for o1-preview model configuration.
     """
+    class Meta:
+        csrf = True
+        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
+
     provider_id = SelectField(
         "Provider",
         validators=[DataRequired(message="Provider is required.")],
@@ -881,5 +869,6 @@ class DefaultModelForm(FlaskForm):
                 r"^[a-zA-Z0-9_\-\s]+$",
                 message="Deployment name can only contain letters, numbers, spaces, underscores, and hyphens.",
             ),
-        ]
+        ],
     )
+
