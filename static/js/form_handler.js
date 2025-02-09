@@ -56,22 +56,17 @@ class ModelFormHandler {
             submitButton.disabled = true;
             submitButton.innerHTML = this.loadingButtonHTML();
 
-            // Process form data with proper type handling
+            // Ensure CSRF token is present
             const formData = new FormData(form);
+            if (!formData.get('csrf_token')) {
+                const csrfToken = this.utils.getCSRFToken();
+                formData.append('csrf_token', csrfToken);
+            }
+
             const data = this.processFormData(formData);
 
-            // Handle API key preservation
-            if (!data.api_key || data.api_key.trim() === '') {
-                delete data.api_key;
-            }
-
-            // Add CSRF token
+            // Add CSRF token from meta tag as header
             const csrfToken = this.utils.getCSRFToken();
-            if (csrfToken) {
-                data.csrf_token = csrfToken;
-            }
-
-            // Add CSRF headers
             const headers = {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': csrfToken,
@@ -93,6 +88,11 @@ class ModelFormHandler {
                 this.handleErrors(form, responseData);
             }
         } catch (error) {
+            // Enhanced error handling for CSRF failures
+            if (error.message.includes('CSRF')) {
+                this.handleSubmissionError(new Error('Security validation failed. Please refresh the page.'));
+                return;
+            }
             this.handleSubmissionError(error);
         } finally {
             this.resetSubmitButton(submitButton, form);

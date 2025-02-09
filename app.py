@@ -124,6 +124,10 @@ def configure_app(app: Optional[Flask] = None) -> None:
         app = current_app
 
     app.config.from_object(Config)
+    # Explicitly set SESSION_COOKIE_DOMAIN to 'localhost' during local dev
+    # if you're testing at http://localhost:5000 so cookies match the domain
+    if app.config.get("ENV", "production").lower() == "development":
+        app.config["SESSION_COOKIE_DOMAIN"] = "localhost"
 
     # Session configuration
     app.config.update(
@@ -347,6 +351,14 @@ def create_app() -> Flask:
     # Ensure config is loaded before database initialization
     config = Config()
     app.config.from_object(config)
+
+    # Debug log the current environment
+    import sys
+    print(f"DEBUG: app.config['ENV'] -> {app.config['ENV']}", file=sys.stderr)
+    print(f"DEBUG: app.config['DEBUG'] -> {app.config['DEBUG']}", file=sys.stderr)
+    print(f"DEBUG: ENV: {app.config['ENV']}", file=sys.stderr)
+    print(f"DEBUG: DEBUG: {app.config['DEBUG']}", file=sys.stderr)
+
     init_db_app(app)
 
     # Verify database connection
@@ -382,8 +394,6 @@ def create_app() -> Flask:
     return app
 
 
-app = create_app()
-
 
 def create_error_response(
     error_msg: str, status_code: int
@@ -397,6 +407,7 @@ def create_error_response(
         status_code,
     )
 
+app = create_app()
 
 # Error handlers
 for code in [400, 401, 403, 404, 405, 429]:
@@ -506,6 +517,11 @@ def index() -> WerkzeugResponse:
         return redirect(url_for("auth.login"))
     return redirect(url_for("chat.chat_interface"))
 
+    # Add an explicit route to handle requests to "/login" in case they are arriving here instead of "/auth/login"
+    @app.route("/login", methods=["GET", "POST"])
+    def direct_login():
+        # Redirect to the actual auth.login route
+        return redirect(url_for("auth.login"))
 
 @app.route("/clear-session")
 def clear_session() -> WerkzeugResponse:

@@ -199,6 +199,9 @@ class Config:
         self.DEBUG = os.getenv("FLASK_DEBUG", "False").lower() in ("true", "1", "t")
         self.LOG_LEVEL = "DEBUG" if self.DEBUG else os.getenv("LOG_LEVEL", "INFO")
         self.SUPPRESS_WERKZEUG_LOGS = True
+        # Force SESSION_COOKIE_SECURE = False in development to avoid cookie issues on HTTP
+        if self.ENV.lower() == "development":
+            os.environ["SESSION_COOKIE_SECURE"] = "False"
 
         # Core settings
         self.SECRET_KEY = os.getenv("SECRET_KEY")

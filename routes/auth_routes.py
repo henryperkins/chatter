@@ -7,6 +7,8 @@ import os
 from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 
+from typing import Optional
+from flask_wtf.csrf import CSRFError
 from email_validator import EmailNotValidError, validate_email
 from flask import (
     Blueprint,
@@ -51,17 +53,17 @@ def is_safe_url(target: str) -> bool:
 
 def json_response(
     success: bool,
-    message: str = None,
-    data: dict = None,
-    errors: dict = None,
+    message: Optional[str] = None,
+    data: Optional[dict] = None,
+    errors: Optional[dict] = None,
     status_code: int = 200,
 ):
     """Helper for consistent JSON responses"""
     response = {
         "success": success,
-        "message": message,
-        "data": data or {},
-        "errors": errors or {},
+        "message": message if message is not None else "",
+        "data": data if data is not None else {},
+        "errors": errors if errors is not None else {},
     }
     return jsonify(response), status_code
 
@@ -119,6 +121,12 @@ def login():
     form = LoginForm()
 
     if form.validate_on_submit():
+        # Add CSRF debugging
+        logger.debug(f"CSRF data in form object: {form.csrf_token.data}")
+        logger.debug(f"Raw form data for csrf_token: {request.form.get('csrf_token')}")
+        logger.debug(f"Cookies sent by client: {request.cookies}")
+    if not form.csrf_token.data:
+        raise CSRFError("Missing CSRF token")
         try:
             username = form.username.data
             if not username or not isinstance(username, str):
@@ -157,6 +165,32 @@ def login():
             return render_template("login.html", form=form)
 
     return render_template("login.html", form=form)
+
+
+@bp.errorhandler(CSRFError)
+def handle_csrf_error(e):
+    """Handle CSRF validation failures."""
+    logger.warning(
+        "CSRF validation failed",
+        extra={
+            "ip_address": request.remote_addr,
+            "route": request.path,
+            "error": str(e),
+            "headers": dict(request.headers),
+            "form_data": request.form.to_dict(),
+        }
+    )
+    
+    response_data = {
+        "success": False,
+        "error": "CSRF validation failed. Please refresh the page.",
+    }
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify(response_data), 400  # Return JSON for AJAX requests
+
+    flash("Form validation failed. Please try again.", "error")
+    return redirect(url_for("auth.login"))
 
 
 @bp.route("/register", methods=["GET", "POST"]) 
@@ -212,8 +246,13 @@ def register():
 
 
 @bp.route("/forgot_password", methods=["GET", "POST"])
-@limiter.limit("5 per minute")
 def forgot_password():
+    if current_app.config["ENV"] == "development":
+        # No rate limit in development
+        limiter.exempt(forgot_password)
+    else:
+        # 5 per minute in production
+        limiter.limit("5 per minute")(forgot_password)
     """Handle forgot password requests."""
     form = ForgotPasswordForm()
 
@@ -520,10 +559,22 @@ def cleanup_session(response):
 def test_create_user():
     """Test route for creating a user with hardcoded data."""
     try:
+        username_env = os.getenv("TEST_USERNAME")
+        email_env = os.getenv("TEST_EMAIL")
+        password_env = os.getenv("TEST_PASSWORD")
+
+        # Provide a fallback or raise an error if any of them is None
+        if not username_env:
+            username_env = "test-user"
+        if not email_env:
+            email_env = "test@example.com"
+        if not password_env:
+            password_env = "TestPassword123"
+
         user = User.create(
-            username=os.getenv("TEST_USERNAME"),
-            email=os.getenv("TEST_EMAIL"),
-            password=os.getenv("TEST_PASSWORD"),
+            username=username_env,
+            email=email_env,
+            password=password_env
         )
         return jsonify({"success": True, "user_id": user.id}), 200
     except Exception as e:
