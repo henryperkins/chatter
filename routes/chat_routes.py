@@ -295,7 +295,7 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         azure_token = None
         if model_obj and model_obj.api_key:
             try:
-                from utils.encryption import decrypt_api_key
+                from utils.encryption import decrypt_api_key, EncryptionError
 
                 encryption_key = os.getenv("ENCRYPTION_KEY", None)
                 if model_obj.api_key:
@@ -403,7 +403,7 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         azure_token = None
         if model_obj and model_obj.api_key:
             try:
-                from utils.encryption import decrypt_api_key
+                from utils.encryption import decrypt_api_key, EncryptionError
 
                 encryption_key = os.getenv("ENCRYPTION_KEY", None)
                 if model_obj.api_key:
