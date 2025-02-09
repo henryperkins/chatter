@@ -320,9 +320,6 @@ def get_models():
 def create_model():
     """Create a new model (admin-only)."""
     start_time = datetime.now()
-    csrf_error = validate_csrf_token()
-    if csrf_error:
-        return csrf_error
 
     # Check if we have any form data
     if not (request.form or request.get_json()):

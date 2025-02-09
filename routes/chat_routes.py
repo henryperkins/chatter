@@ -610,11 +610,11 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                 chat_id, include_system=not model_obj.requires_o1_handling
             )
 
-            # Check if streaming is requested
+            # Check if streaming is requested via query param
             use_streaming = (
                 model_obj.supports_streaming
                 and not model_obj.requires_o1_handling
-                and request.headers.get("Accept") == "text/event-stream"
+                and request.args.get("stream", "false").lower() == "true"
             )
 
             if use_streaming:
@@ -628,6 +628,34 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
     except Exception as e:
         logger.error(f"Chat handling error: {str(e)}", exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@chat_routes.route("/send_stream", methods=["POST"])
+@login_required
+@limiter.limit("60 per minute")
+def handle_chat_stream() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
+    """Handle streaming chat messages with dedicated endpoint."""
+    try:
+        chat_id = request.headers.get("X-Chat-ID") or session.get("chat_id")
+        if not chat_id:
+            return jsonify({"error": "No chat ID provided"}), 400
+
+        if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
+            return jsonify({"error": "Unauthorized access to chat"}), 403
+
+        model_obj = Chat.get_model(chat_id)
+        if not model_obj:
+            return jsonify({"error": "No model configured"}), 400
+
+        if not model_obj.supports_streaming or model_obj.requires_o1_handling:
+            return jsonify({"error": "Model does not support streaming"}), 400
+
+        history = conversation_manager.get_context(chat_id)
+        return stream_response(chat_id, history, model_obj)
+
+    except Exception as e:
+        logger.error(f"Streaming chat error: {str(e)}", exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
@@ -884,7 +912,14 @@ def scrape_route() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     if not query:
         return jsonify({"error": "Query is required."}), 400
 
+    # Validate domain against whitelist
     try:
+        from urllib.parse import urlparse
+        domain = urlparse(query).netloc.lower().split(":")[0]
+        allowed_domains = {"example.com", "docs.example.org"}  # Configure as needed
+        if domain not in allowed_domains:
+            return jsonify({"error": "Domain not allowed"}), 400
+
         response = scrape_data(query)
         return jsonify({"response": response})
     except ValueError as ex:
