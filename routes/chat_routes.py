@@ -401,8 +401,12 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             try:
                 from utils.encryption import decrypt_api_key
 
-                encryption_key = os.getenv("ENCRYPTION_KEY", "")
-                azure_token = decrypt_api_key(model_obj.api_key, encryption_key)
+                encryption_key = os.getenv("ENCRYPTION_KEY", None)
+                if encryption_key and model_obj.api_key:
+                    azure_token = decrypt_api_key(model_obj.api_key, encryption_key)
+                else:
+                    azure_token = None
+                    logger.warning("Azure token not decrypted because ENCRYPTION_KEY or api_key is empty.")
             except Exception as e:
                 logger.error("Error decrypting Azure token: %s", str(e))
 
