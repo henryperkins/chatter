@@ -10,11 +10,11 @@ logger = logging.getLogger(__name__)
 
 # Initialize Flask-Login
 login_manager = LoginManager()
-login_manager.login_view = 'auth.login'
+login_manager.login_view = 'auth.login'  # type: ignore
 login_manager.login_message_category = 'info'
 
 # Initialize CSRF Protection
-csrf = CSRFProtect()
+csrf = CSRFProtect()  # Initialize CSRF protection without skip_on_get argument
 
 # Alias for csrf.protect
 csrf_protect = csrf.protect

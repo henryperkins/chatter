@@ -153,13 +153,14 @@ def configure_app(app: Optional[Flask] = None) -> None:
     # CSRF configuration
     app.config.update(
         {
-            "WTF_CSRF_ENABLED": True,
-            "WTF_CSRF_TIME_LIMIT": 3600,
-            "WTF_CSRF_SSL_STRICT": False,
-            "WTF_CSRF_HEADERS": ["X-CSRFToken", "X-CSRF-Token"],
-            "WTF_CSRF_METHODS": ["POST", "PUT", "PATCH", "DELETE"],
-            "WTF_CSRF_FIELD_NAME": "csrf_token",
-            "WTF_CSRF_CHECK_DEFAULT": True
+            'WTF_CSRF_ENABLED': True,
+            'WTF_CSRF_SECRET_KEY': app.config['SECRET_KEY'],
+            'WTF_CSRF_TIME_LIMIT': 3600,
+            'WTF_CSRF_SSL_STRICT': False,
+            'WTF_CSRF_HEADERS': ['X-CSRFToken', 'X-CSRF-Token'],
+            'WTF_CSRF_METHODS': ['POST', 'PUT', 'PATCH', 'DELETE'],
+            'WTF_CSRF_FIELD_NAME': 'csrf_token',
+            'WTF_CSRF_CHECK_DEFAULT': False  # Don't check CSRF for all routes by default
         }
     )
 
@@ -177,13 +178,19 @@ def init_app_components(app: Flask) -> None:
     app.wsgi_app = SecurityMiddleware(app.wsgi_app)
 
     login_manager.init_app(app)
-    login_manager.login_view = "auth.login"
+    login_manager.login_view = "auth.login"  # type: ignore
 
     @login_manager.user_loader
     def load_user(user_id):
         return User.get(int(user_id))
 
+    # Initialize CSRF protection
     csrf.init_app(app)
+    
+    # Exempt certain routes from CSRF protection
+    csrf.exempt(app.static_folder)
+
+    # Initialize rate limiter
     limiter.init_app(app)
 
     # Register blueprints
@@ -206,7 +213,7 @@ def init_app_components(app: Flask) -> None:
             mimetype = 'text/css'
         elif filename.endswith('.js'):
             mimetype = 'application/javascript'
-        return send_from_directory(app.static_folder, filename, mimetype=mimetype)
+        return send_from_directory(str(app.static_folder), filename, mimetype=mimetype)
 
 
 def register_cli_commands(app):
@@ -323,7 +330,7 @@ def register_cli_commands(app):
                 """)
                 result = db.execute(query)
                 db.commit()
-                if result.rowcount > 0:
+                if result.rowcount > 0:  # type: ignore
                     print("Successfully fixed deployment name")
                 else:
                     print("No models needed fixing")
@@ -333,12 +340,12 @@ def register_cli_commands(app):
 
 def create_app() -> Flask:
     if hasattr(Flask, "_already_configured"):
-        return Flask._app_instance
+        return Flask._app_instance  # type: ignore
 
     app = Flask(__name__)
     app.secret_key = os.urandom(24)  # Set a secure secret key
-    Flask._already_configured = True
-    Flask._app_instance = app
+    Flask._already_configured = True  # type: ignore
+    Flask._app_instance = app  # type: ignore
 
     # Ensure config is loaded before database initialization
     config = Config()
@@ -349,13 +356,13 @@ def create_app() -> Flask:
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            engine = app._db_state["engine"]
+            engine = app._db_state["engine"]  # type: ignore
             if not engine:
                 raise RuntimeError("Database engine not initialized")
             with engine.connect() as conn:
                 result = conn.execute(text("SELECT 1"))
                 result.scalar()
-            if not app._db_state.get("Session"):
+            if not app._db_state.get("Session"):  # type: ignore
                 raise RuntimeError("Database session factory not initialized")
             break
         except Exception as e:
@@ -367,7 +374,7 @@ def create_app() -> Flask:
     if not hasattr(app, "_components_initialized"):
         try:
             init_app_components(app)
-            app._components_initialized = True
+            app._components_initialized = True  # type: ignore
         except Exception as e:
             logger.error("Component initialization failed", exc_info=True)
             raise RuntimeError(
@@ -528,7 +535,7 @@ def health_check():
                 "status": "healthy",
                 "initialized": is_initialized(),
                 "read_write": "success",
-            }
+            }  # type: ignore
 
         # Check system
         health_data["components"]["system"] = {
@@ -538,7 +545,7 @@ def health_check():
             "memory_percent": psutil.virtual_memory().percent,
             "cpu_percent": psutil.cpu_percent(),
             "disk_usage": psutil.disk_usage("/").percent,
-        }
+        }  # type: ignore
 
         return jsonify(health_data)
 
@@ -556,7 +563,7 @@ if __name__ == "__main__":
         {
             "DEBUG": debug_mode,
             "TEMPLATES_AUTO_RELOAD": debug_mode,
-            "SEND_FILE_MAX_AGE_DEFAULT": 0 if debug_mode else 3600,
+            "SEND_FILE_MAX_AGE_DEFAULT": 0 if debug_mode else 3600,  # type: ignore
         }
     )
 

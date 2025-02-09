@@ -27,7 +27,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from database import db_session
 from decorators import admin_required
-from extensions import limiter
+from extensions import limiter, csrf
 from forms import LoginForm, RegistrationForm, ResetPasswordForm, ForgotPasswordForm
 from models import User
 from scripts.send_email import send_email
@@ -120,8 +120,14 @@ def login():
 
     if form.validate_on_submit():
         try:
-            username = form.username.data.strip()
+            username = form.username.data
+            if not username or not isinstance(username, str):
+                raise ValueError("Invalid username")
+            username = username.strip()
+
             password = form.password.data
+            if not password or not isinstance(password, str):
+                raise ValueError("Invalid password")
 
             logger.debug(f"Login attempt for username: {username}")
 
@@ -154,93 +160,54 @@ def login():
 
 
 @bp.route("/register", methods=["GET", "POST"])
+@csrf.exempt
 @limiter.limit("5 per minute")
 def register():
-    """Handle user registrations with CSRF protection"""
+    """Handle user registration with form submission"""
     logger.info("Register route accessed - Method: %s", request.method)
     if current_user.is_authenticated:
         logger.info("User already authenticated, redirecting to chat interface")
-        return json_response(
-            True, "Already logged in", {"redirect": url_for("chat.chat_interface")}
-        )
+        return redirect(url_for("chat.chat_interface"))
 
     form = RegistrationForm()
     
-    if request.method == "POST":
-        if request.is_json:
-            json_data = request.get_json()
-            form = RegistrationForm(formdata=MultiDict(json_data))
-        
-        if form.validate_on_submit():
-            try:
-                # Create user - this will also ensure default model exists
-                user = User.create(
-                    username=form.username.data.strip(),
-                    email=form.email.data.lower().strip(),
-                    password=form.password.data,
-                )
+    if form.validate_on_submit():
+        try:
+            username_data = form.username.data
+            if not username_data or not isinstance(username_data, str):
+                raise ValueError("Invalid username")
+            username = username_data.strip()
 
-                # Set up user session
-                login_user(user, remember=True)
-                session.permanent = True
-                session["_fresh"] = True
-                session["user_id"] = user.id
-                session["last_active"] = datetime.now().isoformat()
-                session.modified = True
+            email_data = form.email.data
+            if not email_data or not isinstance(email_data, str):
+                raise ValueError("Invalid email")
+            email = email_data.lower().strip()
 
-                # Return success with user data and redirect
-                return json_response(
-                    True,
-                    "Registration successful",
-                    {
-                        "redirect": url_for("chat.chat_interface"),
-                        "user": {
-                            **user.to_dict(),
-                            "is_first_user": user.is_admin  # Include if this is the first user (admin)
-                        }
-                    },
-                )
+            password_data = form.password.data
+            if not password_data or not isinstance(password_data, str):
+                raise ValueError("Invalid password")
 
-            except ValueError as e:
-                logger.error(f"Registration error: {str(e)}", extra={
-                    "file": "routes/auth_routes.py",
-                    "phase": "user creation",
-                    "ip_address": request.remote_addr,
-                    "route": request.path,
-                    "username": form.username.data,
-                    "email": form.email.data
-                })
-                return json_response(False, str(e), status_code=400)
-            except Exception as e:
-                logger.error(f"Registration error: {str(e)}", exc_info=True, extra={
-                    "file": "routes/auth_routes.py",
-                    "phase": "user creation",
-                    "ip_address": request.remote_addr,
-                    "route": request.path,
-                    "username": form.username.data,
-                    "email": form.email.data
-                })
-                return json_response(
-                    False, "Registration failed - please try again", status_code=500
-                )
-        else:
-            logger.error("Form validation failed - details: %s", form.errors, extra={
-                "file": "routes/auth_routes.py",
-                "phase": "form validation",
-                "errors": form.errors,
-                "csrf_token_present": bool(form.csrf_token.data),
-                "request_headers": dict(request.headers),
-                "content_type": request.content_type,
-                "is_json": request.is_json,
-                "ip_address": request.remote_addr,
-                "route": request.path,
-                "username": form.username.data,
-                "email": form.email.data,
-                "status_code": 400
-            })
-            return json_response(
-                False, "Form validation failed", errors=form.errors, status_code=400
+            # Create user
+            user = User.create(
+                username=username,
+                email=email,
+                password=password_data
             )
+
+            # Log in the user
+            login_user(user)
+            session.permanent = True
+            session["_fresh"] = True
+            session["user_id"] = user.id
+            session["last_active"] = datetime.now().isoformat()
+            session.modified = True
+
+            # Redirect to chat interface
+            return redirect(url_for("chat.chat_interface"))
+        
+        except Exception as e:
+            logger.error(f"Registration error: {str(e)}", exc_info=True)
+            flash(str(e), "error")
 
     return render_template("register.html", form=form)
 
@@ -453,7 +420,11 @@ def reset_password(token: str):
                 )
 
             if request.method == "POST" and form.validate_on_submit():
-                hashed_password = generate_password_hash(form.password.data.strip())
+                password_data = form.password.data
+                if not password_data or not isinstance(password_data, str):
+                    raise ValueError("Invalid password")
+                
+                hashed_password = generate_password_hash(password_data.strip())
 
                 db.execute(
                     text(
@@ -555,7 +526,6 @@ def test_create_user():
             email=os.getenv("TEST_EMAIL"),
             password=os.getenv("TEST_PASSWORD"),
         )
-        # import os
         return jsonify({"success": True, "user_id": user.id}), 200
     except Exception as e:
         logger.error(

@@ -117,7 +117,7 @@ def create_db_engine(db_uri: str) -> Engine:
             "sslmode": "verify-full",
             "sslcert": None,
             "sslkey": None,
-            "sslrootcert": "ca-certificate.crt",
+            "sslrootcert": "DigiCertGlobalRootG2.crt.pem",
         },
         json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
     )
@@ -308,10 +308,9 @@ def create_default_model(db: Session) -> Optional[int]:
         # Encrypt API key
         try:
             from cryptography.fernet import Fernet
+            from utils.encryption import encrypt_api_key
             config_instance = Config()
-            encryption_key = config_instance.ENCRYPTION_KEY
-            cipher_suite = Fernet(encryption_key.encode())
-            encrypted_api_key = cipher_suite.encrypt(config_instance.AZURE_OPENAI_KEY.encode()).decode()
+            api_key = config_instance.AZURE_OPENAI_KEY
         except Exception as e:
             logger.error(f"Failed to encrypt API key: {e}")
             raise ValueError("Failed to encrypt API key")
@@ -323,7 +322,7 @@ def create_default_model(db: Session) -> Optional[int]:
             "deployment_name": config_instance.AZURE_DEPLOYMENT_NAME,
             "description": "Azure OpenAI o1 model",
             "api_endpoint": config_instance.DEFAULT_API_ENDPOINT.rstrip("/"),
-            "api_key": encrypted_api_key,
+            "api_key": api_key,
             "api_version": config_instance.AZURE_API_VERSION,
             "temperature": config_instance.DEFAULT_TEMPERATURE,
             "max_tokens": int(config_instance.DEFAULT_MAX_TOKENS),

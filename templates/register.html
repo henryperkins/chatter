@@ -30,7 +30,11 @@
                     required="required",
                     aria_describedby="username-error"
                 ) }}
-                <div id="username-error" class="error-text text-red-600 dark:text-red-400 text-sm mt-1"></div>
+                {% if form.username.errors %}
+                <div id="username-error" class="error-text text-red-600 dark:text-red-400 text-sm mt-1">
+                    {{ form.username.errors[0] }}
+                </div>
+                {% endif %}
             </div>
 
             <!-- Email -->
@@ -109,16 +113,8 @@
             <!-- Submit Button -->
             <button type="submit"
                     class="w-full px-6 py-3 text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                    id="submit-button"
-                    data-loading-text="Registering..."
-                    data-default-text="Register">
-                <span class="relative inline-flex items-center">
-                    <span id="button-text">Register</span>
-                    <svg id="loading-spinner" class="hidden w-5 h-5 ml-2 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                </span>
+                    id="submit-button">
+                Register
             </button>
         </form>
 
@@ -138,67 +134,6 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('registration-form');
-    const submitButton = document.getElementById('submit-button');
-    let isSubmitting = false;
-    if (form) {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (isSubmitting) return;
-            isSubmitting = true;
-            // Clear previous errors
-            document.querySelectorAll('.error-text').forEach(el => el.textContent = '');
-            document.getElementById('form-errors').classList.add('hidden');
-            try {
-                submitButton.disabled = true;
-                document.getElementById('loading-spinner').classList.remove('hidden');
-                document.getElementById('button-text').textContent = 'Registering...';
-                const formData = new FormData(form);
-                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-                if (!csrfToken) {
-                    throw new Error('CSRF token not found');
-                }
-                formData.append('csrf_token', csrfToken);
-                
-                const responseData = await window.utils.fetchWithCSRF(form.action, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-CSRFToken': csrfToken
-                    }
-                });
-                
-                if (responseData.success) {
-                    if (responseData.data?.redirect) {
-                        window.location.href = responseData.data.redirect;
-                    }
-                } else {
-                    if (responseData.errors) {
-                        Object.entries(responseData.errors).forEach(([field, errors]) => {
-                            const errorElement = document.getElementById(`${field}-error`);
-                            if (errorElement) {
-                                errorElement.textContent = Array.isArray(errors) ? errors.join(', ') : errors;
-                                errorElement.classList.remove('hidden');
-                            }
-                        });
-                    }
-                    if (responseData.message) {
-                        const formErrors = document.getElementById('form-errors');
-                        formErrors.textContent = responseData.message;
-                        formErrors.classList.remove('hidden');
-                    }
-                }
-            } catch (error) {
-                console.error('Registration error:', error);
-                window.utils.handleError(error);
-            } finally {
-                isSubmitting = false;
-                submitButton.disabled = false;
-                document.getElementById('loading-spinner').classList.add('hidden');
-                document.getElementById('button-text').textContent = 'Register';
-            }
-        });
-    }
     window.togglePasswordVisibility = function(fieldId) {
         const field = document.getElementById(fieldId);
         const icon = document.getElementById(`${fieldId}-toggle-icon`);
@@ -212,16 +147,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     };
-    form.querySelectorAll('input').forEach(input => {
-        input.addEventListener('input', () => {
-            const errorElement = document.getElementById(`${input.id}-error`);
-            if (errorElement) {
-                errorElement.textContent = '';
-                errorElement.classList.add('hidden');
-            }
-        });
-    });
 });
 </script>
 {% endblock %}
-</final_file_content>

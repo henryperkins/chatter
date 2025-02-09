@@ -241,6 +241,16 @@ class Model:
                     {k: v if k != "api_key" else "****" for k, v in data.items()},
                 )
 
+                # Encrypt API key before storing
+                from utils.encryption import encrypt_api_key
+                config = Config()
+                if "api_key" in data:
+                    try:
+                        data["api_key"] = encrypt_api_key(data["api_key"], config.ENCRYPTION_KEY)
+                    except Exception as e:
+                        logger.error("Failed to encrypt API key: %s", str(e))
+                        raise ValueError(f"Failed to encrypt API key: {str(e)}")
+
                 provider = Provider.get_by_id(data["provider_id"])
                 if not provider:
                     raise ValueError("Invalid provider_id")
@@ -439,6 +449,16 @@ class Model:
                 if not update_data:
                     logger.info("No valid fields to update for model ID %d", model_id)
                     return
+                
+                # Encrypt API key if it's being updated
+                if "api_key" in update_data:
+                    from utils.encryption import encrypt_api_key
+                    config = Config()
+                    try:
+                        update_data["api_key"] = encrypt_api_key(update_data["api_key"], config.ENCRYPTION_KEY)
+                    except Exception as e:
+                        logger.error("Failed to encrypt API key: %s", str(e))
+                        raise ValueError(f"Failed to encrypt API key: {str(e)}")
 
                 existing_model = Model.get_by_id(model_id)
                 if not existing_model:

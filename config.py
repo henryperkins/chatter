@@ -270,8 +270,12 @@ class Config:
         """Process encryption key for use with Fernet."""
         if not key:
             raise ValueError("ENCRYPTION_KEY environment variable is required")
-        key_bytes = hashlib.sha256(key.encode()).digest()
-        return base64.b64encode(key_bytes).decode()
+        key = key.strip()  # Remove any whitespace
+        try:
+            base64.urlsafe_b64decode(key)  # Validate it's a valid base64 string
+            return key
+        except Exception:
+            raise ValueError(f"ENCRYPTION_KEY must be a valid URL-safe base64-encoded string. Got: {key}")
 
     @staticmethod
     def validate_model_config(config: dict) -> None:

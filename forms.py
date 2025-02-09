@@ -119,7 +119,7 @@ class LoginForm(FlaskForm):
                         {"username": field.data.strip()},
                     ).scalar()
 
-                    if recent_failures >= 5:
+                    if recent_failures is not None and int(recent_failures) >= 5:
                         raise ValidationError(
                             "Too many failed login attempts. Please try again in 15 minutes."
                         )
@@ -146,15 +146,35 @@ class RegistrationForm(FlaskForm):
     Form for user registration.
     Inherits CSRF protection from FlaskForm.
     """
-    class Meta:
-        csrf = True  # Explicitly enable CSRF protection
-
     def __init__(self, *args, **kwargs):
+        # Enable CSRF protection by default
+        if 'csrf_enabled' not in kwargs:
+            kwargs['csrf_enabled'] = True
         super().__init__(*args, **kwargs)
+        # Initialize csrf_token field if not present
+        if not hasattr(self, "csrf_token"):
+            from wtforms import HiddenField
+            self.csrf_token = HiddenField('CSRF Token')
         if request and request.is_json:
             # For JSON requests, accept CSRF token from either body or header
             token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
-            if token:
+            if token and hasattr(self, 'csrf_token'):
+                self.csrf_token.data = token
+
+
+    def __init__(self, *args, **kwargs):
+        # Enable CSRF protection by default
+        if 'csrf_enabled' not in kwargs:
+            kwargs['csrf_enabled'] = True
+        super().__init__(*args, **kwargs)
+        # Initialize csrf_token field if not present
+        if not hasattr(self, "csrf_token"):
+            from wtforms import HiddenField
+            self.csrf_token = HiddenField('CSRF Token')
+        if request and request.is_json:
+            # For JSON requests, accept CSRF token from either body or header
+            token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
+            if token and hasattr(self, 'csrf_token'):
                 self.csrf_token.data = token
 
     def validate_csrf_token(self, field):
@@ -168,7 +188,14 @@ class RegistrationForm(FlaskForm):
             if not field.validate(token):
                 raise ValidationError('CSRF token invalid')
             return True
-        return super().validate_csrf_token(field)
+        # For non-JSON requests, validate that a token is present
+        if not field.data:
+            raise ValidationError('Missing CSRF token.')
+        if not field.current_token:
+            raise ValidationError('CSRF session token missing')
+        if not field.validate(field.data):
+            raise ValidationError('CSRF token invalid')
+        return True
 
     username = StringField(
         "Username",
@@ -413,11 +440,12 @@ class ProviderForm(FlaskForm):
         """Validate the API base URL."""
         try:
             # Don't allow Azure OpenAI URLs
-            if 'azure' in field.data.lower():
+            if field.data and 'azure' in str(field.data).lower():
                 raise ValidationError("Azure OpenAI endpoints should be configured through the Azure provider type")
 
             # Remove trailing slash
-            field.data = field.data.rstrip('/')
+            if field.data:
+                field.data = str(field.data).rstrip('/')
 
         except ValidationError:
             raise
@@ -548,6 +576,7 @@ class ModelForm(FlaskForm):
 
     def __init__(self, *args, **kwargs):
         self.is_edit = kwargs.pop('is_edit', False)
+        self._obj = kwargs.pop('obj', None)  # Store the model object if provided
         self.provider_validation_rules = {}  # Initialize here
 
         super().__init__(*args, **kwargs)
@@ -710,14 +739,19 @@ class ModelForm(FlaskForm):
     def process_api_key(self):
         """Handle API key encryption and preservation"""
         if self.is_edit and not self.api_key.data:
-            # Preserve existing encrypted key
-            original_model = Model.get_by_id(self._obj.id) if self._obj else None
+            original_model = None
+            if self._obj and hasattr(self._obj, 'id'):
+                original_model = Model.get_by_id(self._obj.id)
             if original_model:
                 self.api_key.data = original_model.api_key
         elif self.api_key.data:
             # Encrypt new key
             try:
-                self.api_key.data = encrypt_api_key(self.api_key.data)
+                from flask import current_app
+                encryption_key = current_app.config.get('ENCRYPTION_KEY')
+                if not encryption_key:
+                    raise ValidationError("Encryption key not configured")
+                self.api_key.data = encrypt_api_key(self.api_key.data, encryption_key)
             except EncryptionError as e:
                 logger.error(f"API key encryption failed: {str(e)}")
                 raise ValidationError("Failed to secure API key")
@@ -776,60 +810,28 @@ class ModelForm(FlaskForm):
         from models.provider import Provider
         provider = Provider.get_by_id(self.provider_id.data)
 
-        # Log validation context
-        logger.info("Validating deployment_name", extra={
-            "field_value": field.data,
-            "provider": provider.name if provider else None,
-            "is_azure": provider.is_azure if provider else None,
-            "field_required": bool(provider and provider.is_azure),
-            "field_attributes": {
-                "required": getattr(field, 'flags', {}).required,
-                "render_kw": getattr(field, 'render_kw', {}),
-                "validators": [v.__class__.__name__ for v in getattr(field, 'validators', [])]
-            }
-        })
-
         if provider and provider.is_azure:
             # For Azure providers, deployment_name is required
             if not field.data:
-                logger.error("Missing required deployment_name for Azure provider", extra={
-                    "field_state": {
-                        "value": field.data,
-                        "required": getattr(field, 'flags', {}).required,
-                        "render_kw": getattr(field, 'render_kw', {})
-                    }
-                })
                 raise ValidationError("Deployment name is required for Azure OpenAI providers.")
 
             # Validate pattern if one exists
             pattern = self.provider_validation_rules.get('model_id')
             if pattern:
                 import re
-                if not re.match(pattern, field.data):
-                    logger.error("Invalid deployment_name format", extra={
-                        "value": field.data,
-                        "pattern": pattern
-                    })
+                if field.data and not re.match(pattern, field.data):
                     raise ValidationError("Deployment name does not match the required format specified by the provider.")
-                logger.debug("Deployment name pattern validation passed", extra={
-                    "value": field.data,
-                    "pattern": pattern
-                })
         else:
             # For non-Azure providers, deployment_name should be empty
             if field.data:
-                logger.warning("Deployment name provided for non-Azure provider", extra={
-                    "value": field.data,
-                    "provider": provider.name if provider else None
-                })
-            field.data = ""  # Clear the field for non-Azure providers
-            return
+                field.data = ""  # Clear the field for non-Azure providers
+                return
 
     def validate_version(self, field):
         """Optimistic concurrency control"""
-        if self.is_edit and self._obj:
-            current_version = Model.get_by_id(self._obj.id).version
-            if int(field.data) != current_version:
+        if self.is_edit and self._obj and hasattr(self._obj, 'id') and field.data:
+            model = Model.get_by_id(self._obj.id)
+            if model and hasattr(model, 'version') and int(field.data) != model.version:
                 raise ValidationError("This model was modified by another user. Please refresh.")
 
 # ------------------------------------------------------------------------

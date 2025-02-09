@@ -242,17 +242,13 @@
         {% block content %}{% endblock %}
     </main>
 
-<<<<<<< HEAD
-    <!-- Core Libraries -->
-=======
     <!-- Core Libraries First -->
->>>>>>> defb0c86fc90957450031dc582fc8b17b35897f4
     <script src="{{ url_for('static', filename='js/lib/axios.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/lib/dompurify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/lib/markdown-it.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/lib/prism.js') }}"></script>
 
-    <!-- Core Utilities -->
+    <!-- Core Utilities After -->
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/monitoring.js') }}"></script>
     <script src="{{ url_for('static', filename='js/base.js') }}"></script>
@@ -261,17 +257,6 @@
     <script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>
     <script src="{{ url_for('static', filename='js/shared-validation.js') }}"></script>
 
-<<<<<<< HEAD
-    <!-- Core App -->
-=======
-    <!-- Feature Modules After -->
-    <script src="{{ url_for('static', filename='js/fileUpload.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/token-usage.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/chat-config.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/chat.js') }}"></script>
-
-    <!-- Core App Last -->
->>>>>>> defb0c86fc90957450031dc582fc8b17b35897f4
     <script src="{{ url_for('static', filename='js/core.js') }}"></script>
 
     {% block scripts %}
