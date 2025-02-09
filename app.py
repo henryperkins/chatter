@@ -124,8 +124,6 @@ def configure_app(app: Optional[Flask] = None) -> None:
         app = current_app
 
     app.config.from_object(Config)
-    if not app.config.get("SECRET_KEY"):
-        app.config["SECRET_KEY"] = os.urandom(32)
 
     # Session configuration
     app.config.update(
