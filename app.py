@@ -160,7 +160,7 @@ def configure_app(app: Optional[Flask] = None) -> None:
             'WTF_CSRF_HEADERS': ['X-CSRFToken', 'X-CSRF-Token'],
             'WTF_CSRF_METHODS': ['POST', 'PUT', 'PATCH', 'DELETE'],
             'WTF_CSRF_FIELD_NAME': 'csrf_token',
-            'WTF_CSRF_CHECK_DEFAULT': False  # Don't check CSRF for all routes by default
+            'WTF_CSRF_CHECK_DEFAULT': True  # Enable CSRF for all routes by default
         }
     )
 
