@@ -444,7 +444,8 @@ def create_model():
 
             # Encrypt API key
             try:
-                data["api_key"] = encrypt_api_key(data["api_key"])
+                from config import Config
+                data["api_key"] = encrypt_api_key(data["api_key"], Config().ENCRYPTION_KEY)
             except EncryptionError as e:
                 logger.error(str(e))
                 return render_template(
