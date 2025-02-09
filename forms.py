@@ -98,6 +98,15 @@ class LoginForm(FlaskForm):
     remember = BooleanField("Remember Me", default=False)
     submit = SubmitField("Login")
 
+    def __init__(self, *args, **kwargs):
+        if 'csrf_enabled' not in kwargs:
+            kwargs['csrf_enabled'] = True
+        super().__init__(*args, **kwargs)
+        if request and request.is_json:
+            token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
+            if token and hasattr(self, 'csrf_token'):
+                self.csrf_token.data = token
+
     def validate_username(self, field: Field) -> None:
         """
         Check for too many failed login attempts before allowing another try.
@@ -137,6 +146,24 @@ class LoginForm(FlaskForm):
                 "Unable to process login at this time. Please try again later."
             )
 
+    def validate_csrf_token(self, field):
+        if request.is_json:
+            token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
+            if not token:
+                raise ValidationError('CSRF token missing')
+            if not field.current_token:
+                raise ValidationError('CSRF session token missing')
+            if not field.validate(token):
+                raise ValidationError('CSRF token invalid')
+            return True
+        if not field.data:
+            raise ValidationError('Missing CSRF token.')
+        if not field.current_token:
+            raise ValidationError('CSRF session token missing')
+        if not field.validate(field.data):
+            raise ValidationError('CSRF token invalid')
+        return True
+
 # ------------------------------------------------------------------------
 # RegistrationForm
 # ------------------------------------------------------------------------
@@ -146,22 +173,6 @@ class RegistrationForm(FlaskForm):
     Form for user registration.
     Inherits CSRF protection from FlaskForm.
     """
-    def __init__(self, *args, **kwargs):
-        # Enable CSRF protection by default
-        if 'csrf_enabled' not in kwargs:
-            kwargs['csrf_enabled'] = True
-        super().__init__(*args, **kwargs)
-        # Initialize csrf_token field if not present
-        if not hasattr(self, "csrf_token"):
-            from wtforms import HiddenField
-            self.csrf_token = HiddenField('CSRF Token')
-        if request and request.is_json:
-            # For JSON requests, accept CSRF token from either body or header
-            token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
-            if token and hasattr(self, 'csrf_token'):
-                self.csrf_token.data = token
-
-
     def __init__(self, *args, **kwargs):
         # Enable CSRF protection by default
         if 'csrf_enabled' not in kwargs:

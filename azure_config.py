@@ -33,7 +33,7 @@ def validate_model_config(model_config: Dict[str, Any]) -> None:
         value = model_config.get(field)
         if not value or not isinstance(value, str):
             raise ValueError(f"Missing or invalid {field}")
-
+V 
     # Safe model_type access and validation
     model_type = model_config.get("model_type")
     if not model_type or not isinstance(model_type, str):
