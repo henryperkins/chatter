@@ -413,6 +413,11 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                 encryption_key = os.getenv("ENCRYPTION_KEY", None)
                 if model_obj.api_key:
                     try:
+                        logger.debug(
+                            "Decrypting model_obj.api_key (length=%s) with ENCRYPTION_KEY length=%s",
+                            len(model_obj.api_key) if model_obj.api_key else 0,
+                            len(encryption_key) if encryption_key else 0
+                        )
                         azure_token = decrypt_api_key(model_obj.api_key, encryption_key)
                     except EncryptionError as e:
                         logger.error("Error decrypting Azure token: %s", str(e))

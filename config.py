@@ -268,8 +268,10 @@ class Config:
 
     def _process_encryption_key(self, key: str) -> str:
         """Process encryption key for use with Fernet."""
-        if not key:
-            raise ValueError("ENCRYPTION_KEY environment variable is required")
+        logger.debug("Raw ENCRYPTION_KEY (redacted) length=%d", len(key) if key else 0)
+
+        if not key or len(key) < 40:
+            raise ValueError("ENCRYPTION_KEY is missing or looks too short. Check your .env setup.")
         key = key.strip()  # Remove any whitespace
         try:
             base64.urlsafe_b64decode(key)  # Validate it's a valid base64 string
