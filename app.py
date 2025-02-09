@@ -177,18 +177,17 @@ def init_app_components(app: Flask) -> None:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     app.wsgi_app = SecurityMiddleware(app.wsgi_app)
 
+    # Initialize CSRF protection first
+    csrf.init_app(app)
+    csrf.exempt(app.static_folder)
+    
+    # Then initialize login manager
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"  # type: ignore
 
     @login_manager.user_loader
     def load_user(user_id):
         return User.get(int(user_id))
-
-    # Initialize CSRF protection
-    csrf.init_app(app)
-    
-    # Exempt certain routes from CSRF protection
-    csrf.exempt(app.static_folder)
 
     # Initialize rate limiter
     limiter.init_app(app)
