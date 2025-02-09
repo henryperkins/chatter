@@ -224,15 +224,9 @@ def validate_chat_request(request_data) -> Dict[str, Any]:
     Return a dict with {"valid": bool, "error": str, "chat_id": str}.
     """
     try:
-        csrf_token = request_data.form.get("csrf_token")
-        if not csrf_token:
-            return {"valid": False, "error": "Missing CSRF token"}
-
-        try:
-            validate_csrf(csrf_token)
-        except CSRFError as e:
-            logger.error("CSRF token validation failed: %s", str(e))
-            return {"valid": False, "error": "Invalid CSRF token"}
+        # Let Flask-WTF handle CSRF validation through the form
+        if not request_data.form:
+            return {"valid": False, "error": "Missing form data"}
 
         chat_id = request_data.headers.get("X-Chat-ID") or session.get("chat_id")
         if not chat_id:

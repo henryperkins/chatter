@@ -163,17 +163,9 @@ class RegistrationForm(FlaskForm):
             kwargs['csrf_enabled'] = True
         super().__init__(*args, **kwargs)
 
-        # Ensure a hidden field for form-based CSRF:
+        # Ensure a hidden field for form-based CSRF only
         if not hasattr(self, "csrf_token"):
             self.csrf_token = HiddenField('CSRF Token')
-
-        # If this is a JSON request, retrieve the token from header/body.
-        # Otherwise, rely on the hidden form field.
-        if request:
-            if request.is_json:
-                token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
-                if token and hasattr(self, 'csrf_token'):
-                    self.csrf_token.data = token
 
     username = StringField(
         "Username",

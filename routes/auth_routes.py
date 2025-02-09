@@ -159,8 +159,7 @@ def login():
     return render_template("login.html", form=form)
 
 
-@bp.route("/register", methods=["GET", "POST"])
-@csrf.exempt
+@bp.route("/register", methods=["GET", "POST"]) 
 @limiter.limit("5 per minute")
 def register():
     """Handle user registration with form submission"""
