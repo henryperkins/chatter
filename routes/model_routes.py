@@ -744,7 +744,7 @@ def edit_model(model_id):
             else:
                 try:
                     # Encrypt new key if provided
-                    update_data['api_key'] = encrypt_api_key(form.api_key.data)
+                    update_data['api_key'] = encrypt_api_key(form.api_key.data, Config().ENCRYPTION_KEY)
                 except EncryptionError as e:
                     logger.error(str(e))
                     flash("Failed to secure API key", "error")
