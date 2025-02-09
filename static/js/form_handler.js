@@ -71,8 +71,15 @@ class ModelFormHandler {
                 data.csrf_token = csrfToken;
             }
 
-            // Send request
-            response = await this.sendFormRequest(actionUrl, data, csrfToken);
+            // Add CSRF headers
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            };
+
+            // Send request with CSRF headers
+            response = await this.sendFormRequest(actionUrl, data, headers);
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -146,16 +153,15 @@ class ModelFormHandler {
         return ['on', 'true', '1'].includes(value.toLowerCase());
     }
 
-    async sendFormRequest(url, data, csrfToken) {
+    async sendFormRequest(url, data, headers) {
         return fetch(url, {
             method: 'POST',
             credentials: 'same-origin',  // Ensure cookies (including the CSRF cookie) are sent
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken,
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: JSON.stringify(data)
+            headers: headers,
+            body: JSON.stringify({
+                ...data,
+                csrf_token: headers['X-CSRFToken']  // Include token in request body
+            })
         });
     }
 
