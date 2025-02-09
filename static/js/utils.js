@@ -10,7 +10,12 @@ class FetchError extends Error {
 
 window.utils = {
     getCSRFToken() {
-        return document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const token = document.querySelector('meta[name="csrf-token"]')?.content;
+        if (!token) {
+            console.error('CSRF token meta tag not found');
+            throw new Error('CSRF token not available');
+        }
+        return token;
     },
 
     async fetchWithCSRF(url, options = {}) {

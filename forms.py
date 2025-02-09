@@ -79,8 +79,8 @@ class LoginForm(FlaskForm):
     Form for user login.
     """
     class Meta:
-        csrf = True
-        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
+        csrf = True  # Enable CSRF protection
+        csrf_secret = os.getenv('CSRF_SECRET')  # Use env var without fallback
 
     username = StringField(
         "Username",
