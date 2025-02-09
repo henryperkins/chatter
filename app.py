@@ -131,7 +131,8 @@ def configure_app(app: Optional[Flask] = None) -> None:
             "PERMANENT_SESSION_LIFETIME": timedelta(minutes=60),
             "SESSION_REFRESH_EACH_REQUEST": True,
             "SESSION_COOKIE_HTTPONLY": True,
-            "SESSION_COOKIE_SECURE": app.config.get("ENV") == "production",
+            # Only force secure cookies in production; allow HTTP in dev
+            "SESSION_COOKIE_SECURE": False if app.config.get("ENV") != "production" else True,
             "SESSION_COOKIE_SAMESITE": "Lax",
             "SESSION_COOKIE_NAME": (
                 "__Secure-session"
