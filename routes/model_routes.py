@@ -630,11 +630,6 @@ def edit_model(model_id):
         form.provider_id.choices = [(p.id, p.name) for p in Provider.get_all()]
 
         if request.method == "POST":
-            # CSRF protection
-            csrf_error = validate_csrf_token()
-            if csrf_error:
-                return csrf_error
-
             # Handle form data from both JSON and form submissions
             if request.is_json:
                 form_data = request.get_json()
