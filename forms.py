@@ -159,20 +159,21 @@ class RegistrationForm(FlaskForm):
         csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
 
     def __init__(self, *args, **kwargs):
-        # Enable CSRF protection by default if not specified
         if 'csrf_enabled' not in kwargs:
             kwargs['csrf_enabled'] = True
         super().__init__(*args, **kwargs)
 
-        # If csrf_token isn't defined, define it (some older WTForms setups)
+        # Ensure a hidden field for form-based CSRF:
         if not hasattr(self, "csrf_token"):
             self.csrf_token = HiddenField('CSRF Token')
 
-        # For JSON requests, accept CSRF token from either body or header
-        if request and request.is_json:
-            token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
-            if token and hasattr(self, 'csrf_token'):
-                self.csrf_token.data = token
+        # If this is a JSON request, retrieve the token from header/body.
+        # Otherwise, rely on the hidden form field.
+        if request:
+            if request.is_json:
+                token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
+                if token and hasattr(self, 'csrf_token'):
+                    self.csrf_token.data = token
 
     username = StringField(
         "Username",
