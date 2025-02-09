@@ -7,7 +7,10 @@ __pycache__/
 .venv/
 venv/
 env/
-
+.env2
+.env.save
+.env.template
+notenv
 # Node modules
 node_modules/
 
