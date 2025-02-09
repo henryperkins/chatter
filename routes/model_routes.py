@@ -785,6 +785,15 @@ def edit_model(model_id):
             # Perform the update with version tracking
             with db_session() as db:
                 try:
+                    # Get existing model for api_key handling
+                    existing_model = Model.get_by_id(model_id)
+                    if not existing_model:
+                        raise ValueError(f"Model with ID {model_id} not found")
+
+                    # If api_key is empty/None, preserve existing encrypted key
+                    if "api_key" in update_data and not update_data["api_key"].strip():
+                        update_data["api_key"] = existing_model.api_key
+
                     # Create version snapshot
                     db.execute(
                         text("""
