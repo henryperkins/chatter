@@ -233,11 +233,29 @@ class User(UserMixin):
                     
                 return created_user
 
-        except IntegrityError:
-            logger.error(f"Integrity error creating user '{username}'")
+        except IntegrityError as e:
+            logger.error(
+                 f"Integrity error creating user '{username}': {e}",
+                 exc_info=True,
+                 extra={
+                     "file": "models/user.py",
+                     "phase": "user creation",
+                     "username": username,
+                     "email": email
+                 }
+             )
             raise ValueError("Username or email already exists")
         except Exception as e:
-            logger.error(f"Error creating user '{username}': {e}")
+            logger.error(
+                 f"Error creating user '{username}': {e}",
+                 exc_info=True,
+                 extra={
+                     "file": "models/user.py",
+                     "phase": "user creation",
+                     "username": username,
+                     "email": email
+                 }
+             )
             raise
 
     @staticmethod

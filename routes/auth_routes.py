@@ -191,11 +191,18 @@ def register():
 
         if not form.validate():
             logger.error("Form validation failed - details: %s", form.errors, extra={
+                "file": "routes/auth_routes.py",
+                "phase": "form validation",
                 "errors": form.errors,
                 "csrf_token_present": bool(form.csrf_token.data),
                 "request_headers": dict(request.headers),
                 "content_type": request.content_type,
-                "is_json": request.is_json
+                "is_json": request.is_json,
+                "ip_address": request.remote_addr,
+                "route": request.path,
+                "username": form.username.data,
+                "email": form.email.data,
+                "status_code": 400
             })
             return json_response(
                 False, "Form validation failed", errors=form.errors, status_code=400
@@ -223,10 +230,24 @@ def register():
             )
 
         except ValueError as e:
-            logger.error(f"Registration error: {str(e)}")
+            logger.error(f"Registration error: {str(e)}", extra={
+                 "file": "routes/auth_routes.py",
+                 "phase": "user creation",
+                 "ip_address": request.remote_addr,
+                 "route": request.path,
+                 "username": form.username.data,
+                 "email": form.email.data
+             })
             return json_response(False, str(e), status_code=400)
         except Exception as e:
-            logger.error(f"Registration error: {str(e)}", exc_info=True)
+            logger.error(f"Registration error: {str(e)}", exc_info=True, extra={
+                 "file": "routes/auth_routes.py",
+                 "phase": "user creation",
+                 "ip_address": request.remote_addr,
+                 "route": request.path,
+                 "username": form.username.data,
+                 "email": form.email.data
+             })
             return json_response(
                 False, "Registration failed - please try again", status_code=500
             )
@@ -547,7 +568,16 @@ def test_create_user():
         # import os
         return jsonify({"success": True, "user_id": user.id}), 200
     except Exception as e:
-        logger.error(f"Test user creation failed: {str(e)}", exc_info=True)
+        logger.error(
+            f"Test user creation failed: {str(e)}",
+            exc_info=True,
+            extra={
+                "ip_address": request.remote_addr,
+                "route": request.path,
+                "TEST_USERNAME": os.getenv("TEST_USERNAME"),
+                "TEST_EMAIL": os.getenv("TEST_EMAIL")
+            }
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 
