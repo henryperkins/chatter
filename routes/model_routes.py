@@ -46,61 +46,6 @@ bp = Blueprint("model", __name__, url_prefix="/models")
 
 
 # Helper Functions
-def validate_csrf_token() -> Optional[tuple]:
-    """Validate CSRF token for all POST, PUT, and DELETE requests.
-
-    Checks for token in:
-    - X-CSRFToken header
-    - X-CSRF-Token header
-    - Form data (csrf_token)
-    - JSON body (csrf_token)
-    """
-    try:
-        # Try to get token from multiple locations
-        csrf_token = (
-            request.headers.get("X-CSRFToken")
-            or request.headers.get("X-CSRF-Token")
-            or request.form.get("csrf_token")
-            or (request.get_json(silent=True) or {}).get("csrf_token")
-        )
-
-        if not csrf_token:
-            logger.warning(
-                "CSRF token missing from request - Headers: %s, Form: %s, JSON: %s",
-                request.headers,
-                request.form,
-                request.get_json(silent=True),
-            )
-            raise ValueError("CSRF token is required for this request.")
-
-        # Validate the token
-        flask_validate_csrf(csrf_token)
-        logger.debug("CSRF token validated successfully")
-        return None
-
-    except ValueError as e:
-        logger.warning("CSRF validation failed - missing token: %s", str(e))
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": "Security token is missing. Please refresh the page and try again.",
-                }
-            ),
-            400,
-        )
-
-    except Exception as e:
-        logger.error("CSRF validation failed: %s", str(e), exc_info=True)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": "Invalid security token. Please refresh the page and try again.",
-                }
-            ),
-            400,
-        )
 
 
 def handle_error(error: Exception, message: str, status_code: int = 500) -> tuple:
@@ -523,10 +468,6 @@ def update_model(model_id: int):
     """
     Update an existing model (admin-only).
     """
-    csrf_error = validate_csrf_token()
-    if csrf_error:
-        return csrf_error
-
     data = request.get_json()
     if not data:
         logger.warning("No data provided for updating model %d", model_id)
@@ -565,10 +506,6 @@ def delete_model(model_id: int):
     """
     Delete a model (admin-only).
     """
-    csrf_error = validate_csrf_token()
-    if csrf_error:
-        return csrf_error
-
     try:
         with db_session() as db:
             logger.info("Deleting model with ID: %d", model_id)
@@ -858,10 +795,6 @@ def set_default_model(model_id: int):
     """
     Set a model as the default (admin-only).
     """
-    csrf_error = validate_csrf_token()
-    if csrf_error:
-        return csrf_error
-
     try:
         with db_session() as db:
             logger.info("Setting model %d as default", model_id)
