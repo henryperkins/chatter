@@ -27,7 +27,7 @@
             {% endif %}
         </div>
 
-        <form id="login-form" method="POST" action="{{ url_for('auth.login') }}" class="space-y-6" novalidate>
+        <form id="login-form" method="POST" action="{{ url_for('auth.login') }}" class="space-y-6">
             {{ form.hidden_tag() }}
 
             <!-- Username Field -->

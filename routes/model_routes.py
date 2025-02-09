@@ -23,7 +23,6 @@ from flask import (
 )
 from flask_login import current_user
 from flask_login import login_required
-from flask_wtf.csrf import validate_csrf as flask_validate_csrf
 from werkzeug.exceptions import HTTPException
 import json
 from config import Config
