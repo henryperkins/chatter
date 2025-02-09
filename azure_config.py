@@ -13,7 +13,7 @@ from logging_config import get_logger
 logger = get_logger(__name__)
 
 # Constants
-DEFAULT_API_VERSION = "2025-01-01-preview"
+DEFAULT_API_VERSION = "2024-12-01-preview"  # Default for client creation
 DEFAULT_TIMEOUT = 30
 API_URL_PATTERN = "{endpoint}/openai/deployments/{deployment}/chat/completions"
 VALID_REASONING_EFFORTS = ["low", "medium", "high"]
@@ -258,18 +258,19 @@ def validate_api_endpoint(
             for prefix in ["o1", "o3"]
         )
 
-        payload = {
-            "messages": [{"role": "user", "content": "Test message"}],
-        }
+        messages = [
+            {"role": "developer", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "Test message"}
+        ]
 
         if is_o_series:
             # O-series specific payload
-            payload.update({
+            payload = {
+                "messages": messages,
                 "max_completion_tokens": 1,
-                "reasoning_effort": "low",
-                "response_format": {"type": "text"},
+                "reasoning_effort": "medium",
                 "stream": False
-            })
+            }
         else:
             # Legacy model payload
             payload.update({

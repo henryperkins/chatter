@@ -156,7 +156,7 @@ def configure_app(app: Optional[Flask] = None) -> None:
             "WTF_CSRF_ENABLED": True,
             "WTF_CSRF_TIME_LIMIT": 3600,
             "WTF_CSRF_SSL_STRICT": False,
-            "WTF_CSRF_HEADERS": ["X-CSRFToken", "X-CSRF-Token"],  # Support both header variations
+            "WTF_CSRF_HEADERS": ["X-CSRFToken", "X-CSRF-Token"],
             "WTF_CSRF_METHODS": ["POST", "PUT", "PATCH", "DELETE"],
             "WTF_CSRF_FIELD_NAME": "csrf_token",
             "WTF_CSRF_CHECK_DEFAULT": True

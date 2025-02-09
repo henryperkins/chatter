@@ -154,32 +154,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('loading-spinner').classList.remove('hidden');
                 document.getElementById('button-text').textContent = 'Registering...';
                 const formData = new FormData(form);
-                const payload = {};
-                formData.forEach((value, key) => { payload[key] = value; });
                 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
                 if (!csrfToken) {
                     throw new Error('CSRF token not found');
                 }
+                formData.append('csrf_token', csrfToken);
                 
-                const response = await fetch(form.action, {
+                const responseData = await window.utils.fetchWithCSRF(form.action, {
                     method: 'POST',
+                    body: formData,
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': csrfToken,
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json',
-                        'Cache-Control': 'no-cache'
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({
-                        ...payload,
-                        csrf_token: csrfToken
-                    })
+                        'X-CSRFToken': csrfToken
+                    }
                 });
-                const responseData = await response.json();
-                if (response.ok && responseData.success) {
-                    if (responseData.redirect) {
-                        window.location.href = responseData.redirect;
+                
+                if (responseData.success) {
+                    if (responseData.data?.redirect) {
+                        window.location.href = responseData.data.redirect;
                     }
                 } else {
                     if (responseData.errors) {
@@ -195,9 +186,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         const formErrors = document.getElementById('form-errors');
                         formErrors.textContent = responseData.message;
                         formErrors.classList.remove('hidden');
-                    }
-                    if (!responseData.errors && !responseData.message) {
-                        throw new Error('Registration failed. Please check your input and try again.');
                     }
                 }
             } catch (error) {

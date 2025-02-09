@@ -165,31 +165,65 @@ def register():
         )
 
     form = RegistrationForm()
-
+    
     if request.method == "POST":
-        # Handle both form-data and JSON submissions
         if request.is_json:
-            json_data = request.get_json() or {}
-            # Get CSRF token from both JSON body and header
-            body_csrf = json_data.get('csrf_token')
-            header_csrf = request.headers.get('X-CSRFToken')
-            
-            # Use header CSRF if body CSRF is missing
-            csrf_token = body_csrf if body_csrf else header_csrf
-            
-            # Create form data with CSRF token
-            form_data = MultiDict({
-                'csrf_token': csrf_token,
-                'username': json_data.get('username', ''),
-                'email': json_data.get('email', ''),
-                'password': json_data.get('password', ''),
-                'confirm_password': json_data.get('confirm_password', '')
-            })
-            
-            # Create new form instance with the form data
-            form = RegistrationForm(formdata=form_data)
+            json_data = request.get_json()
+            form = RegistrationForm(formdata=MultiDict(json_data))
+        
+        if form.validate_on_submit():
+            try:
+                # Create user - this will also ensure default model exists
+                user = User.create(
+                    username=form.username.data.strip(),
+                    email=form.email.data.lower().strip(),
+                    password=form.password.data,
+                )
 
-        if not form.validate():
+                # Set up user session
+                login_user(user, remember=True)
+                session.permanent = True
+                session["_fresh"] = True
+                session["user_id"] = user.id
+                session["last_active"] = datetime.now().isoformat()
+                session.modified = True
+
+                # Return success with user data and redirect
+                return json_response(
+                    True,
+                    "Registration successful",
+                    {
+                        "redirect": url_for("chat.chat_interface"),
+                        "user": {
+                            **user.to_dict(),
+                            "is_first_user": user.is_admin  # Include if this is the first user (admin)
+                        }
+                    },
+                )
+
+            except ValueError as e:
+                logger.error(f"Registration error: {str(e)}", extra={
+                    "file": "routes/auth_routes.py",
+                    "phase": "user creation",
+                    "ip_address": request.remote_addr,
+                    "route": request.path,
+                    "username": form.username.data,
+                    "email": form.email.data
+                })
+                return json_response(False, str(e), status_code=400)
+            except Exception as e:
+                logger.error(f"Registration error: {str(e)}", exc_info=True, extra={
+                    "file": "routes/auth_routes.py",
+                    "phase": "user creation",
+                    "ip_address": request.remote_addr,
+                    "route": request.path,
+                    "username": form.username.data,
+                    "email": form.email.data
+                })
+                return json_response(
+                    False, "Registration failed - please try again", status_code=500
+                )
+        else:
             logger.error("Form validation failed - details: %s", form.errors, extra={
                 "file": "routes/auth_routes.py",
                 "phase": "form validation",
@@ -206,50 +240,6 @@ def register():
             })
             return json_response(
                 False, "Form validation failed", errors=form.errors, status_code=400
-            )
-
-        try:
-            user = User.create(
-                username=form.username.data.strip(),
-                email=form.email.data.lower().strip(),
-                password=form.password.data,
-            )
-
-            login_user(user, remember=True)
-            session.permanent = True
-            session["_fresh"] = True
-            session["user_id"] = user.id
-            session["last_active"] = datetime.now().isoformat()
-
-            session.modified = True
-
-            return json_response(
-                True,
-                "Registration successful",
-                {"redirect": url_for("chat.chat_interface"), "user": user.to_dict()},
-            )
-
-        except ValueError as e:
-            logger.error(f"Registration error: {str(e)}", extra={
-                 "file": "routes/auth_routes.py",
-                 "phase": "user creation",
-                 "ip_address": request.remote_addr,
-                 "route": request.path,
-                 "username": form.username.data,
-                 "email": form.email.data
-             })
-            return json_response(False, str(e), status_code=400)
-        except Exception as e:
-            logger.error(f"Registration error: {str(e)}", exc_info=True, extra={
-                 "file": "routes/auth_routes.py",
-                 "phase": "user creation",
-                 "ip_address": request.remote_addr,
-                 "route": request.path,
-                 "username": form.username.data,
-                 "email": form.email.data
-             })
-            return json_response(
-                False, "Registration failed - please try again", status_code=500
             )
 
     return render_template("register.html", form=form)

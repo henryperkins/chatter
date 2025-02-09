@@ -160,8 +160,14 @@ class RegistrationForm(FlaskForm):
     def validate_csrf_token(self, field):
         """Custom CSRF validation for both form and JSON submissions"""
         if request.is_json:
-            # Omite la validación real si la petición es JSON
-            return
+            token = request.headers.get('X-CSRFToken') or (request.get_json() or {}).get('csrf_token')
+            if not token:
+                raise ValidationError('CSRF token missing')
+            if not field.current_token:
+                raise ValidationError('CSRF session token missing')
+            if not field.validate(token):
+                raise ValidationError('CSRF token invalid')
+            return True
         return super().validate_csrf_token(field)
 
     username = StringField(
@@ -492,6 +498,8 @@ class ModelForm(FlaskForm):
     model_type = SelectField('Model Type',
         choices=[
             ('azure', 'Azure OpenAI (Standard)'),
+            ('o1', 'Azure OpenAI (o1)'),
+            ('o1-mini', 'Azure OpenAI (o1-mini)'),
             ('o1-preview', 'Azure OpenAI (o1-preview)'),
             ('o3-mini', 'Azure OpenAI (o3-mini)')
         ],

@@ -689,13 +689,14 @@ class Model:
 
             # Force temperature to 1.0 and remove unsupported parameters
             config["temperature"] = 1.0
-            config.pop("max_tokens", None)
+            config["max_tokens"] = model_caps.get("max_tokens", 200000)  # Set max_tokens from model capabilities
             config.pop("top_p", None)
             config.pop("frequency_penalty", None)
             config.pop("presence_penalty", None)
         else:
             config["reasoning_effort"] = "medium"
             config["store_completion"] = False
+            config["max_tokens"] = config.get("max_tokens", 16384)  # Default for non-o-series models
         required_fields = {
             "provider_id": (int, "Provider ID must be an integer"),
             "name": (str, "Name must be a non-empty string"),

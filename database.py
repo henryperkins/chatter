@@ -319,18 +319,19 @@ def create_default_model(db: Session) -> Optional[int]:
         # Build model data
         model_data = {
             "provider_id": provider_id,
-            "name": config_instance.MODEL_NAME,
-            "deployment_name": config_instance.DEFAULT_DEPLOYMENT_NAME,
-            "description": "Azure OpenAI GPT-4 model with streaming support",
+            "name": config_instance.DEFAULT_MODEL_NAME,
+            "deployment_name": config_instance.AZURE_DEPLOYMENT_NAME,
+            "description": "Azure OpenAI o1 model",
             "api_endpoint": config_instance.DEFAULT_API_ENDPOINT.rstrip("/"),
             "api_key": encrypted_api_key,
             "api_version": config_instance.AZURE_API_VERSION,
             "temperature": config_instance.DEFAULT_TEMPERATURE,
-            "max_tokens": 128000,
-            "max_completion_tokens": min(config_instance.MAX_TOKENS, 16384),
-            "model_type": "azure",
+            "max_tokens": int(config_instance.DEFAULT_MAX_TOKENS),
+            "max_completion_tokens": config_instance.DEFAULT_MAX_COMPLETION_TOKENS,
+            "model_type": config_instance.DEFAULT_MODEL_TYPE,
+            "reasoning_effort": config_instance.DEFAULT_REASONING_EFFORT,
             "requires_o1_handling": config_instance.DEFAULT_REQUIRES_O1_HANDLING,
-            "supports_streaming": config_instance.DEFAULT_SUPPORTS_STREAMING,
+            "supports_streaming": False,  # o1 models don't support streaming
             "is_default": True
         }
         Model.validate_model_config(model_data)

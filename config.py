@@ -11,46 +11,99 @@ from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
-# Example function to log and verify environment values
 # Model configuration
 MODEL_CONFIG = {
+    "o1": {
+        "required_params": [
+            "deployment_name",
+            "api_version",
+            "max_completion_tokens",
+            "reasoning_effort"
+        ],
+        "fixed_params": {
+            "temperature": 1.0,
+            "top_p": 1.0,
+            "supports_streaming": False
+        },
+        "capabilities": {
+            "max_tokens": 200000,
+            "max_completion_tokens": 100000,
+            "supports_function_calling": True,
+            "supports_vision": True,
+            "requires_reasoning_effort": True,
+            "valid_reasoning_efforts": ["low", "medium", "high"]
+        }
+    },
+    "o1-mini": {
+        "required_params": [
+            "deployment_name",
+            "api_version",
+            "max_completion_tokens",
+            "reasoning_effort"
+        ],
+        "fixed_params": {
+            "temperature": 1.0,
+            "top_p": 1.0,
+            "supports_streaming": False
+        },
+        "capabilities": {
+            "max_tokens": 100000,
+            "max_completion_tokens": 50000,
+            "supports_function_calling": True,
+            "supports_vision": False,
+            "requires_reasoning_effort": True,
+            "valid_reasoning_efforts": ["low", "medium", "high"]
+        }
+    },
+    "o1-preview": {
+        "required_params": [
+            "deployment_name",
+            "api_version",
+            "max_completion_tokens",
+            "reasoning_effort"
+        ],
+        "fixed_params": {
+            "temperature": 1.0,
+            "top_p": 1.0,
+            "supports_streaming": False
+        },
+        "capabilities": {
+            "max_tokens": 200000,
+            "max_completion_tokens": 100000,
+            "supports_function_calling": True,
+            "supports_vision": True,
+            "requires_reasoning_effort": True,
+            "valid_reasoning_efforts": ["low", "medium", "high"]
+        }
+    },
+    "o3-mini": {
+        "required_params": [
+            "deployment_name",
+            "api_version",
+            "max_completion_tokens",
+            "reasoning_effort"
+        ],
+        "fixed_params": {
+            "temperature": 1.0,
+            "top_p": 1.0,
+            "supports_streaming": False
+        },
+        "capabilities": {
+            "max_tokens": 150000,
+            "max_completion_tokens": 75000,
+            "supports_function_calling": True,
+            "supports_vision": False,
+            "requires_reasoning_effort": True,
+            "valid_reasoning_efforts": ["low", "medium", "high"]
+        }
+    },
     "azure": {
         "supports_streaming": True,
         "max_tokens": 16384,
         "token_overhead": 3,
         "endpoint_format": "https://{endpoint}/openai/deployments/{deployment}/chat/completions",
         "api_version": "2024-12-01-preview",
-    },
-    "o3-mini": {
-        "fixed_temperature": True,
-        "streaming": True,
-        "max_tokens": 200000,
-        "max_completion_tokens": 100000,
-        "token_overhead": 3,
-        "endpoint_format": "https://{endpoint}/openai/deployments/{deployment}/chat/completions",
-        "api_version": "2025-01-01-preview",
-        "supports_reasoning_effort": True,
-    },
-    "o1": {
-        "fixed_temperature": True,
-        "streaming": True,
-        "max_tokens": 200000,
-        "max_completion_tokens": 100000,
-        "token_overhead": 3,
-        "endpoint_format": "https://{endpoint}/openai/deployments/{deployment}/chat/completions",
-        "api_version": "2025-01-01-preview",
-        "supports_reasoning_effort": True,
-        "supports_vision": True,
-    },
-    "o1-mini": {
-        "fixed_temperature": True,
-        "streaming": True,
-        "max_tokens": 128000,
-        "max_completion_tokens": 65536,
-        "token_overhead": 3,
-        "endpoint_format": "https://{endpoint}/openai/deployments/{deployment}/chat/completions",
-        "api_version": "2024-12-01-preview",
-    },
+    }
 }
 
 # File type configurations
@@ -67,11 +120,19 @@ FILE_CONFIG = {
     },
 }
 
+def validate_model_config(config: dict) -> None:
+    """Validate model configuration based on model type."""
+    model_type = config.get("model_type")
+    if model_type == "o1-preview":
+        if config.get("temperature") != 1.0:
+            raise ValueError("o1-preview models require temperature=1.0")
+        if config.get("max_completion_tokens", 0) > 100000:
+            raise ValueError("max_completion_tokens exceeds 100k limit for o1-preview")
+        if config.get("reasoning_effort") not in ["low", "medium", "high"]:
+            raise ValueError("Invalid reasoning_effort value for o1-preview")
 
 def validate_config(config: Dict[str, Any]) -> None:
-    """
-    Validate configuration values.
-    """
+    """Validate configuration values."""
     if not config["SECRET_KEY"] or len(config["SECRET_KEY"]) < 12:
         raise ValueError("SECRET_KEY must be at least 12 characters long")
 
@@ -85,9 +146,7 @@ def validate_config(config: Dict[str, Any]) -> None:
     required_vars = {"ENCRYPTION_KEY", "AZURE_OPENAI_KEY"}
     missing = [var for var in required_vars if not config.get(var)]
     if missing:
-        raise ValueError(
-            f"Missing required environment variables: {', '.join(missing)}"
-        )
+        raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
 
     if config["DEFAULT_MAX_TOKENS"] <= 0:
         raise ValueError("DEFAULT_MAX_TOKENS must be positive")
@@ -97,22 +156,16 @@ def validate_config(config: Dict[str, Any]) -> None:
     if config["DEBUG"] and config["ENV"] == "production":
         raise ValueError("Debug mode cannot be enabled in production environment")
 
-
 class ApiError(Exception):
     def __init__(self, message: str, status_code: int = 500):
         self.message = message
         self.status_code = status_code
         super().__init__(self.message)
 
-
 class Config:
-    """
-    Application configuration.
-    Implements the singleton pattern to ensure only one instance exists.
-    """
-
+    """Application configuration."""
     _instance = None
-    MODEL_CAPABILITIES = MODEL_CONFIG  # Expose model config to other modules
+    MODEL_CAPABILITIES = MODEL_CONFIG
 
     @classmethod
     def log_env_values(cls):
@@ -134,12 +187,11 @@ class Config:
         if self._initialized:
             return
         self._initialized = True
-        # Load environment variables from .env file
+
+        # Load environment variables
         env_path = Path(os.path.dirname(os.path.abspath(__file__))) / ".env"
         if not env_path.exists():
-            raise ValueError(
-                "Missing .env file. Please create one using .env.template as a guide."
-            )
+            raise ValueError("Missing .env file. Please create one using .env.template as a guide.")
         load_dotenv(dotenv_path=str(env_path), override=True)
 
         # Environment and debug settings
@@ -152,83 +204,46 @@ class Config:
         self.SECRET_KEY = os.getenv("SECRET_KEY")
         self.DATABASE_URI = os.getenv("DATABASE_URI", "")
         if self.DATABASE_URI.startswith("postgres://"):
-            self.DATABASE_URI = self.DATABASE_URI.replace(
-                "postgres://", "postgresql://", 1
-            )
+            self.DATABASE_URI = self.DATABASE_URI.replace("postgres://", "postgresql://", 1)
 
         # Azure OpenAI settings
         self.AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
-        # Convert openai.azure.com to cognitiveservices.azure.com in the endpoint
-        self.AZURE_API_ENDPOINT = os.getenv(
-            "AZURE_OPENAI_ENDPOINT", "https://hp-east2.openai.azure.com"
-        ).strip()
-
-        self.AZURE_API_VERSION = os.getenv(
-            "AZURE_OPENAI_API_VERSION", "2024-12-01-preview"
-        )
-        self.AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+        self.AZURE_API_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "https://o1models.openai.azure.com").strip()
+        self.AZURE_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2025-01-01-preview")
+        self.AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "o1-east2")
 
         # Model settings
-        self.MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")
-        self.DEFAULT_MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "Default Model")
-        self.DEFAULT_DEPLOYMENT_NAME = os.getenv(
-            "DEFAULT_DEPLOYMENT_NAME", self.AZURE_DEPLOYMENT_NAME
-        )
-        self.DEFAULT_MODEL_DESCRIPTION = os.getenv(
-            "DEFAULT_MODEL_DESCRIPTION", "Default model description"
-        )
-        self.DEFAULT_API_ENDPOINT = os.getenv(
-            "DEFAULT_API_ENDPOINT", self.AZURE_API_ENDPOINT
-        )
-        self.DEFAULT_API_VERSION = os.getenv(
-            "DEFAULT_API_VERSION", self.AZURE_API_VERSION
-        )
+        self.MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "Azure o1")
+        self.DEFAULT_MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "Azure o1")
+        self.DEFAULT_DEPLOYMENT_NAME = os.getenv("DEFAULT_DEPLOYMENT_NAME", self.AZURE_DEPLOYMENT_NAME)
+        self.DEFAULT_MODEL_TYPE = os.getenv("DEFAULT_MODEL_TYPE", "o1-preview")
+        self.DEFAULT_API_ENDPOINT = os.getenv("DEFAULT_API_ENDPOINT", self.AZURE_API_ENDPOINT)
+        self.DEFAULT_API_VERSION = os.getenv("DEFAULT_API_VERSION", self.AZURE_API_VERSION)
         self.DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", "1.0"))
-        self.DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", "16384"))
-        self.DEFAULT_MAX_COMPLETION_TOKENS = int(
-            os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "32000")
-        )
-        self.DEFAULT_REQUIRES_O1_HANDLING = bool(
-            os.getenv("DEFAULT_REQUIRES_O1_HANDLING", False)
-        )
-        self.DEFAULT_SUPPORTS_STREAMING = bool(
-            os.getenv("DEFAULT_SUPPORTS_STREAMING", True)
-        )
-        self.MAX_TOKENS = int(os.getenv("MAX_TOKENS", "16384"))
-        self.MAX_MESSAGE_TOKENS = int(os.getenv("MAX_MESSAGE_TOKENS", "16384"))
+        self.DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", "200000"))
+        self.DEFAULT_MAX_COMPLETION_TOKENS = int(os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "100000"))
+        self.DEFAULT_REASONING_EFFORT = os.getenv("DEFAULT_REASONING_EFFORT", "medium")
+        self.DEFAULT_REQUIRES_O1_HANDLING = True
+        self.DEFAULT_SUPPORTS_STREAMING = False
 
         # File handling settings
-        self.UPLOAD_FOLDER = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), "uploads"
-        )
+        self.UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
         self.MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", 10 * 1024 * 1024))
-        self.MAX_TOTAL_FILE_SIZE = int(
-            os.getenv("MAX_TOTAL_FILE_SIZE", 50 * 1024 * 1024)
-        )
+        self.MAX_TOTAL_FILE_SIZE = int(os.getenv("MAX_TOTAL_FILE_SIZE", 50 * 1024 * 1024))
         self.ALLOWED_FILE_EXTENSIONS = FILE_CONFIG["ALLOWED_EXTENSIONS"]
         self.ALLOWED_MIME_TYPES = set(FILE_CONFIG["MIME_TYPES"].values())
         self.MIME_TYPE_MAP = FILE_CONFIG["MIME_TYPES"]
 
         # Security settings
-        self.ENCRYPTION_KEY = self._process_encryption_key(
-            os.getenv("ENCRYPTION_KEY", "")
-        )
+        self.ENCRYPTION_KEY = self._process_encryption_key(os.getenv("ENCRYPTION_KEY", ""))
         self.PASSWORD_MIN_LENGTH = int(os.getenv("PASSWORD_MIN_LENGTH", "8"))
-        self.PASSWORD_REQUIRE_UPPERCASE = bool(
-            os.getenv("PASSWORD_REQUIRE_UPPERCASE", True)
-        )
-        self.PASSWORD_REQUIRE_LOWERCASE = bool(
-            os.getenv("PASSWORD_REQUIRE_LOWERCASE", True)
-        )
+        self.PASSWORD_REQUIRE_UPPERCASE = bool(os.getenv("PASSWORD_REQUIRE_UPPERCASE", True))
+        self.PASSWORD_REQUIRE_LOWERCASE = bool(os.getenv("PASSWORD_REQUIRE_LOWERCASE", True))
         self.PASSWORD_REQUIRE_NUMBER = bool(os.getenv("PASSWORD_REQUIRE_NUMBER", True))
-        self.PASSWORD_REQUIRE_SPECIAL_CHAR = bool(
-            os.getenv("PASSWORD_REQUIRE_SPECIAL_CHAR", True)
-        )
+        self.PASSWORD_REQUIRE_SPECIAL_CHAR = bool(os.getenv("PASSWORD_REQUIRE_SPECIAL_CHAR", True))
 
         # Session settings
-        self.PERMANENT_SESSION_LIFETIME = int(
-            os.getenv("PERMANENT_SESSION_LIFETIME", "3600")
-        )
+        self.PERMANENT_SESSION_LIFETIME = int(os.getenv("PERMANENT_SESSION_LIFETIME", "3600"))
         self.SESSION_COOKIE_SECURE = bool(os.getenv("SESSION_COOKIE_SECURE", False))
         self.SESSION_COOKIE_HTTPONLY = True
         self.SESSION_COOKIE_SAMESITE = "Lax"
@@ -252,10 +267,13 @@ class Config:
             Config._logged = True
 
     def _process_encryption_key(self, key: str) -> str:
-        """
-        Process encryption key for use with Fernet.
-        """
+        """Process encryption key for use with Fernet."""
         if not key:
             raise ValueError("ENCRYPTION_KEY environment variable is required")
         key_bytes = hashlib.sha256(key.encode()).digest()
         return base64.b64encode(key_bytes).decode()
+
+    @staticmethod
+    def validate_model_config(config: dict) -> None:
+        """Validate model configuration."""
+        validate_model_config(config)
