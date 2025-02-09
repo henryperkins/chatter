@@ -151,8 +151,6 @@ class RegistrationForm(FlaskForm):
     Inherits CSRF protection from FlaskForm.
     """
     def __init__(self, *args, **kwargs):
-        if 'csrf_enabled' not in kwargs:
-            kwargs['csrf_enabled'] = True
         super().__init__(*args, **kwargs)
 
         # Ensure a hidden field for form-based CSRF only
@@ -315,10 +313,6 @@ class ForgotPasswordForm(FlaskForm):
     """
     Form for requesting a password reset.
     """
-    class Meta:
-        csrf = True
-        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
-
     email = StringField(
         "Email",
         validators=[
@@ -472,10 +466,6 @@ class ProviderForm(FlaskForm):
 # ------------------------------------------------------------------------
 
 class ModelForm(FlaskForm):
-    class Meta:
-        csrf = True
-        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
-
     name = StringField('Model Name', validators=[DataRequired(), Length(max=255)])
     deployment_name = StringField(
         'Deployment Name',
@@ -815,10 +805,6 @@ class DefaultModelForm(FlaskForm):
     Form for editing the default model configuration during registration if invalid,
     specifically for o1-preview model configuration.
     """
-    class Meta:
-        csrf = True
-        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
-
     provider_id = SelectField(
         "Provider",
         validators=[DataRequired(message="Provider is required.")],
