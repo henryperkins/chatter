@@ -268,16 +268,27 @@ class Config:
 
     def _process_encryption_key(self, key: str) -> str:
         """Process encryption key for use with Fernet."""
-        logger.debug("Raw ENCRYPTION_KEY (redacted) length=%d", len(key) if key else 0)
+        logger.debug("Processing encryption key (redacted) length=%d", len(key) if key else 0)
 
-        if not key or len(key) < 40:
-            raise ValueError("ENCRYPTION_KEY is missing or looks too short. Check your .env setup.")
+        if not key:
+            raise ValueError("ENCRYPTION_KEY is missing. Check your .env setup.")
+            
         key = key.strip()  # Remove any whitespace
+        
+        # If key is not base64-encoded, hash it and encode
         try:
-            base64.urlsafe_b64decode(key)  # Validate it's a valid base64 string
+            # First try to decode - if this works, key is already properly formatted
+            base64.urlsafe_b64decode(key.encode())
+            logger.debug("Using provided base64 encryption key")
             return key
         except Exception:
-            raise ValueError(f"ENCRYPTION_KEY must be a valid URL-safe base64-encoded string. Got: {key}")
+            # If decode fails, treat as raw key that needs processing
+            logger.debug("Processing raw encryption key")
+            # Hash the key and encode it properly for Fernet
+            key_bytes = hashlib.sha256(key.encode()).digest()
+            encoded_key = base64.urlsafe_b64encode(key_bytes).decode()
+            logger.debug("Successfully processed encryption key")
+            return encoded_key
 
     @staticmethod
     def validate_model_config(config: dict) -> None:
