@@ -149,6 +149,7 @@ class ModelFormHandler {
     async sendFormRequest(url, data, csrfToken) {
         return fetch(url, {
             method: 'POST',
+            credentials: 'same-origin',  // Ensure cookies (including the CSRF cookie) are sent
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRFToken': csrfToken,
