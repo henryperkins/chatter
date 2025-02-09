@@ -298,11 +298,15 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                 from utils.encryption import decrypt_api_key
 
                 encryption_key = os.getenv("ENCRYPTION_KEY", None)
-                if encryption_key and model_obj.api_key:
-                    azure_token = decrypt_api_key(model_obj.api_key, encryption_key)
+                if model_obj.api_key:
+                    try:
+                        azure_token = decrypt_api_key(model_obj.api_key, encryption_key)
+                    except EncryptionError as e:
+                        logger.error("Error decrypting Azure token: %s", str(e))
+                        return render_template("error.html", error="Configuration error: Unable to decrypt API key. Please contact your administrator.")
                 else:
                     azure_token = None
-                    logger.warning("Azure token not decrypted because ENCRYPTION_KEY or api_key is empty.")
+                    logger.warning("No API key found for model.")
             except Exception as e:
                 logger.error("Error decrypting Azure token: %s", str(e))
 
@@ -402,11 +406,15 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                 from utils.encryption import decrypt_api_key
 
                 encryption_key = os.getenv("ENCRYPTION_KEY", None)
-                if encryption_key and model_obj.api_key:
-                    azure_token = decrypt_api_key(model_obj.api_key, encryption_key)
+                if model_obj.api_key:
+                    try:
+                        azure_token = decrypt_api_key(model_obj.api_key, encryption_key)
+                    except EncryptionError as e:
+                        logger.error("Error decrypting Azure token: %s", str(e))
+                        return render_template("error.html", error="Configuration error: Unable to decrypt API key. Please contact your administrator.")
                 else:
                     azure_token = None
-                    logger.warning("Azure token not decrypted because ENCRYPTION_KEY or api_key is empty.")
+                    logger.warning("No API key found for model.")
             except Exception as e:
                 logger.error("Error decrypting Azure token: %s", str(e))
 

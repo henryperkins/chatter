@@ -26,8 +26,10 @@ def encrypt_api_key(api_key: str, encryption_key: str) -> str:
 def decrypt_api_key(encrypted_key: str, encryption_key: str) -> str:
     """Decrypt API key using Fernet symmetric encryption."""
     try:
-        if not encrypted_key or not encryption_key:
-            raise EncryptionError("Encrypted key and encryption key are required")
+        if not encrypted_key:
+            raise EncryptionError("Cannot decrypt: Encrypted key is empty.")
+        if not encryption_key:
+            raise EncryptionError("Cannot decrypt: ENCRYPTION_KEY is missing or invalid.")
         cipher_suite = Fernet(encryption_key.encode())
         decrypted_key = cipher_suite.decrypt(encrypted_key.encode())
         return decrypted_key.decode()
