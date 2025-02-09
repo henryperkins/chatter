@@ -78,10 +78,6 @@ class LoginForm(FlaskForm):
     """
     Form for user login.
     """
-    class Meta:
-        csrf = True  # Enable CSRF protection
-        csrf_secret = os.getenv('CSRF_SECRET')  # Use env var without fallback
-
     username = StringField(
         "Username",
         validators=[DataRequired(message="Username is required.")],
@@ -154,10 +150,6 @@ class RegistrationForm(FlaskForm):
     Form for user registration.
     Inherits CSRF protection from FlaskForm.
     """
-    class Meta:
-        csrf = True
-        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
-
     def __init__(self, *args, **kwargs):
         if 'csrf_enabled' not in kwargs:
             kwargs['csrf_enabled'] = True
@@ -295,10 +287,6 @@ class ResetPasswordForm(FlaskForm):
     """
     Form for resetting password.
     """
-    class Meta:
-        csrf = True
-        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
-
     password = PasswordField(
         "New Password",
         validators=[
@@ -348,10 +336,6 @@ class ProviderForm(FlaskForm):
     """
     Form for creating or updating AI providers.
     """
-
-    class Meta:
-        csrf = True
-        csrf_secret = os.getenv('CSRF_SECRET', 'secret-key-here')
 
     name = StringField(
         "Provider Name",

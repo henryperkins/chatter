@@ -342,7 +342,6 @@ def create_app() -> Flask:
         return Flask._app_instance  # type: ignore
 
     app = Flask(__name__)
-    app.secret_key = os.urandom(24)  # Set a secure secret key
     Flask._already_configured = True  # type: ignore
     Flask._app_instance = app  # type: ignore
 
