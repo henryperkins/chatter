@@ -205,7 +205,7 @@ class Model:
                     # Decrypt API key if present
                     from utils.encryption import decrypt_api_key, EncryptionError
                     encrypted_key = model_dict.get("api_key", "")
-                    if encrypted_key:
+                    if encrypted_key and config.ENCRYPTION_KEY:
                         try:
                             model_dict["api_key"] = decrypt_api_key(encrypted_key, config.ENCRYPTION_KEY)
                         except EncryptionError as e:
@@ -213,6 +213,7 @@ class Model:
                             model_dict["api_key"] = ""
                     else:
                         model_dict["api_key"] = ""
+                        logger.warning("API key not decrypted because ENCRYPTION_KEY or api_key is empty.")
 
                     models.append(Model(**model_dict))
                 return models
