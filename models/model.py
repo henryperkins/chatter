@@ -10,9 +10,9 @@ This module provides a Model class for managing AI model configurations, includi
 
 import json
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List, cast, ClassVar
-from sqlalchemy import text, Column, Integer, Float, Boolean, String, DateTime
-from sqlalchemy.orm import mapped_column, Session
+from typing import Optional, Dict, Any, List, ClassVar
+from sqlalchemy import text, Integer, Float, Boolean, String, DateTime
+from sqlalchemy.orm import mapped_column
 
 from database import db_session
 from config import Config
@@ -47,7 +47,6 @@ class Model:
         supports_streaming: Whether model supports streaming responses
         api_version: Azure API version
         reasoning_effort: Reasoning effort setting for some models
-        store_completion: Flag to store completions
         created_at: Creation timestamp
         version: Record version for optimistic locking
     """
@@ -84,9 +83,6 @@ class Model:
     )
     reasoning_effort: str = field(
         default="medium", metadata={"sa": mapped_column(String(10), nullable=False)}
-    )
-    store_completion: bool = field(
-        default=False, metadata={"sa": mapped_column(Boolean, nullable=False)}
     )
     created_at: Optional[str] = field(
         default=None, metadata={"sa": mapped_column(DateTime, nullable=True)}
@@ -195,7 +191,7 @@ class Model:
                     model_dict["max_completion_tokens"] = int(model_dict["max_completion_tokens"]) if model_dict.get("max_completion_tokens") is not None else 8300
 
                     # Normalize boolean fields
-                    for bool_field in ["requires_o1_handling", "supports_streaming", "is_default", "store_completion"]:
+                    for bool_field in ["requires_o1_handling", "supports_streaming", "is_default"]:
                         value = model_dict.get(bool_field)
                         if isinstance(value, str):
                             model_dict[bool_field] = value.lower() in ("true", "t", "1")
@@ -442,7 +438,6 @@ class Model:
                     "is_default",
                     "provider_id",
                     "reasoning_effort",
-                    "store_completion",
                 }
                 update_data = {
                     key: value for key, value in data.items() if key in allowed_fields
@@ -697,8 +692,6 @@ class Model:
             if reasoning_effort not in ["low", "medium", "high"]:
                 raise ValueError("reasoning_effort must be one of: low, medium, high")
             config["reasoning_effort"] = reasoning_effort
-            config["store_completion"] = bool(config.get("store_completion", False))
-
             # Validate max completion tokens
             max_completion_tokens = config.get("max_completion_tokens")
             model_caps = Model.PROVIDER_CAPABILITIES.get(model_type, {})
@@ -716,7 +709,6 @@ class Model:
             config.pop("presence_penalty", None)
         else:
             config["reasoning_effort"] = "medium"
-            config["store_completion"] = False
             config["max_tokens"] = config.get("max_tokens", 16384)  # Default for non-o-series models
         required_fields = {
             "provider_id": (int, "Provider ID must be an integer"),
@@ -726,14 +718,14 @@ class Model:
             "api_endpoint": (str, "API endpoint must be a valid HTTPS URL"),
             "api_key": (str, "API key must be a non-empty string"),
         }
-        for field, (expected_type, error_msg) in required_fields.items():
-            if field not in config:
-                raise ValueError(f"Missing required field: {field}")
-            value = config[field]
+        for field_name, (expected_type, error_msg) in required_fields.items():
+            if field_name not in config:
+                raise ValueError(f"Missing required field: {field_name}")
+            value = config[field_name]
             if value is None or value == "":
                 raise ValueError(error_msg)
             if not isinstance(value, expected_type):
-                raise ValueError(f"{field} must be of type {expected_type.__name__}")
+                raise ValueError(f"{field_name} must be of type {expected_type.__name__}")
         api_endpoint = config["api_endpoint"]
         if not isinstance(api_endpoint, str):
             raise ValueError("API endpoint must be a string")

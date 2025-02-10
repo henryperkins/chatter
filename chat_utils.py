@@ -1,11 +1,14 @@
 import uuid
-from typing import List, Dict, Tuple, Any
-from werkzeug.utils import secure_filename as werkzeug_secure_filename
 import os
 import smtplib
+import logging
+from typing import List, Dict, Tuple, Any
+from werkzeug.utils import secure_filename as werkzeug_secure_filename
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from flask import jsonify
 from token_utils import count_tokens, truncate_content, get_encoding
+from context_manager import ContextManager, ContextMonitor
 
 # Constants
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")  # Default model name
@@ -107,7 +110,6 @@ def count_file_tokens(content: str) -> int:
     # Add overhead for file metadata and structure
     return base_tokens + 10
 
-from context_manager import ContextManager, ContextMonitor
 
 # Initialize context management
 context_manager = ContextManager(model_max_tokens=int(os.getenv("MODEL_MAX_TOKENS", "8000")))
@@ -127,9 +129,17 @@ def process_file(file) -> Tuple[str, str, int]:
     Raises:
         ValueError: If the file is invalid or cannot be processed.
     """
+    if not file.filename:
+        raise ValueError("Empty filename provided")
+        
     filename = secure_filename(file.filename)
+    if not filename:
+        raise ValueError("Invalid filename")
+        
     mime_type = file.mimetype
     ext = os.path.splitext(filename)[1].lower().lstrip('.')
+    if not ext:
+        raise ValueError("File must have an extension")
 
     # Check file size
     file.seek(0, os.SEEK_END)
@@ -143,7 +153,8 @@ def process_file(file) -> Tuple[str, str, int]:
     if mime_type == 'application/octet-stream':
         try:
             file.seek(0)
-            sample = file.read(1024).decode('utf-8')
+            # Try to read and decode a sample to verify it's text
+            file.read(1024).decode('utf-8')
             file.seek(0)
             if ext in ['md', 'txt', 'json', 'py', 'js', 'css', 'html', 'csv']:
                 mime_type = f'text/{ext}' if ext != 'md' else 'text/markdown'
@@ -264,8 +275,6 @@ def validate_password_strength(password: str) -> List[str]:
         errors.append("Password must contain at least one special character.")
     return errors
 
-import logging
-from flask import jsonify
 
 logger = logging.getLogger(__name__)
 

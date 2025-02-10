@@ -3,8 +3,7 @@
 import os
 import logging
 import base64
-import hashlib
-import hmac
+from cryptography.fernet import Fernet
 from pathlib import Path
 from typing import Dict, Any
 from urllib.parse import urlparse
@@ -281,37 +280,30 @@ class Config:
             
         key = key.strip()  # Remove any whitespace
         
-        # If key is not base64-encoded, hash it and encode
         try:
-            # First try to decode - if this works, key is already properly formatted
-            base64.urlsafe_b64decode(key.encode())
-            logger.debug("Using provided base64 encryption key")
+            # First try to use the key directly with Fernet to validate it
+            Fernet(key.encode())
+            logger.debug("Using valid Fernet key")
             return key
         except Exception:
-            # If decode fails, treat as raw key that needs processing
-            logger.debug("Processing raw encryption key")
-            # Use PBKDF2HMAC for proper key derivation
-            # Generate unique salt per key using HMAC
-            salt = hmac.new(
-                msg=key.encode(),
-                key=b'chatter_salt',
-                digestmod=hashlib.sha256
-            ).digest()
-            key_bytes = hashlib.pbkdf2_hmac(
-                'sha256',
-                key.encode(),
-                salt,
-                100000,  # Number of iterations
-                dklen=32  # Length of derived key
-            )
-            encoded_key = base64.urlsafe_b64encode(key_bytes).decode()
-            logger.debug("Successfully processed encryption key")
-            return encoded_key
+            # If that fails, try to process it into a valid Fernet key
+            try:
+                # Generate a 32-byte key using SHA256
+                key_bytes = base64.urlsafe_b64decode(key.encode())
+                if len(key_bytes) != 32:
+                    key_bytes = key_bytes[:32].ljust(32, b'\0')  # Ensure exactly 32 bytes
+                # Convert to Fernet key format (URL-safe base64)
+                fernet_key = base64.urlsafe_b64encode(key_bytes)
+                logger.debug("Successfully processed encryption key")
+                return fernet_key.decode()
+            except Exception as e:
+                raise ValueError(f"Invalid encryption key format: {str(e)}")
 
     @staticmethod
     def validate_model_config(config: dict) -> None:
         """Validate model configuration."""
         validate_model_config(config)
-        
+
+
 # Finally, create a single global instance you can import in other modules.
 config_instance = Config()

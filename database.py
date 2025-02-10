@@ -308,8 +308,9 @@ def create_default_model(db: Session) -> Optional[int]:
         # Encrypt API key
         try:
         
+            from utils.encryption import encrypt_api_key
             config_instance = Config()
-            api_key = config_instance.AZURE_OPENAI_KEY
+            api_key = encrypt_api_key(config_instance.AZURE_OPENAI_KEY, config_instance.ENCRYPTION_KEY)
         except Exception as e:
             logger.error(f"Failed to encrypt API key: {e}")
             raise ValueError("Failed to encrypt API key")

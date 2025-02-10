@@ -83,7 +83,6 @@ def extract_model_data(form: ModelForm) -> dict:
         "supports_streaming": form.supports_streaming.data,
         "is_default": form.is_default.data,
         "reasoning_effort": form.reasoning_effort.data,
-        "store_completion": form.store.data,
     }
     return data
 

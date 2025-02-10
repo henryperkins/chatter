@@ -82,7 +82,6 @@ def get_azure_response(
     model_type: Optional[str] = None,
     requires_o1_handling: bool = False,
     reasoning_effort: str = "medium",  # Must be one of "low", "medium", or "high"
-    store_completion: bool = False,
     response_format: Optional[Dict[str, Any]] = None,
     timeout_seconds: int = 600,
     stream: bool = False,
@@ -100,6 +99,12 @@ def get_azure_response(
             isinstance(m, dict) and "role" in m and "content" in m for m in messages
         ):
             raise ChatAPIError("Invalid messages format", 400)
+
+        # Validate system messages for o-series models
+        if model_type and model_type.lower() in ["o1-mini", "o1-preview"]:
+            system_messages = [m for m in messages if m["role"] == "system"]
+            if system_messages:
+                raise ChatAPIError(f"Model {model_type} does not support system messages", 400)
 
         # Decrypt API key if needed
         try:
@@ -136,13 +141,43 @@ def get_azure_response(
         # According to the new documentation, these models only support max_completion_tokens (not standard "max_tokens"),
         # and we can optionally pass "reasoning_effort". Also ignore typical generation parameters (temperature, top_p, etc.).
         if model_type and model_type.lower() in ["o1", "o1-mini", "o1-preview", "o3-mini"]:
+            # Validate API version for o-series models
+            model_type_lower = model_type.lower()
+            if model_type_lower in ["o3-mini", "o1"]:
+                valid_versions = ["2024-12-01-preview", "2025-01-01-preview"]
+                if api_version not in valid_versions:
+                    raise ChatAPIError(f"Model {model_type} requires API version {' or '.join(valid_versions)}", 400)
+            else:  # o1-preview and o1-mini
+                valid_versions = ["2024-09-01-preview", "2024-10-01-preview", "2024-12-01-preview"]
+                if api_version not in valid_versions:
+                    raise ChatAPIError(f"Model {model_type} requires API version {', '.join(valid_versions[:-1])} or {valid_versions[-1]}", 400)
+
+            # Validate streaming support (only o3-mini supports streaming)
+            if stream and model_type_lower != "o3-mini":
+                raise ChatAPIError(f"Model {model_type} does not support streaming", 400)
             # For O-series, rely on max_completion_tokens, reasoning_effort, developer messages, etc.
+            # Validate max_completion_tokens based on model type
+            max_tokens_limits = {
+                "o3-mini": 75000,
+                "o1": 100000,
+                "o1-mini": 50000,
+                "o1-preview": 32768
+            }
+            model_limit = max_tokens_limits[model_type_lower]
+            if max_completion_tokens > model_limit:
+                raise ChatAPIError(f"Model {model_type} has a maximum completion token limit of {model_limit}", 400)
             completion_params["max_completion_tokens"] = max_completion_tokens
-            completion_params["reasoning_effort"] = reasoning_effort  # can be "low", "medium", or "high"
-            completion_params["store_completion"] = store_completion
+            
+            # Validate reasoning_effort parameter
+            valid_efforts = ["low", "medium", "high"]
+            if reasoning_effort not in valid_efforts:
+                raise ChatAPIError(f"Invalid reasoning_effort value. Must be one of: {', '.join(valid_efforts)}", 400)
+            completion_params["reasoning_effort"] = reasoning_effort
+            
+            completion_params["temperature"] = 1.0  # Required for o-series models
 
             # Remove any typical generation parameters that might break O-series usage:
-            for param in ["temperature", "top_p", "presence_penalty", "frequency_penalty", "logprobs", "top_logprobs", "logit_bias"]:
+            for param in ["top_p", "presence_penalty", "frequency_penalty", "logprobs", "top_logprobs", "logit_bias"]:
                 if param in completion_params:
                     del completion_params[param]
         else:
