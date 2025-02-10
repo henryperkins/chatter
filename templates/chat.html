@@ -208,6 +208,7 @@
 document.addEventListener('app:ready', () => {
     // Render all assistant messages
     document.querySelectorAll('[data-role="assistant-message"]').forEach(element => {
+        if (element.getAttribute('data-rendered') === 'true') return;
         const content = element.dataset.content;
         if (content && window.md) {
             const renderedContent = window.md.render(content);
@@ -217,6 +218,7 @@ document.addEventListener('app:ready', () => {
             if (window.Prism) {
                 window.Prism.highlightAllUnder(element);
             }
+            element.setAttribute('data-rendered', 'true');
         }
     });
 });

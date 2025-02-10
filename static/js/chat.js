@@ -180,11 +180,6 @@
                 stream: true
             };
 
-            // Add model if present
-            const modelSelect = document.getElementById('model-select');
-            if (modelSelect && modelSelect.value) {
-                jsonData.model = modelSelect.value;
-            }
 
             logDebug('Sending chat request:', {
                 url: '/chat/send',
@@ -401,6 +396,33 @@
             // Initialize file upload functionality
             if (window.fileUploadManager) {
                 await window.fileUploadManager.initializeFileUpload();
+            }
+
+            // Wire up model selection change to update the current chat's model immediately
+            const modelSelect = document.getElementById('model-select');
+            if (modelSelect) {
+                modelSelect.addEventListener('change', async () => {
+                    const newModelId = modelSelect.value;
+                    const chatId = window.CHAT_CONFIG.chatId;
+                    try {
+                        const response = await fetch('/chat/update_model', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+                            },
+                            body: JSON.stringify({ chat_id: chatId, model_id: newModelId })
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            window.showAlert("Chat model updated", "success");
+                        } else {
+                            window.showAlert(data.error || "Failed to update chat model", "error");
+                        }
+                    } catch (err) {
+                        window.showAlert("Failed to update chat model", "error");
+                    }
+                });
             }
 
             const chatForm = document.getElementById('chat-form');
