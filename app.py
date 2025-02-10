@@ -382,7 +382,8 @@ def create_app() -> Flask:
 
     if not hasattr(app, "_components_initialized"):
         try:
-            init_app_components(app)
+            with app.app_context():
+                init_app_components(app)
             app._components_initialized = True  # type: ignore
         except Exception as e:
             logger.error("Component initialization failed", exc_info=True)
