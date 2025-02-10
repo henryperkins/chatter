@@ -132,7 +132,6 @@ class LoginForm(FlaskForm):
     """
     Form for user login.
     """
-    csrf_token = HiddenField('CSRF Token')
     username = StringField(
         "Username",
         validators=[DataRequired(message="Username is required.")],
