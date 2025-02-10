@@ -36,9 +36,13 @@ from utils.encryption import encrypt_api_key, EncryptionError
 from models.provider import Provider
 from models.model import Model
 
-# Azure libraries for deployment validation
-from azure.identity import DefaultAzureCredential
-from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
+# Azure libraries for deployment validation (optional)
+try:
+    from azure.identity import DefaultAzureCredential
+    from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
+    AZURE_IMPORTS_AVAILABLE = True
+except ImportError:
+    AZURE_IMPORTS_AVAILABLE = False
 
 # Cryptography imports for key derivation
 from cryptography.hazmat.primitives import hashes
@@ -57,6 +61,10 @@ def validate_azure_deployment(deployment_name, subscription_id, resource_group, 
     """
     Validate that the specified Azure deployment exists.
     """
+    if not AZURE_IMPORTS_AVAILABLE:
+        logger.warning("Azure SDK not installed - skipping deployment validation")
+        return True
+        
     try:
         credential = DefaultAzureCredential()
         client = CognitiveServicesManagementClient(credential, subscription_id)
