@@ -630,13 +630,21 @@ def stream_response(chat_id: str, history: List[Dict[str, Any]], model_obj: Mode
                 api_version=model_obj.api_version,
             )
             
-            response = client.chat.completions.create(
-                model=model_obj.deployment_name,
-                messages=history,
-                temperature=model_obj.temperature,
-                max_tokens=model_obj.max_completion_tokens,
-                stream=True,
-            )
+            # Build completion parameters
+            completion_params = {
+                "model": model_obj.deployment_name,
+                "messages": history,
+                "max_completion_tokens": model_obj.max_completion_tokens,
+                "stream": True
+            }
+
+            # Add temperature for o-series models
+            if model_obj.model_type and model_obj.model_type.lower() in ["o3-mini", "o1", "o1-mini", "o1-preview"]:
+                completion_params["temperature"] = 1.0
+            else:
+                completion_params["temperature"] = model_obj.temperature
+
+            response = client.chat.completions.create(**completion_params)
 
             for chunk in response:
                 if hasattr(chunk, 'choices') and chunk.choices:
