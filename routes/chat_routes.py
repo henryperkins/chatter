@@ -729,8 +729,8 @@ def normal_response(
                 if isinstance(message_dict, dict):
                     content = message_dict.get("content")
 
-        if not content:
-            raise ValueError("No content in API response")
+        # Default to fallback message if no content
+        content = content or "[No response from model]"
 
         conversation_manager.add_message(
             chat_id=chat_id,
