@@ -169,6 +169,11 @@ def login():
 @bp.errorhandler(CSRFError)
 def handle_csrf_error(e):
     """Handle CSRF validation failures."""
+    # CSRF validation may fail due to:
+    # 1. No Matching Session Cookie: Ensure the request includes the session cookie set by Flask.
+    # 2. The Hidden Field Isn’t Submitted: Verify that the <input type="hidden" name="csrf_token"> is included in the form.
+    # 3. Secret Key or Session Setup: Confirm that a valid SECRET_KEY is set and session cookies are properly configured.
+    # 4. Accessing the Route Incorrectly: External requests (e.g. via Postman) may miss necessary cookies.
     logger.warning(
         "CSRF validation failed",
         extra={
