@@ -718,6 +718,7 @@ def normal_response(
 
         response = get_azure_response(**api_params)
 
+        # Extract content with fallback messages
         content: Optional[str] = None
         if hasattr(response, 'choices') and response.choices:
             choice = response.choices[0]
@@ -729,8 +730,12 @@ def normal_response(
                 if isinstance(message_dict, dict):
                     content = message_dict.get("content")
 
-        # Default to fallback message if no content
-        content = content or "[No response from model]"
+        # Fallback messages for different scenarios
+        if not content:
+            if model_obj.requires_o1_handling:
+                content = "[No response generated. The model may need more context or a different prompt format.]"
+            else:
+                content = "[No response from model. Please try again or contact support if this persists.]"
 
         conversation_manager.add_message(
             chat_id=chat_id,
