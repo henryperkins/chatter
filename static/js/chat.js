@@ -247,6 +247,9 @@
         // data.message.content holds the assistant's reply
         const content = data.message?.content || '';
         await appendAssistantMessage(content, /* isStreaming= */ false);
+
+        // Immediately show a quick success toast
+        showSuccess("Assistant responded successfully");
     }
 
     async function handleStreamingResponse(formData) {
