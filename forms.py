@@ -33,6 +33,8 @@ from sqlalchemy import text
 from database import db_session, is_initialized
 from chat_utils import validate_password_strength
 from utils.encryption import encrypt_api_key, EncryptionError
+from models.provider import Provider
+from models.model import Model
 
 # Azure libraries for deployment validation
 from azure.identity import DefaultAzureCredential
