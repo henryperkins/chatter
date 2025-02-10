@@ -158,7 +158,7 @@
     }
 
     .input-area {
-        @apply pb-safe px-2 safe-area-bottom;
+        @apply px-2 pb-[env(safe-area-inset-bottom)];
     }
 
     .chat-container {
