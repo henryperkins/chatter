@@ -1,4 +1,3 @@
-
 class FetchError extends Error {
     constructor(message, status, data) {
         super(message);
@@ -10,17 +9,39 @@ class FetchError extends Error {
 
 window.utils = {
     getCSRFToken() {
-        const token = document.querySelector('meta[name="csrf-token"]')?.content;
+        try {
+            // Try multiple sources for CSRF token
+            const sources = [
+                () => document.querySelector('meta[name="csrf-token"]')?.content,
+                () => document.querySelector('input[name="csrf_token"]')?.value,
+                () => document.querySelector('input[name="_csrf_token"]')?.value
+            ];
+
+            for (const getToken of sources) {
+                const token = getToken();
+                if (token) return token;
+            }
+
+            // If we get here, no token was found
+            throw new Error('CSRF token not found');
+        } catch (error) {
+            console.error('CSRF token error:', error);
+            // Don't throw here, let the calling code handle the error
+            return null;
+        }
+    },
+
+    ensureCSRFToken() {
+        const token = this.getCSRFToken();
         if (!token) {
-            console.error('CSRF token meta tag not found');
-            throw new Error('CSRF token not available');
+            throw new Error('CSRF validation failed. Please refresh the page and try again.');
         }
         return token;
     },
 
     async fetchWithCSRF(url, options = {}) {
         try {
-            const csrfToken = this.getCSRFToken();
+            const csrfToken = this.ensureCSRFToken();
             const defaultHeaders = {
                 'X-Requested-With': 'XMLHttpRequest',
                 'X-CSRFToken': csrfToken
@@ -36,7 +57,8 @@ window.utils = {
             if (finalBody && !(finalBody instanceof FormData)) {
                 if (typeof finalBody === 'object') {
                     finalBody = JSON.stringify({
-                        ...finalBody
+                        ...finalBody,
+                        csrf_token: csrfToken // Include token in request body
                     });
                     defaultHeaders['Content-Type'] = 'application/json';
                 }
@@ -249,148 +271,146 @@ window.utils = {
                 </span>
             `;
 
-
-
-const result = await callback();
-return result;
+            const result = await callback();
+            return result;
         } finally {
-    if (element) {
-        element.disabled = false;
-        element.classList.remove(...loadingClasses);
-        element.innerHTML = originalContent;
-    }
-}
+            if (element) {
+                element.disabled = false;
+                element.classList.remove(...loadingClasses);
+                element.innerHTML = originalContent;
+            }
+        }
     },
 
-validateForm(formElement, validationRules = {}) {
-    const errors = {};
-    if (!formElement) return { isValid: false, errors: { form: 'Form not found' } };
+    validateForm(formElement, validationRules = {}) {
+        const errors = {};
+        if (!formElement) return { isValid: false, errors: { form: 'Form not found' } };
 
-    const formData = new FormData(formElement);
+        const formData = new FormData(formElement);
 
-    for (const [fieldName, rules] of Object.entries(validationRules)) {
-        const value = formData.get(fieldName);
+        for (const [fieldName, rules] of Object.entries(validationRules)) {
+            const value = formData.get(fieldName);
 
-        if (rules.required && !value) {
-            errors[fieldName] = 'This field is required';
-            continue;
-        }
-
-        if (value) {
-            if (rules.minLength && value.length < rules.minLength) {
-                errors[fieldName] = `Must be at least ${rules.minLength} characters`;
+            if (rules.required && !value) {
+                errors[fieldName] = 'This field is required';
+                continue;
             }
 
-            if (rules.maxLength && value.length > rules.maxLength) {
-                errors[fieldName] = `Must be no more than ${rules.maxLength} characters`;
-            }
+            if (value) {
+                if (rules.minLength && value.length < rules.minLength) {
+                    errors[fieldName] = `Must be at least ${rules.minLength} characters`;
+                }
 
-            if (rules.pattern && !new RegExp(rules.pattern).test(value)) {
-                errors[fieldName] = rules.patternMessage || 'Invalid format';
-            }
+                if (rules.maxLength && value.length > rules.maxLength) {
+                    errors[fieldName] = `Must be no more than ${rules.maxLength} characters`;
+                }
 
-            if (rules.custom && typeof rules.custom === 'function') {
-                const customError = rules.custom(value, formData);
-                if (customError) {
-                    errors[fieldName] = customError;
+                if (rules.pattern && !new RegExp(rules.pattern).test(value)) {
+                    errors[fieldName] = rules.patternMessage || 'Invalid format';
+                }
+
+                if (rules.custom && typeof rules.custom === 'function') {
+                    const customError = rules.custom(value, formData);
+                    if (customError) {
+                        errors[fieldName] = customError;
+                    }
                 }
             }
         }
-    }
 
-    return {
-        isValid: Object.keys(errors).length === 0,
-        errors
-    };
-},
+        return {
+            isValid: Object.keys(errors).length === 0,
+            errors
+        };
+    },
 
-showValidationErrors(errors, formElement) {
-    if (!formElement) return;
+    showValidationErrors(errors, formElement) {
+        if (!formElement) return;
 
-    // Remove existing error messages
-    formElement.querySelectorAll('.error-message').forEach(el => el.remove());
-    formElement.querySelectorAll('.error-field').forEach(el => {
-        el.classList.remove('error-field', 'border-red-500');
-    });
+        // Remove existing error messages
+        formElement.querySelectorAll('.error-message').forEach(el => el.remove());
+        formElement.querySelectorAll('.error-field').forEach(el => {
+            el.classList.remove('error-field', 'border-red-500');
+        });
 
-    // Add new error messages
-    Object.entries(errors).forEach(([fieldName, message]) => {
-        const field = formElement.querySelector(`[name="${fieldName}"]`);
-        if (field) {
-            field.classList.add('error-field', 'border-red-500');
+        // Add new error messages
+        Object.entries(errors).forEach(([fieldName, message]) => {
+            const field = formElement.querySelector(`[name="${fieldName}"]`);
+            if (field) {
+                field.classList.add('error-field', 'border-red-500');
 
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message text-red-500 text-sm mt-1';
-            errorDiv.textContent = message;
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message text-red-500 text-sm mt-1';
+                errorDiv.textContent = message;
 
-            field.parentNode.insertBefore(errorDiv, field.nextSibling);
+                field.parentNode.insertBefore(errorDiv, field.nextSibling);
+            }
+        });
+    },
+
+    formatBytes(bytes, decimals = 2) {
+        if (!bytes || bytes === 0) return '0 Bytes';
+
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    },
+
+    sanitizeHTML(html) {
+        if (!html) return '';
+        const div = document.createElement('div');
+        div.textContent = html;
+        return div.innerHTML;
+    },
+
+    parseJSON(jsonString, fallback = null) {
+        if (!jsonString) return fallback;
+        try {
+            return JSON.parse(jsonString);
+        } catch (e) {
+            console.error('JSON parse error:', e);
+            return fallback;
         }
-    });
-},
+    },
 
-formatBytes(bytes, decimals = 2) {
-    if (!bytes || bytes === 0) return '0 Bytes';
+    getQueryParam(param) {
+        if (!param) return null;
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get(param);
+    },
 
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    setQueryParam(param, value) {
+        if (!param) return;
+        const urlParams = new URLSearchParams(window.location.search);
+        if (value === null || value === undefined) {
+            urlParams.delete(param);
+        } else {
+            urlParams.set(param, value);
+        }
+        const newUrl = `${window.location.pathname}${urlParams.toString() ? '?' + urlParams.toString() : ''}`;
+        window.history.replaceState({}, '', newUrl);
+    },
 
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    handleError(error) {
+        console.error('Error:', error);
 
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-},
+        let message = 'An unexpected error occurred';
+        let type = 'error';
 
-sanitizeHTML(html) {
-    if (!html) return '';
-    const div = document.createElement('div');
-    div.textContent = html;
-    return div.innerHTML;
-},
+        if (error instanceof FetchError) {
+            message = error.message;
+            type = error.status >= 500 ? 'error' : 'warning';
+        } else if (error instanceof Error) {
+            message = error.message;
+        }
 
-parseJSON(jsonString, fallback = null) {
-    if (!jsonString) return fallback;
-    try {
-        return JSON.parse(jsonString);
-    } catch (e) {
-        console.error('JSON parse error:', e);
-        return fallback;
+        this.showFeedback(message, type);
+        return { message, type };
     }
-},
-
-getQueryParam(param) {
-    if (!param) return null;
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get(param);
-},
-
-setQueryParam(param, value) {
-    if (!param) return;
-    const urlParams = new URLSearchParams(window.location.search);
-    if (value === null || value === undefined) {
-        urlParams.delete(param);
-    } else {
-        urlParams.set(param, value);
-    }
-    const newUrl = `${window.location.pathname}${urlParams.toString() ? '?' + urlParams.toString() : ''}`;
-    window.history.replaceState({}, '', newUrl);
-},
-
-handleError(error) {
-    console.error('Error:', error);
-
-    let message = 'An unexpected error occurred';
-    let type = 'error';
-
-    if (error instanceof FetchError) {
-        message = error.message;
-        type = error.status >= 500 ? 'error' : 'warning';
-    } else if (error instanceof Error) {
-        message = error.message;
-    }
-
-    this.showFeedback(message, type);
-    return { message, type };
-}
 };
 
 // Export for module environments

@@ -22,6 +22,7 @@ class FileUploadHandler:
         self.QUARANTINE_FOLDER = os.path.join(self.config.UPLOAD_FOLDER, "quarantine")
         self.MIME_TYPE_MAP = self.config.MIME_TYPE_MAP
         self.SCAN_TIMEOUT = 30  # seconds for virus scan
+        current_app.logger.debug(f"FileUploadHandler initialized with ALLOWED_EXTENSIONS={self.ALLOWED_EXTENSIONS}, MAX_FILE_SIZE={self.MAX_FILE_SIZE}, MAX_TOTAL_SIZE={self.MAX_TOTAL_SIZE}")
 
         # Ensure the quarantine folder exists
         os.makedirs(self.QUARANTINE_FOLDER, exist_ok=True)
@@ -38,6 +39,7 @@ class FileUploadHandler:
         Returns:
             Tuple[bool, List[str]]: (True, []) if allowed, (False, errors) if not
         """
+        current_app.logger.debug(f"allowed_file called with filename: {filename}")
         errors = []
 
         # Check filename security
@@ -118,6 +120,7 @@ class FileUploadHandler:
         Returns:
             Tuple[List, List]: A tuple containing valid files and a list of errors.
         """
+        current_app.logger.debug("validate_files called")
         valid_files = []
         errors = []
         file_hashes = set()
@@ -203,6 +206,7 @@ class FileUploadHandler:
         Returns:
             str: The SHA256 hash of the file content.
         """
+        current_app.logger.debug("calculate_file_hash called")
         import hashlib
 
         sha256_hash = hashlib.sha256()
@@ -221,6 +225,7 @@ class FileUploadHandler:
         Returns:
             bool: True if the file content matches its extension, False otherwise.
         """
+        current_app.logger.debug(f"validate_file_content called for file: {file.filename}")
         file.seek(0)
         mime = None
 
@@ -299,6 +304,7 @@ class FileUploadHandler:
         Returns:
             str: "clean" if the file is clean or scan not available, otherwise the scan result.
         """
+        current_app.logger.debug(f"scan_for_viruses called for file: {file.filename}")
         try:
             import pyclamd
             import platform
@@ -333,6 +339,7 @@ class FileUploadHandler:
         Args:
             file: The file object.
         """
+        current_app.logger.debug(f"quarantine_file called for file: {file.filename}")
         quarantine_path = os.path.join(self.QUARANTINE_FOLDER, file.filename)
         try:
             file.save(quarantine_path)
@@ -347,6 +354,7 @@ class FileUploadHandler:
         Args:
             file_info: Dictionary containing file metadata and content
         """
+        current_app.logger.debug(f"index_file_in_search called for file: {file_info['filename']}")
         try:
             search_config = AzureSearchConfig()
 
@@ -392,6 +400,7 @@ class FileUploadHandler:
         Returns:
             List[Dict]: A list of dictionaries containing saved file details.
         """
+        current_app.logger.debug(f"save_files called with {len(files)} files for chat_id: {chat_id}")
         from chat_utils import context_manager, context_monitor
 
         saved_files = []
@@ -547,6 +556,7 @@ class FileUploadHandler:
         Returns:
             Response: A Flask JSON response with detailed file metadata.
         """
+        current_app.logger.debug(f"handle_upload called for chat_id: {chat_id}")
         try:
             if "files[]" not in request.files:
                 return jsonify({"error": "No files provided"}), 400

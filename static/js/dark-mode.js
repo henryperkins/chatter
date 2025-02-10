@@ -114,7 +114,10 @@ const DarkMode = {
     updateToggleButton(isDark) {
         if (!this.darkModeToggle) return;
 
-        const [moonIcon, sunIcon] = this.darkModeToggle.querySelectorAll('svg');
+        const moonIcon = this.darkModeToggle.querySelector('.fa-moon');
+        const sunIcon = this.darkModeToggle.querySelector('.fa-sun');
+
+        if (!moonIcon || !sunIcon) return;
 
         if (isDark) {
             moonIcon.classList.add('hidden');
