@@ -250,7 +250,9 @@ class Config:
         self.PERMANENT_SESSION_LIFETIME = int(os.getenv("PERMANENT_SESSION_LIFETIME", "3600"))
         self.SESSION_COOKIE_SECURE = bool(os.getenv("SESSION_COOKIE_SECURE", False))
         self.SESSION_COOKIE_HTTPONLY = True
-        self.SESSION_COOKIE_SAMESITE = "Lax"
+        # Relax samesite & secure for local dev
+        self.SESSION_COOKIE_SECURE = False
+        self.SESSION_COOKIE_SAMESITE = None
 
         # Email settings
         self.EMAIL_SENDER = os.getenv("EMAIL_SENDER", "no-reply@example.com")
