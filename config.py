@@ -4,6 +4,7 @@ import os
 import logging
 import base64
 import hashlib
+import hmac
 from pathlib import Path
 from typing import Dict, Any
 from urllib.parse import urlparse
@@ -234,7 +235,7 @@ class Config:
         self.MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", 10 * 1024 * 1024))
         self.MAX_TOTAL_FILE_SIZE = int(os.getenv("MAX_TOTAL_FILE_SIZE", 50 * 1024 * 1024))
         self.ALLOWED_FILE_EXTENSIONS = FILE_CONFIG["ALLOWED_EXTENSIONS"]
-        self.ALLOWED_MIME_TYPES = set(FILE_CONFIG["MIME_TYPES"].values())
+        self.ALLOWED_MIME_TYPES: set[str] = {v for v in FILE_CONFIG["MIME_TYPES"].values()}
         self.MIME_TYPE_MAP = FILE_CONFIG["MIME_TYPES"]
 
         # Security settings
@@ -287,8 +288,20 @@ class Config:
         except Exception:
             # If decode fails, treat as raw key that needs processing
             logger.debug("Processing raw encryption key")
-            # Hash the key and encode it properly for Fernet
-            key_bytes = hashlib.sha256(key.encode()).digest()
+            # Use PBKDF2HMAC for proper key derivation
+            # Generate unique salt per key using HMAC
+            salt = hmac.new(
+                msg=key.encode(),
+                key=b'chatter_salt',
+                digestmod=hashlib.sha256
+            ).digest()
+            key_bytes = hashlib.pbkdf2_hmac(
+                'sha256',
+                key.encode(),
+                salt,
+                100000,  # Number of iterations
+                dklen=32  # Length of derived key
+            )
             encoded_key = base64.urlsafe_b64encode(key_bytes).decode()
             logger.debug("Successfully processed encryption key")
             return encoded_key

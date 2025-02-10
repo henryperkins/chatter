@@ -307,8 +307,7 @@ def create_default_model(db: Session) -> Optional[int]:
 
         # Encrypt API key
         try:
-            from cryptography.fernet import Fernet
-            from utils.encryption import encrypt_api_key
+        
             config_instance = Config()
             api_key = config_instance.AZURE_OPENAI_KEY
         except Exception as e:
@@ -498,6 +497,8 @@ def init_db() -> None:
                 DROP TABLE IF EXISTS uploaded_files CASCADE;
                 DROP TABLE IF EXISTS messages CASCADE;
                 DROP TABLE IF EXISTS chats CASCADE;
+                DROP TABLE IF EXISTS model_versions CASCADE;
+                DROP TABLE IF EXISTS login_attempts CASCADE;
                 DROP TABLE IF EXISTS models CASCADE;
                 DROP TABLE IF EXISTS providers CASCADE;
                 DROP TABLE IF EXISTS users CASCADE;

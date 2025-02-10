@@ -1,8 +1,6 @@
-import os
 import re
 import logging
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timedelta
 
 from flask import current_app, request
 from flask_wtf import FlaskForm
@@ -35,13 +33,63 @@ from sqlalchemy import text
 from database import db_session, is_initialized
 from chat_utils import validate_password_strength
 from utils.encryption import encrypt_api_key, EncryptionError
-from models.provider import Provider
-from models.model import Model
+
+# Azure libraries for deployment validation
+from azure.identity import DefaultAzureCredential
+from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
+
+# Cryptography imports for key derivation
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+# Optional: Input sanitization if using a web application firewall
+# from waf import sanitize_input
 
 logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------------
-# Custom Fields: NullableIntegerField, NullableFloatField
+# Utility Functions
+# ------------------------------------------------------------------------
+
+def validate_azure_deployment(deployment_name, subscription_id, resource_group, account_name):
+    """
+    Validate that the specified Azure deployment exists.
+    """
+    try:
+        credential = DefaultAzureCredential()
+        client = CognitiveServicesManagementClient(credential, subscription_id)
+        deployments = client.deployments.list(resource_group, account_name)
+        return any(d.name == deployment_name for d in deployments)
+    except Exception as e:
+        logger.error(f"Error validating Azure deployment: {str(e)}", exc_info=True)
+        return False
+
+def derive_encryption_key(master_key: bytes, salt: bytes) -> bytes:
+    """
+    Derive an encryption key using PBKDF2HMAC.
+    """
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA512(),
+        length=32,
+        salt=salt,
+        iterations=600000,
+    )
+    return kdf.derive(master_key)
+
+def verify_database_schema():
+    """
+    Verify that the required database schema is in place.
+    (Implementation depends on your DB/ORM; ensure migrations are applied.)
+    """
+    # required_schema = {
+    #     'users': ['locked_until', 'version'],
+    #     'models': ['deployment_name', 'azure_verified']
+    # }
+    logger.info("Database schema verification is pending. Please ensure migrations are applied.")
+
+
+# ------------------------------------------------------------------------
+# Custom Fields: NullableIntegerField, NullableFloatField, (Optional) HardenedStringField
 # ------------------------------------------------------------------------
 
 class NullableIntegerField(IntegerField):
@@ -70,6 +118,12 @@ class NullableFloatField(FloatField):
         else:
             self.data = None
 
+# Optional: HardenedStringField for input sanitization
+# class HardenedStringField(StringField):
+#     def process_formdata(self, valuelist):
+#         if valuelist:
+#             self.data = sanitize_input(valuelist[0])
+
 # ------------------------------------------------------------------------
 # LoginForm
 # ------------------------------------------------------------------------
@@ -92,7 +146,7 @@ class LoginForm(FlaskForm):
 
     def validate_username(self, field: Field) -> None:
         """
-        Add account lockout checks and password spray protection.
+        Add account lockout checks, password spray protection, and security logging.
         """
         username = field.data.strip().lower()
         ip_address = request.remote_addr
@@ -103,13 +157,18 @@ class LoginForm(FlaskForm):
                 locked_until = db.execute(
                     text("""
                         SELECT locked_until
-                        FROM user_accounts
+                        FROM users
                         WHERE username = :username
                     """),
                     {"username": username}
                 ).scalar()
 
-                if locked_until and locked_until > datetime.utcnow():
+                if locked_until is not None and locked_until > datetime.utcnow():
+                    logger.error("Account locked", extra={
+                        'username': username,
+                        'ip': ip_address,
+                        'locked_until': locked_until
+                    })
                     raise ValidationError("Account temporarily locked - please try again later.")
 
                 # 2) Check recent failed attempts for username or IP
@@ -125,21 +184,29 @@ class LoginForm(FlaskForm):
                 ).scalar()
 
                 if recent_failures >= 5:
-                    # Lock the account for 15 minutes
+                    extra_failures = recent_failures - 5
+                    lock_minutes = 15 * (2 ** min(extra_failures, 5))  # exponential backoff
+                    lock_time = datetime.utcnow() + timedelta(minutes=lock_minutes)
                     db.execute(
                         text("""
-                            UPDATE user_accounts
-                            SET locked_until = NOW() + INTERVAL '15 minutes'
+                            UPDATE users
+                            SET locked_until = :lock_time
                             WHERE username = :username
                         """),
-                        {"username": username}
+                        {"lock_time": lock_time, "username": username}
                     )
-                    raise ValidationError("Too many failed attempts - account locked for 15 minutes.")
+                    logger.error("Excessive login failures", extra={
+                        'username': username,
+                        'ip': ip_address,
+                        'recent_failures': recent_failures,
+                        'lock_time': lock_time
+                    })
+                    raise ValidationError(f"Too many failed attempts - account locked for {lock_minutes} minutes.")
 
         except ValidationError:
             raise
         except Exception as e:
-            logger.error(f"Security validation error: {str(e)}")
+            logger.error(f"Security validation error: {str(e)}", exc_info=True)
             raise ValidationError("Login temporarily unavailable - please try again later.")
 
 # ------------------------------------------------------------------------
@@ -153,8 +220,6 @@ class RegistrationForm(FlaskForm):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        # Ensure a hidden field for form-based CSRF only
         if not hasattr(self, "csrf_token"):
             self.csrf_token = HiddenField('CSRF Token')
 
@@ -176,7 +241,6 @@ class RegistrationForm(FlaskForm):
             Email(message="Invalid email address."),
         ],
     )
-    # Enhanced minimum password length = 12
     password = PasswordField(
         "Password",
         validators=[
@@ -203,26 +267,23 @@ class RegistrationForm(FlaskForm):
     def validate_username(self, field: Field) -> None:
         """
         Custom validator for username.
-        Checks if username is already taken; also ensures format checks.
+        Checks if username is already taken and performs format checks.
         """
         if not field.data:
             return
         username = field.data.strip()
 
         if not is_initialized():
-            logger.warning("Database not initialized - skipping username validation")
-            return
+            raise ValidationError("System initialization incomplete. Please contact the administrator.")
 
         try:
             with db_session(transactional=True) as db:
-                # Check if username already exists
                 if db.execute(
                     text("SELECT 1 FROM users WHERE username = :uname"),
                     {"uname": username},
                 ).scalar():
                     raise ValidationError("This username is already taken. Please choose a different username.")
 
-            # Validate username format
             if field.data != username:
                 raise ValidationError("Username cannot contain leading or trailing spaces.")
 
@@ -230,9 +291,7 @@ class RegistrationForm(FlaskForm):
                 raise ValidationError("Username must be at least 4 characters long.")
 
             if not re.match(r"^[a-zA-Z0-9_]+$", username):
-                raise ValidationError(
-                    "Username can only contain letters, numbers, and underscores."
-                )
+                raise ValidationError("Username can only contain letters, numbers, and underscores.")
 
         except ValidationError:
             raise
@@ -242,7 +301,7 @@ class RegistrationForm(FlaskForm):
 
     def validate_email(self, field: Field) -> None:
         """
-        Custom validator for email. Checks if email is already registered.
+        Custom validator for email. Checks if the email is already registered.
         """
         if not field.data:
             raise ValidationError("Email is required")
@@ -331,7 +390,6 @@ class ProviderForm(FlaskForm):
     """
     Form for creating or updating AI providers.
     """
-
     name = StringField(
         "Provider Name",
         validators=[
@@ -381,15 +439,12 @@ class ProviderForm(FlaskForm):
     def validate_endpoint_pattern(self, field):
         """Validate the API path format."""
         try:
-            if "azure" in self.slug.data.lower():
+            if self.slug and self.slug.data and "azure" in self.slug.data.lower():
                 raise ValidationError("Azure OpenAI endpoints should be configured via Azure provider type.")
-
             if not field.data.startswith("/"):
                 raise ValidationError("API path must start with /")
-
             if "//" in field.data:
                 raise ValidationError("API path cannot contain double slashes")
-
         except ValidationError:
             raise
         except Exception as e:
@@ -400,7 +455,6 @@ class ProviderForm(FlaskForm):
         try:
             if field.data and "azure" in str(field.data).lower():
                 raise ValidationError("Azure OpenAI endpoints should be configured through the Azure provider type.")
-
             if field.data:
                 field.data = str(field.data).rstrip("/")
         except ValidationError:
@@ -559,7 +613,6 @@ class ModelForm(FlaskForm):
                 "is_azure": provider.is_azure if provider else None
             })
 
-        # Configure deployment_name after we know the provider
         self.setup_deployment_name_field(provider)
 
         logger.debug("Form initialized", extra={
@@ -597,11 +650,10 @@ class ModelForm(FlaskForm):
                 "provider": provider.name,
                 "rules": rules
             })
-        except Exception as e:
+        except Exception:
             logger.error("Error loading validation rules", exc_info=True)
             rules = {}
 
-        # If provider is Azure, make deployment_name required
         if provider.is_azure:
             logger.debug("Setting up Azure provider validation")
             self.deployment_name.validators = [DataRequired(), Length(max=255)]
@@ -684,20 +736,24 @@ class ModelForm(FlaskForm):
 
     def validate_deployment_name(self, field):
         """
-        Enhanced validation for deployment_name field with detailed logging.
+        Enhanced validation for deployment_name with Azure deployment check.
         """
         provider = Provider.get_by_id(self.provider_id.data) if self.provider_id.data else None
 
         if provider and provider.is_azure:
-            # Must have a deployment name
             if not field.data:
                 raise ValidationError("Deployment name is required for Azure OpenAI providers.")
 
             pattern = self.provider_validation_rules.get('model_id')
             if pattern and not re.match(pattern, field.data):
                 raise ValidationError("Deployment name does not match provider format requirements.")
+
+            subscription_id = current_app.config.get('AZURE_SUBSCRIPTION_ID')
+            resource_group = current_app.config.get('AZURE_RESOURCE_GROUP')
+            account_name = current_app.config.get('AZURE_ACCOUNT_NAME')
+            if not validate_azure_deployment(field.data, subscription_id, resource_group, account_name):
+                raise ValidationError("Azure deployment not found.")
         else:
-            # Non-Azure providers must not supply a deployment name
             if field.data:
                 raise ValidationError("Deployment names are only allowed for Azure providers.")
 
@@ -711,7 +767,10 @@ class ModelForm(FlaskForm):
             raise ValidationError("Must be a valid integer")
 
         provider = Provider.get_by_id(self.provider_id.data)
-        provider_max = provider.capabilities.get('max_tokens', 16384) if provider else 16384
+        if provider and isinstance(provider.capabilities, dict):
+            provider_max = provider.capabilities.get('max_tokens', 16384)
+        else:
+            provider_max = 16384
 
         if self.requires_o1_handling.data:
             if not (1 <= value <= 25000):
@@ -722,15 +781,12 @@ class ModelForm(FlaskForm):
 
     def validate_temperature(self, field):
         """
-        Temperature validation with o1-preview locking.
+        Temperature validation with o1-preview constraint.
         """
         if self.requires_o1_handling.data:
-            field.data = 1.0  # Force value for o1-preview
-            return
-
+            raise ValidationError("Temperature is fixed for o1-preview models; please do not specify a value.")
         if field.data is None:
             return
-
         try:
             temp = float(field.data)
             if not (0 <= temp <= 2):
@@ -747,27 +803,26 @@ class ModelForm(FlaskForm):
 
     def process_api_key(self):
         """
-        Handle API key encryption with better error handling.
+        Handle API key encryption with improved security and error handling.
         """
         try:
-            # If editing and no new API key is supplied, preserve the old one.
-            if self.is_edit and not self.api_key.data and self._obj:
-                self.api_key.data = self._obj.api_key
+            if self.is_edit and not self.api_key.data:
+                # Clear API key field to avoid exposing the stored encrypted key.
+                self.api_key.data = None
                 return
 
             if self.api_key.data:
                 if len(self.api_key.data) < 32:
                     raise ValidationError("API key must be at least 32 characters.")
 
-                encryption_key = current_app.config.get('ENCRYPTION_KEY')
+                from config import Config
+                config_instance = Config()
+                encryption_key = config_instance.ENCRYPTION_KEY
                 if not encryption_key:
                     logger.critical("Encryption key missing in configuration.")
                     raise ValidationError("System configuration error - please contact administrator.")
 
-                # Encrypt new key with optional versioning
-                version = current_app.config.get('ENCRYPTION_KEY_VERSION', 1)
-                self.api_key.data = encrypt_api_key(self.api_key.data, encryption_key, version)
-
+                self.api_key.data = encrypt_api_key(self.api_key.data, encryption_key)
         except EncryptionError as e:
             logger.error(f"API key encryption failed: {str(e)}")
             raise ValidationError("Failed to secure API key - please try again.")
@@ -835,3 +890,5 @@ class DefaultModelForm(FlaskForm):
             ),
         ],
     )
+    submit = SubmitField("Save Default Model")
+ 

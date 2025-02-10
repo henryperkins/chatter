@@ -46,6 +46,9 @@ CREATE TABLE users (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     otp_secret TEXT DEFAULT NULL,
     otp_required BOOLEAN DEFAULT FALSE
+,
+    locked_until TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    version INT NOT NULL DEFAULT 0
 );
 
 -- MODELS TABLE

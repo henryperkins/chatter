@@ -22,14 +22,13 @@ from flask import (
     session,
     url_for,
 )
-from werkzeug.datastructures import MultiDict
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import text
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database import db_session
 from decorators import admin_required
-from extensions import limiter, csrf
+from extensions import limiter
 from forms import LoginForm, RegistrationForm, ResetPasswordForm, ForgotPasswordForm
 from models import User
 from scripts.send_email import send_email
@@ -125,8 +124,8 @@ def login():
         logger.debug(f"CSRF data in form object: {form.csrf_token.data}")
         logger.debug(f"Raw form data for csrf_token: {request.form.get('csrf_token')}")
         logger.debug(f"Cookies sent by client: {request.cookies}")
-    if not form.csrf_token.data:
-        raise CSRFError("Missing CSRF token")
+        if not form.csrf_token.data:
+            raise CSRFError("Missing CSRF token")
         try:
             username = form.username.data
             if not username or not isinstance(username, str):
