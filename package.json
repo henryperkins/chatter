@@ -5,7 +5,7 @@
   "scripts": {
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
-    "build:css": "NODE_ENV=production tailwindcss -i ./static/css/input.css -o ./static/css/output.css --minify",
+    "build:css": "cross-env NODE_ENV=production tailwindcss -i ./static/css/input.css -o ./static/css/output.css --minify",
     "start": "flask run",
     "watch:css": "tailwindcss -i ./static/css/input.css -o ./static/css/output.css --watch",
     "update-libs": "copy node_modules\\axios\\dist\\axios.min.js* static\\js\\ && copy node_modules\\dompurify\\dist\\purify.min.js* static\\js\\ && copy node_modules\\markdown-it\\dist\\markdown-it.min.js static\\js\\ && copy node_modules\\prismjs\\prism.js static\\js\\"
@@ -17,6 +17,7 @@
     "@tailwindcss/forms": "^0.5.7",
     "@tailwindcss/typography": "^0.5.10",
     "autoprefixer": "^10.4.17",
+    "cross-env": "^7.0.3",
     "cssnano": "^6.0.3",
     "eslint": "^8.10.0",
     "eslint-config-prettier": "^8.8.0",
@@ -24,6 +25,7 @@
     "postcss": "^8.4.33",
     "postcss-import": "^15.1.0",
     "postcss-nested": "^6.2.0",
+    "postcss-nesting": "^13.0.1",
     "tailwind-scrollbar": "^3.0.5",
     "tailwindcss": "^3.4.1"
   },

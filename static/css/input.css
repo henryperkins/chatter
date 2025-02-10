@@ -34,11 +34,11 @@
 
     /* Chat tabs components */
     .chat-tabs {
-        @apply flex overflow-x-auto scrollbar-none gap-2 px-4 py-2;
+        @apply flex overflow-x-auto scrollbar-none gap-2 px-4 py-2 sm:py-3 -mx-4 sm:mx-0 touch-pan-x;
     }
 
     .chat-tab {
-        @apply flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 whitespace-nowrap focus:outline-none;
+        @apply flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 whitespace-nowrap focus:outline-none active:scale-95 hover:scale-105 touch-manipulation;
     }
 
     .chat-tab-active {
@@ -107,7 +107,7 @@
 
     /* Form components */
     .form-input {
-        @apply w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700/90 dark:text-gray-100 backdrop-blur-sm bg-white/90;
+        @apply w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl shadow-inner focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700/90 dark:text-gray-100 backdrop-blur-sm bg-white/90 text-base sm:text-sm leading-relaxed;
     }
 
     .form-label {
@@ -154,57 +154,48 @@
 /* Mobile optimizations */
 @media (max-width: 640px) {
     .chat-message {
-        @apply max-w-[92%] mx-auto;
+        @apply text-base leading-relaxed;
     }
 
-    .input-area {
-        @apply px-2 pb-[env(safe-area-inset-bottom)];
+    /* Larger touch targets on mobile */
+    .btn, .icon-button, .chat-control-btn {
+        @apply min-h-[44px] min-w-[44px];
     }
 
-    .chat-container {
-        margin-top: 140px;
+    /* Improved mobile input experience */
+    #message-input {
+        @apply text-base leading-relaxed py-4 min-h-[100px];
     }
 
-    #chat-box {
-        padding-bottom: 140px;
-        max-height: calc(100vh - 140px);
-    }
-
-    .mobile-menu {
-        @apply top-16 w-[90%] max-w-[320px];
-    }
-
-    /* Enhanced mobile message spacing */
-    #chat-box {
-        @apply px-3 py-3 pb-16 space-y-4;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    /* Improve touch targets */
-    .icon-button {
-        @apply min-w-touch min-h-touch w-12 h-12;
-    }
-
-    /* Chat tabs mobile optimization */
-    .chat-tabs {
-        @apply px-2 py-1;
-    }
-
-    .chat-tab {
-        @apply px-3 py-1.5 text-sm;
-    }
-
+    /* Better spacing for mobile */
     .chat-controls {
-        @apply px-3 py-2;
+        @apply py-4 px-4;
     }
 
-    .chat-control-btn {
-        @apply p-2;
+    /* Enhanced mobile scrolling */
+    #chat-box {
+        @apply overscroll-contain touch-pan-y;
     }
 
-    #model-select {
-        @apply h-9 text-sm;
+    /* Improved mobile message bubbles */
+    .message-container {
+        @apply px-2 max-w-[95%];
     }
+}
+
+/* Enhanced touch feedback */
+.touch-feedback {
+    @apply active:scale-95 transition-transform duration-200 touch-manipulation;
+}
+
+/* Improved message bubbles */
+.message-bubble {
+    @apply rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50;
+}
+
+/* Token usage panel improvements */
+#token-usage {
+    @apply text-sm sm:text-xs rounded-t-xl border-t-2;
 }
 
 /* Dark mode transitions */

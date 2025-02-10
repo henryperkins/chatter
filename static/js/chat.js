@@ -1,5 +1,68 @@
 (() => {
     'use strict';
+// Mobile support adaptations from mobilesupport.md
+// 1. Visual viewport resize handling for on-screen keyboard:
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    const inputBar = document.getElementById('chat-input');
+    if (!inputBar) return;
+    const viewport = window.visualViewport;
+    // Adjust the bottom of the input bar so it stays visible above the virtual keyboard
+    inputBar.style.bottom = `${viewport.height - viewport.offsetTop}px`;
+  });
+}
+
+// 2. Swipe navigation on chat box
+(() => {
+  const chatBox = document.getElementById('chat-box');
+  if (!chatBox) return;
+
+  let touchStartX = 0;
+  let touchEndX = 0;
+  const SWIPE_THRESHOLD = 50; // px
+
+  chatBox.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+
+  chatBox.addEventListener('touchend', (e) => {
+    touchEndX = e.changedTouches[0].clientX;
+    const deltaX = touchEndX - touchStartX;
+    if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
+      if (deltaX > 0) {
+        // Swipe right
+        // TODO: Implement "previous chat" logic if desired
+        console.debug('Swiped right in chat box');
+      } else {
+        // Swipe left
+        // TODO: Implement "next chat" logic if desired
+        console.debug('Swiped left in chat box');
+      }
+    }
+  }, { passive: true });
+})();
+
+// 3. IntersectionObserver-based message virtualization (basic example):
+(() => {
+  if (!('IntersectionObserver' in window)) return; // gracefully degrade
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        // Reveal this message container
+        entry.target.style.visibility = 'visible';
+        // If needed, re-render for performance
+      } else {
+        // Hide this message container to free up memory if we want
+        entry.target.style.visibility = 'hidden';
+        entry.target.innerHTML = ''; // Clear non-visible content
+      }
+    });
+  }, { threshold: 0.1 });
+
+  document.querySelectorAll('.message-container').forEach(el => {
+    observer.observe(el);
+  });
+})();
 
     const CONFIG = {
         DEPENDENCY_TIMEOUT: 5000,
@@ -7,6 +70,16 @@
         MAX_DEPENDENCY_ATTEMPTS: 50,
         DEBUG: true
     };
+
+    // Mobile chat selector handler
+    document.getElementById('mobile-chat-selector')?.addEventListener('change', function(e) {
+        const chatId = e.target.value;
+        if (chatId === 'new') {
+            window.location.href = '/chat/new';
+        } else {
+            window.location.href = `/chat/${chatId}`;
+        }
+    });
 
     function logDebug(...args) {
         if (window.monitoring) {

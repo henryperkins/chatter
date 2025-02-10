@@ -7,51 +7,158 @@
 
 {% block title %}Chat - Azure OpenAI{% endblock %}
 
-{% block nav_classes %}top-0 md:top-[84px]{% endblock %}
+{% block nav_classes %}top-0{% endblock %}
 
 {% block main_classes %}relative flex-1{% endblock %}
 
 {% block chat_tabs %}
-<div
-    class="fixed w-full top-14 md:top-16 z-[1900] bg-gradient-to-b from-white/95 to-gray-100/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-md safe-area-top shadow-sm">
-    <div
-        class="chat-tabs flex overflow-x-auto border-b border-gray-200/50 dark:border-gray-700/50 px-4 sm:px-6 lg:px-8 gap-2 scrollbar-none max-w-7xl mx-auto">
+<div class="fixed w-full top-[72px] z-50 bg-gradient-to-b from-white/95 to-gray-100/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-md safe-area-top shadow-lg">
+    <div class="chat-tabs flex overflow-x-auto border-b-2 border-gray-200/50 dark:border-gray-700/50 px-4 sm:px-6 lg:px-8 gap-2 scrollbar-none max-w-7xl mx-auto touch-pan-x">
         <!-- New Chat Button -->
         <button
-            class="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-gray-100/90 dark:bg-gray-700/90 hover:bg-gray-200/90 dark:hover:bg-gray-600/90 transition-all duration-200 rounded-md my-1"
+            class="flex-shrink-0 flex items-center gap-2 px-4 py-3 bg-gray-100/90 dark:bg-gray-700/90 hover:bg-gray-200/90 dark:hover:bg-gray-600/90 transition-all duration-200 rounded-xl my-1 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 touch-manipulation min-h-[44px]"
             id="new-chat-btn" aria-label="Start new chat" role="button">
             <i class="fas fa-plus text-sm text-gray-600 dark:text-gray-300"></i>
             <span class="text-gray-600 dark:text-gray-300">New Tab</span>
         </button>
 
-        <!-- Chat Tabs -->
-        {% for conversation in conversations|sort(attribute='timestamp') %}
-        <div class="group">
-            <button
-                class="flex items-center gap-2 px-3 py-2 {% if conversation.id == chat_id %}bg-white dark:bg-gray-800 shadow-sm{% else %}bg-gray-50/90 dark:bg-gray-700/90 hover:bg-gray-100/90 dark:hover:bg-gray-600/90{% endif %} rounded-md my-1 transition-all duration-200"
-                data-chat-id="{{ conversation.id }}"
-                data-href="{{ url_for('chat.chat_interface', chat_id=conversation.id) }}"
-                onclick="window.location.href=this.dataset.href">
-                <span class="truncate max-w-[200px]">{{ conversation.title | e }}</span>
-                <button onclick="event.stopPropagation(); event.preventDefault();"
-                    class="ml-2 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-500 dark:text-gray-400"
-                    data-chat-id="{{ conversation.id }}" title="Delete chat" aria-label="Delete chat">
-                    <i class="fas fa-times text-xs"></i>
+    <!-- Chat Tabs -->
+    <div class="hidden md:flex chat-tabs">
+        {% for chat in recent_chats %}
+            <div class="chat-tab {% if chat.id == current_chat.id %}chat-tab-active{% else %}chat-tab-default{% endif %}"
+                data-chat-id="{{ chat.id }}">
+                <span>{{ chat.title|truncate(20) }}</span>
+                <button class="chat-tab-close" data-chat-id="{{ chat.id }}">
+                    <i class="fas fa-times"></i>
                 </button>
-            </button>
+            </div>
+        {% endfor %}
+        <div class="chat-tab chat-tab-default hover:bg-gray-100 dark:hover:bg-gray-700" id="new-chat-tab">
+            <i class="fas fa-plus"></i>
+            <span>New Chat</span>
         </div>
+    </div>
+    
+    <!-- Mobile Chat Selector -->
+    <select id="mobile-chat-selector" class="md:hidden w-full mx-4 mt-2 p-2 rounded-lg bg-white/95 dark:bg-gray-800/95 border border-gray-200/80 dark:border-gray-700/80">
+        {% for chat in recent_chats %}
+            <option value="{{ chat.id }}" {% if chat.id == current_chat.id %}selected{% endif %}>{{ chat.title|truncate(20) }}</option>
+        {% endfor %}
+        <option value="new">+ New Chat</option>
+    </select>
+    </div>
+</div>
+{% endblock %}
+{% extends "base.html" %}
+
+{% block extra_head %}
+<!-- Chat-specific styles -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+{% endblock %}
+
+{% block title %}Chat - Azure OpenAI{% endblock %}
+
+{% block nav_classes %}top-0{% endblock %}
+
+{% block main_classes %}relative flex-1{% endblock %}
+
+{% block chat_tabs %}
+<div class="fixed w-full top-[72px] z-50 bg-gradient-to-b from-white/95 to-gray-100/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-md safe-area-top shadow-lg">
+    <div class="chat-tabs flex overflow-x-auto border-b-2 border-gray-200/50 dark:border-gray-700/50 px-4 sm:px-6 lg:px-8 gap-2 scrollbar-none max-w-7xl mx-auto touch-pan-x">
+        <!-- New Chat Button -->
+        <button
+            class="flex-shrink-0 flex items-center gap-2 px-4 py-3 bg-gray-100/90 dark:bg-gray-700/90 hover:bg-gray-200/90 dark:hover:bg-gray-600/90 transition-all duration-200 rounded-xl my-1 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 touch-manipulation min-h-[44px]"
+            id="new-chat-btn" aria-label="Start new chat" role="button">
+            <i class="fas fa-plus text-sm text-gray-600 dark:text-gray-300"></i>
+            <span class="text-gray-600 dark:text-gray-300">New Tab</span>
+        </button>
+
+    <!-- Chat Tabs -->
+    <div class="hidden md:flex chat-tabs">
+        {% for chat in recent_chats %}
+            <div class="chat-tab {% if chat.id == current_chat.id %}chat-tab-active{% else %}chat-tab-default{% endif %}"
+                data-chat-id="{{ chat.id }}">
+                <span>{{ chat.title|truncate(20) }}</span>
+                <button class="chat-tab-close" data-chat-id="{{ chat.id }}">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        {% endfor %}
+        <div class="chat-tab chat-tab-default hover:bg-gray-100 dark:hover:bg-gray-700" id="new-chat-tab">
+            <i class="fas fa-plus"></i>
+            <span>New Chat</span>
+        </div>
+    </div>
+    
+    <!-- Mobile Chat Selector -->
+    <select id="mobile-chat-selector" class="md:hidden w-full mx-4 mt-2 p-2 rounded-lg bg-white/95 dark:bg-gray-800/95 border border-gray-200/80 dark:border-gray-700/80">
+        {% for chat in recent_chats %}
+            <option value="{{ chat.id }}" {% if chat.id == current_chat.id %}selected{% endif %}>{{ chat.title|truncate(20) }}</option>
+        {% endfor %}
+        <option value="new">+ New Chat</option>
+    </select>
+        {% endfor %}
+    </div>
+    {% endblock %}
+{% extends "base.html" %}
+
+{% block extra_head %}
+<!-- Chat-specific styles -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+{% endblock %}
+
+{% block title %}Chat - Azure OpenAI{% endblock %}
+
+{% block nav_classes %}top-0{% endblock %}
+
+{% block main_classes %}relative flex-1{% endblock %}
+
+{% block chat_tabs %}
+<div class="fixed w-full top-[72px] z-50 bg-gradient-to-b from-white/95 to-gray-100/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-md safe-area-top shadow-lg">
+    <div class="chat-tabs flex overflow-x-auto border-b-2 border-gray-200/50 dark:border-gray-700/50 px-4 sm:px-6 lg:px-8 gap-2 scrollbar-none max-w-7xl mx-auto touch-pan-x">
+        <!-- New Chat Button -->
+        <button
+            class="flex-shrink-0 flex items-center gap-2 px-4 py-3 bg-gray-100/90 dark:bg-gray-700/90 hover:bg-gray-200/90 dark:hover:bg-gray-600/90 transition-all duration-200 rounded-xl my-1 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 touch-manipulation min-h-[44px]"
+            id="new-chat-btn" aria-label="Start new chat" role="button">
+            <i class="fas fa-plus text-sm text-gray-600 dark:text-gray-300"></i>
+            <span class="text-gray-600 dark:text-gray-300">New Tab</span>
+        </button>
+
+    <!-- Chat Tabs -->
+    <div class="hidden md:flex chat-tabs">
+        {% for chat in recent_chats %}
+            <div class="chat-tab {% if chat.id == current_chat.id %}chat-tab-active{% else %}chat-tab-default{% endif %}"
+                data-chat-id="{{ chat.id }}">
+                <span>{{ chat.title|truncate(20) }}</span>
+                <button class="chat-tab-close" data-chat-id="{{ chat.id }}">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        {% endfor %}
+        <div class="chat-tab chat-tab-default hover:bg-gray-100 dark:hover:bg-gray-700" id="new-chat-tab">
+            <i class="fas fa-plus"></i>
+            <span>New Chat</span>
+        </div>
+    </div>
+    
+    <!-- Mobile Chat Selector -->
+    <select id="mobile-chat-selector" class="md:hidden w-full mx-4 mt-2 p-2 rounded-lg bg-white/95 dark:bg-gray-800/95 border border-gray-200/80 dark:border-gray-700/80">
+        {% for chat in recent_chats %}
+            <option value="{{ chat.id }}" {% if chat.id == current_chat.id %}selected{% endif %}>{{ chat.title|truncate(20) }}</option>
+        {% endfor %}
+        <option value="new">+ New Chat</option>
+    </select>
         {% endfor %}
     </div>
 
     <!-- Chat Controls -->
-    <div
-        class="relative z-[1850] flex items-center gap-2 px-4 sm:px-6 lg:px-8 py-2 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50 max-w-7xl mx-auto">
+    <div class="relative z-40 flex items-center gap-3 px-4 sm:px-6 lg:px-8 py-3 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-md border-b-2 border-gray-200/50 dark:border-gray-700/50 max-w-7xl mx-auto">
         <!-- Model Selection -->
         {% if models %}
         <div class="relative flex-1 max-w-xs">
             <select id="model-select" data-original-value="{{ current_model.id if current_model else '' }}"
                 title="Select AI model"
-                class="w-full h-8 px-2 pr-8 text-sm border border-gray-300/50 dark:border-gray-600/50 rounded-lg shadow-soft focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:bg-gray-800/90 dark:text-gray-200 appearance-none cursor-pointer touch-manipulation bg-white/90 backdrop-blur-sm transition-all duration-300 hover:border-primary-500 dark:hover:border-primary-400">
+                class="w-full h-10 px-3 pr-8 text-base sm:text-sm border border-gray-300/50 dark:border-gray-600/50 rounded-xl shadow-md focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:bg-gray-800/90 dark:text-gray-200 appearance-none cursor-pointer touch-manipulation bg-white/90 backdrop-blur-sm transition-all duration-300 hover:border-primary-500 dark:hover:border-primary-400">
                 {% for model in models %}
                 <option value="{{ model.id }}"
                     data-requires-o1-handling="{{ 'true' if model.requires_o1_handling else 'false' }}"
@@ -61,8 +168,7 @@
                 </option>
                 {% endfor %}
             </select>
-            <div
-                class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500 dark:text-gray-400">
+            <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-gray-500 dark:text-gray-400">
                 <i class="fas fa-chevron-down"></i>
             </div>
         </div>
@@ -72,24 +178,24 @@
         {% if current_user.role == 'admin' %}
         <div class="flex items-center gap-1">
             <a href="{{ url_for('model.add_model_page') }}"
-                class="p-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
+                class="p-2 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center touch-manipulation"
                 title="Add new model">
-                <i class="fas fa-plus-circle"></i>
+                <i class="fas fa-plus-circle text-lg sm:text-base"></i>
                 <span class="sr-only">Add new model</span>
             </a>
             <button id="edit-model-btn"
-                class="p-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
+                class="p-2 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center touch-manipulation"
                 aria-label="Edit current model settings">
-                <i class="fas fa-edit"></i>
+                <i class="fas fa-edit text-lg sm:text-base"></i>
             </button>
         </div>
         {% endif %}
 
         <!-- Edit Title Button -->
         <button id="edit-title-btn"
-            class="p-1.5 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
+            class="p-2 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center touch-manipulation"
             aria-label="Edit chat title">
-            <i class="fas fa-edit"></i>
+            <i class="fas fa-edit text-lg sm:text-base"></i>
         </button>
     </div>
 </div>
@@ -98,24 +204,24 @@
 {% block content %}
 <!-- Message Templates -->
 <template id="assistant-message-template">
-    <div class="flex w-full mt-4 space-x-3 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl animate-slide-up">
-        <div class='flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-soft' role='img' aria-label='Assistant avatar'>
+    <div class="flex w-full mt-4 space-x-3 max-w-[95%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl animate-slide-up">
+        <div class='flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-md hover:shadow-lg transition-all duration-200' role='img' aria-label='Assistant avatar'>
             <i class='fas fa-robot text-sm'></i>
         </div>
         <div class='relative flex-1 group'>
-            <div class='absolute right-2 top-2 flex items-center space-x-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200'>
-                <button class='copy-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft'
+            <div class='absolute right-3 top-3 flex items-center space-x-2 z-10 opacity-0 group-hover:opacity-100 sm:group-hover:opacity-100 transition-opacity duration-200'>
+                <button class='copy-button p-2 rounded-xl bg-white/95 dark:bg-gray-800/95 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 active:scale-95 min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] touch-manipulation'
                         title='Copy to clipboard'
                         aria-label='Copy message to clipboard'
                         data-raw-content=''>
                     <i class='fas fa-copy'></i>
                 </button>
-                <button class='regenerate-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft' 
+                <button class='regenerate-button p-2 rounded-xl bg-white/95 dark:bg-gray-800/95 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-md hover:shadow-lg hover:scale-105 active:scale-95 min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] touch-manipulation' 
                          title='Regenerate response' aria-label='Regenerate response'>
                     <i class='fas fa-redo-alt'></i>
                 </button>
             </div>
-            <div class='bg-gray-100/95 dark:bg-gray-800/95 p-5 rounded-r-lg rounded-bl-lg shadow-soft border border-gray-200/50 dark:border-gray-700/50'>
+            <div class='message-bubble bg-white/95 dark:bg-gray-800/95 p-5 sm:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:-translate-y-0.5'>
                 <div class='prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto' data-role='assistant-message'>
                 </div>
             </div>
@@ -126,9 +232,9 @@
 </template>
 
 <template id="user-message-template">
-    <div class="flex w-full mt-4 space-x-3 max-w-[85%] sm:max-w-md md:max-w-2xl ml-auto justify-end animate-slide-up">
+    <div class="flex w-full mt-4 space-x-3 max-w-[90%] sm:max-w-md md:max-w-2xl ml-auto justify-end animate-slide-up">
         <div>
-            <div class='relative bg-gradient-to-r from-primary-600/95 to-secondary-600/95 text-white p-4 rounded-l-lg rounded-br-lg shadow-soft hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 border border-primary-500/10'>
+            <div class='message-bubble relative bg-gradient-to-r from-primary-600/95 to-secondary-600/95 text-white p-5 sm:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5 backdrop-blur-sm border border-primary-500/10'>
                 <p class='text-[15px] leading-relaxed break-words whitespace-pre-wrap'>
                 </p>
             </div>
@@ -147,17 +253,16 @@
 </template>
 
 <template id="attachment-item-template">
-    <div class='attachment-item flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded-md'>
-        <i class='fas fa-paperclip text-gray-500'></i>
-        <span class='attachment-name flex-1 truncate'></span>
-        <a class='attachment-link text-blue-600 hover:underline text-sm' target='_blank'>View</a>
+    <div class='attachment-item flex items-center gap-2 bg-gray-100/90 dark:bg-gray-800/90 px-4 py-3 sm:py-2 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 backdrop-blur-sm'>
+        <i class='fas fa-paperclip text-gray-500 text-lg sm:text-base'></i>
+        <span class='attachment-name flex-1 truncate text-base sm:text-sm'></span>
+        <a class='attachment-link text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-base sm:text-sm font-medium min-h-[44px] sm:min-h-[36px] min-w-[44px] sm:min-w-[36px] flex items-center justify-center touch-manipulation' target='_blank'>View</a>
     </div>
 </template>
-<div
- id="chat-container"
-    class="relative flex flex-col w-full h-full overflow-hidden touch-manipulation bg-gradient-to-b from-gray-50/95 to-white/95 dark:from-gray-900/95 dark:to-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-[100px] sm:mt-[140px] md:mt-[180px]"
-    style="min-height: -webkit-fill-available; /* Use available screen height on mobile */ 
-           min-height: 100vh;">
+
+<div id="chat-container"
+    class="relative flex flex-col w-full h-full overflow-hidden touch-manipulation bg-gradient-to-b from-gray-50/95 to-white/95 dark:from-gray-900/95 dark:to-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-[120px]"
+    style="min-height: calc(100vh - 120px);">
     <!-- Chat Configuration -->
     <div id="chat-config" data-chat-id="{{ chat_id }}" data-csrf-token="{{ csrf_token() }}"
         data-models='{{ models|tojson|safe }}'
@@ -167,12 +272,27 @@
     </div>
 
     <!-- Main Chat Area -->
-    <div
- id="chat-main"
-        class="flex-1 flex flex-col overflow-hidden pb-safe bg-white/90 dark:bg-gray-900/90 dark-mode-transition backdrop-blur-sm rounded-lg shadow-md">
+    <div id="chat-main"
+        class="flex-1 flex flex-col overflow-hidden pb-[180px] sm:pb-[140px] bg-white/90 dark:bg-gray-900/90 dark-mode-transition backdrop-blur-sm rounded-lg shadow-md relative z-10">
         <!-- Messages Area -->
-        <div id="chat-box"
-            class="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-8 space-y-6 min-h-[200px] scrollbar-thin scrollbar-thumb-gray-400/50 hover:scrollbar-thumb-gray-400 dark:scrollbar-thumb-gray-600/50 dark:hover:scrollbar-thumb-gray-600 scrollbar-track-transparent"
+        <div 
+            id="chat-box"
+            class="
+                flex-1 overflow-y-auto 
+                px-4 sm:px-6 
+                py-4 sm:py-8 
+                space-y-6 
+                min-h-[200px]
+                scrollbar-thin 
+                scrollbar-thumb-gray-400/50 
+                hover:scrollbar-thumb-gray-400 
+                dark:scrollbar-thumb-gray-600/50 
+                dark:hover:scrollbar-thumb-gray-600 
+                scrollbar-track-transparent
+                sm:pb-28 
+                sm:max-h-[calc(100vh-120px)]
+                overscroll-contain
+            "
             role="log" aria-live="polite">
             <div class="max-w-4xl mx-auto w-full">
                 {% if messages %}
@@ -186,7 +306,7 @@
                     </div>
                     <div class="relative flex-1 group">
                         <div
-                            class="absolute right-3 top-3 flex items-center space-x-2 z-[50] opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            class="absolute right-3 top-3 flex items-center space-x-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                             <button
                                 class="copy-button p-2 rounded-lg bg-white/95 dark:bg-gray-800/95 backdrop-blur-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
                                 title="Copy to clipboard"
@@ -212,7 +332,7 @@
                             <div class="mt-4 space-y-2">
                                 <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Attached Files:</div>
                                 {% for attachment in message.metadata.attachments %}
-                                <div class="flex items-center space-x-2 bg-gray-50 dark:bg-gray-700/50 p-2 rounded-lg">
+                                <div class="flex items-center space-x-2 bg-gray-50/90 dark:bg-gray-700/50 p-4 sm:p-3 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5 backdrop-blur-sm">
                                     <div class="flex-shrink-0">
                                         <i class="fas fa-file-alt text-blue-500"></i>
                                     </div>
@@ -225,12 +345,12 @@
                                         </div>
                                     </div>
                                     <button
-                                        class="toggle-file-content p-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                                        class="toggle-file-content p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center touch-manipulation rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
                                         data-file-name="{{ attachment.name }}" aria-label="Toggle file content">
                                         <i class="fas fa-chevron-down"></i>
                                     </button>
                                 </div>
-                                <div class="file-content hidden ml-6 mt-2 bg-gray-100 dark:bg-gray-800 p-3 rounded-lg">
+                                <div class="file-content hidden ml-6 mt-2 bg-gray-100/90 dark:bg-gray-800/90 p-4 sm:p-3 rounded-xl shadow-md backdrop-blur-sm">
                                     <pre
                                         class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">{{ attachment.content }}</pre>
                                 </div>
@@ -291,57 +411,71 @@ document.addEventListener('app:ready', () => {
 </div>
 </div>
 
-<!-- Token Usage Panel -->
-<div id="token-usage"
-    class="fixed bottom-[120px] left-0 right-0 z-[1700] px-4 sm:px-6 py-3 bg-white/95 dark:bg-gray-800/95 border-t border-gray-200/50 dark:border-gray-700/50 text-sm text-gray-600 dark:text-gray-300 backdrop-blur-md shadow-lg max-w-7xl mx-auto">
+<div class="token-panel-container">
+    <div 
+        id="token-usage"
+        class="
+            px-4 sm:px-6 py-3 
+            bg-white/95 dark:bg-gray-800/95 
+            border-t-2 border-gray-200/50 dark:border-gray-700/50 
+            text-sm text-gray-600 dark:text-gray-300 
+            backdrop-blur-md shadow-lg 
+            max-w-7xl mx-auto
+            sm:text-xs
+            rounded-t-2xl
+            mx-4 sm:mx-6 lg:mx-8
+        "
+    >
     <div class="flex flex-col space-y-1">
-        <div class="flex items-center justify-between mb-1">
-            <div class="flex items-center space-x-2">
-                <span id="tokens-used">0</span>
-                <span id="tokens-limit" class="ml-1">/ 0 max</span>
-                <span id="tokens-left" class="text-xs text-gray-500 dark:text-gray-400">(0 remaining)</span>
+        <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center space-x-3">
+                <div class="flex items-center space-x-2 bg-white/50 dark:bg-gray-800/50 px-4 py-2 rounded-xl shadow-sm">
+                    <span id="tokens-used" class="text-base sm:text-sm font-medium">0</span>
+                    <span id="tokens-limit" class="text-base sm:text-sm text-gray-500 dark:text-gray-400">/ 0 max</span>
+                </div>
+                <span id="tokens-left" class="text-base sm:text-sm text-gray-500 dark:text-gray-400 bg-white/50 dark:bg-gray-800/50 px-4 py-2 rounded-xl shadow-sm">(0 remaining)</span>
             </div>
-            <div class="flex items-center space-x-2">
-                <span id="token-percentage" class="text-xs">0%</span>
+            <div class="flex items-center space-x-3">
+                <span id="token-percentage" class="text-base sm:text-sm font-medium bg-white/50 dark:bg-gray-800/50 px-4 py-2 rounded-xl shadow-sm">0%</span>
                 <button id="toggle-stats-btn"
-                    class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 min-h-[44px] min-w-[44px] sm:min-h-[36px] sm:min-w-[36px] flex items-center justify-center touch-manipulation bg-white/50 dark:bg-gray-800/50"
                     title="Toggle token usage statistics">
-                    <i class="fas fa-chart-pie"></i>
+                    <i class="fas fa-chart-pie text-lg sm:text-base"></i>
                 </button>
             </div>
         </div>
-        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <div id="token-progress" class="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+        <div class="w-full bg-gray-200/90 dark:bg-gray-700/90 rounded-xl h-3 shadow-inner overflow-hidden">
+            <div id="token-progress" class="bg-gradient-to-r from-primary-500 to-secondary-500 h-full rounded-xl transition-all duration-300 shadow-sm"
                 style="width: 0%">
             </div>
         </div>
         <div id="token-breakdown"
-            class="flex flex-col text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-2 bg-gray-50 dark:bg-gray-700/50 p-2 rounded-lg">
+            class="flex flex-col text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-2 bg-gray-50/90 dark:bg-gray-700/50 p-4 sm:p-3 rounded-xl shadow-md backdrop-blur-sm">
             <div class="flex justify-between items-center">
                 <span class="font-medium text-gray-700 dark:text-gray-300">Token Distribution</span>
                 <span id="avg-tokens" class="text-xs">Avg: 0 per message</span>
             </div>
             <div class="grid grid-cols-3 gap-4">
-                <div class="flex flex-col">
-                    <div class="flex items-center space-x-1">
-                        <i class="fas fa-user text-xs text-blue-500"></i>
-                        <span class="font-medium">User</span>
+                <div class="flex flex-col p-3 bg-white/50 dark:bg-gray-800/50 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5">
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-user text-base sm:text-sm text-primary-500"></i>
+                        <span class="font-medium text-base sm:text-sm">User</span>
                     </div>
-                    <span id="user-tokens" class="mt-1">0</span>
+                    <span id="user-tokens" class="mt-2 text-base sm:text-sm">0</span>
                 </div>
-                <div class="flex flex-col">
-                    <div class="flex items-center space-x-1">
-                        <i class="fas fa-robot text-xs text-green-500"></i>
-                        <span class="font-medium">Assistant</span>
+                <div class="flex flex-col p-3 bg-white/50 dark:bg-gray-800/50 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5">
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-robot text-base sm:text-sm text-secondary-500"></i>
+                        <span class="font-medium text-base sm:text-sm">Assistant</span>
                     </div>
-                    <span id="assistant-tokens" class="mt-1">0</span>
+                    <span id="assistant-tokens" class="mt-2 text-base sm:text-sm">0</span>
                 </div>
-                <div class="flex flex-col">
-                    <div class="flex items-center space-x-1">
-                        <i class="fas fa-cog text-xs text-purple-500"></i>
-                        <span class="font-medium">System</span>
+                <div class="flex flex-col p-3 bg-white/50 dark:bg-gray-800/50 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5">
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-cog text-base sm:text-sm text-purple-500"></i>
+                        <span class="font-medium text-base sm:text-sm">System</span>
                     </div>
-                    <span id="system-tokens" class="mt-1">0</span>
+                    <span id="system-tokens" class="mt-2 text-base sm:text-sm">0</span>
                 </div>
             </div>
             <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
@@ -351,31 +485,40 @@ document.addEventListener('app:ready', () => {
         </div>
     </div>
 </div>
-            <span>User: <span id="user-tokens">0</span></span>
-            <span>Assistant: <span id="assistant-tokens">0</span></span>
 
 <!-- Chat Input Area -->
-<div id="chat-input"
-    class="fixed bottom-0 left-0 right-0 z-[1600] px-4 sm:px-6 py-4 sm:py-6 border-t border-gray-200/50 dark:border-gray-700/50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-lg safe-area-bottom max-w-7xl mx-auto">
-<form id="chat-form" enctype="multipart/form-data">
+<div 
+  id="chat-input"
+  class="
+    fixed inset-x-0 bottom-0 z-40 
+    border-t-2 border-gray-200/50 dark:border-gray-700/50 
+    bg-white/95 dark:bg-gray-900/95 
+    backdrop-blur-md shadow-lg 
+    safe-area-bottom
+    max-w-7xl mx-auto 
+    px-4 sm:px-6 py-4 sm:py-6
+    rounded-t-2xl
+  "
+>
+<form id="chat-form" enctype="multipart/form-data" class="max-w-4xl mx-auto">
         <textarea name="message" id="message-input" rows="3"
-            class="w-full border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 shadow-inner resize-none"
-            placeholder="Type your message here..."></textarea>
+            class="w-full border rounded-xl px-4 py-3 sm:py-4 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 shadow-inner resize-none text-base sm:text-sm leading-relaxed"
+            placeholder="Type your message here..." spellcheck="true"></textarea>
         <div class="flex items-center justify-between mt-2">
             <div class="flex items-center space-x-2">
                 <input type="file" name="files[]" id="file-upload" class="hidden" multiple
                     accept=".txt,.pdf,.doc,.docx,.md">
                 <label for="file-upload"
-                    class="cursor-pointer inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
-                    <i class="fas fa-paperclip mr-2"></i>
-                    Attach Files
+                    class="cursor-pointer inline-flex items-center px-4 py-3 sm:py-2 border border-gray-300 dark:border-gray-600 rounded-xl shadow-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 min-h-[44px] sm:min-h-[36px] touch-manipulation">
+                    <i class="fas fa-paperclip mr-2 text-lg sm:text-base"></i>
+                    <span>Attach Files</span>
                 </label>
                 <div id="file-list" class="text-sm text-gray-500 dark:text-gray-400"></div>
             </div>
             <button type="submit" id="send-button"
-                class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
+                class="inline-flex items-center px-4 py-3 sm:py-2 border border-transparent rounded-xl shadow-md text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 min-h-[44px] sm:min-h-[36px] touch-manipulation">
                 <i class="fas fa-paper-plane mr-2"></i>
-                Send
+                <span>Send</span>
             </button>
         </div>
     </form>
