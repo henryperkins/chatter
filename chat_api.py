@@ -81,10 +81,11 @@ def get_azure_response(
     api_version: str,
     model_type: Optional[str] = None,
     requires_o1_handling: bool = False,
-    reasoning_effort: str = "medium",  # Must be one of "low", "medium", or "high"
+    reasoning_effort: Optional[str] = None,
     response_format: Optional[Dict[str, Any]] = None,
     timeout_seconds: int = 600,
     stream: bool = False,
+    temperature: Optional[float] = None,
 ) -> ResponseType:
     """
     Get response from Azure OpenAI API.

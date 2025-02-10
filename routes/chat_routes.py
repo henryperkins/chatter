@@ -669,21 +669,46 @@ def normal_response(
         if not model_obj:
             return make_response(jsonify({"error": "No model configured"}), 400)
 
-        is_o_series = model_obj.model_type in ["o1", "o1-mini", "o1-preview", "o3-mini"] if model_obj.model_type else False
+        # Determine if this is an o-series model
+        model_type = model_obj.model_type or ""
+        is_o_series = model_type.lower() in ["o1", "o1-mini", "o1-preview", "o3-mini"]
+        
+        # Get max completion tokens with validation
         max_tokens = max(1, getattr(model_obj, "max_completion_tokens", 100000))
+        
+        # Validate token limits for o-series models
+        if is_o_series:
+            token_limits = {
+                "o3-mini": 75000,
+                "o1": 100000,
+                "o1-mini": 50000,
+                "o1-preview": 32768
+            }
+            model_limit = token_limits.get(model_type.lower(), 32768)
+            if max_tokens > model_limit:
+                max_tokens = model_limit
 
-        response = get_azure_response(
-            messages=history,
-            deployment_name=model_obj.deployment_name,
-            max_completion_tokens=max_tokens,
-            api_endpoint=model_obj.api_endpoint,
-            api_key=model_obj.api_key,
-            api_version=model_obj.api_version,
-            model_type=model_obj.model_type,
-            requires_o1_handling=model_obj.requires_o1_handling,
-            reasoning_effort="medium" if is_o_series else "default",
-            stream=False,
-        )
+        # Set up API parameters
+        api_params = {
+            "messages": history,
+            "deployment_name": model_obj.deployment_name,
+            "max_completion_tokens": max_tokens,
+            "api_endpoint": model_obj.api_endpoint,
+            "api_key": model_obj.api_key,
+            "api_version": model_obj.api_version,
+            "model_type": model_obj.model_type,
+            "requires_o1_handling": model_obj.requires_o1_handling,
+            "stream": False
+        }
+
+        # Add o-series specific parameters
+        if is_o_series:
+            api_params["temperature"] = 1.0
+            # Only add reasoning_effort for o3-mini and o1
+            if model_type.lower() in ["o3-mini", "o1"]:
+                api_params["reasoning_effort"] = "medium"
+
+        response = get_azure_response(**api_params)
 
         content: Optional[str] = None
         if hasattr(response, 'choices') and response.choices:
