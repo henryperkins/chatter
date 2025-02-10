@@ -2,15 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+    :root {
+        --safe-area-top: env(safe-area-inset-top, 0px);
+        --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+        --safe-area-left: env(safe-area-inset-left, 0px);
+        --safe-area-right: env(safe-area-inset-right, 0px);
+    }
+}
+
 @layer components {
-    /* Remove pre-formatted text decorations */
-    pre::before,
-    pre::after {
-        content: none !important;
-        display: none !important;
+    /* Layout components */
+    .chat-container {
+        --chat-input-height: 180px;
+        --chat-header-height: 64px;
     }
 
-    /* Layout components */
     .page-container {
         @apply min-h-screen flex flex-col bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900;
     }
@@ -32,199 +39,69 @@
         @apply text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800;
     }
 
-    /* Chat tabs components */
-    .chat-tabs {
-        @apply flex overflow-x-auto scrollbar-none gap-2 px-4 py-2 sm:py-3 -mx-4 sm:mx-0 touch-pan-x;
+    /* Chat components */
+    .message-container {
+        @apply max-w-4xl mx-auto w-full mb-6;
     }
 
-    .chat-tab {
-        @apply flex items-center gap-2 px-3 py-2.5 text-sm font-medium rounded-xl transition-all duration-200 whitespace-nowrap focus:outline-none active:scale-95 hover:scale-105 touch-manipulation;
+    .message-bubble {
+        @apply rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm;
+        @apply border border-gray-200/50 dark:border-gray-700/50;
+        @apply p-5 sm:p-6;
     }
 
-    .chat-tab-active {
-        @apply bg-white dark:bg-gray-800 text-primary-600 dark:text-primary-400 shadow-sm;
-    }
-
-    .chat-tab-default {
-        @apply text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100/50 dark:hover:bg-gray-700/50;
-    }
-
-    .chat-tab-close {
-        @apply ml-2 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors duration-200;
-    }
-
-    /* Chat controls */
     .chat-controls {
-        @apply flex items-center gap-3 px-4 py-3 bg-white/95 dark:bg-gray-800/95 border-b border-gray-200/50 dark:border-gray-700/50 backdrop-blur-md shadow-sm;
-    }
-
-    .chat-control-btn {
-        @apply p-2 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200;
-    }
-
-    /* Mobile menu components */
-    .mobile-menu-link {
-        @apply block px-3 py-2 rounded-md text-base font-medium transition-all duration-300;
-    }
-
-    .mobile-menu-active {
-        @apply text-primary-600 bg-primary-50 dark:text-primary-400 dark:bg-primary-900/30;
-    }
-
-    .mobile-menu-default {
-        @apply text-gray-700 hover:text-gray-900 hover:bg-gray-100;
+        @apply flex items-center gap-3 px-4 py-3 bg-white/95 dark:bg-gray-800/95;
+        @apply border-b border-gray-200/50 dark:border-gray-700/50;
+        @apply backdrop-blur-md shadow-sm;
     }
 
     /* Button components */
     .btn {
-        @apply px-4 py-3 rounded-lg text-sm font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
-    }
-
-    .icon-button {
-        @apply w-10 h-10 flex items-center justify-center transition-transform duration-300 hover:scale-105 active:scale-95;
+        @apply px-4 py-3 rounded-lg text-sm font-medium transition-all duration-300;
+        @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+        @apply shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
     }
 
     .btn-primary {
-        @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 active:bg-primary-800 shadow-md hover:shadow-lg;
+        @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
     }
 
     .btn-secondary {
-        @apply bg-gray-500 text-white hover:bg-gray-600 focus:ring-gray-500 active:bg-gray-700 shadow-md hover:shadow-lg;
-    }
-
-    /* Card components */
-    .card {
-        @apply bg-white/95 dark:bg-gray-800/95 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-md;
-    }
-
-    .card-header {
-        @apply px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50;
-    }
-
-    .card-body {
-        @apply px-6 py-4;
+        @apply bg-gray-500 text-white hover:bg-gray-600 focus:ring-gray-500;
     }
 
     /* Form components */
     .form-input {
-        @apply w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl shadow-inner focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700/90 dark:text-gray-100 backdrop-blur-sm bg-white/90 text-base sm:text-sm leading-relaxed;
+        @apply w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl;
+        @apply shadow-inner focus:outline-none focus:ring-2 focus:ring-primary-500;
+        @apply dark:bg-gray-700/90 dark:text-gray-100 backdrop-blur-sm bg-white/90;
+        @apply text-base sm:text-sm leading-relaxed;
     }
 
     .form-label {
         @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1;
     }
-
-    /* Alert components */
-    .alert {
-        @apply p-4 rounded-lg mb-4 transition-all duration-300 shadow-md hover:shadow-lg;
-    }
-
-    .alert-error {
-        @apply bg-error-100 dark:bg-error-900/50 border border-error-200 dark:border-error-800 text-error-700 dark:text-error-200;
-    }
-
-    .alert-success {
-        @apply bg-success-100 dark:bg-success-900/50 border border-success-200 dark:border-success-800 text-success-700 dark:text-success-200;
-    }
-
-    /* Markdown content */
-    .markdown-content {
-        @apply prose dark:prose-invert max-w-none overflow-x-auto prose-headings:font-semibold prose-a:text-primary-600 dark:prose-a:text-primary-400;
-    }
-
-    /* Enhanced code block styling */
-    .code-block-wrapper {
-        @apply relative my-4 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300;
-    }
 }
 
-/* Custom scrollbar */
-.custom-scrollbar {
-    @apply scrollbar-thin scrollbar-thumb-gray-400/80 hover:scrollbar-thumb-gray-500/90 dark:scrollbar-thumb-gray-600/80 dark:hover:scrollbar-thumb-gray-500/90 scrollbar-track-transparent;
-}
-
-/* Safe area adjustments */
-.safe-area-inset {
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-top: env(safe-area-inset-top);
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-}
-
-/* Mobile optimizations */
-@media (max-width: 640px) {
-    .chat-message {
-        @apply text-base leading-relaxed;
+@layer utilities {
+    .safe-area-inset {
+        padding-top: var(--safe-area-top);
+        padding-bottom: var(--safe-area-bottom);
+        padding-left: var(--safe-area-left);
+        padding-right: var(--safe-area-right);
     }
 
-    /* Larger touch targets on mobile */
-    .btn, .icon-button, .chat-control-btn {
-        @apply min-h-[44px] min-w-[44px];
+    .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
     }
 
-    /* Improved mobile input experience */
-    #message-input {
-        @apply text-base leading-relaxed py-4 min-h-[100px];
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
     }
 
-    /* Better spacing for mobile */
-    .chat-controls {
-        @apply py-4 px-4;
-    }
-
-    /* Enhanced mobile scrolling */
-    #chat-box {
-        @apply overscroll-contain touch-pan-y;
-    }
-
-    /* Improved mobile message bubbles */
-    .message-container {
-        @apply px-2 max-w-[95%];
-    }
-}
-
-/* Enhanced touch feedback */
-.touch-feedback {
-    @apply active:scale-95 transition-transform duration-200 touch-manipulation;
-}
-
-/* Improved message bubbles */
-.message-bubble {
-    @apply rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50;
-}
-
-/* Token usage panel improvements */
-#token-usage {
-    @apply text-sm sm:text-xs rounded-t-xl border-t-2;
-}
-
-/* Dark mode transitions */
-.dark-mode-transition {
-    @apply transition-all duration-300 ease-in-out;
-}
-
-/* Focus states */
-.focus-ring {
-    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800;
-}
-
-/* Loading states */
-.loading {
-    @apply opacity-75 cursor-not-allowed;
-}
-
-/* Additional mobile-friendly rules */
-@media (max-width: 640px) {
-    /* Provide extra spacing at the bottom to accommodate fixed input bar */
-    .page-container {
-        padding-bottom: 5rem;
-    }
-    .main-content {
-        padding-bottom: 5rem;
-    }
-    /* Slightly larger tap targets on buttons */
-    .btn,
-    .chat-control-btn {
-        min-height: 48px;
+    .touch-manipulation {
+        touch-action: manipulation;
     }
 }
