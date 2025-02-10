@@ -28,7 +28,7 @@
                     'application/vnd.openxmlformats-officedocument.presentationml.presentation' // .pptx
                 ];
 
-                // DOM elements (fall back to ID-based references if not passed)
+                // DOM elements (fallback to ID-based references if not passed)
                 this.uploadButton = uploadButton || document.getElementById('file-upload');
                 this.dropZone = document.getElementById('drop-zone');
                 this.fileInput = document.getElementById('file-input');
@@ -41,16 +41,9 @@
                     this.fileInput.type = 'file';
                     this.fileInput.id = 'file-input';
                     this.fileInput.multiple = true;
-                    // Convert MIME types to file extensions for better browser compatibility
                     const acceptTypes = [
-                        // Text files
-                        '.txt', '.md', '.html',
-                        // Application files
-                        '.pdf', '.docx', '.pptx',
-                        // Also include MIME types for better coverage
-                        'text/plain',
-                        'text/markdown',
-                        'text/html',
+                        '.txt', '.md', '.html', '.pdf', '.docx', '.pptx',
+                        'text/plain', 'text/markdown', 'text/html',
                         'application/pdf',
                         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                         'application/vnd.openxmlformats-officedocument.presentationml.presentation'
@@ -60,13 +53,12 @@
                     document.body.appendChild(this.fileInput);
                 }
 
-                // Don't initialize in constructor, wait for explicit initialization
+                // Don't initialize in constructor; wait for explicit initialization
                 this.initialized = false;
             }
 
             async initializeFileUpload() {
                 if (this.initialized) return true;
-
                 try {
                     this.setupDragAndDrop();
                     this.setupEventListeners();
@@ -79,28 +71,48 @@
                 }
             }
 
+            // New method: uploads files to the backend API
+            async uploadFiles() {
+                if (!this.uploadedFiles.length) return [];
+                const formData = new FormData();
+                this.uploadedFiles.forEach(file => {
+                    formData.append('files[]', file);
+                });
+                try {
+                    const response = await fetch(`/api/files/upload/${this.chatId}`, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+                        }
+                    });
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Upload failed');
+                    }
+                    const result = await response.json();
+                    if (!result.success) {
+                        throw new Error(result.error || 'Upload failed');
+                    }
+                    return result.saved_files;
+                } catch (error) {
+                    console.error('File upload error:', error);
+                    this.showError(`Failed to upload files: ${error.message}`);
+                    return [];
+                }
+            }
+
             clearFiles() {
-                // Clear the uploaded files array
                 this.uploadedFiles = [];
-
-                // Clear the UI
                 this.updateFileList();
-
-                // Clear file input
                 if (this.fileInput) {
                     this.fileInput.value = '';
                 }
-
-                // Reset any progress indicators
                 const progressElements = document.querySelectorAll('.file-progress');
                 progressElements.forEach(el => el.remove());
-
-                // Clear the file list display
                 if (this.uploadedFilesDiv) {
                     this.uploadedFilesDiv.innerHTML = '';
                 }
-
-                // Clear file list
                 const fileList = document.getElementById('file-list');
                 if (fileList) {
                     fileList.innerHTML = '';
@@ -110,7 +122,6 @@
             updateFileList() {
                 const fileList = document.getElementById('file-list');
                 if (!fileList) return;
-
                 fileList.innerHTML = this.uploadedFiles.map(file => `
                     <div class="flex items-center space-x-2 text-sm">
                         <span class="text-gray-600 dark:text-gray-400">${file.name}</span>
@@ -127,44 +138,21 @@
                 this.updateFileList();
             }
 
-            setupMobileUpload() {
-                if (!this.mobileUploadMenu) return;
-
-                // Show mobile upload controls on small screens
-                if (window.innerWidth <= 640) {
-                    this.mobileUploadMenu.style.display = 'block';
-                }
-
-                // Update visibility on resize
-                window.addEventListener('resize', () => this.updateMobileMenuVisibility());
-            }
-
-            updateMobileMenuVisibility() {
-                if (this.mobileUploadMenu) {
-                    this.mobileUploadMenu.style.display = window.innerWidth <= 640 ? 'block' : 'none';
-                }
-            }
-
             setupEventListeners() {
-                // If the file input is present, handle change events (with debouncing)
                 if (this.fileInput) {
                     this.fileInput.style.display = 'none';
                     this.fileInput.addEventListener('change', window.utils.debounce((e) => {
                         const files = Array.from(e.target.files);
                         const { validFiles, errors } = this.processFiles(files);
-
                         errors.forEach(error => {
                             this.showError(error.errors.join(', '), { filename: error.file });
                         });
-
                         if (validFiles.length > 0) {
                             this.uploadedFiles.push(...validFiles);
                             this.updateFileList();
                         }
                     }, 300));
                 }
-
-                // If the upload button is present, wire it to open the file dialog
                 if (this.uploadButton) {
                     this.uploadButton.addEventListener('click', () => {
                         if (this.fileInput && window.innerWidth > 640) {
@@ -172,56 +160,7 @@
                         }
                     });
                 }
-
-                // Handle mobile upload menu
                 this.setupMobileUploadMenu();
-            }
-
-            setupMobileUploadMenu() {
-                const mobileMenu = document.getElementById('mobile-upload-menu');
-                if (!mobileMenu) return;
-
-                // Handle camera capture
-                const cameraBtn = mobileMenu.querySelector('[onclick*="camera"]');
-                if (cameraBtn) {
-                    cameraBtn.onclick = () => this.triggerFileInput('image/*;capture=camera');
-                }
-
-                // Handle gallery selection
-                const galleryBtn = mobileMenu.querySelector('[onclick*="gallery"]');
-                if (galleryBtn) {
-                    galleryBtn.onclick = () => this.triggerFileInput('image/*');
-                }
-
-                // Handle file selection
-                const filesBtn = mobileMenu.querySelector('[onclick*="files"]');
-                if (filesBtn) {
-                    filesBtn.onclick = () => this.triggerFileInput(this.ALLOWED_FILE_TYPES.join(','));
-                }
-            }
-
-            triggerFileInput(accept) {
-                if (!this.fileInput) return;
-
-                // Handle special cases for mobile capture
-                if (accept === 'image/*;capture=camera' || accept === 'image/*') {
-                    this.fileInput.accept = accept;
-                } else {
-                    // Use our standard accept types for regular file selection
-                    const acceptTypes = [
-                        '.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.xml', '.yaml', '.yml',
-                        '.pdf', '.doc', '.docx',
-                        '.jpg', '.jpeg', '.png', '.gif', '.webp',
-                        'text/*',
-                        'application/json',
-                        'application/pdf',
-                        'image/*'
-                    ].join(',');
-                    this.fileInput.accept = acceptTypes;
-                }
-
-                // Trigger click
-                this.fileInput.click();
             }
 
             showError(message, file = null) {
@@ -239,97 +178,119 @@
                 console.debug('File validation error:', { file, message });
             }
 
+            setupMobileUpload() {
+                if (!this.mobileUploadMenu) return;
+                if (window.innerWidth <= 640) {
+                    this.mobileUploadMenu.style.display = 'block';
+                }
+                window.addEventListener('resize', () => this.updateMobileMenuVisibility());
+            }
+
+            updateMobileMenuVisibility() {
+                if (this.mobileUploadMenu) {
+                    this.mobileUploadMenu.style.display = window.innerWidth <= 640 ? 'block' : 'none';
+                }
+            }
+
+            setupMobileUploadMenu() {
+                const mobileMenu = document.getElementById('mobile-upload-menu');
+                if (!mobileMenu) return;
+                const cameraBtn = mobileMenu.querySelector('[onclick*="camera"]');
+                if (cameraBtn) {
+                    cameraBtn.onclick = () => this.triggerFileInput('image/*;capture=camera');
+                }
+                const galleryBtn = mobileMenu.querySelector('[onclick*="gallery"]');
+                if (galleryBtn) {
+                    galleryBtn.onclick = () => this.triggerFileInput('image/*');
+                }
+                const filesBtn = mobileMenu.querySelector('[onclick*="files"]');
+                if (filesBtn) {
+                    filesBtn.onclick = () => this.triggerFileInput(this.ALLOWED_FILE_TYPES.join(','));
+                }
+            }
+
+            triggerFileInput(accept) {
+                if (!this.fileInput) return;
+                if (accept === 'image/*;capture=camera' || accept === 'image/*') {
+                    this.fileInput.accept = accept;
+                } else {
+                    const acceptTypes = [
+                        '.txt', '.md', '.py', '.js', '.json', '.csv', '.html', '.css', '.xml', '.yaml', '.yml',
+                        '.pdf', '.doc', '.docx',
+                        '.jpg', '.jpeg', '.png', '.gif', '.webp',
+                        'text/*',
+                        'application/json',
+                        'application/pdf',
+                        'image/*'
+                    ].join(',');
+                    this.fileInput.accept = acceptTypes;
+                }
+                this.fileInput.click();
+            }
+
             validateFile(file) {
                 const errors = [];
-
-                // File type validation
                 const fileType = file.type || this.getMimeType(file.name);
                 if (!fileType) {
                     errors.push(`Could not determine file type for: ${file.name}`);
                     return errors;
                 }
-
-                // Check if file type is allowed
                 const isText = fileType.startsWith('text/') || fileType === 'application/json';
                 const isImage = fileType.startsWith('image/');
                 const isPDF = fileType === 'application/pdf';
                 const isDoc = fileType.includes('msword') || fileType.includes('wordprocessingml');
-
                 if (!isText && !isImage && !isPDF && !isDoc) {
                     errors.push(`Unsupported file type: ${fileType}`);
                     return errors;
                 }
-
-                // Size validation based on file type
                 if (isText && file.size > 1024 * 1024) {
                     errors.push(`Text file too large: ${file.name} (max 1MB)`);
                 }
-
-                // Additional validation for binary files
                 if (!fileType.startsWith('text/') && !fileType.includes('json')) {
-                    const maxBinarySize = 5 * 1024 * 1024; // 5MB limit for binary files
+                    const maxBinarySize = 5 * 1024 * 1024;
                     if (file.size > maxBinarySize) {
                         errors.push(`Binary file too large: ${(file.size / 1024 / 1024).toFixed(2)} MB (max ${maxBinarySize / 1024 / 1024}MB)`);
                     }
                 }
-
-                // File size validation
                 if (file.size > this.MAX_FILE_SIZE) {
                     errors.push(`File too large: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
                 }
-
-                // Duplicate check (same name and size)
                 if (this.uploadedFiles.some(f => f.name === file.name && f.size === file.size)) {
                     errors.push(`Duplicate file: ${file.name}`);
                 }
-
-                // Estimate token count
                 if (file.size > 0) {
                     const estimatedTokens = this.estimateFileTokens(file);
                     file.tokenCount = estimatedTokens;
-
-                    // Check against token limits
                     const currentTotal = this.uploadedFiles.reduce((sum, f) => sum + (f.tokenCount || 0), 0);
                     if (currentTotal + estimatedTokens > this.MAX_TOKENS) {
                         errors.push(`File would exceed token limit: ${file.name}`);
                     }
                 }
-
                 return errors;
             }
 
             processFiles(files) {
                 const validFiles = [];
                 const errors = [];
-
-                // Calculate current total size
                 const currentTotalSize = this.uploadedFiles.reduce((sum, file) => sum + file.size, 0);
-
                 for (const file of files) {
                     const fileErrors = this.validateFile(file);
-
-                    // Skip invalid files
                     if (fileErrors.length > 0) {
                         errors.push({ file: file.name, errors: fileErrors });
                         continue;
                     }
-
-                    // Check total limit if adding this file
                     if (currentTotalSize + file.size > this.MAX_TOTAL_SIZE) {
                         errors.push({ file: file.name, errors: ['Total size limit exceeded'] });
                         continue;
                     }
-
                     validFiles.push(file);
                 }
-
                 return { validFiles, errors };
             }
 
             getMimeType(filename) {
                 const ext = filename.split('.').pop().toLowerCase();
                 const mimeTypes = {
-                    // Text files
                     'txt': 'text/plain',
                     'md': 'text/markdown',
                     'js': 'application/javascript',
@@ -341,8 +302,6 @@
                     'xml': 'text/xml',
                     'yaml': 'text/yaml',
                     'yml': 'text/yaml',
-
-                    // Binary files
                     'pdf': 'application/pdf',
                     'jpg': 'image/jpeg',
                     'jpeg': 'image/jpeg',
@@ -352,10 +311,8 @@
                     'doc': 'application/msword',
                     'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                 };
-
                 const mimeType = mimeTypes[ext];
                 if (!mimeType && ext) {
-                    // For unknown extensions, try to infer text vs binary
                     if (['log', 'cfg', 'conf', 'ini', 'env'].includes(ext)) {
                         return 'text/plain';
                     }
@@ -364,18 +321,13 @@
             }
 
             estimateFileTokens(file) {
-                // Estimate tokens based on file size and type
-                const charsPerToken = 4; // Conservative estimate
+                const charsPerToken = 4;
                 const baseTokens = Math.ceil(file.size / charsPerToken);
-
-                // Add overhead for file metadata
                 return baseTokens + 10;
             }
 
             setupDragAndDrop() {
                 if (!this.dropZone) return;
-
-                // Prevent default drag behaviors
                 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
                     this.dropZone.addEventListener(eventName, (e) => {
                         e.preventDefault();
@@ -386,29 +338,22 @@
                         e.stopPropagation();
                     });
                 });
-
-                // Highlight drop zone when dragging over it
                 ['dragenter', 'dragover'].forEach(eventName => {
                     this.dropZone.addEventListener(eventName, () => {
                         this.dropZone.classList.add('drag-active');
                     });
                 });
-
                 ['dragleave', 'drop'].forEach(eventName => {
                     this.dropZone.addEventListener(eventName, () => {
                         this.dropZone.classList.remove('drag-active');
                     });
                 });
-
-                // Handle dropped files
                 this.dropZone.addEventListener('drop', (e) => {
                     const files = Array.from(e.dataTransfer.files);
                     const { validFiles, errors } = this.processFiles(files);
-
                     errors.forEach(error => {
                         this.showError(error.errors.join(', '), { filename: error.file });
                     });
-
                     if (validFiles.length > 0) {
                         this.uploadedFiles.push(...validFiles);
                         this.updateFileList();
@@ -416,7 +361,6 @@
                 });
             }
         }
-
         // Expose to window
         window.FileUploadManager = FileUploadManager;
     }

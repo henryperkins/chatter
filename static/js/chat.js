@@ -378,9 +378,34 @@
 
     async function startChat() {
         try {
+            // Get configuration data
+            const configDiv = document.getElementById('chat-config');
+            if (!configDiv) {
+                throw new Error('Chat configuration not found');
+            }
+
+            // Initialize managers if they don't exist
+            if (!window.fileUploadManager) {
+                const uploadButton = document.getElementById('file-upload');
+                window.fileUploadManager = new FileUploadManager(
+                    configDiv.dataset.chatId,
+                    configDiv.dataset.userId,
+                    uploadButton
+                );
+            }
+            if (!window.tokenUsageManager) {
+                window.tokenUsageManager = new TokenUsageManager(window.CHAT_CONFIG);
+                await window.tokenUsageManager.initialize();
+            }
+
+            // Initialize file upload functionality
+            if (window.fileUploadManager) {
+                await window.fileUploadManager.initializeFileUpload();
+            }
+
             const chatForm = document.getElementById('chat-form');
             if (chatForm) {
-                chatForm.addEventListener('submit', sendMessage);
+                // Removed form submission handling. Now only the send button triggers sending.
             }
 
             const messageInput = document.getElementById('message-input');

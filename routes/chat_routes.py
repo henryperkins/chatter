@@ -35,10 +35,7 @@ from extensions import csrf
 
 from chat_api import get_azure_response, scrape_data
 from azure_search_client import AzureOpenAI
-from chat_utils import (
-    generate_new_chat_id,
-    process_uploaded_files,
-)
+from chat_utils import generate_new_chat_id, process_uploaded_files
 from conversation_manager import conversation_manager
 from database import db_session
 from models.chat import Chat
@@ -51,22 +48,30 @@ from config import config_instance
 from logging_config import get_logger
 logger = get_logger(__name__)
 
+# ----------------------------------------------------------------------------
 # File Constants
+# ----------------------------------------------------------------------------
 MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", default=str(10 * 1024 * 1024)))  # 10 MB
 MAX_TOTAL_FILE_SIZE = int(os.getenv("MAX_TOTAL_FILE_SIZE", default=str(50 * 1024 * 1024)))  # 50 MB
 ALLOWED_EXTENSIONS = {"txt", "pdf", "docx", "md"}
 
+# ----------------------------------------------------------------------------
 # Token & Model Constants
+# ----------------------------------------------------------------------------
 DEFAULT_MODEL = "gpt-4"
 MODEL_NAME = DEFAULT_MODEL
 MAX_INPUT_TOKENS = int(os.getenv("MAX_INPUT_TOKENS", default="8192"))
 MAX_CONTEXT_TOKENS = int(os.getenv("MAX_CONTEXT_TOKENS", default="128000"))
 
+# ----------------------------------------------------------------------------
 # Rate Limiting Constants
+# ----------------------------------------------------------------------------
 SCRAPE_RATE_LIMIT = "5 per minute"
 CHAT_RATE_LIMIT = "60 per minute"
 
-# Create the Blueprint with a URL prefix
+# ----------------------------------------------------------------------------
+# Blueprint and Limiter
+# ----------------------------------------------------------------------------
 chat_routes = Blueprint("chat", __name__, url_prefix="/chat")
 limiter = Limiter(key_func=get_remote_address)
 
@@ -77,13 +82,14 @@ def get_token_encoder(model_name: str = DEFAULT_MODEL):
     try:
         return tiktoken.encoding_for_model(model_name)
     except KeyError:
-        logger.warning(f"Model '{model_name}' not found. Using 'cl100k_base'.")
+        logger.warning("Model '%s' not found. Using 'cl100k_base'.", model_name)
         return tiktoken.get_encoding("cl100k_base")
 
 
 encoding = get_token_encoder()
 
 
+# ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------
 # Upload Folder Initialization
 # ----------------------------------------------------------------------------
@@ -92,8 +98,10 @@ def init_upload_folder() -> None:
     upload_folder = os.getenv("UPLOAD_FOLDER", "uploads")
     if not os.path.exists(upload_folder):
         os.makedirs(upload_folder, exist_ok=True)
-
 init_upload_folder()
+
+
+
 
 
 ##############################################################################
@@ -152,7 +160,7 @@ def validate_model(model: Optional[Any]) -> Optional[str]:
         return None
 
     except Exception as e:
-        logger.error(f"Model validation error: {str(e)}")
+        logger.error("Model validation error: %s", str(e))
         return f"Invalid model configuration: {str(e)}"
 
 def get_model_token_limit(model_obj: Any) -> int:
@@ -468,7 +476,7 @@ def new_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         Chat.create(chat_id=chat_id, user_id=current_user.id, title="New Chat")
         return jsonify({"success": True, "chat_id": chat_id})
     except Exception as e:
-        logger.error(f"Error creating new chat: {str(e)}", exc_info=True)
+        logger.error("Error creating new chat: %s", str(e), exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 @chat_routes.after_request
@@ -517,19 +525,14 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             # Process file uploads if any
             files_data = []
             files_list = request.files.getlist("files[]")
-            # Only process files if there are actual files with filenames
             if files_list and any(f.filename for f in files_list):
-                included_files, excluded_files, total_tokens, file_contents = (
-                    process_uploaded_files(files_list)
-                )
+                included_files, excluded_files, total_tokens, file_contents = process_uploaded_files(files_list)
                 if excluded_files:
                     return (
-                        jsonify(
-                            {
-                                "error": "Some files could not be processed",
-                                "details": excluded_files,
-                            }
-                        ),
+                        jsonify({
+                            "error": "Some files could not be processed",
+                            "details": excluded_files,
+                        }),
                         400,
                     )
                 files_data = file_contents
@@ -586,7 +589,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             return normal_response(chat_id, history, model_obj)
 
     except Exception as e:
-        logger.error(f"Chat handling error: {str(e)}", exc_info=True)
+        logger.error("Chat handling error: %s", str(e), exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 @chat_routes.route("/send_stream", methods=["POST"])
@@ -613,12 +616,11 @@ def handle_chat_stream() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         return stream_response(chat_id, history, model_obj)
 
     except Exception as e:
-        logger.error(f"Streaming chat error: {str(e)}", exc_info=True)
+        logger.error("Streaming chat error: %s", str(e), exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 def stream_response(chat_id: str, history: list, model_obj: Model) -> FlaskResponse:
     """Handle streaming responses using AzureOpenAI."""
-
     def generate():
         try:
             client = AzureOpenAI(
@@ -626,7 +628,6 @@ def stream_response(chat_id: str, history: list, model_obj: Model) -> FlaskRespo
                 api_key=model_obj.api_key,
                 api_version=model_obj.api_version,
             )
-
             response = client.chat.completions.create(
                 model=model_obj.deployment_name,
                 messages=history,
@@ -637,22 +638,20 @@ def stream_response(chat_id: str, history: list, model_obj: Model) -> FlaskRespo
 
             try:
                 for chunk in response:
-                    content = chunk.get("choices", [{}])[0].get("delta", {}).get("content")
-                    if content:
+                    if chunk.choices and chunk.choices[0].delta.content:
+                        content = chunk.choices[0].delta.content
                         yield f"data: {json.dumps({'content': content})}\n\n"
                 yield "data: [DONE]\n\n"
-            except AttributeError as ae:
-                logger.error(f"Malformed response chunk: {str(ae)}")
+            except Exception as ae:
+                logger.error("Malformed response chunk: %s", str(ae))
                 yield f"data: {json.dumps({'error': 'Malformed response'})}\n\n"
         except Exception as e:
-            logger.error(f"Streaming error: {str(e)}")
+            logger.error("Streaming error: %s", str(e))
             yield f"data: {json.dumps({'error': f'API Error: {str(e)}'})}\n\n"
 
     return FlaskResponse(generate(), mimetype="text/event-stream")
 
-def normal_response(
-    chat_id: str, history: list, model_obj: Model
-) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
+def normal_response(chat_id: str, history: list, model_obj: Model) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """
     Handle normal (non-stream) response while honoring o-series constraints.
     """
@@ -677,23 +676,10 @@ def normal_response(
             stream=False,
         )
 
-        if not isinstance(response, dict):
-            raise ValueError("Invalid response format from API")
+        # Get content from the OpenAI response object
+        content = response.choices[0].message.content if response.choices else None
 
-        choices = response.get("choices")
-        if not choices or not isinstance(choices, list):
-            raise ValueError("No choices in API response")
-
-        first_choice = choices[0]
-        if not isinstance(first_choice, dict):
-            raise ValueError("Invalid choice format in API response")
-
-        message = first_choice.get("message")
-        if not message or not isinstance(message, dict):
-            raise ValueError("Invalid message format in API response")
-
-        content = message.get("content")
-        if content is None:
+        if not content:
             raise ValueError("No content in API response")
 
         conversation_manager.add_message(
@@ -716,7 +702,7 @@ def normal_response(
         )
 
     except Exception as e:
-        logger.error(f"Normal response error: {str(e)}", exc_info=True)
+        logger.error("Normal response error: %s", str(e), exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 ##############################################################################
@@ -747,7 +733,7 @@ def log_client_error() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         return jsonify({"success": True}), 200
 
     except Exception as e:
-        logger.error(f"Error logging client error: {str(e)}")
+        logger.error("Error logging client error: %s", str(e))
         return jsonify({"error": "Internal server error"}), 500
 
 @chat_routes.route("/stats/<chat_id>")
@@ -776,7 +762,7 @@ def get_chat_stats(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, in
             }
         )
     except Exception as e:
-        logger.error(f"Error getting chat stats: {str(e)}", exc_info=True)
+        logger.error("Error getting chat stats: %s", str(e), exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 @chat_routes.route("/update_model", methods=["POST"])
@@ -793,4 +779,98 @@ def update_model() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         if not chat_id or not model_id:
             return jsonify({"error": "Missing required parameters"}), 400
 
-        if not Chat.can_access_chat(chat_id, current_user.id, current_user
+        if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
+            return jsonify({"error": "Unauthorized"}), 403
+
+        Chat.update_model_id(chat_id, model_id)
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error("Error updating model: %s", str(e), exc_info=True)
+        return jsonify({"error": str(e)}), 500
+
+@chat_routes.route("/get_chat_context/<chat_id>")
+@login_required
+def get_chat_context(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
+    """
+    Return the current conversation context for a given chat.
+    """
+    if not validate_chat_access(chat_id):
+        return jsonify({"error": "Unauthorized access to chat"}), 403
+    try:
+        messages = conversation_manager.get_context(chat_id)
+        for msg in messages:
+            if msg["role"] == "user":
+                msg["content"] = bleach.clean(msg["content"])
+        return jsonify({"success": True, "messages": messages})
+    except Exception as e:
+        logger.error("Error getting chat context: %s", e)
+        return jsonify({"error": "Failed to get chat context"}), 500
+
+@chat_routes.route("/delete_chat/<chat_id>", methods=["DELETE"])
+@login_required
+def delete_chat(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
+    """
+    Soft-delete a chat if authorized.
+    """
+    logger.debug("Received request to delete chat_id: %s", chat_id)
+    if not validate_chat_access(chat_id):
+        logger.warning("Unauthorized delete attempt for chat %s", chat_id)
+        return jsonify({"error": "Chat not found or access denied"}), 403
+    try:
+        Chat.soft_delete(chat_id)
+        logger.info("Chat %s deleted successfully", chat_id)
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error("Error deleting chat %s: %s", chat_id, e)
+        return jsonify({"error": "Failed to delete chat"}), 500
+
+@chat_routes.route("/scrape", methods=["POST"])
+@login_required
+@limiter.limit(SCRAPE_RATE_LIMIT)
+def scrape_route() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
+    """
+    Handle scraping data from external resources.
+    """
+    data = request.get_json() or {}
+    query = bleach.clean(data.get("query", "").strip())
+    if not query:
+        return jsonify({"error": "Query is required."}), 400
+
+    try:
+        from urllib.parse import urlparse
+        domain = urlparse(query).netloc.lower().split(":")[0]
+        allowed_domains = {"example.com", "docs.example.org"}  # Adjust for your use case
+        if domain not in allowed_domains:
+            return jsonify({"error": "Domain not allowed"}), 400
+
+        response = scrape_data(query)
+        return jsonify({"response": response})
+    except ValueError as ex:
+        logger.error("ValueError during scraping: %s", ex)
+        return jsonify({"error": str(ex)}), 400
+    except Exception as ex:
+        logger.error("Error during scraping: %s", str(ex))
+        return jsonify({"error": "An error occurred during scraping"}), 500
+
+@chat_routes.route("/update_chat_title/<chat_id>", methods=["POST"])
+@login_required
+def update_chat_title(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
+    """
+    Update the user-defined title of a chat session.
+    """
+    logger.debug("Received request to update title for chat_id: %s", chat_id)
+    if not validate_chat_access(chat_id):
+        return jsonify({"error": "Chat not found or access denied"}), 403
+
+    data = request.get_json() or {}
+    title = bleach.clean(data.get("title", "").strip())
+    if not title or len(title) > 100:
+        return jsonify({"error": "Title is required and must be under 100 characters"}), 400
+
+    try:
+        Chat.update_title(chat_id, title)
+        logger.info("Chat title updated for chat_id: %s", chat_id)
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.exception("Error updating chat title: %s", str(e))
+        return jsonify({"error": "Failed to update chat title"}), 500

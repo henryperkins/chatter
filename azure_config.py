@@ -268,17 +268,20 @@ def validate_api_endpoint(
                 "messages": messages,
                 "max_completion_tokens": 1,
                 "reasoning_effort": "medium",
-                "stream": False
+                "stream": False,
+                "temperature": 1.0  # Required for o-series models
             }
         else:
             # Legacy model payload
-            payload.update({
+            payload = {
+                "messages": messages,
                 "max_tokens": 1,
                 "temperature": 1.0,
                 "top_p": 1.0,
                 "frequency_penalty": 0,
-                "presence_penalty": 0
-            })
+                "presence_penalty": 0,
+                "stream": False
+            }
 
         response = requests.post(
             url,
@@ -288,13 +291,21 @@ def validate_api_endpoint(
         )
 
         if response.status_code == 200:
-            return {"success": True}
+            try:
+                response_data = response.json()
+                if "choices" in response_data and len(response_data["choices"]) > 0:
+                    return {"success": True}
+                return {"success": False, "error": "Invalid response format from API"}
+            except ValueError:
+                return {"success": False, "error": "Invalid JSON response from API"}
 
         error_message = f"API returned status code: {response.status_code}"
         try:
             error_data = response.json()
-            if "error" in error_data:
-                error_message = f"{error_message} - {error_data['error'].get('message', '')}"
+            if isinstance(error_data, dict) and "error" in error_data:
+                error_details = error_data["error"]
+                if isinstance(error_details, dict):
+                    error_message = f"{error_message} - {error_details.get('message', '')}"
         except Exception:
             pass
 

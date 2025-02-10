@@ -116,7 +116,6 @@ class Model:
             "requires_reasoning_effort": True,
             "api_version": "2025-01-01-preview",
             "default_reasoning_effort": "medium",
-            "supports_completion_storage": True,
         },
         "o1": {
             "fixed_temperature": True,
@@ -128,7 +127,6 @@ class Model:
             "supports_vision": True,
             "api_version": "2025-01-01-preview",
             "default_reasoning_effort": "medium",
-            "supports_completion_storage": True,
         },
         "o1-mini": {
             "fixed_temperature": True,
@@ -139,7 +137,6 @@ class Model:
             "requires_reasoning_effort": True,
             "api_version": "2024-12-01-preview",
             "default_reasoning_effort": "medium",
-            "supports_completion_storage": True,
         },
         "gpt-3.5-turbo": {
             "fixed_temperature": False,
@@ -183,6 +180,8 @@ class Model:
                 models = []
                 for row in results:
                     model_dict = dict(row)
+                    # Remove store_completion if present (handling database migration period)
+                    model_dict.pop("store_completion", None)
                     # Normalize numeric fields
                     model_dict["id"] = int(model_dict["id"]) if model_dict.get("id") is not None else 0
                     model_dict["provider_id"] = int(model_dict["provider_id"]) if model_dict.get("provider_id") is not None else 0
@@ -197,7 +196,6 @@ class Model:
                             model_dict[bool_field] = value.lower() in ("true", "t", "1")
                         elif isinstance(value, int):
                             model_dict[bool_field] = bool(value)
-
                     # Decrypt API key if present
                     from utils.encryption import decrypt_api_key, EncryptionError
                     encrypted_key = model_dict.get("api_key", "")
@@ -370,6 +368,8 @@ class Model:
                     logger.warning("No model found with ID %d", model_id)
                     return None
                 model_dict = dict(row)
+                # Remove store_completion if present (handling database migration period)
+                model_dict.pop("store_completion", None)
 
                 # Decrypt API key using centralized encryption utilities
                 from utils.encryption import decrypt_api_key, EncryptionError
@@ -394,7 +394,7 @@ class Model:
                 for bool_field in [
                     "requires_o1_handling",
                     "supports_streaming",
-                    "is_default",
+                    "is_default"
                 ]:
                     value = model_dict.get(bool_field)
                     if isinstance(value, str):
