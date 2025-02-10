@@ -309,6 +309,12 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     if request.args.get("chat_id"):
         session["chat_id"] = chat_id
 
+    # Ensure we have a valid chat_id
+    if not chat_id:
+        chat_id = generate_new_chat_id()
+        Chat.create(chat_id=chat_id, user_id=current_user.id, title="New Chat")
+        session["chat_id"] = chat_id
+
     # If no chat_id or the chat doesn't exist, create new
     if not chat_id or not Chat.get_by_id(chat_id):
         chat_id = generate_new_chat_id()
