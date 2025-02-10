@@ -10,6 +10,7 @@ class MobileMenuManager {
         this.touchStartY = 0;
         this.currentTranslateX = 0;
         this.isDragging = false;
+        this.darkModeEnabled = document.documentElement.classList.contains('dark');
 
         if (this.mobileMenuToggle && this.mobileMenu && this.mobileMenuBackdrop) {
             this.initialize();
@@ -52,6 +53,11 @@ class MobileMenuManager {
 
         // Handle safe area changes
         window.addEventListener('resize', this.updateSafeArea.bind(this));
+
+        // Handle dark mode changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+            this.darkModeEnabled = e.matches;
+        });
     }
 
     setupAccessibility() {
@@ -119,12 +125,19 @@ class MobileMenuManager {
 
     openMenu() {
         this.isOpen = true;
+        
+        // Apply backdrop blur with dark mode consideration
+        const backdropClass = this.darkModeEnabled ? 'bg-gray-900/70' : 'bg-gray-800/60';
+        this.mobileMenuBackdrop.classList.add(backdropClass, 'backdrop-blur-sm');
+        
         this.mobileMenu.classList.remove('-translate-x-full');
         this.mobileMenu.classList.add('translate-x-0');
         this.mobileMenuBackdrop.classList.remove('hidden');
         this.mobileMenuBackdrop.classList.add('opacity-100');
         this.mobileMenuToggle.setAttribute('aria-expanded', 'true');
         document.body.classList.add('overflow-hidden');
+        
+        this.updateMenuColors();
 
         // Announce to screen readers
         this.announceMenuState('Menu opened');
@@ -132,6 +145,10 @@ class MobileMenuManager {
 
     closeMenu() {
         this.isOpen = false;
+        
+        // Remove backdrop effects
+        this.mobileMenuBackdrop.className = 'fixed inset-0 z-[2000] hidden transition-all duration-300 ease-in-out opacity-0';
+        
         this.mobileMenu.classList.add('-translate-x-full');
         this.mobileMenu.classList.remove('translate-x-0');
         this.mobileMenuBackdrop.classList.add('hidden');
@@ -141,6 +158,20 @@ class MobileMenuManager {
 
         // Announce to screen readers
         this.announceMenuState('Menu closed');
+    }
+
+    updateMenuColors() {
+        if (this.darkModeEnabled) {
+            this.mobileMenu.classList.remove('bg-white/98');
+            this.mobileMenu.classList.add('bg-gray-800/98');
+            this.mobileMenuBackdrop.classList.remove('bg-gray-800/60');
+            this.mobileMenuBackdrop.classList.add('bg-gray-900/70');
+        } else {
+            this.mobileMenu.classList.remove('bg-gray-800/98');
+            this.mobileMenu.classList.add('bg-white/98');
+            this.mobileMenuBackdrop.classList.remove('bg-gray-900/70');
+            this.mobileMenuBackdrop.classList.add('bg-gray-800/60');
+        }
     }
 
     updateSafeArea() {
@@ -287,7 +318,7 @@ function initializeTooltips() {
         if (!tooltipText) return;
 
         const tooltip = document.createElement('div');
-        tooltip.className = 'tooltip hidden bg-black text-white text-sm px-2 py-1 rounded absolute z-50 transform -translate-x-1/2 transition-opacity duration-200';
+        tooltip.className = 'tooltip hidden bg-gray-900/95 dark:bg-gray-800/95 text-white text-sm px-3 py-1.5 rounded-md absolute z-50 transform -translate-x-1/2 transition-all duration-200 shadow-lg backdrop-blur-sm';
         tooltip.textContent = tooltipText;
         document.body.appendChild(tooltip);
 

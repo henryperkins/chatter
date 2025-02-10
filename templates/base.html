@@ -38,12 +38,12 @@
 </head>
 
 <body
-    class="min-h-[100dvh] bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 antialiased flex flex-col safe-area-inset transition-colors duration-300">
+    class="min-h-[100dvh] bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900 text-gray-900 dark:text-gray-100 antialiased flex flex-col safe-area-inset transition-all duration-300">
     <!-- Chat Tabs Area -->
     {% block chat_tabs %}{% endblock %}
 
     <!-- Navbar - Adjusted z-index and positioning -->
-    <nav class="fixed w-full z-[1500] h-14 md:h-16 transition-all duration-300 ease-in-out backdrop-blur-md bg-white/90 dark:bg-gray-800/90 border-b border-gray-200/80 dark:border-gray-700/80 shadow-soft {% block nav_classes %}top-0{% endblock %}"
+    <nav class="fixed w-full z-[2000] h-14 md:h-16 transition-all duration-300 ease-in-out backdrop-blur-md bg-white/95 dark:bg-gray-800/95 border-b border-gray-200/80 dark:border-gray-700/80 shadow-md {% block nav_classes %}top-0{% endblock %}"
         role="navigation">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div class="flex justify-between h-16">
@@ -115,7 +115,7 @@
 
     <!-- Dark Mode Toggle -->
     <button id="dark-mode-toggle"
-        class="fixed top-20 md:top-24 right-4 z-[1200] p-3 bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 opacity-0 shadow-soft transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95 border border-gray-200/80 dark:border-gray-700/80 backdrop-blur-sm dark-mode-transition"
+        class="fixed top-20 md:top-24 right-4 z-[1800] p-3 bg-white/95 dark:bg-gray-800/95 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 opacity-0 shadow-md hover:shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95 border border-gray-200/80 dark:border-gray-700/80 backdrop-blur-md dark-mode-transition"
         aria-label="Toggle dark mode">
         <svg class="w-6 h-6 dark:hidden" fill="currentColor" viewBox="0 0 20 20">
             <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
@@ -129,7 +129,7 @@
 
     <!-- Font Size Adjuster -->
     <div id="font-size-adjuster"
-        class="fixed bottom-24 right-4 z-[1200] flex flex-col space-y-2 bg-white/90 dark:bg-gray-800/90 p-2 rounded-lg shadow-soft border border-gray-200/80 dark:border-gray-700/80 transition-transform duration-300 transform hover:scale-105 backdrop-blur-sm">
+        class="fixed bottom-24 right-4 z-[1800] flex flex-col space-y-2 bg-white/95 dark:bg-gray-800/95 p-2 rounded-lg shadow-md hover:shadow-lg border border-gray-200/80 dark:border-gray-700/80 transition-all duration-300 transform hover:scale-105 backdrop-blur-md">
         <button id="increase-font-size"
             class="p-2 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
             aria-label="Increase font size">
@@ -149,12 +149,12 @@
 
     <!-- Mobile Menu Backdrop -->
     <div id="mobile-menu-backdrop"
-        class="fixed inset-0 z-[2000] hidden bg-gray-900/60 backdrop-blur-[2px] transition-all duration-300 ease-in-out opacity-0"
+        class="fixed inset-0 z-[2100] hidden bg-gray-900/70 backdrop-blur-[3px] transition-all duration-300 ease-in-out opacity-0"
         aria-hidden="true"></div>
 
     <!-- Mobile Menu -->
     <div id="mobile-menu"
-        class="fixed inset-y-0 left-0 w-full sm:w-64 bg-white/95 dark:bg-gray-800/95 shadow-soft transform -translate-x-full transition-transform duration-300 ease-in-out z-[2100] md:hidden backdrop-blur-md"
+        class="fixed inset-y-0 left-0 w-full sm:w-72 bg-white/98 dark:bg-gray-800/98 shadow-lg transform -translate-x-full transition-transform duration-300 ease-in-out z-[2200] md:hidden backdrop-blur-md"
         role="dialog" aria-modal="true" aria-label="Mobile navigation">
         <div class="h-16 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-700">
             <span class="text-lg font-semibold text-gray-900 dark:text-gray-100">Menu</span>
@@ -217,7 +217,7 @@
     <!-- Main Content -->
     <!-- Alert Container -->
     <div id="alert-container"
-        class="fixed top-20 left-1/2 transform -translate-x-1/2 w-[calc(100%-2rem)] sm:w-auto z-[2200] flex flex-col gap-4 pointer-events-none">
+        class="fixed top-20 left-1/2 transform -translate-x-1/2 w-[calc(100%-2rem)] sm:w-auto z-[2300] flex flex-col gap-4 pointer-events-none max-w-lg mx-auto">
         <!-- Success Alert Template -->
         <template id="success-alert">
             <div class="bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 flex gap-3 rounded-lg p-4 mb-4 items-center backdrop-blur-sm border border-green-200/50 dark:border-green-800/50 shadow-lg">
@@ -230,7 +230,7 @@
         </template>
         <!-- Error Alert Template -->
         <template id="error-alert">
-            <div class="pointer-events-auto bg-red-100/95 dark:bg-red-900/95 text-red-900 dark:text-red-100 flex gap-3 rounded-lg p-4 mb-4 items-center backdrop-blur-sm border-2 border-red-500/80 dark:border-red-500/80 shadow-xl hover:shadow-2xl transition-all duration-200 max-w-[90%] sm:max-w-lg mx-auto">
+            <div class="pointer-events-auto bg-red-100/98 dark:bg-red-900/98 text-red-900 dark:text-red-100 flex gap-3 rounded-lg p-4 mb-4 items-center backdrop-blur-md border-2 border-red-500/80 dark:border-red-500/80 shadow-xl hover:shadow-2xl transition-all duration-200">
                 <i class="fas fa-exclamation-circle text-lg text-red-600 dark:text-red-400"></i>
                 <p class="text-sm font-semibold flex-1 leading-5"></p>
                 <button class="ml-auto p-1.5 hover:bg-red-200 dark:hover:bg-red-800/50 rounded-lg transition-colors" onclick="this.parentElement.remove()" aria-label="Dismiss">
@@ -240,7 +240,7 @@
         </template>
     </div>
     <main class="flex-1 flex flex-col mt-14 md:mt-16 {% block main_classes %}{% endblock %}">
-        {% block content %}{% endblock %}
+        <div class="flex-1 w-full">{% block content %}{% endblock %}</div>
     </main>
 
     <!-- Core Libraries First -->

@@ -13,22 +13,27 @@ const DarkMode = {
     },
 
     initialize() {
-        // Add transition class for smooth theme changes
-        this.html.classList.add('dark-mode-transition');
-
         // Get stored theme or system preference
         const storedTheme = localStorage.getItem('theme');
         const systemPrefersDark = this.mediaQuery.matches;
         const userPrefersDark = storedTheme === 'dark' || (!storedTheme && systemPrefersDark);
 
-        // Set initial theme without transition
-        this.html.classList.remove('dark-mode-transition');
-        this.setTheme(userPrefersDark ? 'dark' : 'light');
+        // Prevent flash of wrong theme
+        document.documentElement.style.visibility = 'hidden';
+        
+        // Set initial theme without transitions
+        this.html.classList.remove('dark-mode-transition', 'transition-colors', 'duration-300');
+        this.setTheme(userPrefersDark ? 'dark' : 'light', false);
 
-        // Re-enable transitions after a brief delay
+        // Re-enable transitions and show content after a brief delay
         setTimeout(() => {
-            this.html.classList.add('dark-mode-transition');
-        }, 100);
+            this.html.classList.add(
+                'dark-mode-transition',
+                'transition-colors',
+                'duration-300'
+            );
+            document.documentElement.style.visibility = '';
+        }, 50);
 
         // Make theme controls visible after initialization
         if (document.readyState === 'loading') {
@@ -85,15 +90,20 @@ const DarkMode = {
         });
     },
 
-    setTheme(theme) {
+    setTheme(theme, animate = true) {
         const isDark = theme === 'dark';
+
+        // Apply theme with or without transitions
+        if (!animate) {
+            this.html.classList.remove('dark-mode-transition', 'transition-colors', 'duration-300');
+        }
 
         if (isDark) {
             this.html.classList.add('dark');
         } else {
             this.html.classList.remove('dark');
         }
-
+        
         // Update toggle button appearance
         this.updateToggleButton(isDark);
 
@@ -122,7 +132,7 @@ const DarkMode = {
             metaThemeColor.name = 'theme-color';
             document.head.appendChild(metaThemeColor);
         }
-        metaThemeColor.content = isDark ? '#111827' : '#ffffff';
+        metaThemeColor.content = isDark ? '#1f2937' : '#ffffff';
     },
 
     updateARIALabels() {

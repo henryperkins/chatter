@@ -12,7 +12,7 @@
 
     /* Layout components */
     .page-container {
-        @apply min-h-screen flex flex-col;
+        @apply min-h-screen flex flex-col bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900;
     }
 
     .main-content {
@@ -21,7 +21,7 @@
 
     /* Navigation components */
     .nav-link {
-        @apply px-3 py-2 rounded-md text-sm font-medium transition-all duration-300;
+        @apply px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300;
     }
 
     .nav-link-active {
@@ -34,45 +34,32 @@
 
     /* Chat tabs components */
     .chat-tabs {
-        @apply flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400/50 dark:scrollbar-thumb-gray-600/50 scrollbar-track-transparent gap-0.5 px-1;
+        @apply flex overflow-x-auto scrollbar-none gap-2 px-4 py-2;
     }
 
     .chat-tab {
-        @apply flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-t-md transition-all duration-200 whitespace-nowrap focus:outline-none relative;
-    }
-
-    .chat-tab::after {
-        @apply absolute bottom-0 left-0 right-0 h-0.5 bg-transparent transition-colors duration-200;
-        content: '';
+        @apply flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 whitespace-nowrap focus:outline-none;
     }
 
     .chat-tab-active {
-        @apply bg-white dark:bg-gray-900 text-primary-600 dark:text-primary-400;
-    }
-
-    .chat-tab-active::after {
-        @apply bg-primary-500;
+        @apply bg-white dark:bg-gray-800 text-primary-600 dark:text-primary-400 shadow-sm;
     }
 
     .chat-tab-default {
         @apply text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100/50 dark:hover:bg-gray-700/50;
     }
 
-    .chat-tab-default::after {
-        @apply hover:bg-gray-300/50 dark:hover:bg-gray-600/50;
-    }
-
     .chat-tab-close {
-        @apply ml-1 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 rounded-full p-1 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors duration-200 opacity-0 group-hover:opacity-100;
+        @apply ml-2 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors duration-200;
     }
 
     /* Chat controls */
     .chat-controls {
-        @apply flex items-center gap-2 px-4 py-2 bg-white/90 dark:bg-gray-800/90 border-b border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm;
+        @apply flex items-center gap-3 px-4 py-3 bg-white/95 dark:bg-gray-800/95 border-b border-gray-200/50 dark:border-gray-700/50 backdrop-blur-md shadow-sm;
     }
 
     .chat-control-btn {
-        @apply p-2 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800;
+        @apply p-2 text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200;
     }
 
     /* Mobile menu components */
@@ -90,28 +77,24 @@
 
     /* Button components */
     .btn {
-        @apply px-4 py-3 rounded-md text-sm font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-soft hover:-translate-y-0.5;
+        @apply px-4 py-3 rounded-lg text-sm font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
     }
 
     .icon-button {
-        @apply w-12 h-12 flex items-center justify-center transition-transform duration-300 hover:scale-105;
-    }
-
-    .icon-button i {
-        @apply text-xl;
+        @apply w-10 h-10 flex items-center justify-center transition-transform duration-300 hover:scale-105 active:scale-95;
     }
 
     .btn-primary {
-        @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 active:bg-primary-800;
+        @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 active:bg-primary-800 shadow-md hover:shadow-lg;
     }
 
     .btn-secondary {
-        @apply bg-gray-500 text-white hover:bg-gray-600 focus:ring-gray-500 active:bg-gray-700;
+        @apply bg-gray-500 text-white hover:bg-gray-600 focus:ring-gray-500 active:bg-gray-700 shadow-md hover:shadow-lg;
     }
 
     /* Card components */
     .card {
-        @apply bg-white/95 dark:bg-gray-800/95 rounded-lg shadow-soft overflow-hidden transition-shadow duration-300 hover:shadow-lg border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm;
+        @apply bg-white/95 dark:bg-gray-800/95 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-md;
     }
 
     .card-header {
@@ -124,7 +107,7 @@
 
     /* Form components */
     .form-input {
-        @apply w-full px-3 py-2 border border-gray-300/50 dark:border-gray-600/50 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700/90 dark:text-gray-100 backdrop-blur-sm bg-white/90;
+        @apply w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-lg shadow-inner focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700/90 dark:text-gray-100 backdrop-blur-sm bg-white/90;
     }
 
     .form-label {
@@ -133,7 +116,7 @@
 
     /* Alert components */
     .alert {
-        @apply p-4 rounded-lg mb-4 transition-all duration-300 shadow-soft;
+        @apply p-4 rounded-lg mb-4 transition-all duration-300 shadow-md hover:shadow-lg;
     }
 
     .alert-error {
@@ -146,43 +129,18 @@
 
     /* Markdown content */
     .markdown-content {
-        @apply prose dark:prose-invert max-w-none overflow-x-auto;
+        @apply prose dark:prose-invert max-w-none overflow-x-auto prose-headings:font-semibold prose-a:text-primary-600 dark:prose-a:text-primary-400;
     }
 
     /* Enhanced code block styling */
     .code-block-wrapper {
-        @apply relative my-4 rounded-lg overflow-hidden shadow-soft;
+        @apply relative my-4 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300;
     }
-}
-
-/* Inline code styling */
-p code,
-li code,
-span code {
-    background-color: #f5f5f5;
-    color: #d14;
-    padding: 0.2em 0.4em;
-    border-radius: 0.3em;
-    font-size: 0.95em;
-}
-
-/* Code block styling */
-pre code {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.9em;
-}
-
-pre {
-    background-color: #2d2d2d;
-    color: #ccc;
-    padding: 1em;
-    overflow-x: auto;
-    border-radius: 0.3em;
 }
 
 /* Custom scrollbar */
 .custom-scrollbar {
-    @apply scrollbar-thin scrollbar-thumb-gray-400/80 dark:scrollbar-thumb-gray-600/80 scrollbar-track-transparent hover:scrollbar-thumb-gray-500/90 dark:hover:scrollbar-thumb-gray-500/90;
+    @apply scrollbar-thin scrollbar-thumb-gray-400/80 hover:scrollbar-thumb-gray-500/90 dark:scrollbar-thumb-gray-600/80 dark:hover:scrollbar-thumb-gray-500/90 scrollbar-track-transparent;
 }
 
 /* Safe area adjustments */
@@ -193,188 +151,65 @@ pre {
     padding-right: env(safe-area-inset-right);
 }
 
-/* Desktop layout adjustments to ensure the chat input bar is visible */
-@media (min-width: 768px) {
-  #chat-container {
-    margin-top: 84px !important;
-  }
-
-  #chat-box {
-    padding-bottom: 180px !important;
-    max-height: calc(100vh - 84px) !important;
-  }
-
-  #chat-input {
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: var(--z-chat-input) !important;
-    background: rgba(255, 255, 255, 0.95) !important;
-    -webkit-backdrop-filter: blur(8px) !important;
-    backdrop-filter: blur(8px) !important;
-    border-top: 1px solid rgba(229, 231, 235, 0.5) !important;
-    padding: 1rem !important;
-  }
-
-  #token-usage {
-    bottom: 100px !important;
-    z-index: var(--z-token-usage) !important;
-  }
-}
-
 /* Mobile optimizations */
 @media (max-width: 640px) {
     .chat-message {
-        @apply max-w-[95%] mx-0;
+        @apply max-w-[92%] mx-auto;
     }
 
     .input-area {
         @apply pb-safe px-2 safe-area-bottom;
     }
 
-    #chat-container {
-        margin-top: 196px; /* Adjusted for mobile */
+    .chat-container {
+        margin-top: 140px;
     }
 
     #chat-box {
-        padding-bottom: 160px; /* Adjusted for mobile */
-    }
-
-    #token-usage {
-        bottom: 112px; /* Adjusted for mobile */
-    }
-
-    #chat-input {
-        padding: 16px; /* Adjusted padding for mobile */
+        padding-bottom: 140px;
+        max-height: calc(100vh - 140px);
     }
 
     .mobile-menu {
-        @apply top-16 w-[85%] max-w-[320px];
+        @apply top-16 w-[90%] max-w-[320px];
     }
 
     /* Enhanced mobile message spacing */
     #chat-box {
-        max-height: calc(100vh - 140px); /* adjust 140px as needed for header, navbar, etc. */
-    }
-    #chat-box {
-        @apply px-2 py-2 pb-16 space-y-3;
+        @apply px-3 py-3 pb-16 space-y-4;
         -webkit-overflow-scrolling: touch;
-    }
-
-    /* Enhanced mobile input area */
-    #message-input {
-        @apply text-base px-3 py-2 min-h-touch;
-        max-height: 100px;
-        line-height: 1.4;
     }
 
     /* Improve touch targets */
     .icon-button {
-        @apply min-w-touch min-h-touch w-14 h-14;
-    }
-
-    /* Optimize message containers */
-    .prose {
-        @apply text-[15px] leading-relaxed xs:text-base;
-        max-width: 100%;
-    }
-
-    /* Enhance mobile message actions */
-    .copy-button,
-    .regenerate-button {
-        @apply p-2 min-w-touch min-h-touch;
-    }
-
-    /* Improve code block readability */
-    pre code {
-        @apply text-sm;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    /* Better handle long messages */
-    .message-content {
-        @apply break-words;
-        word-break: break-word;
-        -webkit-hyphens: auto;
-        hyphens: auto;
-    }
-
-    /* Enhance mobile buttons */
-    #send-button,
-    #upload-button {
-        @apply min-w-touch min-h-touch;
-    }
-
-    /* Improve mobile menu interaction */
-    #mobile-menu-toggle {
-        @apply min-w-touch min-h-touch p-2;
+        @apply min-w-touch min-h-touch w-12 h-12;
     }
 
     /* Chat tabs mobile optimization */
     .chat-tabs {
-        @apply px-0.5;
+        @apply px-2 py-1;
     }
 
     .chat-tab {
-        @apply px-2 py-1 text-xs;
-    }
-
-    .chat-tab-close {
-        @apply opacity-100 p-0.5;
+        @apply px-3 py-1.5 text-sm;
     }
 
     .chat-controls {
-        @apply px-2 py-1.5;
+        @apply px-3 py-2;
     }
 
     .chat-control-btn {
-        @apply p-1.5;
+        @apply p-2;
     }
 
     #model-select {
-        @apply h-8 text-xs;
+        @apply h-9 text-sm;
     }
 }
 
-/* Transitions */
-.transition-all {
-    transition-property: all;
-    transition-duration: 300ms;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Dark mode transition */
+/* Dark mode transitions */
 .dark-mode-transition {
-    @apply transition-all duration-300 ease-in-out backdrop-blur-transition;
-}
-
-/* Z-index layers */
-.z-index-layers {
-    --z-nav: 1500;
-    --z-chat-tabs: 1400;
-    --z-chat-controls: 1300;
-    --z-dark-mode: 1200;
-    --z-chat-input: 2100;
-    --z-token-usage: 2000;
-}
-
-/* Dark mode specific transitions */
-.dark-mode-transition * {
-    @apply transition-colors duration-300 ease-in-out;
-    transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
-}
-
-/* Backdrop blur transition */
-.backdrop-blur-transition {
-    transition-property: backdrop-filter, -webkit-backdrop-filter;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 300ms;
-}
-
-/* Loading states */
-.loading {
-    @apply opacity-75 cursor-not-allowed;
+    @apply transition-all duration-300 ease-in-out;
 }
 
 /* Focus states */
@@ -382,40 +217,7 @@ pre {
     @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800;
 }
 
-/* Safe area adjustments for mobile */
-@supports(padding: max(0px)) {
-    .safe-area-bottom {
-        padding-bottom: max(env(safe-area-inset-bottom), 1.25rem);
-    }
-
-    .safe-area-top {
-        padding-top: max(env(safe-area-inset-top), 1.25rem);
-    }
-}
-
-/* Enhanced touch feedback */
-@media (hover: none) {
-    .btn,
-    .icon-button,
-    .nav-link {
-        @apply active:opacity-70 active:scale-95 transition-all duration-150;
-        -webkit-tap-highlight-color: transparent;
-    }
-
-    /* Improve touch scrolling */
-    .scrollbar-thin {
-        scrollbar-width: none;
-        -ms-overflow-style: none;
-    }
-
-    .scrollbar-thin::-webkit-scrollbar {
-        display: none;
-    }
-}
-
-/* Prevent text selection during touch interactions */
-.touch-manipulation {
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
+/* Loading states */
+.loading {
+    @apply opacity-75 cursor-not-allowed;
 }
