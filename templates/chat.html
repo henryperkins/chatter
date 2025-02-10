@@ -1,4 +1,12 @@
 {% extends "base.html" %}
+          </button>
+          <!-- Turn the old “New Chat” tab into a simpler “New Tab” button -->
+          <button class="flex-shrink-0 flex items-center gap-2 px-4 py-3 bg-gray-100/90 dark:bg-gray-700/90 hover:bg-gray-200/90 dark:hover:bg-gray-600/90 transition-all duration-200 rounded-xl my-1 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 touch-manipulation min-h-[44px]"
+                  id="new-chat-tab" aria-label="Start new tab" role="button">
+            <i class="fas fa-plus text-sm text-gray-600 dark:text-gray-300"></i>
+            <span class="text-gray-600 dark:text-gray-300">New Tab</span>
+          </button>
+        </div>
 
 {% block extra_head %}
 <!-- Chat-specific styles -->
@@ -21,10 +29,12 @@
 {% block main_classes %}relative flex-1{% endblock %}
 
 {% block chat_tabs %}
-<div class="fixed w-full top-[72px] z-50 bg-gradient-to-b from-white/95 to-gray-100/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-md safe-area-top shadow-lg">
+<div class="fixed w-full top-12 z-[1100] bg-gradient-to-b from-white/95 to-gray-100/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-md safe-area-top shadow-lg">
     <div class="chat-tabs flex overflow-x-auto border-b-2 border-gray-200/50 dark:border-gray-700/50 px-4 sm:px-6 lg:px-8 gap-2 scrollbar-none max-w-7xl mx-auto touch-pan-x">
         <!-- New Chat Button -->
-        <button
+        <!-- Group “New Chat” and “New Tab” together in a single flex row -->
+        <div class="flex items-center space-x-3">
+          <button
             class="flex-shrink-0 flex items-center gap-2 px-4 py-3 bg-gray-100/90 dark:bg-gray-700/90 hover:bg-gray-200/90 dark:hover:bg-gray-600/90 transition-all duration-200 rounded-xl my-1 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 touch-manipulation min-h-[44px]"
             id="new-chat-btn" aria-label="Start new chat" role="button">
             <i class="fas fa-plus text-sm text-gray-600 dark:text-gray-300"></i>
@@ -128,7 +138,10 @@
                 </button>
             </div>
             <div class='message-bubble bg-white/95 dark:bg-gray-800/95 p-5 sm:p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:-translate-y-0.5'>
-                <div class='prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto' data-role='assistant-message'>
+                <div class='message-content' data-role='assistant-message'>
+                    <div class='prose dark:prose-invert prose-sm sm:prose-base max-w-none overflow-x-auto prose-headings:font-semibold prose-p:leading-relaxed prose-pre:bg-gray-800/50 prose-pre:shadow-inner prose-pre:rounded-lg prose-pre:p-4 prose-code:text-sm prose-code:leading-relaxed'>
+                    </div>
+                    <button class='toggle-more hidden'>Show more</button>
                 </div>
             </div>
             <span class='text-xs text-gray-500 dark:text-gray-400 block mt-1'>
@@ -167,7 +180,7 @@
 </template>
 
 <div id="chat-container"
-    class="relative flex flex-col min-h-screen w-full overflow-hidden touch-manipulation bg-gradient-to-b from-gray-50/95 to-white/95 dark:from-gray-900/95 dark:to-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    class="relative flex flex-col min-h-screen w-full overflow-hidden touch-manipulation mt-28 bg-gradient-to-b from-gray-50/95 to-white/95 dark:from-gray-900/95 dark:to-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
     <!-- Chat Configuration -->
     <div id="chat-config" data-chat-id="{{ chat_id }}" data-csrf-token="{{ csrf_token() }}"
         data-models='{{ models|tojson|safe }}'
@@ -230,7 +243,7 @@
                         </div>
 
                         <div
-                            class="bg-white dark:bg-gray-800 p-5 sm:p-6 rounded-2xl shadow-lg group hover:shadow-xl transition-all duration-300 backdrop-blur-sm border border-gray-200 dark:border-gray-700 hover:-translate-y-1">
+                            class="bg-white/98 dark:bg-gray-800/98 p-5 sm:p-6 rounded-2xl shadow-lg group hover:shadow-xl transition-all duration-300 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50 hover:-translate-y-0.5">
                             <div class="prose dark:prose-invert prose-base sm:prose-lg max-w-none overflow-x-auto !w-full !break-words prose-headings:font-semibold prose-p:text-gray-800 dark:prose-p:text-gray-200 prose-pre:bg-gray-50 dark:prose-pre:bg-gray-900 prose-pre:shadow-md"
                                 data-role="assistant-message" data-content="{{ message.content | e }}">
                             </div>
@@ -383,7 +396,7 @@
 
         <!-- Chat Input Area -->
         <div id="chat-input"
-            class="fixed inset-x-0 bottom-0 z-40 border-t-2 border-gray-200/50 dark:border-gray-700/50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-lg safe-area-bottom max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 rounded-t-2xl">
+            class="fixed inset-x-0 bottom-0 z-[1200] border-t-2 border-gray-200/50 dark:border-gray-700/50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-lg safe-area-bottom max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6 rounded-t-2xl">
             <form id="chat-form" enctype="multipart/form-data" class="max-w-4xl mx-auto">
                 <textarea name="message" id="message-input" rows="3"
                     class="w-full border rounded-xl px-4 py-3 sm:py-4 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700 shadow-inner resize-none text-base sm:text-sm leading-relaxed"

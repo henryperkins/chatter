@@ -43,7 +43,7 @@
     {% block chat_tabs %}{% endblock %}
 
     <!-- Navbar - Adjusted z-index and positioning -->
-    <nav class="fixed w-full z-[2000] h-14 md:h-16 transition-all duration-300 ease-in-out backdrop-blur-md bg-white/95 dark:bg-gray-800/95 border-b border-gray-200/80 dark:border-gray-700/80 shadow-md {% block nav_classes %}top-0{% endblock %}"
+    <nav class="fixed w-full z-[1000] h-12 transition-all duration-300 ease-in-out backdrop-blur-md bg-white/95 dark:bg-gray-800/95 border-b border-gray-200/80 dark:border-gray-700/80 shadow-md {% block nav_classes %}top-0{% endblock %}"
         role="navigation">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
             <div class="flex justify-between h-16">
@@ -53,15 +53,15 @@
                     <button id="mobile-menu-toggle"
                         class="md:hidden p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
                         aria-label="Toggle menu" aria-expanded="false">
-                        <i class="fas fa-bars text-2xl"></i>
+                        <i class="fas fa-bars text-xl"></i>
                     </button>
 
                     <!-- Brand -->
                     <a href="{{ url_for('chat.chat_interface') }}"
                         class="flex items-center space-x-2 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors duration-200">
-                        <i class="fas fa-robot text-2xl"></i>
+                        <i class="fas fa-robot text-lg"></i>
                         <span
-                            class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-secondary-600 dark:from-primary-400 dark:to-secondary-400">Azure
+                            class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-secondary-600 dark:from-primary-400 dark:to-secondary-400">Azure
                             OpenAI Chat</span>
                     </a>
                 </div>
@@ -115,7 +115,7 @@
 
     <!-- Dark Mode Toggle -->
     <button id="dark-mode-toggle"
-        class="fixed top-20 md:top-24 right-4 z-[1800] p-3 bg-white/95 dark:bg-gray-800/95 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 opacity-0 shadow-md hover:shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95 border border-gray-200/80 dark:border-gray-700/80 backdrop-blur-md dark-mode-transition"
+        class="fixed top-16 right-4 z-[1800] p-3 bg-white/95 dark:bg-gray-800/95 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 shadow-md hover:shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 active:scale-95 border border-gray-200/80 dark:border-gray-700/80 backdrop-blur-md dark-mode-transition"
         aria-label="Toggle dark mode">
         <svg class="w-6 h-6 dark:hidden" fill="currentColor" viewBox="0 0 20 20">
             <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
@@ -128,8 +128,11 @@
     </button>
 
     <!-- Font Size Adjuster -->
-    <div id="font-size-adjuster"
-        class="fixed bottom-24 right-4 z-[1800] flex flex-col space-y-2 bg-white/95 dark:bg-gray-800/95 p-2 rounded-lg shadow-md hover:shadow-lg border border-gray-200/80 dark:border-gray-700/80 transition-all duration-300 transform hover:scale-105 backdrop-blur-md">
+    <!-- Reposition from bottom-24 to top-24 -->
+    <div
+        id="font-size-adjuster"
+        class="fixed top-24 right-4 z-[1800] flex flex-col space-y-2 bg-white/95 dark:bg-gray-800/95 p-2 rounded-lg shadow-md hover:shadow-lg border border-gray-200/80 dark:border-gray-700/80 transition-all duration-300 transform hover:scale-105 backdrop-blur-md"
+    >
         <button id="increase-font-size"
             class="p-2 bg-gray-100 dark:bg-gray-700 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 hover:scale-105 active:scale-95"
             aria-label="Increase font size">
@@ -147,6 +150,14 @@
         </button>
     </div>
 
+    <!-- For smaller screens, shift the panel lower so it doesn't overlap other UI elements -->
+    <style>
+      @media (max-width: 640px) {
+        #font-size-adjuster {
+          top: 20rem;
+        }
+      }
+    </style>
     <!-- Mobile Menu Backdrop -->
     <div id="mobile-menu-backdrop"
         class="fixed inset-0 z-[2100] hidden bg-gray-900/70 backdrop-blur-[3px] transition-all duration-300 ease-in-out opacity-0"

@@ -23,13 +23,14 @@ class MessageRenderer {
     static renderAssistantMessage(content, isStreaming = false) {
         const template = this.templates.assistant;
         const clone = template.content.cloneNode(true);
-        const messageDiv = clone.querySelector('[data-role="assistant-message"]');
+        const messageContent = clone.querySelector('[data-role="assistant-message"]');
+        const proseDiv = messageContent.querySelector('.prose');
         const timestamp = clone.querySelector('span.text-xs');
         const regenerateButton = clone.querySelector('.regenerate-button');
         const copyButton = clone.querySelector('.copy-button');
 
         // Set content (plaintext by default—will be replaced in finalize)
-        messageDiv.textContent = content;
+        proseDiv.textContent = content;
 
         // Show a timestamp
         timestamp.textContent = new Date().toLocaleTimeString();
@@ -94,10 +95,35 @@ class MessageRenderer {
         return clone;
     }
 
+    static makeContentCollapsible(container, content) {
+        const messageContent = container.closest('.message-content');
+        if (!messageContent) return;
+
+        const toggleButton = messageContent.querySelector('.toggle-more');
+        if (!toggleButton) return;
+
+        // Check if content is long enough to need collapsing
+        const shouldCollapse = content.length > 500 || 
+                             content.split('\n').length > 10 ||
+                             container.clientHeight > 300;
+
+        if (shouldCollapse) {
+            messageContent.classList.add('collapsed');
+            toggleButton.classList.remove('hidden');
+            
+            toggleButton.addEventListener('click', () => {
+                messageContent.classList.toggle('collapsed');
+                toggleButton.textContent = messageContent.classList.contains('collapsed') 
+                    ? 'Show more' 
+                    : 'Show less';
+            });
+        }
+    }
+
     static finalizeAssistantMessage(messageDiv, content) {
         if (!messageDiv) return;
 
-        const container = messageDiv.querySelector('[data-role="assistant-message"]');
+        const container = messageDiv.querySelector('.prose');
         if (!container) return;
 
         // Render markdown
@@ -140,6 +166,9 @@ class MessageRenderer {
         if (window.Prism) {
             window.Prism.highlightAllUnder(container);
         }
+
+        // Make content collapsible if needed
+        this.makeContentCollapsible(container, content);
     }
 }
 
