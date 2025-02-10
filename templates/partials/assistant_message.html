@@ -8,11 +8,6 @@
                 <button class="copy-button btn-icon" title="Copy to clipboard" data-raw-content="{{ message.raw_content|default(message.content)|e }}">
                     <i class="fas fa-copy"></i>
                 </button>
-                {% if loop.last %}
-                <button class="regenerate-button btn-icon" title="Regenerate response">
-                    <i class="fas fa-redo-alt"></i>
-                </button>
-                {% endif %}
             </div>
 
             <div class="message-bubble bg-white/95 dark:bg-gray-800/95">
@@ -29,7 +24,7 @@
                             <div class="text-sm font-medium truncate">{{ attachment.name }}</div>
                             <div class="text-xs text-gray-500 dark:text-gray-400">Click to expand</div>
                         </div>
-                        <button class="toggle-file-content btn-icon" data-file-name="{{ attachment.name }}">
+                        <button class="toggle-file-content btn-icon" data-file-name="{{ attachment.name }}" title="Toggle file content">
                             <i class="fas fa-chevron-down"></i>
                         </button>
                     </div>
