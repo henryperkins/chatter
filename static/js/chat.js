@@ -42,6 +42,16 @@
                     console.debug('Swiped left in chat box');
                 }
             }
+
+            function showSuccess(message, durationMs = 3000) {
+                if (window.showAlert) {
+                    window.showAlert(message, 'success', durationMs);
+                    return;
+                }
+                // Fallback if window.showAlert is undefined:
+                console.log('SUCCESS:', message);
+                // Optionally create a basic in-page notification if desired
+            }
         }, { passive: true });
     })();
 
@@ -111,6 +121,9 @@
             message = message.replace('Authentication Error:', '🔑 Authentication Error:');
         }
 
+        // Provide a clear prefix icon or emoji to errors
+        message = `⚠️ ${message}`;
+    
         let errorMessage = message;
         if (file) {
             errorMessage = `[${file.name}] ${message} (${(file.size / 1024 / 1024).toFixed(2)}MB)`;
