@@ -49,15 +49,20 @@
 
             async initialize() {
                 try {
+                    console.log('TokenUsageManager: Starting initialization');
                     let attempts = 0;
                     while ((!window.utils || !window.CHAT_CONFIG) && attempts < 50) {
+                        console.log('TokenUsageManager: Waiting for dependencies...');
                         await new Promise(resolve => setTimeout(resolve, 100));
                         attempts++;
                     }
 
                     if (!window.utils || !window.CHAT_CONFIG) {
+                        console.error('TokenUsageManager: Required dependencies not available after waiting');
                         throw new Error('Required dependencies not available after waiting');
                     }
+
+                    console.log('TokenUsageManager: Dependencies loaded, proceeding with initialization');
 
                     if (this.chatId !== window.CHAT_CONFIG.chatId) {
                         console.warn('TokenUsageManager: Chat ID mismatch, updating to match config');
