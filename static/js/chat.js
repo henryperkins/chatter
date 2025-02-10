@@ -203,6 +203,39 @@
         }
     }
 
+    async function handleNormalResponse(formData) {
+        // Same base JSON payload as handleStreamingResponse, but no "stream: true"
+        const message = formData.get('message') || '';
+        const jsonData = {
+            message,
+            chat_id: window.CHAT_CONFIG.chatId
+        };
+
+        const response = await fetch('/chat/send', {
+            method: 'POST',
+            body: JSON.stringify(jsonData),
+            headers: {
+                'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                'api-key': window.CHAT_CONFIG.azureToken,
+                'Content-Type': 'application/json',
+                'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`Request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        // data.message.content holds the assistant's reply
+        const content = data.message?.content || '';
+        await appendAssistantMessage(content, /* isStreaming= */ false);
+    }
+
     async function handleStreamingResponse(formData) {
         let accumulatedContent = '';
         let messageDiv = null;
@@ -384,12 +417,23 @@
                 });
             }
 
+            const modelSelect = document.getElementById('model-select');
+            const modelSupportsStreaming = (
+                modelSelect &&
+                modelSelect.selectedOptions.length &&
+                modelSelect.selectedOptions[0].dataset.supportsStreaming === 'true'
+            );
+
             appendUserMessage(message, uploadedFiles);
             messageInput.value = '';
             window.fileUploadManager?.clearFiles();
 
             showTypingIndicator();
-            await handleStreamingResponse(formData);
+            if (modelSupportsStreaming) {
+                await handleStreamingResponse(formData);
+            } else {
+                await handleNormalResponse(formData);
+            }
 
             if (window.tokenUsageManager) {
                 await window.tokenUsageManager.handleNewMessage();
