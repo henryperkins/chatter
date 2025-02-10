@@ -226,9 +226,13 @@ class ConversationManager:
                     attachments = metadata.get("attachments", [])
                     if attachments:
                         # Reconstruct content with attachments
-                        original_content = msg["content"]
+                        original_content = str(msg.get("content", ""))
                         attachment_text = "\n\nAttached files:\n"
-                        for attachment in attachments:
+                        
+                        # Ensure attachments is a list of dicts
+                        valid_attachments = [a for a in attachments if isinstance(a, dict)]
+                        
+                        for attachment in valid_attachments:
                             attachment_text += f"\n[{attachment['name']}]:\n{attachment['content']}"
 
                         # Update message content
@@ -451,8 +455,9 @@ class ConversationManager:
         logger.debug("Getting usage stats for chat %s", chat_id)
         messages = Chat.get_messages(chat_id, include_system=True)
         logger.debug("Found %d messages for chat %s", len(messages), chat_id)
+        messages = [m for m in messages if isinstance(m, dict)]
 
-        # Use the TokenBreakdown TypedDict to ensure int values for user/assistant/system
+        # Initialize stats with default values
         stats: Dict[str, Any] = {
             "total_messages": len(messages),
             "total_tokens": 0,
@@ -461,62 +466,47 @@ class ConversationManager:
             "system_messages": 0,
             "token_breakdown": TokenBreakdown(user=0, assistant=0, system=0),
             "average_tokens_per_message": 0,
-            "largest_message": {"role": None, "tokens": 0},
+            "largest_message": {"role": "", "tokens": 0}
         }
 
         for msg in messages:
-            role = msg.get("role", "")
-            metadata: Dict[str, Any] = {}
-            msg_metadata = msg.get("metadata")
-            if isinstance(msg_metadata, dict):
-                metadata = msg_metadata
-            logger.debug("Processing message - Role: %s, Metadata: %s", role, metadata)
+            if not isinstance(msg, dict):
+                continue
 
-            # Safely extract token_count with proper type checking
-            token_count = metadata.get("token_count")
-            tokens = 0
-            if isinstance(token_count, (int, float)):
-                tokens = int(token_count)
-            elif isinstance(token_count, str) and token_count.isdigit():
-                tokens = int(token_count)
-            else:
-                logger.warning("Invalid token count in metadata: %s", token_count)
-            if isinstance(tokens, (int, float)):
-                tokens = int(tokens)
-                if not isinstance(tokens, int):
-                    logger.warning("Token count conversion failed for value: %s", tokens)
-                    tokens = 0
-                stats["total_tokens"] += tokens
+            role = str(msg.get("role", ""))
+            metadata = msg.get("metadata", {})
+            if not isinstance(metadata, dict):
+                metadata = {}
 
-                # Update token_breakdown only if role is recognized
-                if role in stats["token_breakdown"]:
-                    stats["token_breakdown"][role] += tokens
-                    logger.debug(
-                        "Added %d tokens to %s role (total: %d)",
-                        tokens,
-                        role,
-                        stats["token_breakdown"][role],
-                    )
+            try:
+                token_count = metadata.get("token_count", 0)
+                tokens = int(token_count) if token_count is not None else 0
+            except (ValueError, TypeError):
+                logger.warning("Invalid token count in metadata: %s", metadata.get("token_count"))
+                tokens = 0
+
+            stats["total_tokens"] += tokens
+
+            # Update token breakdown
+            if role in ["user", "assistant", "system"]:
+                stats["token_breakdown"][role] += tokens
+                stats[f"{role}_messages"] += 1
 
                 # Track largest message
-                largest_tokens = stats["largest_message"]["tokens"]
-                if isinstance(largest_tokens, int) and isinstance(tokens, int) and tokens > largest_tokens:
+                if tokens > stats["largest_message"]["tokens"]:
                     stats["largest_message"] = {"role": role, "tokens": tokens}
-                    logger.debug("New largest message: %s with %d tokens", role, tokens)
-            else:
-                logger.warning(
-                    "Invalid token count in metadata for message: %s", tokens
-                )
-
-            # Count messages by role
-            if role in ["user", "assistant", "system"]:
-                stats[f"{role}_messages"] += 1
 
         # Calculate average tokens per message
         if stats["total_messages"] > 0:
-            stats["average_tokens_per_message"] = (
-                stats["total_tokens"] / stats["total_messages"]
-            )
+            stats["average_tokens_per_message"] = round(stats["total_tokens"] / stats["total_messages"])
+
+        # Add model limits
+        stats["model_limits"] = {
+            "max_tokens": MAX_TOKENS,
+            "max_message_tokens": MAX_MESSAGE_TOKENS,
+            "tokens_left": max(0, MAX_TOKENS - stats["total_tokens"]),
+            "tokens_used_percentage": round((stats["total_tokens"] / MAX_TOKENS * 100) if MAX_TOKENS > 0 else 0, 1)
+        }
 
         logger.debug("Final stats for chat %s: %s", chat_id, stats)
         return stats

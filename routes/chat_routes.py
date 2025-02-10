@@ -7,16 +7,16 @@ This module provides routes for managing chat interactions, including:
 - Chat session management
 - Stats and utility routes
 """
-
 import os
 import uuid
 import json
 import bleach
 import tiktoken
 from datetime import datetime, timedelta
-from typing import Union, Tuple, Dict, Any, Optional, cast
+from typing import Union, Tuple, Dict, Any, Optional, cast, List
 
 from flask import (
+    Response,
     Blueprint,
     request,
     jsonify,
@@ -115,7 +115,7 @@ def validate_chat_access(chat_id: Optional[str]) -> bool:
         return False
     return Chat.can_access_chat(chat_id, current_user.id, current_user.role)
 
-def validate_model(model: Optional[Any]) -> Optional[str]:
+def validate_model(model: Optional[Model]) -> Optional[str]:
     """
     Validate a model's configuration.
     Returns None if valid; otherwise returns an error message.
@@ -124,25 +124,25 @@ def validate_model(model: Optional[Any]) -> Optional[str]:
         return "No model configured for this chat."
 
     try:
+        # Type-safe access to model attributes
         max_completion_tokens = getattr(model, "max_completion_tokens", None)
         if max_completion_tokens is None:
             return "max_completion_tokens is required"
 
         try:
             max_completion_tokens = int(max_completion_tokens)
+            if not (1 <= max_completion_tokens <= 16384):
+                return "max_completion_tokens must be between 1 and 16384"
         except (TypeError, ValueError):
             return "max_completion_tokens must be a valid integer"
 
-        if max_completion_tokens < 1:
-            return "max_completion_tokens must be at least 1"
-
-        # Check provider capabilities
-        provider = Provider.get_by_id(getattr(model, "provider_id", None))
+        # Type-safe provider access
+        provider_id = getattr(model, "provider_id", None)
+        provider = Provider.get_by_id(provider_id) if provider_id else None
         if not provider:
             return "Invalid provider configuration"
 
         provider_max = provider.capabilities.get("max_tokens", 16384)
-
         model_type = getattr(model, "model_type", "")
         if not model_type:
             return "model_type is required"
@@ -150,12 +150,8 @@ def validate_model(model: Optional[Any]) -> Optional[str]:
         requires_o1 = getattr(model, "requires_o1_handling", False)
         is_o1_preview = model_type.lower() == "o1-preview" and requires_o1
 
-        if is_o1_preview:
-            if max_completion_tokens > 8300:
-                return "max_completion_tokens must be between 1 and 8300 for o1-preview models"
-        else:
-            if max_completion_tokens > provider_max:
-                return f"max_completion_tokens must be between 1 and {provider_max}"
+        if is_o1_preview and max_completion_tokens > 8300:
+            return "o1-preview models are limited to 8300 max_completion_tokens"
 
         return None
 
@@ -625,15 +621,16 @@ def handle_chat_stream() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         logger.error("Streaming chat error: %s", str(e), exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
-def stream_response(chat_id: str, history: list, model_obj: Model) -> FlaskResponse:
+def stream_response(chat_id: str, history: List[Dict[str, Any]], model_obj: Model) -> FlaskResponse:
     """Handle streaming responses using AzureOpenAI."""
-    def generate():
+    def generate() -> str:
         try:
             client = AzureOpenAI(
                 azure_endpoint=model_obj.api_endpoint,
                 api_key=model_obj.api_key,
                 api_version=model_obj.api_version,
             )
+            
             response = client.chat.completions.create(
                 model=model_obj.deployment_name,
                 messages=history,
@@ -642,32 +639,39 @@ def stream_response(chat_id: str, history: list, model_obj: Model) -> FlaskRespo
                 stream=True,
             )
 
-            try:
-                for chunk in response:
-                    if chunk.choices and chunk.choices[0].delta.content:
-                        content = chunk.choices[0].delta.content
+            for chunk in response:
+                if hasattr(chunk, 'choices') and chunk.choices:
+                    delta = chunk.choices[0].delta
+                    if hasattr(delta, 'content') and delta.content:
+                        content = delta.content
                         yield f"data: {json.dumps({'content': content})}\n\n"
-                yield "data: [DONE]\n\n"
-            except Exception as ae:
-                logger.error("Malformed response chunk: %s", str(ae))
-                yield f"data: {json.dumps({'error': 'Malformed response'})}\n\n"
+            yield "data: [DONE]\n\n"
+
         except Exception as e:
             logger.error("Streaming error: %s", str(e))
             yield f"data: {json.dumps({'error': f'API Error: {str(e)}'})}\n\n"
 
-    return FlaskResponse(generate(), mimetype="text/event-stream")
+    return FlaskResponse(
+        generate(), 
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Transfer-Encoding": "chunked"
+        }
+    )
 
-def normal_response(chat_id: str, history: list, model_obj: Model) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
-    """
-    Handle normal (non-stream) response while honoring o-series constraints.
-    """
+def normal_response(
+    chat_id: str, 
+    history: List[Dict[str, Any]], 
+    model_obj: Model
+) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
+    """Handle normal (non-stream) response while honoring o-series constraints."""
     try:
         if not model_obj:
             return jsonify({"error": "No model configured"}), 400
 
         is_o_series = model_obj.model_type in ["o1", "o1-mini", "o1-preview", "o3-mini"] if model_obj.model_type else False
         max_tokens = max(1, getattr(model_obj, "max_completion_tokens", 100000))
-        reasoning_effort = getattr(model_obj, "reasoning_effort", "medium")
 
         response = get_azure_response(
             messages=history,
@@ -678,12 +682,18 @@ def normal_response(chat_id: str, history: list, model_obj: Model) -> Union[Flas
             api_version=model_obj.api_version,
             model_type=model_obj.model_type,
             requires_o1_handling=model_obj.requires_o1_handling,
-            reasoning_effort=reasoning_effort if is_o_series else "default",
+            reasoning_effort="medium" if is_o_series else "default",
             stream=False,
         )
 
-        # Get content from the OpenAI response object
-        content = response.choices[0].message.content if response.choices else None
+        # Type-safe response handling
+        content = None
+        if hasattr(response, 'choices') and response.choices:
+            choice = response.choices[0]
+            if hasattr(choice, 'message'):
+                content = choice.message.content
+            elif isinstance(choice, dict):
+                content = choice.get('message', {}).get('content')
 
         if not content:
             raise ValueError("No content in API response")
@@ -696,21 +706,19 @@ def normal_response(chat_id: str, history: list, model_obj: Model) -> Union[Flas
             requires_o1_handling=model_obj.requires_o1_handling,
         )
 
-        return jsonify(
-            {
-                "success": True,
-                "message": {
-                    "role": "assistant",
-                    "content": content,
-                    "id": str(uuid.uuid4()),
-                },
-            }
-        )
+        return jsonify({
+            "success": True,
+            "message": {
+                "role": "assistant",
+                "content": content,
+                "id": str(uuid.uuid4()),
+            },
+        })
 
     except Exception as e:
         logger.error("Normal response error: %s", str(e), exc_info=True)
         return jsonify({"error": str(e)}), 500
-
+    
 ##############################################################################
 # 4) Stats & Utility Routes
 ##############################################################################
@@ -746,7 +754,11 @@ def log_client_error() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 @login_required
 def get_chat_stats(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """
-    Get chat statistics: total tokens, breakdown, model limits, etc.
+    Get comprehensive chat statistics including:
+    - Total tokens and breakdown by role
+    - Message counts and averages
+    - Model limits and usage percentages
+    - Largest message information
     """
     if not Chat.can_access_chat(chat_id, current_user.id, current_user.role):
         return jsonify({"error": "Unauthorized"}), 403
@@ -756,17 +768,31 @@ def get_chat_stats(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, in
         if not model_obj:
             return jsonify({"error": "Model not found"}), 404
 
+        # Get detailed stats from conversation manager
         stats = conversation_manager.get_usage_stats(chat_id)
-        return jsonify(
-            {
-                "success": True,
-                "stats": {
-                    "total_tokens": stats.get("total_tokens", 0),
-                    "token_breakdown": stats.get("token_breakdown", {}),
-                    "model_limits": {"max_tokens": model_obj.max_tokens},
+        
+        return jsonify({
+            "success": True,
+            "stats": {
+                "total_tokens": stats["total_tokens"],
+                "token_breakdown": stats["token_breakdown"],
+                "total_messages": stats["total_messages"],
+                "message_counts": {
+                    "user": stats["user_messages"],
+                    "assistant": stats["assistant_messages"],
+                    "system": stats["system_messages"]
                 },
+                "average_tokens_per_message": stats["average_tokens_per_message"],
+                "largest_message": stats["largest_message"],
+                "model_limits": {
+                    "max_tokens": model_obj.max_tokens,
+                    "max_completion_tokens": model_obj.max_completion_tokens,
+                    "tokens_left": stats["model_limits"]["tokens_left"],
+                    "tokens_used_percentage": stats["model_limits"]["tokens_used_percentage"]
+                }
             }
-        )
+        })
+
     except Exception as e:
         logger.error("Error getting chat stats: %s", str(e), exc_info=True)
         return jsonify({"error": str(e)}), 500

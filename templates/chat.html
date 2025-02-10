@@ -236,27 +236,62 @@ document.addEventListener('app:ready', () => {
 <div id="token-usage"
     class="fixed bottom-[120px] left-0 right-0 z-[2000] px-4 sm:px-6 py-2 bg-white/90 dark:bg-gray-800/90 border-t border-gray-200/50 dark:border-gray-700/50 text-sm text-gray-600 dark:text-gray-300">
     <div class="flex flex-col space-y-1">
-        <div class="flex items-center justify-between">
-            <span>
+        <div class="flex items-center justify-between mb-1">
+            <div class="flex items-center space-x-2">
                 <span id="tokens-used">0</span>
                 <span id="tokens-limit" class="ml-1">/ 0 max</span>
-            </span>
+                <span id="tokens-left" class="text-xs text-gray-500 dark:text-gray-400">(0 remaining)</span>
+            </div>
             <div class="flex items-center space-x-2">
                 <span id="token-percentage" class="text-xs">0%</span>
                 <button id="toggle-stats-btn"
                     class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
                     title="Toggle token usage statistics">
-                    <i class="fas fa-chart-bar"></i>
+                    <i class="fas fa-chart-pie"></i>
                 </button>
             </div>
         </div>
-        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
             <div id="token-progress" class="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
                 style="width: 0%">
             </div>
         </div>
         <div id="token-breakdown"
-            class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1 space-x-4">
+            class="flex flex-col text-xs text-gray-500 dark:text-gray-400 mt-2 space-y-2 bg-gray-50 dark:bg-gray-700/50 p-2 rounded-lg">
+            <div class="flex justify-between items-center">
+                <span class="font-medium text-gray-700 dark:text-gray-300">Token Distribution</span>
+                <span id="avg-tokens" class="text-xs">Avg: 0 per message</span>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="flex flex-col">
+                    <div class="flex items-center space-x-1">
+                        <i class="fas fa-user text-xs text-blue-500"></i>
+                        <span class="font-medium">User</span>
+                    </div>
+                    <span id="user-tokens" class="mt-1">0</span>
+                </div>
+                <div class="flex flex-col">
+                    <div class="flex items-center space-x-1">
+                        <i class="fas fa-robot text-xs text-green-500"></i>
+                        <span class="font-medium">Assistant</span>
+                    </div>
+                    <span id="assistant-tokens" class="mt-1">0</span>
+                </div>
+                <div class="flex flex-col">
+                    <div class="flex items-center space-x-1">
+                        <i class="fas fa-cog text-xs text-purple-500"></i>
+                        <span class="font-medium">System</span>
+                    </div>
+                    <span id="system-tokens" class="mt-1">0</span>
+                </div>
+            </div>
+            <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                <span id="message-count" class="text-xs">Messages: 0</span>
+                <span id="largest-message" class="text-xs">Largest: 0 tokens</span>
+            </div>
+        </div>
+    </div>
+</div>
             <span>User: <span id="user-tokens">0</span></span>
             <span>Assistant: <span id="assistant-tokens">0</span></span>
             <span>System: <span id="system-tokens">0</span></span>

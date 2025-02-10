@@ -139,6 +139,7 @@
                     const limit = stats.model_limits?.max_tokens || 0;
                     const used = stats.total_tokens || 0;
                     const percentage = limit > 0 ? (used / limit) * 100 : 0;
+                    const tokensLeft = limit - used;
 
                     // Update progress bar
                     if (this.elements.progress) {
@@ -146,6 +147,7 @@
                         this.elements.progress.style.width = width;
                         this.elements.progress.setAttribute('aria-valuenow', percentage);
                         this.updateProgressColor(percentage);
+                        this.elements.progress.style.height = '0.5rem';  // Match new height
                     }
 
                     // Update token counts
@@ -157,22 +159,32 @@
                         this.elements.tokensLimit.textContent = `/ ${limit.toLocaleString()} max`;
                     }
 
-                    // Update breakdown
-                    if (this.elements.breakdown) {
-                        this.elements.breakdown.innerHTML = `
-                            <span class="flex items-center">
-                                <i class="fas fa-user text-xs mr-1"></i>
-                                <span id="user-tokens">${(breakdown.user || 0).toLocaleString()}</span>
-                            </span>
-                            <span class="flex items-center">
-                                <i class="fas fa-robot text-xs mr-1"></i>
-                                <span id="assistant-tokens">${(breakdown.assistant || 0).toLocaleString()}</span>
-                            </span>
-                            <span class="flex items-center">
-                                <i class="fas fa-cog text-xs mr-1"></i>
-                                <span id="system-tokens">${(breakdown.system || 0).toLocaleString()}</span>
-                            </span>
-                        `;
+                    // Update tokens left
+                    if (this.elements.tokensLeft) {
+                        this.elements.tokensLeft.textContent = `(${tokensLeft.toLocaleString()} remaining)`;
+                    }
+
+                    // Update token breakdown
+                    if (this.elements.userTokens) {
+                        this.elements.userTokens.textContent = (breakdown.user || 0).toLocaleString();
+                    }
+                    if (this.elements.assistantTokens) {
+                        this.elements.assistantTokens.textContent = (breakdown.assistant || 0).toLocaleString();
+                    }
+                    if (this.elements.systemTokens) {
+                        this.elements.systemTokens.textContent = (breakdown.system || 0).toLocaleString();
+                    }
+
+                    // Update additional stats
+                    if (this.elements.avgTokens) {
+                        const avgTokens = Math.round(used / (stats.total_messages || 1));
+                        this.elements.avgTokens.textContent = `Avg: ${avgTokens.toLocaleString()} per message`;
+                    }
+                    if (this.elements.messageCount) {
+                        this.elements.messageCount.textContent = `Messages: ${stats.total_messages.toLocaleString()}`;
+                    }
+                    if (this.elements.largestMessage && stats.largest_message) {
+                        this.elements.largestMessage.textContent = `Largest: ${stats.largest_message.tokens.toLocaleString()} tokens`;
                     }
 
                     console.log('TokenUsageManager: Stats updated successfully');
@@ -187,9 +199,9 @@
                     this.elements.progress.classList.remove('bg-blue-600', 'bg-yellow-600', 'bg-red-600');
 
                     if (percentage > 90) {
-                        this.elements.progress.classList.add('bg-red-600');
+                        this.elements.progress.classList.add('bg-red-500');
                     } else if (percentage > 75) {
-                        this.elements.progress.classList.add('bg-yellow-600');
+                        this.elements.progress.classList.add('bg-yellow-500');
                     } else {
                         this.elements.progress.classList.add('bg-blue-600');
                     }
