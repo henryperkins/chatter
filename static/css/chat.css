@@ -182,9 +182,10 @@
 /* Responsive adjustments */
 @media (max-width: 640px) {
     #chat-box {
-        padding-bottom: 140px !important;
+        padding-bottom: 120px !important; /* Less bottom space on small screens */
         padding-top: 1rem;
-        max-height: calc(100vh - 140px);
+        max-height: calc(100vh - 120px);
+        overscroll-behavior: contain; /* Prevent scroll chaining for better experience */
     }
 
     #file-list {

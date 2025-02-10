@@ -155,7 +155,9 @@
 </template>
 <div
  id="chat-container"
-    class="relative flex flex-col w-full h-full overflow-hidden touch-manipulation bg-gradient-to-b from-gray-50/95 to-white/95 dark:from-gray-900/95 dark:to-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-[140px] md:mt-[180px]">
+    class="relative flex flex-col w-full h-full overflow-hidden touch-manipulation bg-gradient-to-b from-gray-50/95 to-white/95 dark:from-gray-900/95 dark:to-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-[100px] sm:mt-[140px] md:mt-[180px]"
+    style="min-height: -webkit-fill-available; /* Use available screen height on mobile */ 
+           min-height: 100vh;">
     <!-- Chat Configuration -->
     <div id="chat-config" data-chat-id="{{ chat_id }}" data-csrf-token="{{ csrf_token() }}"
         data-models='{{ models|tojson|safe }}'
