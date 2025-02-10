@@ -100,7 +100,7 @@
  id="chat-container"
     class="relative flex flex-col w-full h-full overflow-hidden touch-manipulation bg-white/95 dark:bg-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm mx-2 sm:mx-0 mt-[120px] md:mt-[160px]">
     <!-- Chat Configuration -->
-    <div id="chat-config" data-chat-id="{{ chat_id if chat_id else '' }}" data-csrf-token="{{ csrf_token() }}"
+    <div id="chat-config" data-chat-id="{{ chat_id if chat_id else 'fallback-chat-id' }}" data-csrf-token="{{ csrf_token() }}"
         data-models='{{ models|tojson|safe }}'
         data-current-model='{{ current_model|tojson|safe if current_model else "null" }}'
         data-user-id="{{ current_user.id }}" class="hidden" data-debug="true"
@@ -303,6 +303,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const config = ChatConfig.getInstance();
     await config.init();
     
+    if (!window.CHAT_CONFIG?.chatId) {
+        console.warn('No valid chatId found, skipping TokenUsageManager initialization.');
+        return;
+    }
+
     // Initialize token usage manager
     if (window.TokenUsageManager) {
         window.tokenUsageManager = new TokenUsageManager(window.CHAT_CONFIG);
