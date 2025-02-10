@@ -310,3 +310,6 @@ class Config:
     def validate_model_config(config: dict) -> None:
         """Validate model configuration."""
         validate_model_config(config)
+        
+# Finally, create a single global instance you can import in other modules.
+config_instance = Config()
