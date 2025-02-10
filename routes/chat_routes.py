@@ -622,6 +622,8 @@ def handle_chat_stream() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
 def stream_response(chat_id: str, history: List[Dict[str, Any]], model_obj: Model) -> FlaskResponse:
     """Handle streaming responses using AzureOpenAI."""
+    logger.debug("Starting stream_response with model_id=%d, model_type=%s", model_obj.id, model_obj.model_type)
+
     def generate() -> Generator[str, None, None]:
         try:
             client = AzureOpenAI(
@@ -645,6 +647,7 @@ def stream_response(chat_id: str, history: List[Dict[str, Any]], model_obj: Mode
                 completion_params["temperature"] = model_obj.temperature
 
             response = client.chat.completions.create(**completion_params)
+            logger.debug("Streaming response initiated, returning SSE chunks")
 
             for chunk in response:
                 if hasattr(chunk, 'choices') and chunk.choices:
@@ -676,6 +679,8 @@ def normal_response(
     try:
         if not model_obj:
             return make_response(jsonify({"error": "No model configured"}), 400)
+
+        logger.debug("Starting normal_response with model_id=%d, model_type=%s", model_obj.id, model_obj.model_type)
 
         # Determine if this is an o-series model
         model_type = model_obj.model_type or ""
@@ -717,6 +722,7 @@ def normal_response(
                 api_params["reasoning_effort"] = "medium"
 
         response = get_azure_response(**api_params)
+        logger.debug("Raw model response object: %s", response)
 
         # Extract content with fallback messages
         content: Optional[str] = None
@@ -736,6 +742,8 @@ def normal_response(
                 content = "[No response generated. The model may need more context or a different prompt format.]"
             else:
                 content = "[No response from model. Please try again or contact support if this persists.]"
+
+        logger.info("Normal response content length: %d", len(content) if content else 0)
 
         conversation_manager.add_message(
             chat_id=chat_id,
