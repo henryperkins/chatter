@@ -31,7 +31,7 @@
                 // DOM elements (fallback to ID-based references if not passed)
                 this.uploadButton = uploadButton || document.getElementById('file-upload');
                 this.dropZone = document.getElementById('drop-zone');
-                this.fileInput = document.getElementById('file-input');
+                this.fileInput = document.getElementById('file-upload');
                 this.mobileUploadMenu = document.getElementById('mobile-upload-controls');
                 this.uploadedFilesDiv = document.getElementById('uploaded-files');
 
@@ -193,7 +193,7 @@
             }
 
             setupMobileUploadMenu() {
-                const mobileMenu = document.getElementById('mobile-upload-menu');
+                const mobileMenu = this.mobileUploadMenu;
                 if (!mobileMenu) return;
                 const cameraBtn = mobileMenu.querySelector('[onclick*="camera"]');
                 if (cameraBtn) {

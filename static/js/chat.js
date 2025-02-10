@@ -311,7 +311,7 @@
             // Add files if present
             if (hasFiles) {
                 window.fileUploadManager.uploadedFiles.forEach(file => {
-                    formData.append('files', file);
+                    formData.append('files[]', file);
                 });
             }
 
@@ -434,6 +434,84 @@
                 messageInput.addEventListener('keydown', debouncedKeydown);
                 sendButton.addEventListener('click', sendMessage);
             }
+
+            // Wire up Delete Chat Buttons
+            document.querySelectorAll('button[aria-label="Delete chat"]').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const chatId = btn.getAttribute('data-chat-id');
+                    if (!chatId) return;
+                    if (!confirm("Are you sure you want to delete this chat?")) return;
+                    try {
+                        const response = await fetch(`/chat/delete_chat/${chatId}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+                            }
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            window.showAlert("Chat deleted", "success");
+                            window.location.href = "/chat/interface";
+                        } else {
+                            window.showAlert(data.error, "error");
+                        }
+                    } catch (err) {
+                        window.showAlert("Delete failed", "error");
+                    }
+                });
+            });
+
+            // Wire up Edit Title Button
+            const editTitleBtn = document.getElementById('edit-title-btn');
+            if (editTitleBtn) {
+                editTitleBtn.addEventListener('click', async () => {
+                    const newTitle = prompt("Enter new chat title:");
+                    if (!newTitle || newTitle.trim() === "") return;
+                    try {
+                        const response = await fetch(`/chat/update_chat_title/${window.CHAT_CONFIG.chatId}`, {
+                            method: "POST",
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+                            },
+                            body: JSON.stringify({ title: newTitle.trim() })
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                            window.showAlert("Chat title updated", "success");
+                            location.reload();
+                        } else {
+                            window.showAlert(data.error, "error");
+                        }
+                    } catch (error) {
+                        window.showAlert("Failed to update chat title", "error");
+                    }
+                });
+            }
+
+            // Wire up Copy Buttons on Assistant Messages
+            document.querySelectorAll('.copy-button').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const rawContent = btn.getAttribute('data-raw-content');
+                    if (rawContent) {
+                        window.utils.copyToClipboard(rawContent);
+                    }
+                });
+            });
+
+            // Wire up Regenerate Buttons on Assistant Messages
+            document.querySelectorAll('.regenerate-button').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (confirm("Do you want to regenerate the assistant response?")) {
+                        window.showAlert("Regeneration triggered (feature not fully implemented yet)", "info");
+                    }
+                });
+            });
+
         } catch (error) {
             window.monitoring?.logError('Failed to initialize chat:', error);
             showError(error.message);
