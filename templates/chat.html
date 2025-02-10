@@ -56,7 +56,7 @@
                 <option value="{{ model.id }}"
                     data-requires-o1-handling="{{ 'true' if model.requires_o1_handling else 'false' }}"
                     data-supports-streaming="{{ 'true' if model.supports_streaming else 'false' }}"
-                    data-max-completion-tokens="{{ model.max_completion_tokens if model.max_completion_tokens is not none else 0 }}" {% if current_model and model.id == current_model.id %}selected{% endif %}>
+                    data-max-completion-tokens="{{ model.max_completion_tokens|default(0, true) }}" {% if current_model and model.id == current_model.id %}selected{% endif %}>
                     {{ model.name }}{% if model.is_default %} (Default){% endif %}
                 </option>
                 {% endfor %}
