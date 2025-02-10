@@ -22,6 +22,7 @@
                 this.updateInterval = null;
                 this.retryCount = 0;
                 this.initialized = false;
+                this.tokenCount = 0; // Initialize token count
 
                 // Set up element references
                 this.elements = this.initializeElements();
@@ -30,6 +31,15 @@
                 window.TokenUsageManager.instance = this;
 
                 console.log('TokenUsageManager: New instance initialized with chatId:', this.chatId);
+            }
+
+            updateTokenCount(count) {
+                if (!this.elements.tokenCounter) {
+                    console.error('TokenUsageManager: tokenCounter element not found');
+                    return;
+                }
+                this.tokenCount = count;
+                this.elements.tokenCounter.textContent = this.tokenCount;
             }
 
             initializeElements() {

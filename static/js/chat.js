@@ -27,22 +27,27 @@
         }
     }
 
-    function showError(message) {
+    function showError(message, file = null) {
         if (message.includes('Authentication Error')) {
             message = message.replace('Authentication Error:', '🔑 Authentication Error:');
         }
 
+        let errorMessage = message;
+        if (file) {
+            errorMessage = `[${file.name}] ${message} (${(file.size / 1024 / 1024).toFixed(2)}MB)`;
+        }
+
         if (window.showAlert) {
-            window.showAlert(message, 'error', 10000);
+            window.showAlert(errorMessage, 'error', 10000);
         } else {
             const errorDiv = document.createElement('div');
             errorDiv.className = 'pointer-events-auto fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-100 dark:bg-red-900/50 text-red-900 dark:text-red-100 px-6 py-4 rounded-lg shadow-xl border-2 border-red-500/50 z-[2200] max-w-[90%] sm:max-w-lg';
             errorDiv.innerHTML = `
-                <div class="flex items-center gap-3">
-                    <i class="fas fa-exclamation-circle text-lg"></i>
-                    <p class="text-sm font-medium flex-1">${message}</p>
-                    <button onclick="this.parentElement.parentElement.remove()" class="hover:opacity-80 transition-opacity">
-                        <i class="fas fa-times"></i>
+                <div class='flex items-center gap-3'>
+                    <i class='fas fa-exclamation-circle text-lg'></i>
+                    <p class='text-sm font-medium flex-1'>${errorMessage}</p>
+                    <button onclick='this.parentElement.parentElement.remove()' class='hover:opacity-80 transition-opacity'>
+                        <i class='fas fa-times'></i>
                     </button>
                 </div>
             `;
@@ -55,15 +60,34 @@
         }
     }
 
-    async function appendAssistantMessage(message, isStreaming = false, existingDiv = null) {
-        if (!message) return;
-        logDebug('Appending assistant message:', message);
+    function appendUserMessage(message, files = []) {
+        if (!message || typeof message !== 'string') {
+            window.monitoring?.logError('Invalid user message content.');
+            return;
+        }
+
         const chatBox = document.getElementById('chat-box');
         if (!chatBox) {
             window.monitoring?.logError('Chat box not found');
             return;
         }
 
+        const messageDiv = window.MessageRenderer.renderUserMessage(message, files);
+        chatBox.appendChild(messageDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function appendAssistantMessage(message, isStreaming = false, existingDiv = null, files = []) {
+        if (!message) return;
+        logDebug('Appending assistant message:', message);
+
+        const chatBox = document.getElementById('chat-box');
+        if (!chatBox) {
+            window.monitoring?.logError('Chat box not found');
+            return;
+        }
+
+        // Wait for dependencies
         let attempts = 0;
         while ((!window.md || !window.DOMPurify) && attempts < CONFIG.MAX_DEPENDENCY_ATTEMPTS) {
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -73,86 +97,31 @@
         if (!window.md || !window.DOMPurify) {
             window.monitoring?.logError('Required dependencies not available.');
             const errorDiv = document.createElement('div');
-            errorDiv.innerHTML = '<p class="text-red-500">Error: Required dependencies not available. Please refresh the page.</p>';
+            errorDiv.innerHTML = '<p class=\'text-red-500\'>Error: Required dependencies not available. Please refresh the page.</p>';
             chatBox.insertBefore(errorDiv, chatBox.firstChild);
             return;
         }
 
         try {
-            const renderedHtml = typeof message === 'string' ? window.md.render(message) : message.content;
-            const DOMPurifyOptions = {
-                ALLOWED_TAGS: [
-                    'p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote',
-                    'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'br',
-                    'table', 'thead', 'tbody', 'tr', 'th', 'td', 'del', 'input'
-                ],
-                ALLOWED_ATTRS: {
-                    'a': ['href', 'title', 'target', 'rel', 'class'],
-                    'span': ['class'],
-                    'code': ['class'],
-                    'pre': ['class'],
-                    'div': ['class', 'style'],
-                    'table': ['class'],
-                    'th': ['class'],
-                    'td': ['class'],
-                    'input': ['type', 'checked', 'disabled'],
-                    'li': ['class']
-                },
-                ADD_ATTR: ['target'],
-                FORCE_BODY: true
-            };
-
-            const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, DOMPurifyOptions);
+            const textContent = (typeof message === 'string') ? message : message.content;
             let messageDiv;
 
             if (!existingDiv) {
-                messageDiv = document.createElement('div');
-                messageDiv.className = 'flex w-full mt-4 space-x-3 max-w-[90%] sm:max-w-xl md:max-w-2xl lg:max-w-3xl animate-slide-up';
+                messageDiv = window.MessageRenderer.renderAssistantMessage(textContent, isStreaming);
+                chatBox.appendChild(messageDiv);
             } else {
                 messageDiv = existingDiv;
+                window.MessageRenderer.finalizeAssistantMessage(messageDiv, textContent);
             }
 
-            messageDiv.innerHTML = `
-                <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-soft" role="img" aria-label="Assistant avatar">
-                    <i class="fas fa-robot text-sm"></i>
-                </div>
-                <div class="relative flex-1">
-                    <div class="absolute right-2 top-2 flex items-center space-x-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <button class="copy-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft" title="Copy to clipboard" aria-label="Copy message to clipboard" data-raw-content="${message.content ? message.content.replace(/"/g, '&quot;') : ''}">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                        ${!isStreaming
-                            ? `<button class="regenerate-button p-1.5 rounded-md bg-white/90 dark:bg-gray-800/90 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-all duration-200 shadow-soft" title="Regenerate response" aria-label="Regenerate response">
-                                <i class="fas fa-redo-alt"></i>
-                               </button>`
-                            : ''}
-                    </div>
-                    <div class="bg-gray-100/95 dark:bg-gray-800/95 p-5 rounded-r-lg rounded-bl-lg shadow-soft border border-gray-200/50 dark:border-gray-700/50">
-                        <div class="prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none overflow-x-auto" data-role="assistant-message">
-                            ${sanitizedHtml}
-                        </div>
-                    </div>
-                    <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1">
-                        ${new Date().toLocaleTimeString()}
-                    </span>
-                </div>
-            `;
-
-            if (!existingDiv) {
-                chatBox.appendChild(messageDiv);
-            }
-
-            if (window.Prism) {
-                window.Prism.highlightAllUnder(messageDiv.querySelector('[data-role="assistant-message"]'));
-            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return messageDiv;
         } catch (error) {
             window.monitoring?.logError('Error appending assistant message:', error);
             const errorDiv = document.createElement('div');
-            errorDiv.innerHTML = `<p class="text-red-500">Error creating message: ${error.message}</p>`;
+            errorDiv.innerHTML = `<p class='text-red-500'>Error creating message: ${error.message}</p>`;
             chatBox.appendChild(errorDiv);
         }
-
-        chatBox.scrollTop = chatBox.scrollHeight;
     }
 
     async function handleStreamingResponse(formData) {
@@ -161,36 +130,21 @@
         let buffer = '';
 
         try {
-            // Get message and files from FormData
             const message = formData.get('message');
-            const files = formData.getAll('files');
+            const files = formData.getAll('files[]') || [];
             const hasMessage = message && message.trim().length > 0;
             const hasFiles = files && files.length > 0;
 
-            // Validate that we have either a message or files
             if (!hasMessage && !hasFiles) {
-                throw new Error('Please provide a message or upload files');
+                throw new Error('Please provide a message or upload files.');
             }
 
-            // Convert FormData to JSON while preserving structure
             const jsonData = {
                 message: message || '',
-                files: files || [],
+                files: [],
                 chat_id: window.CHAT_CONFIG.chatId,
                 stream: true
             };
-
-
-            logDebug('Sending chat request:', {
-                url: '/chat/send',
-                method: 'POST',
-                headers: {
-                    'X-Chat-ID': window.CHAT_CONFIG.chatId,
-                    'Content-Type': 'application/json',
-                    'Accept': 'text/event-stream'
-                },
-                body: jsonData
-            });
 
             const response = await fetch('/chat/send', {
                 method: 'POST',
@@ -213,12 +167,6 @@
                 } catch {
                     errorMessage = `Server error: ${response.status}`;
                 }
-                window.monitoring?.logError('Server error response:', {
-                    status: response.status,
-                    statusText: response.statusText,
-                    headers: Object.fromEntries([...response.headers]),
-                    body: text
-                });
                 throw new Error(errorMessage);
             }
 
@@ -226,15 +174,34 @@
             const decoder = new TextDecoder();
 
             let streamComplete = false;
+            let updateQueue = [];
+            let updateScheduled = false;
+            
+            const processUpdate = () => {
+                if (updateQueue.length > 0) {
+                    const latestContent = updateQueue[updateQueue.length - 1];
+                    accumulatedContent = latestContent;
+                    
+                    if (!messageDiv) {
+                        messageDiv = window.MessageRenderer.renderAssistantMessage(latestContent, true);
+                        document.getElementById('chat-box').appendChild(messageDiv);
+                    } else {
+                        const contentContainer = messageDiv.querySelector('[data-role="assistant-message"]');
+                        if (contentContainer) {
+                            contentContainer.textContent = latestContent;
+                        }
+                    }
+                    
+                    updateQueue = [];
+                    updateScheduled = false;
+                }
+            };
+
             while (!streamComplete) {
                 const { done, value } = await reader.read();
                 if (done) {
                     streamComplete = true;
                     continue;
-                }
-
-                if (window.monitoring) {
-                    window.monitoring.mark('chunkReceived');
                 }
 
                 buffer += decoder.decode(value, { stream: true });
@@ -248,34 +215,54 @@
                     try {
                         const data = JSON.parse(match[1]);
                         if (data.error) throw new Error(data.error);
-
+                        
                         if (data.content) {
                             accumulatedContent += data.content;
-                            if (!messageDiv) {
-                                messageDiv = document.createElement('div');
-                                document.getElementById('chat-box').appendChild(messageDiv);
+                            updateQueue.push(accumulatedContent);
+                            
+                            if (!updateScheduled) {
+                                updateScheduled = true;
+                                requestAnimationFrame(processUpdate);
                             }
-                            await appendAssistantMessage({ content: accumulatedContent }, true, messageDiv);
                         }
-                    } catch (error) {
-                        throw new Error(`Stream parsing error: ${error.message}`);
+                    } catch (err) {
+                        throw new Error(`Stream parsing error: ${err.message}`);
                     }
                 }
 
-                const chatBox = document.getElementById('chat-box');
-                chatBox.scrollTop = chatBox.scrollHeight;
+                // Debounce scroll updates
+                if (!streamComplete) {
+                    const chatBox = document.getElementById('chat-box');
+                    const scrollPos = chatBox.scrollTop;
+                    const isNearBottom = chatBox.scrollHeight - chatBox.clientHeight - scrollPos < 100;
+                    
+                    if (isNearBottom) {
+                        cancelAnimationFrame(scrollFrame);
+                        const scrollFrame = requestAnimationFrame(() => {
+                            chatBox.scrollTop = chatBox.scrollHeight;
+                        });
+                    }
+                }
+            }
+            
+            // Final render with Markdown and syntax highlighting
+            if (messageDiv) {
+                window.MessageRenderer.finalizeAssistantMessage(messageDiv, accumulatedContent);
             }
 
             if (window.monitoring) {
                 window.monitoring.mark('streamEnd');
                 window.monitoring.measure('streamDuration', 'streamStart', 'streamEnd');
             }
+
         } catch (error) {
             if (window.monitoring) {
                 window.monitoring.logError('Streaming failed:', error);
             }
             showError(`API Error: ${error.message}`);
-            if (messageDiv) messageDiv.remove();
+            if (messageDiv) {
+                messageDiv.remove();
+            }
         }
     }
 
@@ -291,45 +278,39 @@
             showError('Chat interface not properly initialized');
             return;
         }
-
         if (sendButton.disabled) return;
+
         sendButton.disabled = true;
 
         try {
             const message = messageInput.value.trim();
             const hasFiles = window.fileUploadManager?.uploadedFiles?.length > 0;
+            let uploadedFiles = [];
 
-            // Create FormData
+            if (hasFiles) {
+                try {
+                    uploadedFiles = await window.fileUploadManager.uploadFiles();
+                } catch (uploadError) {
+                    showError('File upload failed', uploadError.file);
+                    throw uploadError;
+                }
+            }
+
             const formData = new FormData();
             formData.append('message', message);
 
-            // Add files if present
             if (hasFiles) {
                 window.fileUploadManager.uploadedFiles.forEach(file => {
                     formData.append('files[]', file);
                 });
             }
 
-            // Clear input and files
+            appendUserMessage(message, uploadedFiles);
             messageInput.value = '';
-            if (window.fileUploadManager) {
-                window.fileUploadManager.clearFiles();
-            }
+            window.fileUploadManager?.clearFiles();
 
-            // Add user message to chat
-            if (message) {
-                appendUserMessage(message);
-            }
-
-            // Show typing indicator
             showTypingIndicator();
-
-            try {
-                await handleStreamingResponse(formData);
-            } catch (error) {
-                window.monitoring?.logError('Failed to send message:', error);
-                showError('Failed to send message. Please try again.');
-            }
+            await handleStreamingResponse(formData);
 
             if (window.tokenUsageManager) {
                 await window.tokenUsageManager.handleNewMessage();
@@ -343,69 +324,63 @@
         }
     }
 
-    function appendUserMessage(message) {
-        if (!message || typeof message !== 'string') {
-            window.monitoring?.logError('Invalid message content.');
-            return;
-        }
-
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'flex w-full mt-4 space-x-3 max-w-[85%] sm:max-w-md md:max-w-2xl ml-auto justify-end animate-slide-up';
-        messageDiv.innerHTML = `
-            <div>
-                <div class="relative bg-gradient-to-r from-primary-600/95 to-secondary-600/95 text-white p-4 rounded-l-lg rounded-br-lg shadow-soft hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 border border-primary-500/10">
-                    <p class="text-[15px] leading-relaxed break-words whitespace-pre-wrap">${message}</p>
-                </div>
-                <span class="text-xs text-gray-500 block mt-1">
-                    ${new Date().toLocaleTimeString()}
-                </span>
-            </div>
-        `;
-
-        const chatBox = document.getElementById('chat-box');
-        if (chatBox) {
-            chatBox.appendChild(messageDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        } else {
-            window.monitoring?.logError('Chat box not found');
-        }
-    }
-
     async function startChat() {
         try {
-            // Get configuration data
             const configDiv = document.getElementById('chat-config');
             if (!configDiv) {
                 throw new Error('Chat configuration not found');
             }
 
-            // Initialize managers if they don't exist
-            if (!window.fileUploadManager) {
-                const uploadButton = document.getElementById('file-upload');
-                window.fileUploadManager = new FileUploadManager(
-                    configDiv.dataset.chatId,
-                    configDiv.dataset.userId,
-                    uploadButton
-                );
-            }
-            if (!window.tokenUsageManager) {
-                window.tokenUsageManager = new TokenUsageManager(window.CHAT_CONFIG);
-                await window.tokenUsageManager.initialize();
+            // Wait for MessageRenderer to be available
+            let attempts = 0;
+            while (!window.MessageRenderer && attempts < CONFIG.MAX_DEPENDENCY_ATTEMPTS) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                attempts++;
             }
 
-            // Initialize file upload functionality
+            if (!window.MessageRenderer) {
+                throw new Error('MessageRenderer not available');
+            }
+
+            try {
+                const FileUploadManagerClass = window.FileUploadManager;
+                if (!FileUploadManagerClass) {
+                    throw new Error('FileUploadManager class not loaded');
+                }
+                if (!window.fileUploadManager) {
+                    const uploadButton = document.getElementById('file-upload');
+                    window.fileUploadManager = new FileUploadManagerClass(
+                        configDiv.dataset.chatId,
+                        configDiv.dataset.userId,
+                        uploadButton
+                    );
+                }
+
+                const TokenUsageManagerClass = window.TokenUsageManager;
+                if (!TokenUsageManagerClass) {
+                    throw new Error('TokenUsageManager class not loaded');
+                }
+                if (!window.tokenUsageManager && window.CHAT_CONFIG?.chatId) {
+                    window.tokenUsageManager = new TokenUsageManagerClass(window.CHAT_CONFIG);
+                    await window.tokenUsageManager.initialize();
+                }
+            } catch (error) {
+                window.monitoring?.logError('Component init failed', error);
+                showError('Failed to initialize chat components: ' + error.message);
+                return;
+            }
+
             if (window.fileUploadManager) {
                 await window.fileUploadManager.initializeFileUpload();
             }
 
-            // Wire up model selection change to update the current chat's model immediately
             const modelSelect = document.getElementById('model-select');
             if (modelSelect) {
                 modelSelect.addEventListener('change', async () => {
                     const newModelId = modelSelect.value;
                     const chatId = window.CHAT_CONFIG.chatId;
                     try {
-                        const response = await fetch('/chat/update_model', {
+                        const resp = await fetch('/chat/update_model', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -413,26 +388,20 @@
                             },
                             body: JSON.stringify({ chat_id: chatId, model_id: newModelId })
                         });
-                        const data = await response.json();
+                        const data = await resp.json();
                         if (data.success) {
-                            window.showAlert("Chat model updated", "success");
+                            window.showAlert('Chat model updated', 'success');
                         } else {
-                            window.showAlert(data.error || "Failed to update chat model", "error");
+                            window.showAlert(data.error || 'Failed to update chat model', 'error');
                         }
                     } catch (err) {
-                        window.showAlert("Failed to update chat model", "error");
+                        window.showAlert('Failed to update chat model', 'error');
                     }
                 });
             }
 
-            const chatForm = document.getElementById('chat-form');
-            if (chatForm) {
-                // Removed form submission handling. Now only the send button triggers sending.
-            }
-
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
-
             if (messageInput && sendButton) {
                 const debounce = (func, wait) => {
                     let timeout;
@@ -457,79 +426,75 @@
                 sendButton.addEventListener('click', sendMessage);
             }
 
-            // Wire up Delete Chat Buttons
             document.querySelectorAll('button[aria-label="Delete chat"]').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
                     e.stopPropagation();
                     const chatId = btn.getAttribute('data-chat-id');
                     if (!chatId) return;
-                    if (!confirm("Are you sure you want to delete this chat?")) return;
+                    if (!confirm('Are you sure you want to delete this chat?')) return;
                     try {
-                        const response = await fetch(`/chat/delete_chat/${chatId}`, {
+                        const resp = await fetch(`/chat/delete_chat/${chatId}`, {
                             method: 'DELETE',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'X-CSRFToken': window.CHAT_CONFIG.csrfToken
                             }
                         });
-                        const data = await response.json();
+                        const data = await resp.json();
                         if (data.success) {
-                            window.showAlert("Chat deleted", "success");
-                            window.location.href = "/chat/interface";
+                            window.showAlert('Chat deleted', 'success');
+                            window.location.href = '/chat/interface';
                         } else {
-                            window.showAlert(data.error, "error");
+                            window.showAlert(data.error, 'error');
                         }
                     } catch (err) {
-                        window.showAlert("Delete failed", "error");
+                        window.showAlert('Delete failed', 'error');
                     }
                 });
             });
 
-            // Wire up Edit Title Button
             const editTitleBtn = document.getElementById('edit-title-btn');
             if (editTitleBtn) {
                 editTitleBtn.addEventListener('click', async () => {
-                    const newTitle = prompt("Enter new chat title:");
-                    if (!newTitle || newTitle.trim() === "") return;
+                    const newTitle = prompt('Enter new chat title:');
+                    if (!newTitle || newTitle.trim() === '') return;
                     try {
-                        const response = await fetch(`/chat/update_chat_title/${window.CHAT_CONFIG.chatId}`, {
-                            method: "POST",
+                        const resp = await fetch(`/chat/update_chat_title/${window.CHAT_CONFIG.chatId}`, {
+                            method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'X-CSRFToken': window.CHAT_CONFIG.csrfToken
                             },
                             body: JSON.stringify({ title: newTitle.trim() })
                         });
-                        const data = await response.json();
+                        const data = await resp.json();
                         if (data.success) {
-                            window.showAlert("Chat title updated", "success");
+                            window.showAlert('Chat title updated', 'success');
                             location.reload();
                         } else {
-                            window.showAlert(data.error, "error");
+                            window.showAlert(data.error, 'error');
                         }
-                    } catch (error) {
-                        window.showAlert("Failed to update chat title", "error");
+                    } catch (err) {
+                        window.showAlert('Failed to update chat title', 'error');
                     }
                 });
             }
 
-            // Wire up Copy Buttons on Assistant Messages
             document.querySelectorAll('.copy-button').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const rawContent = btn.getAttribute('data-raw-content');
-                    if (rawContent) {
+                    if (rawContent && window.utils?.copyToClipboard) {
                         window.utils.copyToClipboard(rawContent);
                     }
                 });
             });
 
-            // Wire up Regenerate Buttons on Assistant Messages
             document.querySelectorAll('.regenerate-button').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    if (confirm("Do you want to regenerate the assistant response?")) {
-                        window.showAlert("Regeneration triggered (feature not fully implemented yet)", "info");
+                    if (confirm('Do you want to regenerate the assistant response?')) {
+                        window.showAlert('Regeneration triggered (feature not fully implemented yet)', 'info');
                     }
                 });
             });
@@ -540,6 +505,5 @@
         }
     }
 
-    // Initialize when DOM is ready
-    document.addEventListener('app:ready', startChat);
+    window.addEventListener('load', startChat);
 })();
