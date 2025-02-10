@@ -144,7 +144,7 @@ def configure_app(app: Optional[Flask] = None) -> None:
                 else "session"
             ),
             "SESSION_COOKIE_PATH": "/",
-            "SESSION_COOKIE_DOMAIN": None,
+            "SESSION_COOKIE_DOMAIN": "localhost",
             "SESSION_COOKIE_MAX_AGE": 3600,
             "SESSION_PROTECTION": "strong",
             "REMEMBER_COOKIE_SECURE": True,
