@@ -9,7 +9,7 @@ class MessageRenderer {
     };
 
     static initialize() {
-        // Cache templates
+        // Cache templates from the DOM
         this.templates.assistant = document.getElementById('assistant-message-template');
         this.templates.user = document.getElementById('user-message-template');
         this.templates.attachment = document.getElementById('attachment-template');
@@ -28,10 +28,16 @@ class MessageRenderer {
         const regenerateButton = clone.querySelector('.regenerate-button');
         const copyButton = clone.querySelector('.copy-button');
 
-        // Set content
+        // Set content (plaintext by default—will be replaced in finalize)
         messageDiv.textContent = content;
+
+        // Show a timestamp
         timestamp.textContent = new Date().toLocaleTimeString();
-        copyButton.setAttribute('data-raw-content', content);
+
+        // If there's a copy button, store raw text. 
+        if (copyButton) {
+            copyButton.setAttribute('data-raw-content', content);
+        }
 
         // Hide regenerate button during streaming
         if (isStreaming && regenerateButton) {
@@ -47,11 +53,11 @@ class MessageRenderer {
         const messageText = clone.querySelector('p');
         const timestamp = clone.querySelector('span.text-xs');
 
-        // Set content
+        // Assign user content
         messageText.textContent = content;
         timestamp.textContent = new Date().toLocaleTimeString();
 
-        // Add attachments if present
+        // If user included attachments, render them
         if (files && files.length > 0) {
             const attachments = this.renderAttachments(files);
             messageText.parentNode.appendChild(attachments);
@@ -65,23 +71,25 @@ class MessageRenderer {
         const clone = template.content.cloneNode(true);
         const attachmentList = clone.querySelector('.attachment-list');
 
+        // For each file, clone the attachment-item template
         files.forEach(file => {
             const itemTemplate = this.templates.attachmentItem;
-            const itemClone = itemTemplate.content.cloneNode(true);
-            
-            const nameSpan = itemClone.querySelector('.attachment-name');
-            nameSpan.textContent = file.name;
+            if (!itemTemplate) return; // fallback if template is missing
 
+            const itemClone = itemTemplate.content.cloneNode(true);
+            const nameSpan = itemClone.querySelector('.attachment-name');
             const link = itemClone.querySelector('.attachment-link');
+
+            // File info
+            nameSpan.textContent = file.name;
             if (file.url) {
                 link.href = file.url;
             } else {
-                link.remove();
+                link.remove(); // if no URL, remove the link entirely
             }
 
             attachmentList.appendChild(itemClone);
         });
-window.MessageRenderer = MessageRenderer;
 
         return clone;
     }
@@ -92,47 +100,53 @@ window.MessageRenderer = MessageRenderer;
         const container = messageDiv.querySelector('[data-role="assistant-message"]');
         if (!container) return;
 
-        // Render markdown and sanitize
-        const renderedHtml = window.md.render(content);
-        const sanitizedHtml = window.DOMPurify.sanitize(renderedHtml, {
-            ALLOWED_TAGS: [
-                'p', 'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre', 'blockquote',
-                'a', 'span', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'br',
-                'table', 'thead', 'tbody', 'tr', 'th', 'td', 'del', 'input'
-            ],
-            ALLOWED_ATTRS: {
-                a: ['href', 'title', 'target', 'rel', 'class'],
-                span: ['class'],
-                code: ['class'],
-                pre: ['class'],
-                div: ['class', 'style'],
-                table: ['class'],
-                th: ['class'],
-                td: ['class'],
-                input: ['type', 'checked', 'disabled'],
-                li: ['class']
-            },
-            ADD_ATTR: ['target'],
-            FORCE_BODY: true
-        });
+        // Render markdown
+        const renderedHtml = window.md ? window.md.render(content) : content;
+        // Sanitize with DOMPurify
+        const sanitizedHtml = window.DOMPurify
+          ? window.DOMPurify.sanitize(renderedHtml, {
+                ALLOWED_TAGS: [
+                    'p','strong','em','ul','ol','li','code','pre','blockquote','a','span','div',
+                    'h1','h2','h3','h4','h5','h6','hr','br','table','thead','tbody','tr','th','td',
+                    'del','input'
+                ],
+                ALLOWED_ATTRS: {
+                    a: ['href', 'title', 'target', 'rel', 'class'],
+                    span: ['class'],
+                    code: ['class'],
+                    pre: ['class'],
+                    div: ['class', 'style'],
+                    table: ['class'],
+                    th: ['class'],
+                    td: ['class'],
+                    input: ['type', 'checked', 'disabled'],
+                    li: ['class']
+                },
+                ADD_ATTR: ['target'],
+                FORCE_BODY: true
+            })
+          : renderedHtml; // fallback if no DOMPurify
 
+        // Insert sanitized HTML
         container.innerHTML = sanitizedHtml;
 
-        // Update raw content for copy button
+        // Update the copy button’s data-raw-content
         const copyButton = messageDiv.querySelector('.copy-button');
         if (copyButton) {
             copyButton.setAttribute('data-raw-content', content);
         }
 
-        // Apply syntax highlighting
+        // Syntax highlighting
         if (window.Prism) {
             window.Prism.highlightAllUnder(container);
         }
     }
 }
+
+// Make the renderer globally accessible if you want:
 window.MessageRenderer = MessageRenderer;
 
-// Initialize on page load
+// Initialize on DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
     try {
         MessageRenderer.initialize();

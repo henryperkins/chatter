@@ -53,7 +53,7 @@
     display: flex;
     flex-direction: column;
     width: 100%;
-    max-width: 1600px;
+    max-width: 1400px; /* changed from 1600px */
     margin: 0 auto;
     height: 100%;
     min-height: calc(100vh - 200px);
@@ -71,8 +71,7 @@
     z-index: 10;
 }
 
-/* Chat input area */
-/* Chat input is now handled by Tailwind classes in the HTML */
+/* Chat input area: Tailwind classes in the HTML */
 
 /* Token panel positioning */
 .token-panel-container {
@@ -81,8 +80,9 @@
     right: 2rem;
     left: 2rem;
     z-index: 40;
-    max-width: 400px;
+    max-width: 600px; /* changed from 400px */
     margin-left: auto;
+    margin-right: auto;
 }
 
 /* Chat input container */
@@ -92,7 +92,7 @@
     left: 50%;
     transform: translateX(-50%);
     width: 100%;
-    max-width: 1200px;
+    max-width: 800px; /* changed from 1200px */
     z-index: 50;
     padding: 0 2rem;
     background: inherit;
@@ -127,13 +127,34 @@
     backdrop-filter: blur(8px);
 }
 
-/* Responsive adjustments */
-/* Removed manual media query styles in favor of Tailwind’s responsive classes. 
-   For small-screen behavior, use sm: or @screen sm {...} utilities directly in HTML or input.css. */
+/* Responsive adjustments removed in favor of Tailwind classes */
 
 /* Dark mode transitions */
 .dark-mode-transition * {
     transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 300ms;
+}
+
+/* Additional mobile overrides */
+@media (max-width: 640px) {
+    /* Ensure the container expands for small screens + extra space for input */
+    #chat-container {
+        min-height: 100vh;
+        padding-bottom: 96px;
+    }
+    .token-panel-container {
+        bottom: 120px;
+        left: 1rem;
+        right: 1rem;
+        max-width: none;
+    }
+    .chat-input-container {
+        bottom: 0;
+        left: 0;
+        transform: none;
+        width: 100%;
+        max-width: none;
+        padding: 1rem;
+    }
 }

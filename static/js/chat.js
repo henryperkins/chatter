@@ -1,68 +1,74 @@
 (() => {
     'use strict';
-// Mobile support adaptations from mobilesupport.md
-// 1. Visual viewport resize handling for on-screen keyboard:
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', () => {
-    const inputBar = document.getElementById('chat-input');
-    if (!inputBar) return;
-    const viewport = window.visualViewport;
-    // Adjust the bottom of the input bar so it stays visible above the virtual keyboard
-    inputBar.style.bottom = `${viewport.height - viewport.offsetTop}px`;
-  });
-}
 
-// 2. Swipe navigation on chat box
-(() => {
-  const chatBox = document.getElementById('chat-box');
-  if (!chatBox) return;
+    // Declare a variable for scroll animation frames to avoid reference errors
+    let scrollFrame = null;
 
-  let touchStartX = 0;
-  let touchEndX = 0;
-  const SWIPE_THRESHOLD = 50; // px
-
-  chatBox.addEventListener('touchstart', (e) => {
-    touchStartX = e.touches[0].clientX;
-  }, { passive: true });
-
-  chatBox.addEventListener('touchend', (e) => {
-    touchEndX = e.changedTouches[0].clientX;
-    const deltaX = touchEndX - touchStartX;
-    if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
-      if (deltaX > 0) {
-        // Swipe right
-        // TODO: Implement "previous chat" logic if desired
-        console.debug('Swiped right in chat box');
-      } else {
-        // Swipe left
-        // TODO: Implement "next chat" logic if desired
-        console.debug('Swiped left in chat box');
-      }
+    // 1. Visual viewport resize handling for on-screen keyboard:
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+            const inputBar = document.getElementById('chat-input');
+            if (!inputBar) return;
+            const viewport = window.visualViewport;
+            // Adjust the bottom of the input bar so it stays visible above the virtual keyboard
+            inputBar.style.bottom = `${viewport.height - viewport.offsetTop}px`;
+        });
     }
-  }, { passive: true });
-})();
 
-// 3. IntersectionObserver-based message virtualization (basic example):
-(() => {
-  if (!('IntersectionObserver' in window)) return; // gracefully degrade
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        // Reveal this message container
-        entry.target.style.visibility = 'visible';
-        // If needed, re-render for performance
-      } else {
-        // Hide this message container to free up memory if we want
-        entry.target.style.visibility = 'hidden';
-        entry.target.innerHTML = ''; // Clear non-visible content
-      }
-    });
-  }, { threshold: 0.1 });
+    // 2. Swipe navigation on chat box
+    (() => {
+        const chatBox = document.getElementById('chat-box');
+        if (!chatBox) return;
 
-  document.querySelectorAll('.message-container').forEach(el => {
-    observer.observe(el);
-  });
-})();
+        let touchStartX = 0;
+        let touchEndX = 0;
+        const SWIPE_THRESHOLD = 50; // px
+
+        chatBox.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+        }, { passive: true });
+
+        chatBox.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].clientX;
+            const deltaX = touchEndX - touchStartX;
+            if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
+                if (deltaX > 0) {
+                    // Swipe right
+                    // TODO: Implement "previous chat" logic if desired
+                    console.debug('Swiped right in chat box');
+                } else {
+                    // Swipe left
+                    // TODO: Implement "next chat" logic if desired
+                    console.debug('Swiped left in chat box');
+                }
+            }
+        }, { passive: true });
+    })();
+
+    // 3. IntersectionObserver-based message virtualization (basic example):
+    (() => {
+        if (!('IntersectionObserver' in window)) return; // gracefully degrade
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    // Reveal this message container
+                    entry.target.style.visibility = 'visible';
+                    // Additional re-render logic could go here if you truly remove DOM content below
+                } else {
+                    // Hide message container
+                    // If you actually want to free memory, you'd remove the content:
+                    // entry.target.innerHTML = '';
+                    // but you'd also need to restore it later when re-intersecting.
+                    entry.target.style.visibility = 'hidden';
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.message-container').forEach(el => {
+            observer.observe(el);
+        });
+    })();
 
     const CONFIG = {
         DEPENDENCY_TIMEOUT: 5000,
@@ -249,12 +255,12 @@ if (window.visualViewport) {
             let streamComplete = false;
             let updateQueue = [];
             let updateScheduled = false;
-            
+
             const processUpdate = () => {
                 if (updateQueue.length > 0) {
                     const latestContent = updateQueue[updateQueue.length - 1];
                     accumulatedContent = latestContent;
-                    
+
                     if (!messageDiv) {
                         messageDiv = window.MessageRenderer.renderAssistantMessage(latestContent, true);
                         document.getElementById('chat-box').appendChild(messageDiv);
@@ -264,7 +270,7 @@ if (window.visualViewport) {
                             contentContainer.textContent = latestContent;
                         }
                     }
-                    
+
                     updateQueue = [];
                     updateScheduled = false;
                 }
@@ -288,11 +294,11 @@ if (window.visualViewport) {
                     try {
                         const data = JSON.parse(match[1]);
                         if (data.error) throw new Error(data.error);
-                        
+
                         if (data.content) {
                             accumulatedContent += data.content;
                             updateQueue.push(accumulatedContent);
-                            
+
                             if (!updateScheduled) {
                                 updateScheduled = true;
                                 requestAnimationFrame(processUpdate);
@@ -304,21 +310,21 @@ if (window.visualViewport) {
                 }
 
                 // Debounce scroll updates
-                if (!streamComplete) {
-                    const chatBox = document.getElementById('chat-box');
-                    const scrollPos = chatBox.scrollTop;
-                    const isNearBottom = chatBox.scrollHeight - chatBox.clientHeight - scrollPos < 100;
-                    
-                    if (isNearBottom) {
-                        cancelAnimationFrame(scrollFrame);
-                        const scrollFrame = requestAnimationFrame(() => {
-                            chatBox.scrollTop = chatBox.scrollHeight;
-                        });
-                    }
+                const chatBox = document.getElementById('chat-box');
+                if (!chatBox) continue;
+
+                const scrollPos = chatBox.scrollTop;
+                const isNearBottom = chatBox.scrollHeight - chatBox.clientHeight - scrollPos < 100;
+
+                if (isNearBottom) {
+                    cancelAnimationFrame(scrollFrame);
+                    scrollFrame = requestAnimationFrame(() => {
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    });
                 }
             }
-            
-            // Final render with Markdown and syntax highlighting
+
+            // Final render with Markdown + syntax highlighting
             if (messageDiv) {
                 window.MessageRenderer.finalizeAssistantMessage(messageDiv, accumulatedContent);
             }
@@ -476,6 +482,7 @@ if (window.visualViewport) {
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
             if (messageInput && sendButton) {
+                // Debounce Enter presses
                 const debounce = (func, wait) => {
                     let timeout;
                     return function executedFunction(...args) {
@@ -567,6 +574,7 @@ if (window.visualViewport) {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     if (confirm('Do you want to regenerate the assistant response?')) {
+                        // Placeholder regeneration logic
                         window.showAlert('Regeneration triggered (feature not fully implemented yet)', 'info');
                     }
                 });

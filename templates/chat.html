@@ -3,6 +3,15 @@
 {% block extra_head %}
 <!-- Chat-specific styles -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+<!-- Example media query hiding the token panel on very small devices -->
+<style>
+/* Hide the token panel on screens below 640px */
+@media (max-width: 640px) {
+  .token-panel-container {
+    display: none;
+  }
+}
+</style>
 {% endblock %}
 
 {% block title %}Chat - Azure OpenAI{% endblock %}
@@ -97,6 +106,7 @@
     </div>
 </div>
 {% endblock %}
+
 {% block content %}
 <!-- Message Templates -->
 <template id="assistant-message-template">
@@ -157,8 +167,7 @@
 </template>
 
 <div id="chat-container"
-    class="relative flex flex-col w-full h-full overflow-hidden touch-manipulation bg-gradient-to-b from-gray-50/95 to-white/95 dark:from-gray-900/95 dark:to-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-[120px]"
-    style="min-height: calc(100vh - 120px);">
+    class="relative flex flex-col min-h-screen w-full overflow-hidden touch-manipulation bg-gradient-to-b from-gray-50/95 to-white/95 dark:from-gray-900/95 dark:to-gray-950/95 safe-area-inset dark-mode-transition backdrop-blur-sm mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
     <!-- Chat Configuration -->
     <div id="chat-config" data-chat-id="{{ chat_id }}" data-csrf-token="{{ csrf_token() }}"
         data-models='{{ models|tojson|safe }}'
@@ -169,7 +178,7 @@
 
     <!-- Main Chat Area -->
     <div id="chat-main"
-        class="flex-1 flex flex-col overflow-hidden pb-[180px] sm:pb-[140px] bg-white/90 dark:bg-gray-900/90 dark-mode-transition backdrop-blur-sm rounded-lg shadow-md relative z-10">
+        class="flex-1 flex flex-col overflow-hidden bg-white/90 dark:bg-gray-900/90 dark-mode-transition backdrop-blur-sm rounded-lg shadow-md relative z-10">
 
         <!-- Messages Area -->
         <div 
@@ -308,9 +317,9 @@
             </div>
         </div>
 
-        <!-- Token Panel -->
+        <!-- Token Panel (hidden on mobile via media query, can be toggled) -->
         <div id="token-usage" class="hidden">
-        <div class="token-panel-container">
+          <div class="token-panel-container">
             <div class="flex flex-col space-y-1">
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center space-x-3">
@@ -369,8 +378,8 @@
                     </div>
                 </div>
             </div>
+          </div>
         </div>
-         </div>
 
         <!-- Chat Input Area -->
         <div id="chat-input"

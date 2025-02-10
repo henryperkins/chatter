@@ -34,12 +34,12 @@
             }
 
             updateTokenCount(count) {
-                if (!this.elements.tokenCounter) {
-                    console.error('TokenUsageManager: tokenCounter element not found');
+                if (!this.elements.tokensUsed) {
+                    console.error('TokenUsageManager: tokensUsed element not found');
                     return;
                 }
                 this.tokenCount = count;
-                this.elements.tokenCounter.textContent = this.tokenCount;
+                this.elements.tokensUsed.textContent = this.tokenCount;
             }
 
             initializeElements() {

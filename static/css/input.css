@@ -212,3 +212,19 @@
 .loading {
     @apply opacity-75 cursor-not-allowed;
 }
+
+/* Additional mobile-friendly rules */
+@media (max-width: 640px) {
+    /* Provide extra spacing at the bottom to accommodate fixed input bar */
+    .page-container {
+        padding-bottom: 5rem;
+    }
+    .main-content {
+        padding-bottom: 5rem;
+    }
+    /* Slightly larger tap targets on buttons */
+    .btn,
+    .chat-control-btn {
+        min-height: 48px;
+    }
+}

@@ -497,6 +497,10 @@
                 // If you have a global usage manager:
                 if (window.tokenUsageManager) {
                     window.tokenUsageManager.updateTokenCount(totalTokens);
+      // Warn if the corresponding DOM element isn't present
+      if (!document.getElementById('tokens-used')) {
+        console.warn('tokens-used element not present in DOM, skipping usage display.');
+      }
                 }
 
                 // Or simply put it in a DOM element:
