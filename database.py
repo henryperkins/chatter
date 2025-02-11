@@ -15,7 +15,6 @@ import os
 import logging
 import json
 import datetime
-import certifi
 from typing import Optional, TypeVar, Callable, Any, Dict, Union, cast, Iterator, List
 from contextlib import contextmanager
 
@@ -93,14 +92,8 @@ POOL_SETTINGS = {
 
 def create_db_engine(db_uri: str) -> Engine:
     """
-    Create SQLAlchemy engine with optimized settings and proper SSL configuration.
+    Create SQLAlchemy engine with optimized settings.
     """
-    # Get SSL cert path from environment or fallback to certifi
-    ssl_cert = os.getenv('SSL_CERT_FILE') or certifi.where()
-    
-    # Import SSL context with proper cert configuration
-    from azure_ssl_config import AZURE_TLS_CONTEXT
-    
     return create_engine(
         db_uri,
         future=True,
@@ -120,10 +113,7 @@ def create_db_engine(db_uri: str) -> Engine:
             "keepalives_interval": 30,
             "keepalives_count": 15,
             "application_name": "chatter-app",
-            "options": "-c statement_timeout=120000 -c idle_in_transaction_session_timeout=240000",
-            "sslmode": "verify-full",
-            "sslcert": ssl_cert,
-            "sslrootcert": ssl_cert,
+            "options": "-c statement_timeout=120000 -c idle_in_transaction_session_timeout=240000"
         },
         json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
     )

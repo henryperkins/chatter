@@ -206,8 +206,6 @@ class Config:
         # Core settings
         self.SECRET_KEY = os.getenv("SECRET_KEY")
         self.DATABASE_URI = os.getenv("DATABASE_URI", "")
-        if self.DATABASE_URI.startswith("postgres://"):
-            self.DATABASE_URI = self.DATABASE_URI.replace("postgres://", "postgresql://", 1)
 
         # Azure OpenAI settings
         self.AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
