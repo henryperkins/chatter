@@ -1,8 +1,7 @@
 import os
-import os
 from werkzeug.utils import secure_filename
 from flask import current_app, request, jsonify
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Optional
 from models.uploaded_file import UploadedFile
 from config import Config
 from azure_search_config import AzureSearchConfig
