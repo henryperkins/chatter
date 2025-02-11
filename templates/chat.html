@@ -42,7 +42,7 @@
                 <select id="mobile-chat-selector"
                     class="md:hidden flex-1 px-3 py-2 bg-white/95 dark:bg-gray-800/95 border border-gray-200/80 dark:border-gray-700/80 rounded-xl">
                     {% for chat in conversations %}
-                    <option value="{{ chat.id }}" {% if chat.id == chat_id %}selected{% endif %}>
+                    <option value="{{ chat.id }}" {% if chat.id == current_chat.id %}selected{% endif %}>
                         {{ chat.title }}
                     </option>
                     {% endfor %}
@@ -68,7 +68,7 @@
                             data-supports-streaming="{{ 'true' if model.supports_streaming else 'false' }}"
                             data-model-type="{{ model.model_type|default('', true) }}"
                             data-max-completion-tokens="{{ model.max_completion_tokens|default(0, true) }}"
-                            {% if current_model and model.id|string == current_model.id|string %}selected{% endif %}>
+                            {% if current_model and model.id == current_model.id %}selected{% endif %}>
                             {{ model.name }}{% if model.is_default %} (Default){% endif %}
                         </option>
                         {% endfor %}
