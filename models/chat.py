@@ -209,20 +209,34 @@ class Chat:
         """
         with db_session() as db:
             try:
-                query = text("SELECT id FROM models WHERE is_default = TRUE LIMIT 1")
+                # First try to get active default model
+                query = text("""
+                    SELECT m.id FROM models m 
+                    JOIN providers p ON m.provider_id = p.id
+                    WHERE m.is_default = TRUE 
+                    AND p.is_active = TRUE
+                    LIMIT 1
+                """)
                 row = db.execute(query).mappings().first()
                 if row:
                     logger.debug(f"Default model ID retrieved: {row['id']}")
                     return row["id"]
-                logger.warning("No default model found.")
-                logger.warning("No default model found. Selecting any available model.")
-                # If no default model, select any available model
-                query = text("SELECT id FROM models LIMIT 1")
+                
+                logger.warning("No default model found with active provider")
+                
+                # Fallback to any active model
+                query = text("""
+                    SELECT m.id FROM models m
+                    JOIN providers p ON m.provider_id = p.id 
+                    WHERE p.is_active = TRUE
+                    LIMIT 1
+                """)
                 row = db.execute(query).mappings().first()
                 if row:
-                    logger.debug(f"Using model ID {row['id']} as fallback.")
+                    logger.debug(f"Using model ID {row['id']} as fallback")
                     return row["id"]
-                logger.error("No models available in the database.")
+                
+                logger.error("No models available with active providers")
                 return None
             except Exception as e:
                 logger.error(f"Error retrieving default model ID: {e}")

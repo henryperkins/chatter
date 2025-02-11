@@ -417,6 +417,14 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         )
 
     messages = conversation_manager.get_context(chat_id)
+    if not messages:
+        conversation_manager.add_message(
+            chat_id=chat_id,
+            role="system",
+            content="Welcome to Azure OpenAI Chat! Start by typing a message."
+        )
+        messages = conversation_manager.get_context(chat_id)
+    
     for message in messages:
         if message["role"] == "user":
             message["content"] = bleach.clean(message["content"])

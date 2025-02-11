@@ -132,9 +132,11 @@
                         {% endif %}
                     {% endfor %}
                 {% else %}
-                    <div class="text-center text-gray-500 dark:text-gray-400 mt-8">
-                        <p class="text-lg">This is a new chat. Start typing to begin!</p>
-                        <p class="text-sm mt-2">Your messages are end-to-end encrypted</p>
+                    <div class="empty-state flex flex-col items-center justify-center text-center text-gray-500 dark:text-gray-400 mt-8 space-y-4">
+                        <i class="fas fa-comment-slash text-6xl opacity-50"></i>
+                        <h3 class="text-xl font-semibold">No messages yet</h3>
+                        <p class="text-sm">Start a conversation by typing below</p>
+                        <p class="text-xs mt-2">Your messages are end-to-end encrypted</p>
                     </div>
                 {% endif %}
             </div>

@@ -10,6 +10,15 @@ class MessageRenderer {
     };
 
     static async initialize() {
+        if (!window.md) {
+            console.error('Markdown processor not loaded');
+            return;
+        }
+        if (!window.CHAT_CONFIG) {
+            console.error('Chat config not loaded');
+            return;
+        }
+
         // Cache templates from the DOM
         this.templates.assistant = document.getElementById('assistant-message-template');
         this.templates.user = document.getElementById('user-message-template');
@@ -19,6 +28,19 @@ class MessageRenderer {
 
         if (!this.templates.assistant || !this.templates.user) {
             throw new Error('Message templates not found');
+        }
+
+        // Wait for dependencies with timeout
+        try {
+            await Promise.race([
+                new Promise(resolve => document.addEventListener('app:ready', resolve)),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Dependency timeout')), 5000)
+                )
+            ]);
+        } catch (error) {
+            console.error('Failed to initialize MessageRenderer:', error);
+            throw error;
         }
 
         // Wait for App initialization to complete
