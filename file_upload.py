@@ -110,12 +110,13 @@ class FileUploadHandler:
 
         return True, errors
 
-    def validate_files(self, files: List) -> Tuple[List, List]:
+    def validate_files(self, files: List, user_id: Optional[int] = None) -> Tuple[List, List]:
         """
         Validate uploaded files with enhanced security checks.
 
         Args:
             files (List): List of uploaded file objects.
+            user_id (Optional[int]): User ID for token tracking.
 
         Returns:
             Tuple[List, List]: A tuple containing valid files and a list of errors.
@@ -136,6 +137,20 @@ class FileUploadHandler:
             current_app.logger.error(msg)
             errors.append(msg)
             return valid_files, errors
+
+        # Check token usage if user_id provided
+        if user_id:
+            from models.token_usage import TokenUsage
+            try:
+                usage = TokenUsage.get_usage(user_id)
+                estimated_tokens = sum(self.estimate_tokens(f) for f in files)
+                if usage["remaining"] < estimated_tokens:
+                    msg = f"Token limit exceeded. Required: {estimated_tokens}, Remaining: {usage['remaining']}"
+                    current_app.logger.error(msg)
+                    errors.append(msg)
+                    return valid_files, errors
+            except Exception as e:
+                current_app.logger.error(f"Failed to check token usage: {e}")
 
         for file in files:
             file.seek(0)

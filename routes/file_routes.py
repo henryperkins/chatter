@@ -70,6 +70,10 @@ def init_file_routes(app):
     @file_routes.route('/upload/<chat_id>', methods=['POST'])
     def upload_files(chat_id: str):
         """
+        Handle file upload with token tracking and enhanced validation.
+        """
+        from models.token_usage import TokenUsage
+        """
         Handle file upload request with metadata and upload to Azure OpenAI.
 
         Args:
