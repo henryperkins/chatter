@@ -2,131 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-    :root {
-        --safe-area-top: env(safe-area-inset-top, 0px);
-        --safe-area-bottom: env(safe-area-inset-bottom, 0px);
-        --safe-area-left: env(safe-area-inset-left, 0px);
-        --safe-area-right: env(safe-area-inset-right, 0px);
-    }
-}
-
 @layer components {
-    /* Layout components */
-    .chat-container {
-        --chat-input-height: 180px;
-        --chat-header-height: 64px;
-        @apply flex flex-col relative;
-        height: 100vh !important; /* Force full viewport height */
-        height: -webkit-fill-available !important; /* iOS Safari fix */
-    }
+  .chat-container {
+    --chat-input-height: 120px;
+    --chat-header-height: 64px;
+    @apply flex flex-col relative h-screen;
 
-    .page-container {
-        @apply min-h-screen flex flex-col bg-gradient-to-b from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900;
+    /* Mobile viewport height fix */
+    @supports (-webkit-touch-callout: none) {
+      height: -webkit-fill-available;
     }
+  }
 
-    .main-content {
-        @apply flex-grow container mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16;
-    }
+  .chat-messages-container {
+    @apply flex-1 overflow-hidden relative;
+  }
 
-    /* Navigation components */
-    .nav-link {
-        @apply px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300;
-    }
+  .chat-messages-scroll {
+    @apply absolute inset-0 overflow-y-auto overscroll-contain;
+    @apply pb-[calc(var(--chat-input-height)+2rem)] pt-[var(--chat-header-height)];
+  }
 
-    .nav-link-active {
-        @apply text-primary-600 bg-primary-50 dark:text-primary-400 dark:bg-primary-900/30;
-    }
+  .chat-input-container {
+    @apply fixed bottom-0 left-0 right-0 z-[2000];
+    @apply bg-white/95 dark:bg-gray-900/95;
+    @apply border-t border-gray-200/50 dark:border-gray-700/50;
+    @apply shadow-lg backdrop-blur-md;
+    height: var(--chat-input-height);
+  }
 
-    .nav-link-default {
-        @apply text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800;
-    }
+  .chat-controls {
+    @apply flex items-center gap-3 px-4 py-3;
+    @apply bg-white/95 dark:bg-gray-800/95;
+    @apply border-b border-gray-200/50 dark:border-gray-700/50;
+    @apply shadow-sm backdrop-blur-md;
+  }
 
-    /* Chat components */
-    .message-container {
-        @apply max-w-4xl mx-auto w-full mb-6;
-    }
+  .token-panel-container {
+    @apply fixed right-4 z-[60] w-96 max-w-[calc(100%-2rem)];
+    bottom: calc(var(--chat-input-height) + theme('spacing.4'));
+  }
 
-    .message-bubble {
-        @apply rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 backdrop-blur-sm;
-        @apply border border-gray-200/50 dark:border-gray-700/50;
-        @apply p-5 sm:p-6;
-    }
-
-    .chat-controls {
-        @apply flex items-center gap-3 px-4 py-3 bg-white/95 dark:bg-gray-800/95;
-        @apply border-b border-gray-200/50 dark:border-gray-700/50;
-        @apply backdrop-blur-md shadow-sm;
-    }
-
-    /* Chat layout specific */
-    .chat-messages-container {
-        @apply flex-1 overflow-hidden relative;
+  /* Mobile optimizations */
+  @media (max-width: theme('screens.sm')) {
+    .chat-input-container {
+      @apply p-4;
+      height: 120px !important;
     }
 
     .chat-messages-scroll {
-        @apply absolute inset-0 overflow-y-auto overscroll-contain;
-        @apply pb-[calc(var(--chat-input-height)+2rem)];
+      bottom: 120px !important;
     }
 
-    .chat-input-container {
-        @apply fixed bottom-0 left-0 right-0 z-[2000] bg-white dark:bg-gray-900;
-        @apply border-t border-gray-200 dark:border-gray-700;
-        @apply shadow-lg;
-        height: var(--chat-input-height);
+    .message-container {
+      @apply max-w-[90%];
     }
-
-    .token-panel-container {
-        @apply fixed right-4 z-[60] w-96 max-w-[calc(100%-2rem)];
-        bottom: calc(var(--chat-input-height) + theme('spacing.4'));
-    }
-
-    /* Button components */
-    .btn {
-        @apply px-4 py-3 rounded-lg text-sm font-medium transition-all duration-300;
-        @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
-        @apply shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0;
-    }
-
-    .btn-primary {
-        @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
-    }
-
-    .btn-secondary {
-        @apply bg-gray-500 text-white hover:bg-gray-600 focus:ring-gray-500;
-    }
-
-    /* Form components */
-    .form-input {
-        @apply w-full px-4 py-3 border border-gray-300/50 dark:border-gray-600/50 rounded-xl;
-        @apply shadow-inner focus:outline-none focus:ring-2 focus:ring-primary-500;
-        @apply dark:bg-gray-700/90 dark:text-gray-100 backdrop-blur-sm bg-white/90;
-        @apply text-base sm:text-sm leading-relaxed;
-    }
-
-    .form-label {
-        @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1;
-    }
-}
-
-@layer utilities {
-    .safe-area-inset {
-        padding-top: var(--safe-area-top);
-        padding-bottom: var(--safe-area-bottom);
-        padding-left: var(--safe-area-left);
-        padding-right: var(--safe-area-right);
-    }
-
-    .no-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-    }
-
-    .no-scrollbar::-webkit-scrollbar {
-        display: none;
-    }
-
-    .touch-manipulation {
-        touch-action: manipulation;
-    }
+  }
 }

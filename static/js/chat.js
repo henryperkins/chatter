@@ -1,10 +1,9 @@
-(() => {
-    'use strict';
+import { ChatConfig } from './chat-config.js';
+import { MessageRenderer } from './message-renderer.js';
 
-    // Declare a variable for scroll animation frames to avoid reference errors
-    let scrollFrame = null;
+let scrollFrame = null;
 
-    const CONFIG = {
+const CONFIG = {
         DEPENDENCY_TIMEOUT: 5000,
         STREAM_UPDATE_INTERVAL: 100,
         MAX_DEPENDENCY_ATTEMPTS: 50, 
@@ -24,67 +23,10 @@
             const inputBar = document.getElementById('chat-input');
             if (!inputBar) return;
             const viewport = window.visualViewport;
-            // Adjust the bottom of the input bar so it stays visible above the virtual keyboard
             inputBar.style.bottom = `${viewport.height - viewport.offsetTop}px`;
         });
     }
 
-    // 2. Swipe navigation on chat box
-    (() => {
-        const chatBox = document.getElementById('chat-box');
-        if (!chatBox) return;
-
-        let touchStartX = 0;
-        let touchEndX = 0;
-        const SWIPE_THRESHOLD = 50; // px
-
-        chatBox.addEventListener('touchstart', (e) => {
-            touchStartX = e.touches[0].clientX;
-        }, { passive: true });
-
-        chatBox.addEventListener('touchend', (e) => {
-            touchEndX = e.changedTouches[0].clientX;
-            const deltaX = touchEndX - touchStartX;
-            if (Math.abs(deltaX) > SWIPE_THRESHOLD) {
-                if (deltaX > 0) {
-                    // Swipe right
-                    // TODO: Implement "previous chat" logic if desired
-                    console.debug('Swiped right in chat box');
-                } else {
-                    // Swipe left
-                    // TODO: Implement "next chat" logic if desired
-                    console.debug('Swiped left in chat box');
-                }
-            }
-        }, { passive: true });
-    })();
-
-    // 3. IntersectionObserver-based message virtualization (basic example):
-    (() => {
-        if (!('IntersectionObserver' in window)) return; // gracefully degrade
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    // Reveal this message container
-                    entry.target.style.visibility = 'visible';
-                    // Additional re-render logic could go here if you truly remove DOM content below
-                } else {
-                    // Hide message container
-                    // If you actually want to free memory, you'd remove the content:
-                    // entry.target.innerHTML = '';
-                    // but you'd also need to restore it later when re-intersecting.
-                    entry.target.style.visibility = 'hidden';
-                }
-            });
-        }, { threshold: 0.1 });
-
-        document.querySelectorAll('.message-container').forEach(el => {
-            observer.observe(el);
-        });
-    })();
-
-    // Create new chat function
     async function createNewChat() {
         try {
             const sendBtn = document.getElementById('new-chat-btn');
@@ -105,7 +47,6 @@
         
             const data = await response.json();
             if (data.success && data.chat_id) {
-                // Force full page load to initialize new chat
                 window.location.href = `/chat/chat_interface?chat_id=${data.chat_id}&new=true`;
             } else {
                 throw new Error('Invalid response from server');
@@ -119,31 +60,8 @@
         }
     }
 
-    function initializeNewChatButton() {
-        const newChatBtn = document.getElementById('new-chat-btn');
-        if (newChatBtn) {
-            newChatBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                createNewChat();
-            });
-        }
-    }
-
-    // Mobile chat selector handler
-    document.getElementById('mobile-chat-selector')?.addEventListener('change', function(e) {
-        const chatId = e.target.value;
-        if (chatId === 'new') {
-            createNewChat();
-        } else {
-            window.location.href = `/chat/chat_interface?chat_id=${chatId}`;
-        }
-    });
-
-    // New chat button handler
-    document.getElementById('new-chat-btn')?.addEventListener('click', createNewChat);
-
+    // Basic handleNormalResponse with null checks
     async function handleNormalResponse(formData) {
-        // Same base JSON payload as handleStreamingResponse, but no "stream: true"
         const message = formData.get('message') || '';
         const jsonData = {
             message,
@@ -170,14 +88,20 @@
             throw new Error(data.error);
         }
 
-        // data.message.content holds the assistant's reply
-        const content = data.message?.content || '';
-        await window.MessageRenderer.appendAssistantMessage(content, /* isStreaming= */ false);
+        if (!data.message || typeof data.message !== 'object') {
+            throw new Error('Invalid or empty response from server');
+        }
 
-        // Immediately show a quick success toast
+        const content = data.message.content;
+        if (!content) {
+            throw new Error('Empty content in response');
+        }
+
+        await window.MessageRenderer.appendAssistantMessage(content, false);
         window.MessageRenderer.showSuccess('Assistant responded successfully');
     }
 
+    // Basic handleStreamingResponse with null checks
     async function handleStreamingResponse(formData) {
         let accumulatedContent = '';
         let messageDiv = null;
@@ -200,7 +124,7 @@
                 stream: true
             };
 
-            const response = await fetch('/chat/send', {
+            const response = await fetch('/chat/send?stream=true', {
                 method: 'POST',
                 body: JSON.stringify(jsonData),
                 headers: {
@@ -214,13 +138,13 @@
 
             if (!response.ok) {
                 const text = await response.text();
-                let errorMessage;
+                let errorMessage = `Server error: ${response.status}`;
                 try {
                     const errorData = JSON.parse(text);
-                    errorMessage = errorData.error || `Server error: ${response.status}`;
-                } catch {
-                    errorMessage = `Server error: ${response.status}`;
-                }
+                    if (errorData.error) {
+                        errorMessage = errorData.error;
+                    }
+                } catch { /* fallback */ }
                 throw new Error(errorMessage);
             }
 
@@ -284,7 +208,7 @@
                     }
                 }
 
-                // Debounce scroll updates
+                // Auto-scroll if near bottom
                 const chatBox = document.getElementById('chat-box');
                 if (!chatBox) continue;
 
@@ -304,15 +228,9 @@
                 window.MessageRenderer.finalizeAssistantMessage(messageDiv, accumulatedContent);
             }
 
-            if (window.monitoring) {
-                window.monitoring.mark('streamEnd');
-                window.monitoring.measure('streamDuration', 'streamStart', 'streamEnd');
-            }
+            window.MessageRenderer.showSuccess('Assistant responded successfully (stream).');
 
         } catch (error) {
-            if (window.monitoring) {
-                window.monitoring.logError('Streaming failed:', error);
-            }
             window.MessageRenderer.showError(`API Error: ${error.message}`);
             if (messageDiv) {
                 messageDiv.remove();
@@ -367,10 +285,7 @@
                 const selectedOption = modelSelect.selectedOptions[0];
                 const modelType = selectedOption.dataset.modelType;
                 
-                // Check if it's an o-series model
                 isOSeriesModel = CONFIG.O_SERIES_MODELS.includes(modelType);
-                
-                // Only o3-mini supports streaming
                 modelSupportsStreaming = modelType === 'o3-mini';
                 
                 window.CHAT_CONFIG.isOSeriesModel = isOSeriesModel;
@@ -401,14 +316,12 @@
 
     async function startChat() {
         try {
-            initializeNewChatButton();
             const configDiv = document.getElementById('chat-config');
             if (!configDiv) {
                 throw new Error('Chat configuration not found');
             }
             window.CHAT_CONFIG.isOSeriesModel = false;
 
-            // Wait for MessageRenderer to be available
             let attempts = 0;
             while (!window.MessageRenderer && attempts < CONFIG.MAX_DEPENDENCY_ATTEMPTS) {
                 await new Promise(resolve => setTimeout(resolve, 100));
@@ -454,12 +367,10 @@
             const modelSelect = document.getElementById('model-select');
             if (modelSelect) {
                 modelSelect.addEventListener('change', async () => {
-                    // Update o-series model status
                     const selectedOption = modelSelect.selectedOptions[0];
                     const modelType = selectedOption.dataset.modelType;
                     window.CHAT_CONFIG.isOSeriesModel = CONFIG.O_SERIES_MODELS.includes(modelType);
                     
-                    // Update model in backend
                     const newModelId = modelSelect.value;
                     const chatId = window.CHAT_CONFIG.chatId;
                     try {
@@ -486,6 +397,14 @@
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
             const chatForm = document.getElementById('chat-form');
+            const newChatBtn = document.getElementById('new-chat-btn');
+            
+            if (newChatBtn) {
+                newChatBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    createNewChat();
+                });
+            }
             
             if (chatForm) {
                 chatForm.addEventListener('submit', (e) => {
@@ -495,7 +414,6 @@
             }
 
             if (messageInput) {
-                // Debounce Enter presses
                 const debounce = (func, wait) => {
                     let timeout;
                     return function executedFunction(...args) {
@@ -586,8 +504,7 @@
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     if (confirm('Do you want to regenerate the assistant response?')) {
-                        // Placeholder regeneration logic
-                        window.MessageRenderer.showSuccess('Regeneration triggered (feature not fully implemented yet)');
+                        window.MessageRenderer.showSuccess('Regeneration triggered (feature not fully implemented)');
                     }
                 });
             });
@@ -598,5 +515,4 @@
         }
     }
 
-    window.addEventListener('load', startChat);
-})();
+window.addEventListener('load', startChat);
