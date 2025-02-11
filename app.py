@@ -41,8 +41,8 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.wrappers import Response as WerkzeugResponse
 from werkzeug.serving import WSGIRequestHandler
 
-from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy.orm import Session, scoped_session
+from sqlalchemy import text, Engine
 from extensions import limiter, login_manager, csrf
 from config import Config, ApiError
 from database import (
@@ -343,6 +343,11 @@ def register_cli_commands(app):
 
 def create_app() -> Flask:
     from database import get_db_state  # Add missing import
+    from markdown import markdown
+
+    # Add markdown filter
+    def render_markdown(text):
+        return markdown(text, extensions=['fenced_code', 'tables'])
 
     if hasattr(Flask, "_already_configured"):
         return Flask._app_instance  # type: ignore
@@ -370,12 +375,12 @@ def create_app() -> Flask:
         try:
             db_state = get_db_state(app)
             engine = db_state["engine"]
-            if not engine:
+            if not engine or not isinstance(engine, Engine):
                 raise RuntimeError("Database engine not initialized")
-            with engine.connect() as conn:
+            with engine.connect() as conn:  # type: ignore
                 result = conn.execute(text("SELECT 1"))
                 result.scalar()
-            if not db_state.get("Session"):
+            if not db_state.get("Session") or not isinstance(db_state["Session"], scoped_session):
                 raise RuntimeError("Database session factory not initialized")
             break  # Break out of loop on success
         except Exception as e:
