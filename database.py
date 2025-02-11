@@ -82,9 +82,9 @@ def test_db_connection() -> None:
 
 # Connection pool settings
 POOL_SETTINGS = {
-    "POOL_SIZE": int(os.getenv("DB_POOL_SIZE", "10")),
-    "MAX_OVERFLOW": int(os.getenv("DB_MAX_OVERFLOW", "20")),
-    "POOL_TIMEOUT": int(os.getenv("DB_POOL_TIMEOUT", "60")),
+    "POOL_SIZE": int(os.getenv("DB_POOL_SIZE", "15")),
+    "MAX_OVERFLOW": int(os.getenv("DB_MAX_OVERFLOW", "30")),
+    "POOL_TIMEOUT": int(os.getenv("DB_POOL_TIMEOUT", "30")),
     "POOL_PRE_PING": True,  # Always check connection before using
     "POOL_RECYCLE": int(os.getenv("DB_POOL_RECYCLE", "3600")),
 }
@@ -92,8 +92,9 @@ POOL_SETTINGS = {
 
 def create_db_engine(db_uri: str) -> Engine:
     """
-    Create SQLAlchemy engine with optimized settings. Incorporates connect_args from snippet.
+    Create SQLAlchemy engine with optimized settings and proper SSL configuration.
     """
+    from azure_ssl_config import AZURE_TLS_CONTEXT
     return create_engine(
         db_uri,
         future=True,
@@ -115,9 +116,8 @@ def create_db_engine(db_uri: str) -> Engine:
             "application_name": "chatter-app",
             "options": "-c statement_timeout=120000 -c idle_in_transaction_session_timeout=240000",
             "sslmode": "verify-full",
-            "sslcert": None,
-            "sslkey": None,
-            "sslrootcert": "DigiCertGlobalRootG2.crt.pem",
+            "ssl": AZURE_TLS_CONTEXT,
+            "sslrootcert": certifi.where(),
         },
         json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
     )

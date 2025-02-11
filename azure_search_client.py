@@ -175,12 +175,24 @@ class AzureSearchChatExtension:
 
         return params
 
+from azure.core.credentials import AzureKeyCredential
+from azure.identity import DefaultAzureCredential
+import openai
+
 class AzureOpenAI:
-    def __init__(self, azure_endpoint, api_key, api_version):
-        self.azure_endpoint = azure_endpoint
-        self.api_key = api_key
-        self.api_version = api_version
-        self.chat = self.Chat(self.azure_endpoint, self.api_key, self.api_version)
+    def __init__(self, azure_endpoint, api_key=None, api_version="2024-02-15-preview"):
+        if api_key:
+            self.credential = AzureKeyCredential(api_key)
+        else:
+            self.credential = DefaultAzureCredential()
+
+        self.client = openai.AzureOpenAI(
+            azure_endpoint=azure_endpoint,
+            api_version=api_version,
+            credential=self.credential,
+            max_retries=3
+        )
+        self.chat = self.client.chat
 
     class Chat:
         def __init__(self, azure_endpoint, api_key, api_version):
