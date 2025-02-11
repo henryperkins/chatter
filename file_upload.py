@@ -532,6 +532,7 @@ class FileUploadHandler:
                 # Cache the processed content
                 cache_key = hash((filename, os.path.getsize(filepath)))
                 context_manager.context_cache[cache_key] = compressed_content
+                UploadedFile.store_tokenized_content(file_info["id"], compressed_content)
 
                 # Index the file in Azure AI Search
                 if mime_type.startswith('text/') or mime_type in ['application/json', 'text/markdown']:

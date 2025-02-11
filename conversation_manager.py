@@ -542,3 +542,16 @@ class ConversationManager:
 
 # Export an instance of ConversationManager
 conversation_manager = ConversationManager()
+def incorporate_file_content(self, chat_id: str, file_id: int) -> None:
+    from models.uploaded_file import UploadedFile
+    file_record = UploadedFile.get_by_id(file_id)
+    if not file_record or not file_record.tokenized_text:
+        logger.warning("No tokenized text found for file_id %d", file_id)
+        return
+
+    # Insert a new system message referencing the file content
+    Chat.add_message(
+        chat_id=chat_id,
+        role="system",
+        content=f"[FileContent]\n{file_record.tokenized_text}"
+    )

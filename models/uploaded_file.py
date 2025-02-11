@@ -338,3 +338,24 @@ class UploadedFile:
                 logger.error(f"Error deleting file by Azure ID: {e}")
                 raise
 
+@staticmethod
+def store_tokenized_content(file_id: int, tokenized_text: str) -> None:
+    """
+    Save the tokenized version of an uploaded file's text in the DB,
+    enabling later inclusion in conversation context.
+    """
+    from database import db_session
+    from sqlalchemy import text
+
+    with db_session() as db:
+        query = text("""
+            UPDATE uploaded_files
+            SET tokenized_text = :tokenized_text,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = :file_id
+        """)
+        db.execute(query, {
+            "tokenized_text": tokenized_text,
+            "file_id": file_id
+        })
+        db.commit()
