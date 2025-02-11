@@ -120,10 +120,10 @@
     </div>
 
     <!-- Main Chat Area -->
-    <div id="chat-main" class="chat-messages-container">
-        <!-- Messages Area -->
-        <div id="chat-box" class="chat-messages-scroll" role="log" aria-live="polite">
-            <div class="max-w-4xl mx-auto w-full px-4">
+    <div class="chat-container">
+        <div class="flex-1 relative overflow-hidden">
+            <div id="chat-box" class="chat-messages-scroll" role="log" aria-live="polite">
+                <div class="max-w-4xl mx-auto w-full px-4">
                 {% if messages %}
                     {% for message in messages %}
                         {% if message.role == 'assistant' %}
@@ -140,6 +140,7 @@
                         <p class="text-xs mt-2">Your messages are end-to-end encrypted</p>
                     </div>
                 {% endif %}
+                </div>
             </div>
         </div>
 

@@ -4,14 +4,7 @@
 
 @layer components {
   .chat-container {
-    --chat-input-height: 120px;
-    --chat-header-height: 64px;
-    @apply flex flex-col relative h-screen;
-
-    /* Mobile viewport height fix */
-    @supports (-webkit-touch-callout: none) {
-      height: -webkit-fill-available;
-    }
+    @apply flex flex-col h-[calc(100vh-4rem)];  /* 64px height for header */
   }
 
   .chat-messages-container {
@@ -19,20 +12,19 @@
   }
 
   .chat-messages-scroll {
-    @apply absolute inset-0 overflow-y-auto overscroll-contain;
-    @apply pt-[var(--chat-header-height)];
-    padding-bottom: 160px !important;
-    min-height: calc(100vh - 160px);
+    @apply flex-1 pb-[160px] !important;  /* Space for input */
+    min-height: calc(100vh - 160px - 4rem);
+    @apply overflow-y-auto overscroll-contain;
   }
 
   .chat-input-container {
-    @apply sticky bottom-0 left-0 right-0 z-[10000];
-    @apply bg-white/95 dark:bg-gray-900/95;
+    @apply fixed bottom-0 left-0 right-0 z-50 h-40;
+    @apply bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg;
     @apply border-t border-gray-200/50 dark:border-gray-700/50;
-    @apply shadow-lg backdrop-blur-[12px];
-    height: var(--chat-input-height);
+    @apply shadow-lg;
     padding-top: 1rem;
-    will-change: transform;
+    /* Safe area handling for mobile */
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 
   @supports (padding: max(0px)) {
