@@ -122,7 +122,6 @@ def create_db_engine(db_uri: str) -> Engine:
             "application_name": "chatter-app",
             "options": "-c statement_timeout=120000 -c idle_in_transaction_session_timeout=240000",
             "sslmode": "verify-full",
-            "ssl": AZURE_TLS_CONTEXT,
             "sslcert": ssl_cert,
             "sslrootcert": ssl_cert,
         },
