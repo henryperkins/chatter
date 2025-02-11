@@ -87,27 +87,45 @@
     // Create new chat function
     async function createNewChat() {
         try {
+            const sendBtn = document.getElementById('new-chat-btn');
+            if (sendBtn) sendBtn.disabled = true;
+        
             const response = await fetch('/chat/new', {
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': window.CHAT_CONFIG.csrfToken,
+                    'X-CSRFToken': window.CHAT_CONFIG?.csrfToken,
                     'Content-Type': 'application/json'
                 }
             });
-            
+        
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Failed to create new chat');
             }
-            
+        
             const data = await response.json();
             if (data.success && data.chat_id) {
-                window.location.href = `/chat/chat_interface?chat_id=${data.chat_id}`;
+                // Force full page load to initialize new chat
+                window.location.href = `/chat/chat_interface?chat_id=${data.chat_id}&new=true`;
             } else {
                 throw new Error('Invalid response from server');
             }
         } catch (error) {
-            window.MessageRenderer.showError('Failed to start new chat: ' + error.message);
+            console.error('New chat error:', error);
+            window.MessageRenderer.showError(`Failed to create chat: ${error.message}`);
+        } finally {
+            const sendBtn = document.getElementById('new-chat-btn');
+            if (sendBtn) sendBtn.disabled = false;
+        }
+    }
+
+    function initializeNewChatButton() {
+        const newChatBtn = document.getElementById('new-chat-btn');
+        if (newChatBtn) {
+            newChatBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                createNewChat();
+            });
         }
     }
 
@@ -383,6 +401,7 @@
 
     async function startChat() {
         try {
+            initializeNewChatButton();
             const configDiv = document.getElementById('chat-config');
             if (!configDiv) {
                 throw new Error('Chat configuration not found');
@@ -466,7 +485,16 @@
 
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
-            if (messageInput && sendButton) {
+            const chatForm = document.getElementById('chat-form');
+            
+            if (chatForm) {
+                chatForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    sendMessage(e);
+                });
+            }
+
+            if (messageInput) {
                 // Debounce Enter presses
                 const debounce = (func, wait) => {
                     let timeout;
@@ -483,12 +511,11 @@
                 const debouncedKeydown = debounce(e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
-                        sendMessage();
+                        sendMessage(e);
                     }
                 }, 100);
 
                 messageInput.addEventListener('keydown', debouncedKeydown);
-                sendButton.addEventListener('click', sendMessage);
             }
 
             document.querySelectorAll('button[aria-label="Delete chat"]').forEach(btn => {

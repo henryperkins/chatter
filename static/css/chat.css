@@ -172,23 +172,28 @@
 
 /* Mobile optimizations */
 @media (max-width: 640px) {
-  .chat-messages-scroll {
-    position: fixed;
-    top: 180px; /* Account for header + tabs */
-    bottom: 180px; /* Space for input */
-    left: 0;
-    right: 0;
-    padding-bottom: 2rem;
-  }
-  
   .chat-input-container {
     position: fixed;
-    bottom: var(--safe-area-bottom);
+    bottom: max(var(--safe-area-bottom), 20px) !important;
     left: 0;
     right: 0;
-    height: auto;
     padding: 1rem;
     z-index: 2000;
+    height: auto !important;
+    /* Add background for mobile */
+    background: var(--bg-color, theme(colors.white / 95));
+    box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1);
+  }
+  
+  /* Ensure messages scroll area leaves space */
+  .chat-messages-scroll {
+    bottom: 180px !important;
+  }
+  
+  /* Make message bubbles slightly narrower */
+  .message-container.user-message,
+  .message-container.assistant-message {
+    @apply max-w-[90%];
   }
 }
 
