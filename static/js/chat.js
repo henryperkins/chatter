@@ -4,6 +4,20 @@
     // Declare a variable for scroll animation frames to avoid reference errors
     let scrollFrame = null;
 
+    const CONFIG = {
+        DEPENDENCY_TIMEOUT: 5000,
+        STREAM_UPDATE_INTERVAL: 100,
+        MAX_DEPENDENCY_ATTEMPTS: 50, 
+        O_SERIES_MODELS: ['o3-mini', 'o1', 'o1-mini', 'o1-preview'],
+        DEBUG: true
+    };
+
+    function logDebug(...args) {
+        if (window.monitoring) {
+            window.monitoring.log('debug', ...args);
+        }
+    }
+
     // 1. Visual viewport resize handling for on-screen keyboard:
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
@@ -42,16 +56,6 @@
                     console.debug('Swiped left in chat box');
                 }
             }
-
-            function showSuccess(message, durationMs = 3000) {
-                if (window.showAlert) {
-                    window.showAlert(message, 'success', durationMs);
-                    return;
-                }
-                // Fallback if window.showAlert is undefined:
-                console.log('SUCCESS:', message);
-                // Optionally create a basic in-page notification if desired
-            }
         }, { passive: true });
     })();
 
@@ -80,141 +84,45 @@
         });
     })();
 
-    const CONFIG = {
-        DEPENDENCY_TIMEOUT: 5000,
-        STREAM_UPDATE_INTERVAL: 100,
-        MAX_DEPENDENCY_ATTEMPTS: 50,
-        DEBUG: true
-    };
+    // Create new chat function
+    async function createNewChat() {
+        try {
+            const response = await fetch('/chat/new', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': window.CHAT_CONFIG.csrfToken,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to create new chat');
+            }
+            
+            const data = await response.json();
+            if (data.success && data.chat_id) {
+                window.location.href = `/chat/chat_interface?chat_id=${data.chat_id}`;
+            } else {
+                throw new Error('Invalid response from server');
+            }
+        } catch (error) {
+            window.MessageRenderer.showError('Failed to start new chat: ' + error.message);
+        }
+    }
 
     // Mobile chat selector handler
     document.getElementById('mobile-chat-selector')?.addEventListener('change', function(e) {
         const chatId = e.target.value;
         if (chatId === 'new') {
-            window.location.href = '/chat/new';
+            createNewChat();
         } else {
-            window.location.href = `/chat/${chatId}`;
+            window.location.href = `/chat/chat_interface?chat_id=${chatId}`;
         }
     });
 
-    function logDebug(...args) {
-        if (window.monitoring) {
-            window.monitoring.log('debug', ...args);
-        }
-    }
-
-    function showTypingIndicator() {
-        if (window.monitoring) {
-            window.monitoring.mark('typingStart');
-        }
-    }
-
-    function removeTypingIndicator() {
-        if (window.monitoring) {
-            window.monitoring.mark('typingEnd');
-            window.monitoring.measure('typingDuration', 'typingStart', 'typingEnd');
-        }
-    }
-
-    function showError(message, file = null) {
-        if (message.includes('Authentication Error')) {
-            message = message.replace('Authentication Error:', '🔑 Authentication Error:');
-        }
-
-        // Provide a clear prefix icon or emoji to errors
-        message = `⚠️ ${message}`;
-    
-        let errorMessage = message;
-        if (file) {
-            errorMessage = `[${file.name}] ${message} (${(file.size / 1024 / 1024).toFixed(2)}MB)`;
-        }
-
-        if (window.showAlert) {
-            window.showAlert(errorMessage, 'error', 10000);
-        } else {
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'pointer-events-auto fixed top-20 left-1/2 transform -translate-x-1/2 bg-red-100 dark:bg-red-900/50 text-red-900 dark:text-red-100 px-6 py-4 rounded-lg shadow-xl border-2 border-red-500/50 z-[2200] max-w-[90%] sm:max-w-lg';
-            errorDiv.innerHTML = `
-                <div class='flex items-center gap-3'>
-                    <i class='fas fa-exclamation-circle text-lg'></i>
-                    <p class='text-sm font-medium flex-1'>${errorMessage}</p>
-                    <button onclick='this.parentElement.parentElement.remove()' class='hover:opacity-80 transition-opacity'>
-                        <i class='fas fa-times'></i>
-                    </button>
-                </div>
-            `;
-            document.body.appendChild(errorDiv);
-            setTimeout(() => {
-                if (errorDiv.parentElement) {
-                    errorDiv.remove();
-                }
-            }, 10000);
-        }
-    }
-
-    function appendUserMessage(message, files = []) {
-        if (!message || typeof message !== 'string') {
-            window.monitoring?.logError('Invalid user message content.');
-            return;
-        }
-
-        const chatBox = document.getElementById('chat-box');
-        if (!chatBox) {
-            window.monitoring?.logError('Chat box not found');
-            return;
-        }
-
-        const messageDiv = window.MessageRenderer.renderUserMessage(message, files);
-        chatBox.appendChild(messageDiv);
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    async function appendAssistantMessage(message, isStreaming = false, existingDiv = null, files = []) {
-        if (!message) return;
-        logDebug('Appending assistant message:', message);
-
-        const chatBox = document.getElementById('chat-box');
-        if (!chatBox) {
-            window.monitoring?.logError('Chat box not found');
-            return;
-        }
-
-        // Wait for dependencies
-        let attempts = 0;
-        while ((!window.md || !window.DOMPurify) && attempts < CONFIG.MAX_DEPENDENCY_ATTEMPTS) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
-        }
-
-        if (!window.md || !window.DOMPurify) {
-            window.monitoring?.logError('Required dependencies not available.');
-            const errorDiv = document.createElement('div');
-            errorDiv.innerHTML = '<p class=\'text-red-500\'>Error: Required dependencies not available. Please refresh the page.</p>';
-            chatBox.insertBefore(errorDiv, chatBox.firstChild);
-            return;
-        }
-
-        try {
-            const textContent = (typeof message === 'string') ? message : message.content;
-            let messageDiv;
-
-            if (!existingDiv) {
-                messageDiv = window.MessageRenderer.renderAssistantMessage(textContent, isStreaming);
-                chatBox.appendChild(messageDiv);
-            } else {
-                messageDiv = existingDiv;
-                window.MessageRenderer.finalizeAssistantMessage(messageDiv, textContent);
-            }
-
-            chatBox.scrollTop = chatBox.scrollHeight;
-            return messageDiv;
-        } catch (error) {
-            window.monitoring?.logError('Error appending assistant message:', error);
-            const errorDiv = document.createElement('div');
-            errorDiv.innerHTML = `<p class='text-red-500'>Error creating message: ${error.message}</p>`;
-            chatBox.appendChild(errorDiv);
-        }
-    }
+    // New chat button handler
+    document.getElementById('new-chat-btn')?.addEventListener('click', createNewChat);
 
     async function handleNormalResponse(formData) {
         // Same base JSON payload as handleStreamingResponse, but no "stream: true"
@@ -246,10 +154,10 @@
 
         // data.message.content holds the assistant's reply
         const content = data.message?.content || '';
-        await appendAssistantMessage(content, /* isStreaming= */ false);
+        await window.MessageRenderer.appendAssistantMessage(content, /* isStreaming= */ false);
 
         // Immediately show a quick success toast
-        showSuccess("Assistant responded successfully");
+        window.MessageRenderer.showSuccess('Assistant responded successfully');
     }
 
     async function handleStreamingResponse(formData) {
@@ -387,7 +295,7 @@
             if (window.monitoring) {
                 window.monitoring.logError('Streaming failed:', error);
             }
-            showError(`API Error: ${error.message}`);
+            window.MessageRenderer.showError(`API Error: ${error.message}`);
             if (messageDiv) {
                 messageDiv.remove();
             }
@@ -403,7 +311,7 @@
         const sendButton = document.getElementById('send-button');
 
         if (!messageInput || !sendButton) {
-            showError('Chat interface not properly initialized');
+            window.MessageRenderer.showError('Chat interface not properly initialized');
             return;
         }
         if (sendButton.disabled) return;
@@ -419,7 +327,7 @@
                 try {
                     uploadedFiles = await window.fileUploadManager.uploadFiles();
                 } catch (uploadError) {
-                    showError('File upload failed', uploadError.file);
+                    window.MessageRenderer.showError('File upload failed', uploadError.file);
                     throw uploadError;
                 }
             }
@@ -434,17 +342,27 @@
             }
 
             const modelSelect = document.getElementById('model-select');
-            const modelSupportsStreaming = (
-                modelSelect &&
-                modelSelect.selectedOptions.length &&
-                modelSelect.selectedOptions[0].dataset.supportsStreaming === 'true'
-            );
+            let modelSupportsStreaming = false;
+            let isOSeriesModel = false;
+            
+            if (modelSelect && modelSelect.selectedOptions.length) {
+                const selectedOption = modelSelect.selectedOptions[0];
+                const modelType = selectedOption.dataset.modelType;
+                
+                // Check if it's an o-series model
+                isOSeriesModel = CONFIG.O_SERIES_MODELS.includes(modelType);
+                
+                // Only o3-mini supports streaming
+                modelSupportsStreaming = modelType === 'o3-mini';
+                
+                window.CHAT_CONFIG.isOSeriesModel = isOSeriesModel;
+            }
 
-            appendUserMessage(message, uploadedFiles);
+            window.MessageRenderer.appendUserMessage(message, uploadedFiles);
             messageInput.value = '';
             window.fileUploadManager?.clearFiles();
 
-            showTypingIndicator();
+            window.MessageRenderer.showTypingIndicator();
             if (modelSupportsStreaming) {
                 await handleStreamingResponse(formData);
             } else {
@@ -456,10 +374,10 @@
             }
         } catch (error) {
             window.monitoring?.logError('Error in sendMessage:', error);
-            showError(error.message || 'Failed to send message');
+            window.MessageRenderer.showError(error.message || 'Failed to send message');
         } finally {
             sendButton.disabled = false;
-            removeTypingIndicator();
+            window.MessageRenderer.removeTypingIndicator();
         }
     }
 
@@ -469,6 +387,7 @@
             if (!configDiv) {
                 throw new Error('Chat configuration not found');
             }
+            window.CHAT_CONFIG.isOSeriesModel = false;
 
             // Wait for MessageRenderer to be available
             let attempts = 0;
@@ -505,7 +424,7 @@
                 }
             } catch (error) {
                 window.monitoring?.logError('Component init failed', error);
-                showError('Failed to initialize chat components: ' + error.message);
+                window.MessageRenderer.showError('Failed to initialize chat components: ' + error.message);
                 return;
             }
 
@@ -516,6 +435,12 @@
             const modelSelect = document.getElementById('model-select');
             if (modelSelect) {
                 modelSelect.addEventListener('change', async () => {
+                    // Update o-series model status
+                    const selectedOption = modelSelect.selectedOptions[0];
+                    const modelType = selectedOption.dataset.modelType;
+                    window.CHAT_CONFIG.isOSeriesModel = CONFIG.O_SERIES_MODELS.includes(modelType);
+                    
+                    // Update model in backend
                     const newModelId = modelSelect.value;
                     const chatId = window.CHAT_CONFIG.chatId;
                     try {
@@ -529,12 +454,12 @@
                         });
                         const data = await resp.json();
                         if (data.success) {
-                            window.showAlert('Chat model updated', 'success');
+                            window.MessageRenderer.showSuccess('Chat model updated');
                         } else {
-                            window.showAlert(data.error || 'Failed to update chat model', 'error');
+                            window.MessageRenderer.showError(data.error || 'Failed to update chat model');
                         }
                     } catch (err) {
-                        window.showAlert('Failed to update chat model', 'error');
+                        window.MessageRenderer.showError('Failed to update chat model');
                     }
                 });
             }
@@ -582,13 +507,13 @@
                         });
                         const data = await resp.json();
                         if (data.success) {
-                            window.showAlert('Chat deleted', 'success');
+                            window.MessageRenderer.showSuccess('Chat deleted');
                             window.location.href = '/chat/interface';
                         } else {
-                            window.showAlert(data.error, 'error');
+                            window.MessageRenderer.showError(data.error);
                         }
                     } catch (err) {
-                        window.showAlert('Delete failed', 'error');
+                        window.MessageRenderer.showError('Delete failed');
                     }
                 });
             });
@@ -609,13 +534,13 @@
                         });
                         const data = await resp.json();
                         if (data.success) {
-                            window.showAlert('Chat title updated', 'success');
+                            window.MessageRenderer.showSuccess('Chat title updated');
                             location.reload();
                         } else {
-                            window.showAlert(data.error, 'error');
+                            window.MessageRenderer.showError(data.error);
                         }
                     } catch (err) {
-                        window.showAlert('Failed to update chat title', 'error');
+                        window.MessageRenderer.showError('Failed to update chat title');
                     }
                 });
             }
@@ -635,14 +560,14 @@
                     e.stopPropagation();
                     if (confirm('Do you want to regenerate the assistant response?')) {
                         // Placeholder regeneration logic
-                        window.showAlert('Regeneration triggered (feature not fully implemented yet)', 'info');
+                        window.MessageRenderer.showSuccess('Regeneration triggered (feature not fully implemented yet)');
                     }
                 });
             });
 
         } catch (error) {
             window.monitoring?.logError('Failed to initialize chat:', error);
-            showError(error.message);
+            window.MessageRenderer.showError(error.message);
         }
     }
 

@@ -19,14 +19,21 @@ class ContextManager:
     including full context, compression, and summarization.
     """
 
-    def __init__(self, model_max_tokens: int) -> None:
+    def __init__(self, model_max_tokens: int, model_type: Optional[str] = None) -> None:
         """
         Initialize the ContextManager.
 
         Args:
             model_max_tokens: The maximum number of tokens allowed by the model.
+            model_type: The type of model being used (e.g., "o1", "o3-mini").
         """
         self.model_max_tokens = model_max_tokens
+        self.model_type = model_type
+        
+        # Adjust max tokens for o-series models
+        if model_type and model_type.lower() in ["o3-mini", "o1", "o1-mini", "o1-preview"]:
+            self.model_max_tokens = min(model_max_tokens, self._get_o_series_token_limit(model_type))
+        
         self.context_strategy = "full"  # Default strategy
         self.context_cache: Dict[int, List[Dict[str, Any]]] = {}
         self.monitor = ContextMonitor()
@@ -54,7 +61,7 @@ class ContextManager:
         logger.debug("Messages prioritized. Applying context strategy '%s'", self.context_strategy)
 
         if self.context_strategy == "full":
-            context = prioritized
+            context = self._adjust_for_model_type(prioritized)
         elif self.context_strategy == "compressed":
             context = self.compress_context(prioritized, self.model_max_tokens)
         else:  # 'summary'
@@ -66,6 +73,36 @@ class ContextManager:
         logger.debug("Context cache miss. Key %s stored.", cache_key)
 
         return context
+
+    def _adjust_for_model_type(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Adjust messages based on model type requirements."""
+        if not self.model_type:
+            return messages
+
+        model_type = self.model_type.lower()
+        adjusted_messages = []
+
+        for msg in messages:
+            if not isinstance(msg, dict):
+                continue
+
+            # Convert system messages to developer messages for o-series models
+            if model_type in ["o1-mini", "o1-preview"] and msg.get("role") == "system":
+                continue  # Skip system messages for these models
+            elif model_type in ["o3-mini", "o1"] and msg.get("role") == "system":
+                msg = dict(msg)  # Create a copy
+                msg["role"] = "developer"
+
+            adjusted_messages.append(msg)
+
+        return adjusted_messages
+
+    def _get_o_series_token_limit(self, model_type: str) -> int:
+        """Get token limit for o-series model."""
+        limits = {"o3-mini": 75000, "o1": 100000,
+                "o1-mini": 50000, "o1-preview": 32768}
+        model_key = model_type.lower()
+        return limits.get(model_key, 32000)  # Default to 32k for safety
 
     def prioritize_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """

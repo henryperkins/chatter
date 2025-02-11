@@ -1,7 +1,7 @@
-<div class="message-container user flex max-w-2xl ml-auto">
+<div class="message-container user-message">
     <div class="flex gap-3 w-full justify-end">
         <div class="flex-1 relative">
-            <div class="message-bubble bg-gradient-to-r from-primary-600/95 to-secondary-600/95 text-white">
+            <div class="message-bubble">
                 <p class="text-[15px] leading-relaxed break-words whitespace-pre-wrap">
                     {{ message.content }}
                 </p>
@@ -21,6 +21,6 @@
                 {{ message.timestamp }}
             </span>
         </div>
-        <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500/20 to-secondary-500/20 shadow-md"></div>
+        <div class="flex-shrink-0 h-8 w-8 rounded-full bg-primary-600/20 shadow-sm"></div>
     </div>
 </div>

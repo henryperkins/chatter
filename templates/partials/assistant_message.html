@@ -1,4 +1,4 @@
-<div class="message-container assistant flex max-w-3xl mx-auto">
+<div class="message-container assistant-message">
     <div class="flex gap-3 w-full">
         <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-md" role="img" aria-label="Assistant avatar">
             <i class="fas fa-robot text-sm"></i>
@@ -10,8 +10,12 @@
                 </button>
             </div>
 
-            <div class="message-bubble bg-white/95 dark:bg-gray-800/95">
-                <div class="prose dark:prose-invert prose-sm sm:prose-base max-w-none" data-role="assistant-message" data-content="{{ message.content|e }}">
+            <div class="message-bubble">
+                <div class="message-content" data-role="assistant-message">
+                    <div class="prose dark:prose-invert prose-sm sm:prose-base max-w-none" data-content="{{ message.content|e }}">
+                        {{ message.content|safe }}
+                    </div>
+                    <button class="toggle-more hidden">Show more</button>
                 </div>
 
                 {% if message.metadata and message.metadata.has_attachments %}

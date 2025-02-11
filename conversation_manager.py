@@ -1,6 +1,8 @@
+"""Module for managing chat conversations and context."""
+
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict, cast
 
 from tiktoken import get_encoding
 from sqlalchemy import text
@@ -60,12 +62,18 @@ class ConversationManager:
         messages = Chat.get_messages(chat_id=chat_id, include_system=include_system)
         context: List[Dict[str, str]] = []
 
-        # Always add markdown formatting request, even for models that don't use system messages
-        markdown_request = {
-            "role": "system" if include_system else "user",
-            "content": "Formatting re-enabled - code output should be wrapped in markdown. Use standard markdown syntax for headers (#), lists (- or 1.), emphasis (* or _), etc. For code blocks, specify the language after the opening triple backticks (e.g., ```python, ```javascript, ```sql). Only use triple backticks to enclose code blocks – do not wrap the entire response in one giant code block."
-        }
-        context.append(markdown_request)
+        # Get the chat's model to check if it's an o-series model
+        chat = Chat.get_by_id(chat_id)
+        model = Chat.get_model(chat_id) if chat else None
+        is_o_series = model and getattr(model, "model_type", "").lower() in ["o3-mini", "o1", "o1-mini", "o1-preview"]
+
+        # Only add markdown formatting request for o-series models
+        if is_o_series:
+            markdown_request = {
+                "role": "developer",
+                "content": "Formatting re-enabled - please enclose code blocks with appropriate markdown tags."
+            }
+            context.append(markdown_request)
 
         for msg in messages:
             role = msg.get("role")
@@ -221,26 +229,37 @@ class ConversationManager:
 
             # Process messages with attachments
             for msg in optimized_context:
+                if not isinstance(msg, dict):
+                    continue
+                    
                 metadata = msg.get("metadata", {})
+                if not isinstance(metadata, dict):
+                    continue
+
                 if metadata.get("has_attachments"):
                     attachments = metadata.get("attachments", [])
-                    if attachments:
-                        # Reconstruct content with attachments
-                        original_content = str(msg.get("content", ""))
-                        attachment_text = "\n\nAttached files:\n"
-                        
-                        # Ensure attachments is a list of dicts
-                        valid_attachments = [a for a in attachments if isinstance(a, dict)]
-                        
-                        for attachment in valid_attachments:
-                            attachment_text += f"\n[{attachment['name']}]:\n{attachment['content']}"
+                    if not isinstance(attachments, list):
+                        continue
 
-                        # Update message content
-                        msg["content"] = original_content + attachment_text
-                        logger.debug(
-                            "Reconstructed message content with %d attachments",
-                            len(attachments)
-                        )
+                    # Reconstruct content with attachments
+                    original_content = str(msg.get("content", ""))
+                    attachment_text = "\n\nAttached files:\n"
+                    
+                    # Ensure attachments is a list of dicts
+                    valid_attachments = [
+                        a for a in attachments 
+                        if isinstance(a, dict) and "name" in a and "content" in a
+                    ]
+                    
+                    for attachment in valid_attachments:
+                        attachment_text += f"\n[{attachment['name']}]:\n{attachment['content']}"
+
+                    # Update message content
+                    msg["content"] = original_content + attachment_text
+                    logger.debug(
+                        "Reconstructed message content with %d attachments",
+                        len(valid_attachments)
+                    )
 
             current_tokens = count_conversation_tokens(optimized_context)
 
@@ -248,6 +267,8 @@ class ConversationManager:
             if len(optimized_context) < len(messages):
                 keep_ids: List[int] = []
                 for msg in optimized_context:
+                    if not isinstance(msg, dict):
+                        continue
                     msg_id = msg.get("id")
                     if isinstance(msg_id, int):
                         keep_ids.append(msg_id)
@@ -255,7 +276,8 @@ class ConversationManager:
                         keep_ids.append(int(msg_id))
                     else:
                         logger.warning("Invalid message ID type: %s", type(msg_id))
-                self._remove_old_messages(chat_id, keep_ids)
+                if keep_ids:
+                    self._remove_old_messages(chat_id, keep_ids)
 
             # Update context cache
             self.context_cache[chat_id] = optimized_context
@@ -436,7 +458,7 @@ class ConversationManager:
                     AND id NOT IN :keep_ids
                     """
                 )
-                db.execute(query, {"chat_id": chat_id, "keep_ids": keep_ids})
+                db.execute(query, {"chat_id": chat_id, "keep_ids": tuple(keep_ids)})
                 db.commit()
         except Exception as e:
             logger.error("Error removing old messages from chat %s: %s", chat_id, e)

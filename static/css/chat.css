@@ -1,39 +1,106 @@
-/* Layout fundamentals */
-.chat-container {
-    --chat-input-height: 180px;
-    --chat-header-height: 64px;
-}
-
 /* Message containers */
 .message-container {
-    margin-bottom: theme('spacing.6');
+    @apply mb-6;
 }
 
-/* Token panel */
-.token-panel-container {
-    @apply fixed right-4 z-40 w-96 max-w-[calc(100%-2rem)];
-    bottom: var(--chat-input-height);
-    background: theme('colors.white' / 0.98);
-    @apply dark:bg-gray-900/98;
-    @apply rounded-xl shadow-lg backdrop-blur-md;
+.message-container.user-message {
+    @apply ml-auto max-w-[75%];
+}
+
+.message-container.assistant-message {
+    @apply mr-auto max-w-[75%];
+}
+
+/* Message bubbles */
+.user-message .message-bubble {
+    @apply bg-primary-600;
+}
+
+.user-message .message-bubble .prose {
+    @apply text-white;
+}
+
+.user-message .message-bubble .prose pre {
+    @apply bg-primary-700/50;
+    @apply border-primary-500/30;
+}
+
+.user-message .message-bubble .prose code {
+    @apply bg-primary-700/50 text-white;
+}
+
+.assistant-message .message-bubble {
+    @apply bg-gray-100 dark:bg-gray-800;
+}
+
+.assistant-message .message-bubble .prose {
+    @apply text-gray-900 dark:text-gray-100;
+}
+
+/* Removed custom prose overrides to allow Tailwind Typography defaults */
+
+.message-bubble .prose h1,
+.message-bubble .prose h2,
+.message-bubble .prose h3,
+.message-bubble .prose h4 {
+    @apply font-semibold mt-6 mb-3;
+}
+
+.message-bubble .prose h1 {
+    @apply text-xl;
+}
+
+.message-bubble .prose h2 {
+    @apply text-lg;
+}
+
+.message-bubble .prose h3 {
+    @apply text-base;
+}
+
+.message-bubble .prose ul,
+.message-bubble .prose ol {
+    @apply my-3 pl-6;
+}
+
+.message-bubble .prose li {
+    @apply my-1;
+}
+
+.message-bubble .prose blockquote {
+    @apply border-l-4 pl-4 my-3 italic;
+}
+
+.assistant-message .message-bubble .prose blockquote {
+    @apply border-gray-300 dark:border-gray-600;
+}
+
+.user-message .message-bubble .prose blockquote {
+    @apply border-white/30;
+}
+
+/* Code block styling */
+.message-bubble .prose pre {
+    @apply my-4 p-4 rounded-lg overflow-x-auto;
+    @apply font-mono text-sm leading-relaxed;
+    @apply -mx-4 first:mt-0 last:mb-0;
+}
+
+.assistant-message .message-bubble .prose pre {
+    @apply bg-gray-50 dark:bg-gray-800/50;
     @apply border border-gray-200/50 dark:border-gray-700/50;
-    @apply p-4;
 }
 
-/* Chat input area */
-#chat-input {
-    @apply fixed inset-x-0 bottom-0 z-50;
-    @apply bg-white/95 dark:bg-gray-900/95 backdrop-blur-md;
-    @apply border-t border-gray-200/50 dark:border-gray-700/50;
-    @apply transition-all duration-300;
-    height: var(--chat-input-height);
+.message-bubble .prose code {
+    @apply px-1.5 py-0.5 rounded-md font-mono text-sm;
 }
 
-/* Chat box scroll area */
-#chat-box {
-    height: calc(100vh - var(--chat-header-height) - var(--chat-input-height));
-    @apply overflow-y-auto overscroll-contain;
-    padding-bottom: calc(var(--chat-input-height) + theme('spacing.8'));
+.assistant-message .message-bubble .prose code {
+    @apply bg-gray-200/50 dark:bg-gray-700/50;
+}
+
+.message-bubble .prose pre code {
+    @apply p-0 bg-transparent;
 }
 
 /* Message content */
@@ -41,88 +108,43 @@
     @apply relative transition-all duration-300;
 }
 
-.message-content.collapsed {
-    max-height: 200px;
+.message-content.collapsed .prose {
+    max-height: 300px;
     overflow: hidden;
-    mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 60%, transparent 95%);
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 95%);
 }
 
+/* Show more button */
 .message-content .toggle-more {
-    @apply absolute bottom-0 left-0 w-full;
-    @apply p-2 text-center cursor-pointer;
-    @apply text-sm text-primary-600 dark:text-primary-400;
-    @apply bg-gradient-to-t from-white/90 to-transparent dark:from-gray-800/90;
-    @apply rounded-b-lg opacity-0 transition-opacity duration-200;
+    @apply absolute -bottom-8 left-1/2 transform -translate-x-1/2;
+    @apply px-4 py-1.5 text-center cursor-pointer;
+    @apply text-sm font-medium text-primary-600 dark:text-primary-400;
+    @apply bg-white dark:bg-gray-800 rounded-full;
+    @apply shadow-sm hover:shadow-md dark:shadow-none dark:border dark:border-gray-700;
+    @apply z-10 hover:bg-gray-50 dark:hover:bg-gray-700;
+    @apply transition-all duration-200;
+    min-width: 100px;
 }
 
-.message-content.collapsed:hover .toggle-more {
-    @apply opacity-100;
-}
-
-/* Safe area handling */
-@supports(padding: env(safe-area-inset-bottom)) {
-    #chat-input {
-        padding-bottom: max(theme('spacing.4'), env(safe-area-inset-bottom));
-    }
-    
-    #chat-box {
-        --safe-bottom: env(safe-area-inset-bottom, 0px);
-        height: calc(100vh - var(--chat-header-height) - var(--chat-input-height) - var(--safe-bottom));
-    }
+/* O-series model specific styles */
+.o-series-message .message-bubble {
+    @apply border-l-4 border-primary-500/50;
 }
 
 /* Mobile optimizations */
 @media (max-width: 640px) {
-    .chat-container {
-        --chat-input-height: 140px;
-        --chat-header-height: 56px;
-    }
-
-    #message-input {
-        max-height: 120px;
-        overflow-y: auto;
+    .message-container.user-message,
+    .message-container.assistant-message {
+        @apply max-w-[85%];
     }
 
     .message-bubble {
-        @apply px-3 py-2;
+        @apply px-4 py-3;
     }
 
-    .token-panel-container {
-        @apply right-2 left-2 w-auto;
-        bottom: calc(var(--chat-input-height) + theme('spacing.4'));
-    }
-
-    .message-container {
-        @apply max-w-[95%];
-    }
-}
-
-/* Dark mode transitions */
-.dark-mode-transition * {
-    @apply transition-colors duration-300;
-}
-
-/* Sending state */
-.sending #send-button {
-    @apply opacity-70 cursor-not-allowed relative;
-}
-
-.sending #send-button::after {
-    content: "";
-    @apply absolute top-1/2 left-1/2;
-    width: 24px;
-    height: 24px;
-    margin: -12px 0 0 -12px;
-    border: 3px solid theme('colors.white' / 0.3);
-    border-top-color: theme('colors.white');
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
+    .message-bubble pre {
+        @apply -mx-3 px-3;
     }
 }
 
@@ -140,4 +162,51 @@
 
 .animate-slide-up {
     animation: slide-in 0.3s ease-out forwards;
+}
+
+/* Additional typography overrides to enforce proper markdown formatting */
+.message-bubble .prose {
+    font-size: 1rem !important;
+    line-height: 1.5 !important;
+}
+.message-bubble .prose p {
+    margin-bottom: 1rem !important;
+}
+.message-bubble .prose h1,
+.message-bubble .prose h2,
+.message-bubble .prose h3,
+.message-bubble .prose h4,
+.message-bubble .prose h5,
+.message-bubble .prose h6 {
+    margin-top: 1.5rem !important;
+    margin-bottom: 0.75rem !important;
+    font-weight: bold !important;
+}
+.message-bubble .prose blockquote {
+    border-left: 4px solid rgba(156, 163, 175, 1) !important;
+    padding-left: 1rem !important;
+    font-style: italic !important;
+}
+
+/* Custom typography overrides for message bubbles */
+.message-bubble .prose {
+    @apply text-base leading-relaxed;
+}
+.message-bubble .prose h1,
+.message-bubble .prose h2,
+.message-bubble .prose h3,
+.message-bubble .prose h4,
+.message-bubble .prose h5,
+.message-bubble .prose h6 {
+    @apply font-bold mt-6 mb-2;
+}
+.message-bubble .prose p {
+    @apply mb-4;
+}
+.message-bubble .prose ul,
+.message-bubble .prose ol {
+    @apply list-disc pl-6 my-4;
+}
+.message-bubble .prose blockquote {
+    @apply border-l-4 pl-4 italic text-gray-600 dark:text-gray-400 my-4;
 }

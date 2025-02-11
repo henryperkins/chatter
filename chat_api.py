@@ -1,12 +1,14 @@
 """Module for Azure OpenAI API interaction and chat handling."""
 
 import os
-from typing import Optional, List, Dict, Union, Generator, Any
+from typing import Optional, List, Dict, Union, Generator, Any, Mapping
 import requests
 from openai import AzureOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
-from openai.types.chat.chat_completion import Choice, ChatCompletionMessage
+from openai.types.chat.chat_completion_message import ChatCompletionMessage
+from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_chunk import ChoiceDelta
+from azure.identity import DefaultAzureCredential
 
 from logging_config import get_logger
 from utils.encryption import decrypt_api_key
@@ -51,18 +53,16 @@ class ChatClient:
 
         try:
             if not self._azure_client:
-                client_kwargs = {
+                client_kwargs: Dict[str, Any] = {
                     "azure_endpoint": api_endpoint,
                     "api_version": api_version,
                 }
 
                 if use_azure_ad:
-                    from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-                    token_provider = get_bearer_token_provider(
-                        DefaultAzureCredential(),
+                    credential = DefaultAzureCredential()
+                    client_kwargs["azure_ad_token"] = credential.get_token(
                         "https://cognitiveservices.azure.com/.default"
-                    )
-                    client_kwargs["azure_ad_token_provider"] = token_provider
+                    ).token
                 else:
                     client_kwargs["api_key"] = api_key
 
@@ -70,6 +70,38 @@ class ChatClient:
             return self._azure_client
         except Exception as e:
             raise ChatAPIError(f"Failed to create Azure client: {str(e)}", 500)
+
+    @staticmethod
+    def is_o_series_model(model_type: Optional[str]) -> bool:
+        """Check if the model is an o-series model."""
+        if not model_type:
+            return False
+        return model_type.lower() in ["o3-mini", "o1", "o1-mini", "o1-preview"]
+
+    @staticmethod
+    def get_max_completion_tokens_limit(model_type: str) -> int:
+        """Get the max completion tokens limit for a model type."""
+        limits = {
+            "o3-mini": 75000,
+            "o1": 100000,
+            "o1-mini": 50000,
+            "o1-preview": 32768
+        }
+        return limits.get(model_type.lower(), 32000)  # Default to 32k for safety
+
+    @staticmethod
+    def supports_streaming(model_type: Optional[str]) -> bool:
+        """Check if the model supports streaming."""
+        if not model_type:
+            return False
+        return model_type.lower() == "o3-mini"
+
+    @staticmethod
+    def add_markdown_developer_message(messages: List[Message], model_type: Optional[str]) -> List[Message]:
+        """Add developer message for markdown formatting if using o-series model."""
+        if ChatClient.is_o_series_model(model_type):
+            return [{"role": "developer", "content": "Formatting re-enabled - please enclose code blocks with appropriate markdown tags."}] + messages
+        return messages
 
 
 def get_azure_response(
@@ -100,6 +132,16 @@ def get_azure_response(
             isinstance(m, dict) and "role" in m and "content" in m for m in messages
         ):
             raise ChatAPIError("Invalid messages format", 400)
+            
+        # Add markdown formatting message for o-series models
+        messages = ChatClient.add_markdown_developer_message(messages, model_type)
+
+        # Validate streaming support
+        if stream and model_type and not ChatClient.supports_streaming(model_type):
+            raise ChatAPIError(f"Model {model_type} does not support streaming", 400)
+
+        # Get token limit for model type
+        token_limit = ChatClient.get_max_completion_tokens_limit(model_type) if model_type else max_completion_tokens
 
         # Validate system messages for o-series models
         if model_type and model_type.lower() in ["o1-mini", "o1-preview"]:
@@ -126,7 +168,7 @@ def get_azure_response(
         )
 
         # Prepare completion parameters
-        completion_params = {
+        completion_params: Dict[str, Any] = {
             "model": deployment_name,
             "messages": messages,
             "stream": stream,
@@ -138,10 +180,8 @@ def get_azure_response(
                 raise ChatAPIError("Invalid response_format structure", 400)
             completion_params["response_format"] = response_format
 
-        # Handle o-series model parameters more comprehensively
-        # According to the new documentation, these models only support max_completion_tokens (not standard "max_tokens"),
-        # and we can optionally pass "reasoning_effort". Also ignore typical generation parameters (temperature, top_p, etc.).
-        if model_type and model_type.lower() in ["o1", "o1-mini", "o1-preview", "o3-mini"]:
+        # Handle o-series model parameters
+        if model_type and ChatClient.is_o_series_model(model_type):
             # Validate API version for o-series models
             model_type_lower = model_type.lower()
             if model_type_lower in ["o3-mini", "o1"]:
@@ -153,41 +193,38 @@ def get_azure_response(
                 if api_version not in valid_versions:
                     raise ChatAPIError(f"Model {model_type} requires API version {', '.join(valid_versions[:-1])} or {valid_versions[-1]}", 400)
 
-            # Validate streaming support (only o3-mini supports streaming)
-            if stream and model_type_lower != "o3-mini":
-                raise ChatAPIError(f"Model {model_type} does not support streaming", 400)
-            # For O-series, rely on max_completion_tokens, reasoning_effort, developer messages, etc.
-            # Validate max_completion_tokens based on model type
-            max_tokens_limits = {
-                "o3-mini": 75000,
-                "o1": 100000,
-                "o1-mini": 50000,
-                "o1-preview": 32768
-            }
-            model_limit = max_tokens_limits[model_type_lower]
-            if max_completion_tokens > model_limit:
-                raise ChatAPIError(f"Model {model_type} has a maximum completion token limit of {model_limit}", 400)
-            completion_params["max_completion_tokens"] = max_completion_tokens
+            # Set max_completion_tokens
+            completion_params["max_completion_tokens"] = min(max_completion_tokens, token_limit)
             
             # Validate reasoning_effort parameter
             valid_efforts = ["low", "medium", "high"]
-            if reasoning_effort not in valid_efforts:
+            if reasoning_effort and reasoning_effort not in valid_efforts:
                 raise ChatAPIError(f"Invalid reasoning_effort value. Must be one of: {', '.join(valid_efforts)}", 400)
-            completion_params["reasoning_effort"] = reasoning_effort
+            if reasoning_effort:
+                completion_params["reasoning_effort"] = reasoning_effort
             
-            completion_params["temperature"] = 1.0  # Required for o-series models
+            # Set fixed temperature for o-series models
+            completion_params["temperature"] = 1.0
 
-            # Remove any typical generation parameters that might break O-series usage:
+            # Remove any typical generation parameters that might break O-series usage
             for param in ["top_p", "presence_penalty", "frequency_penalty", "logprobs", "top_logprobs", "logit_bias"]:
                 if param in completion_params:
                     del completion_params[param]
         else:
             # For standard models, use max_tokens
             completion_params["max_tokens"] = max_completion_tokens
+            if temperature is not None:
+                completion_params["temperature"] = temperature
 
         try:
             # Make API call
+            logger.info("Sending request to chat completions with parameters: %s", completion_params)
             response = client.chat.completions.create(**completion_params)
+            logger.info("Received response from chat completions: %s", type(response))
+            if response:
+                logger.info("Response object is truthy. Stream mode? %s", stream)
+            else:
+                logger.warning("No response object returned from chat completions. Stream: %s", stream)
 
             if stream:
                 return handle_streaming_response(response)

@@ -16,6 +16,7 @@
     .chat-container {
         --chat-input-height: 180px;
         --chat-header-height: 64px;
+        @apply flex flex-col h-[calc(100vh-var(--chat-header-height))] relative;
     }
 
     .page-container {
@@ -54,6 +55,28 @@
         @apply flex items-center gap-3 px-4 py-3 bg-white/95 dark:bg-gray-800/95;
         @apply border-b border-gray-200/50 dark:border-gray-700/50;
         @apply backdrop-blur-md shadow-sm;
+    }
+
+    /* Chat layout specific */
+    .chat-messages-container {
+        @apply flex-1 overflow-hidden relative;
+    }
+
+    .chat-messages-scroll {
+        @apply absolute inset-0 overflow-y-auto overscroll-contain;
+        @apply pb-[calc(var(--chat-input-height)+2rem)];
+    }
+
+    .chat-input-container {
+        @apply fixed bottom-0 left-0 right-0 z-[55] bg-white dark:bg-gray-900;
+        @apply border-t border-gray-200 dark:border-gray-700;
+        @apply shadow-lg;
+        height: var(--chat-input-height);
+    }
+
+    .token-panel-container {
+        @apply fixed right-4 z-[60] w-96 max-w-[calc(100%-2rem)];
+        bottom: calc(var(--chat-input-height) + theme('spacing.4'));
     }
 
     /* Button components */

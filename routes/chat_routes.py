@@ -34,6 +34,9 @@ from flask_wtf.csrf import generate_csrf
 from sqlalchemy import text
 from extensions import csrf
 
+# ----------------------------------------------------------------------------
+# Updated Import: Use relative import for scrape_data
+# ----------------------------------------------------------------------------
 from chat_api import get_azure_response, scrape_data
 from azure_search_client import AzureOpenAI
 from chat_utils import generate_new_chat_id, process_uploaded_files
@@ -279,23 +282,21 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             except Exception as e:
                 logger.error("Error decrypting Azure token: %s", str(e))
 
-        return cast(
-            FlaskResponse,
-            make_response(render_template(
-                "chat.html",
-                chat_id=chat_id,
-                chat_title=chat_title,
-                model_name=model_name,
-                current_model=current_model,
-                messages=[],
-                models=Model.get_all(),
-                conversations=Chat.get_user_chats(current_user.id),
-                now=datetime.now,
-                today=datetime.now().strftime("%Y-%m-%d"),
-                yesterday=(datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
-                azure_token=azure_token,
-            ))
-        )
+        # Return response without using cast, so the type matches
+        return make_response(render_template(
+            "chat.html",
+            chat_id=chat_id,
+            chat_title=chat_title,
+            model_name=model_name,
+            current_model=current_model,
+            messages=[],
+            models=Model.get_all(),
+            conversations=Chat.get_user_chats(current_user.id),
+            now=datetime.now,
+            today=datetime.now().strftime("%Y-%m-%d"),
+            yesterday=(datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
+            azure_token=azure_token,
+        ))
     except Exception as e:
         logger.error("Error initializing chat interface: %s", str(e))
         return make_response(jsonify({"error": "Internal server error"}), 500)
@@ -650,11 +651,33 @@ def stream_response(chat_id: str, history: List[Dict[str, Any]], model_obj: Mode
             logger.debug("Streaming response initiated, returning SSE chunks")
 
             for chunk in response:
-                if hasattr(chunk, 'choices') and chunk.choices:
-                    delta = chunk.choices[0].delta
-                    if hasattr(delta, 'content') and delta.content:
-                        content = delta.content
-                        yield f"data: {json.dumps({'content': content})}\n\n"
+                # If the chunk is already a string, yield it directly.
+                if isinstance(chunk, str):
+                    yield chunk
+                    continue
+
+                # Get choices safely from dict or object
+                choices = None
+                if isinstance(chunk, dict):
+                    choices = chunk.get("choices")
+                elif hasattr(chunk, "choices"):
+                    choices = chunk.choices
+
+                if choices:
+                    choice = choices[0]
+                    delta = None
+                    if isinstance(choice, dict):
+                        delta = choice.get("delta")
+                    elif hasattr(choice, "delta"):
+                        delta = choice.delta
+                    if delta:
+                        content = None
+                        if isinstance(delta, dict):
+                            content = delta.get("content")
+                        elif hasattr(delta, "content"):
+                            content = delta.content
+                        if content:
+                            yield f"data: {json.dumps({'content': content})}\n\n"
             yield "data: [DONE]\n\n"
 
         except Exception as e:
@@ -726,15 +749,24 @@ def normal_response(
 
         # Extract content with fallback messages
         content: Optional[str] = None
-        if hasattr(response, 'choices') and response.choices:
-            choice = response.choices[0]
-            message_obj = getattr(choice, "message", None)
-            if message_obj is not None:
-                content = getattr(message_obj, "content", None)
-            elif isinstance(choice, dict):
-                message_dict = choice.get("message", {})
-                if isinstance(message_dict, dict):
-                    content = message_dict.get("content")
+
+        # Safely retrieve choices whether response is a dict or an object.
+        choices = []
+        if isinstance(response, dict):
+            choices = response.get("choices", [])
+        elif hasattr(response, "choices"):
+            choices = response.choices
+
+        if choices:
+            choice = choices[0]
+            if isinstance(choice, dict):
+                message_obj = choice.get("message", {})
+                if isinstance(message_obj, dict):
+                    content = message_obj.get("content")
+            else:
+                message_obj = getattr(choice, "message", None)
+                if message_obj is not None:
+                    content = getattr(message_obj, "content", None)
 
         # Fallback messages for different scenarios
         if not content:

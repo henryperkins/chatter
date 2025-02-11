@@ -41,7 +41,7 @@ def count_tokens(text: str, model_name: str = MODEL_NAME) -> int:
 
 class MessageDict(TypedDict):
     """Type-safe dictionary for chat messages."""
-    role: Literal["system", "user", "assistant"]
+    role: Literal["system", "user", "assistant", "developer"]
     content: str
     max_tokens: Optional[int]
     token_count: Optional[int]
@@ -55,6 +55,20 @@ def validate_message(message: dict) -> bool:
     except (TypeError, ValueError):
         return False
 
+def is_o_series_model(model_name: str) -> bool:
+    """Check if the model is an o-series model."""
+    return model_name.lower() in ["o3-mini", "o1", "o1-mini", "o1-preview"]
+
+def get_model_token_limits(model_name: str) -> Dict[str, int]:
+    """Get token limits for a specific model."""
+    if is_o_series_model(model_name):
+        limits = {
+            "o3-mini": 75000, "o1": 100000,
+            "o1-mini": 50000, "o1-preview": 32768
+        }
+        return {"max_tokens": limits.get(model_name.lower(), 32000)}
+    return {"max_tokens": 8192}  # Default for non-o-series models
+
 def count_message_tokens(message: dict) -> int:
     """Count tokens for a single message with role metadata and file attachments."""
     logger.debug("Counting tokens for message: %s", message)
@@ -67,7 +81,7 @@ def count_message_tokens(message: dict) -> int:
     tokens = 0
 
     # Add API-specific formatting tokens
-    if MODEL_NAME.startswith("gpt-"):
+    if MODEL_NAME.startswith("gpt-") and not is_o_series_model(MODEL_NAME):
         tokens += 2  # Start token
         tokens += 1  # End token
         tokens += 1  # Separator token
@@ -83,6 +97,9 @@ def count_message_tokens(message: dict) -> int:
     elif message["role"] == "assistant":
         tokens += 3
         logger.debug("Added 3 tokens for assistant role")
+    elif message["role"] == "developer":
+        tokens += 4  # Same overhead as system messages
+        logger.debug("Added 4 tokens for developer role")
 
     # Add message content tokens
     content_tokens = cached_count_tokens(message["content"])
@@ -117,11 +134,12 @@ def count_message_tokens(message: dict) -> int:
     logger.debug("Total tokens for message: %d", tokens)
     return tokens
 
-def count_conversation_tokens(messages: List[dict]) -> int:
+def count_conversation_tokens(messages: List[dict], model_name: str = MODEL_NAME) -> int:
     """Count total tokens for a conversation."""
     total = 0
 
     # System message overhead
+    # Note: For o-series models, system messages are treated as developer messages
     if messages and messages[0]["role"] == "system":
         total += 4
 
@@ -133,7 +151,7 @@ def count_conversation_tokens(messages: List[dict]) -> int:
         if i > 0:
             total += 3
 
-    # Add safety buffer
+    # Add safety buffer (smaller for o-series models due to larger context)
     total += 20
 
     return total

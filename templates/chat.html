@@ -67,6 +67,7 @@
                         <option value="{{ model.id }}"
                             data-requires-o1-handling="{{ 'true' if model.requires_o1_handling else 'false' }}"
                             data-supports-streaming="{{ 'true' if model.supports_streaming else 'false' }}"
+                            data-model-type="{{ model.model_type|default('', true) }}"
                             data-max-completion-tokens="{{ model.max_completion_tokens|default(0, true) }}"
                             {% if current_model and model.id == current_model.id %}selected{% endif %}>
                             {{ model.name }}{% if model.is_default %} (Default){% endif %}
@@ -103,16 +104,16 @@
     </div>
 </div>
 {% endblock %}
+
 {% block content %}
 <!-- Message Templates -->
 <template id="assistant-message-template">
-    <div class="message-container assistant flex max-w-3xl mx-auto animate-slide-up">
+    <div class="message-container assistant-message" data-model-type="">
         <div class="flex gap-3 w-full">
             <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-md" role="img" aria-label="Assistant avatar">
                 <i class="fas fa-robot text-sm"></i>
             </div>
             <div class="flex-1 relative group">
-                <!-- Message Actions -->
                 <div class="absolute right-3 top-3 flex items-center gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     <button class="copy-button btn-icon" title="Copy to clipboard" aria-label="Copy message to clipboard">
                         <i class="fas fa-copy"></i>
@@ -122,10 +123,9 @@
                     </button>
                 </div>
                 
-                <!-- Message Content -->
-                <div class="message-bubble bg-white/95 dark:bg-gray-800/95">
+                <div class="message-bubble">
                     <div class="message-content" data-role="assistant-message">
-                        <div class="prose dark:prose-invert prose-sm sm:prose-base max-w-none"></div>
+                        <div class="prose dark:prose-invert prose-sm sm:prose-base max-w-none o-series-prose"></div>
                         <button class="toggle-more hidden">Show more</button>
                     </div>
                 </div>
@@ -135,32 +135,36 @@
     </div>
 </template>
 
-<template id="user-message-template">
-    <div class="message-container user flex max-w-2xl ml-auto animate-slide-up">
-        <div class="flex gap-3 w-full justify-end">
-            <div class="flex-1 relative">
-                <div class="message-bubble bg-gradient-to-r from-primary-600/95 to-secondary-600/95 text-white">
-                    <p class="text-[15px] leading-relaxed break-words whitespace-pre-wrap"></p>
-                </div>
-                <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1 text-right"></span>
+<template id="typing-indicator-template">
+    <div class="message-container assistant-message animate-pulse">
+        <div class="flex gap-3 w-full">
+            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-md">
+                <i class="fas fa-robot text-sm"></i>
             </div>
-            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500/20 to-secondary-500/20 shadow-md"></div>
+            <div class="flex-1">
+                <div class="message-bubble">
+                    <div class="flex gap-2 p-2">
+                        <div class="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-bounce"></div>
+                        <div class="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-bounce" style="animation-delay: 0.2s"></div>
+                        <div class="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-bounce" style="animation-delay: 0.4s"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </template>
 
-<template id="attachment-template">
-    <div class="attachments mt-2 border-t border-gray-200 dark:border-gray-700 pt-2">
-        <div class="text-sm font-medium mb-1">Attachments:</div>
-        <div class="attachment-list space-y-1"></div>
-    </div>
-</template>
-
-<template id="attachment-item-template">
-    <div class="attachment-item flex items-center gap-2 bg-gray-100/90 dark:bg-gray-800/90 rounded-xl p-3">
-        <i class="fas fa-paperclip text-gray-500"></i>
-        <span class="attachment-name flex-1 truncate text-sm"></span>
-        <a class="attachment-link btn-link" target="_blank">View</a>
+<template id="user-message-template">
+    <div class="message-container user-message">
+        <div class="flex gap-3 w-full justify-end">
+            <div class="flex-1 relative">
+                <div class="message-bubble">
+                    <p class="text-[15px] leading-relaxed break-words whitespace-pre-wrap"></p>
+                </div>
+                <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1 text-right"></span>
+            </div>
+            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-primary-600/20 shadow-sm"></div>
+        </div>
     </div>
 </template>
 
@@ -174,13 +178,14 @@
         data-current-model='{{ current_model|tojson|safe if current_model else "null" }}'
         data-user-id="{{ current_user.id }}"
         data-debug="true"
+        data-model-type="{{ current_model.model_type|default('', true) if current_model else '' }}"
         data-azure-token="{{ azure_token if azure_token else '' }}">
     </div>
 
     <!-- Main Chat Area -->
-    <div id="chat-main" class="flex-1 flex flex-col bg-white/90 dark:bg-gray-900/90 rounded-lg shadow-md relative z-10">
+    <div id="chat-main" class="chat-messages-container">
         <!-- Messages Area -->
-        <div id="chat-box" class="chat-messages" role="log" aria-live="polite">
+        <div id="chat-box" class="chat-messages-scroll" role="log" aria-live="polite">
             <div class="max-w-4xl mx-auto w-full px-4">
                 {% if messages %}
                     {% for message in messages %}
@@ -207,13 +212,13 @@
         </div>
 
         <!-- Chat Input Area -->
-        <div id="chat-input">
-            <form id="chat-form" class="max-w-4xl mx-auto px-4" enctype="multipart/form-data">
+        <div id="chat-input" class="chat-input-container">
+            <form id="chat-form" class="max-w-4xl mx-auto h-full px-4 py-4 flex flex-col justify-between" enctype="multipart/form-data">
                 <textarea 
                     name="message" 
                     id="message-input" 
                     rows="3"
-                    class="form-input resize-none"
+                    class="form-input resize-none flex-1"
                     placeholder="Type your message here..."
                     spellcheck="true"
                 ></textarea>
