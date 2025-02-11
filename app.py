@@ -16,6 +16,9 @@ import traceback
 import psutil
 import uuid
 import io
+import mistune
+from mistune import create_markdown
+from mistune.plugins import plugin_url, plugin_table
 import logging
 from datetime import timedelta, datetime
 from typing import Optional, Tuple, Union
@@ -349,8 +352,14 @@ def create_app() -> Flask:
     app = Flask(__name__)
     
     # Add markdown filter
-    def render_markdown(text):
-        return markdown(text, extensions=['fenced_code', 'tables'])
+    @app.template_filter('markdown')
+    def markdown_filter(text):
+        renderer = mistune.HTMLRenderer(escape=False)
+        markdown_processor = create_markdown(
+            renderer=renderer,
+            plugins=[plugin_url, plugin_table]
+        )
+        return markdown_processor(text)
 
     if hasattr(Flask, "_already_configured"):
         return Flask._app_instance  # type: ignore
