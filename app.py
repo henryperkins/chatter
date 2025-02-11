@@ -18,7 +18,8 @@ import uuid
 import io
 import mistune
 from mistune import create_markdown
-from mistune.plugins import plugin_url, plugin_table
+from mistune.plugins.url import url_plugin
+from mistune.plugins.table import table_plugin
 import logging
 from datetime import timedelta, datetime
 from typing import Optional, Tuple, Union
@@ -357,7 +358,7 @@ def create_app() -> Flask:
         renderer = mistune.HTMLRenderer(escape=False)
         markdown_processor = create_markdown(
             renderer=renderer,
-            plugins=[plugin_url, plugin_table]
+            plugins=[url_plugin, table_plugin]
         )
         return markdown_processor(text)
 
