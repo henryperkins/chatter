@@ -92,6 +92,16 @@
             setupDragAndDrop() {
                 if (!this.dropZone) return;
 
+                // Configure drop zone positioning
+                this.dropZone.style.zIndex = '9999';
+                this.dropZone.style.pointerEvents = 'none';
+                
+                // Update input height CSS variable
+                document.documentElement.style.setProperty(
+                    '--chat-input-height',
+                    `${this.chatInput?.offsetHeight || 120}px`
+                );
+
                 const highlight = () => this.dropZone.classList.add('drag-active');
                 const unhighlight = () => this.dropZone.classList.remove('drag-active');
 

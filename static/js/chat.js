@@ -17,14 +17,23 @@ const CONFIG = {
         }
     }
 
-    // 1. Visual viewport resize handling for on-screen keyboard:
+    // Visual viewport handling for input positioning
+    function handleViewportChanges() {
+        const visualViewport = window.visualViewport;
+        const chatInput = document.getElementById('chat-input');
+        
+        if (visualViewport && chatInput) {
+            const viewportHeight = visualViewport.height;
+            const offsetTop = visualViewport.offsetTop;
+            const delta = window.innerHeight - viewportHeight - offsetTop;
+            
+            chatInput.style.transform = `translateY(${Math.max(delta, 0)}px)`;
+        }
+    }
+
     if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', () => {
-            const inputBar = document.getElementById('chat-input');
-            if (!inputBar) return;
-            const viewport = window.visualViewport;
-            inputBar.style.bottom = `${viewport.height - viewport.offsetTop}px`;
-        });
+        window.visualViewport.addEventListener('resize', handleViewportChanges);
+        window.visualViewport.addEventListener('scroll', handleViewportChanges);
     }
 
     async function createNewChat() {

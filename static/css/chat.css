@@ -99,6 +99,16 @@
       }
     }
 
+    .chat-input-container {
+      position: fixed !important;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 10000;
+      background-color: var(--bg-color);
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+
     .message-bubble {
       @apply p-4;
 
