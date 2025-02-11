@@ -138,8 +138,10 @@ def validate_config(config: Dict[str, Any]) -> None:
 
     db_uri = config["DATABASE_URI"]
     parsed = urlparse(db_uri)
-    if parsed.scheme not in {"postgresql", "postgresql+psycopg2"}:
-        raise ValueError(f"Invalid DATABASE_URI scheme: {parsed.scheme}")
+    allowed_schemes = {"postgresql", "postgresql+psycopg2", "postgres"}
+    if parsed.scheme not in allowed_schemes:
+        raise ValueError(f"Invalid DATABASE_URI scheme: {parsed.scheme}. " 
+                         "Allowed schemes: postgresql, postgresql+psycopg2, postgres")
     if not parsed.netloc or not parsed.path or parsed.path == "/":
         raise ValueError("Invalid DATABASE_URI: Missing host/port or database name")
 
@@ -206,6 +208,14 @@ class Config:
         # Core settings
         self.SECRET_KEY = os.getenv("SECRET_KEY")
         self.DATABASE_URI = os.getenv("DATABASE_URI", "")
+        
+        # Convert postgres:// to postgresql:// if needed
+        parsed = urlparse(self.DATABASE_URI)
+        if parsed.scheme == 'postgres':
+            # Automatically convert postgres:// to postgresql://
+            parsed = parsed._replace(scheme='postgresql')
+            self.DATABASE_URI = urlunparse(parsed)
+            logger.info(f"Converted database URI from postgres:// to postgresql://: {self.DATABASE_URI}")
 
         # Azure OpenAI settings
         self.AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
