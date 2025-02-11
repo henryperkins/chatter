@@ -18,8 +18,7 @@ import uuid
 import io
 import mistune
 from mistune import create_markdown
-from mistune.plugins.url import url_plugin
-from mistune.plugins.table import table_plugin
+from mistune.plugins import url_plugin, table_plugin
 import logging
 from datetime import timedelta, datetime
 from typing import Optional, Tuple, Union
