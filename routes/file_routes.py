@@ -159,6 +159,73 @@ def init_file_routes(app):
                 'status_code': 500
             }), 500
 
+
+    @file_routes.route('/chunked-upload/<chat_id>', methods=['POST'])
+    def chunked_upload(chat_id: str):
+        """
+        Handle chunked file uploads, merging multiple chunks into a single file.
+        """
+        from models.uploaded_file import UploadedFile
+        from models.token_usage import TokenUsage
+        import os, uuid
+
+        # 1. Parse required form data
+        chunk_index = int(request.form.get('chunkIndex', 0))
+        total_chunks = int(request.form.get('totalChunks', 1))
+        original_name = request.form.get('originalFilename', 'untitled')
+        upload_id = request.form.get('uploadId') or str(uuid.uuid4())
+        file_size = request.form.get('fileSize', type=int)
+
+        # 2. Get the chunk data
+        file_chunk = request.files.get('file')
+        if not file_chunk:
+            return jsonify({"error": "No chunk provided"}), 400
+
+        # 3. Temporary storage directory
+        temp_dir = os.path.join(Config.UPLOAD_FOLDER, 'temp_chunks', chat_id, upload_id)
+        os.makedirs(temp_dir, exist_ok=True)
+
+        # 4. Write chunk to a temporary file
+        chunk_path = os.path.join(temp_dir, f"chunk_{chunk_index}")
+        file_chunk.save(chunk_path)
+
+        # 5. If this is the final chunk, merge them
+        if chunk_index == total_chunks - 1:
+            merged_filename = f"merged_{original_name}"
+            merged_path = os.path.join(temp_dir, merged_filename)
+            with open(merged_path, 'wb') as merged_file:
+                for i in range(total_chunks):
+                    part_path = os.path.join(temp_dir, f"chunk_{i}")
+                    with open(part_path, 'rb') as part:
+                        merged_file.write(part.read())
+
+            # 6. Validate + transfer the merged file to final storage
+            #    (You can reuse logic from "handle_upload" or "file_upload.py" to validate)
+            final_dest = os.path.join(Config.UPLOAD_FOLDER, chat_id)
+            os.makedirs(final_dest, exist_ok=True)
+            final_path = os.path.join(final_dest, merged_filename)
+            os.rename(merged_path, final_path)
+
+            # 7. (Optional) Update the DB, track token usage, etc.
+            #    Example:
+            # TokenUsage.update_usage(<some_user_id>, chat_id, <estimated_tokens_of_merged_file>)
+
+            # 8. Clean up temp chunks
+            for i in range(total_chunks):
+                os.remove(os.path.join(temp_dir, f"chunk_{i}"))
+            # (Optionally remove temp_dir if it’s empty)
+
+            return jsonify({
+                "success": True,
+                "uploadId": upload_id,
+                "mergedFilename": merged_filename,
+                "message": "All chunks merged successfully"
+            })
+
+        # For non-final chunks, just return success
+        return jsonify({"success": True, "uploadId": upload_id})
+
+
     @file_routes.route('/files', methods=['GET'])
     def list_files():
         """
