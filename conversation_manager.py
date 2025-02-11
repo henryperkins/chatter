@@ -59,7 +59,9 @@ class ConversationManager:
         Returns:
             A list of message dictionaries containing role and content.
         """
+        logger.debug(f"Getting messages for chat_id: {chat_id}")
         messages = Chat.get_messages(chat_id=chat_id, include_system=include_system)
+        logger.debug(f"Retrieved {len(messages)} messages for chat {chat_id}")
         context: List[Dict[str, str]] = []
 
         # Get the chat's model to check if it's an o-series model

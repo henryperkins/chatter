@@ -231,22 +231,32 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                         ),
                         show_models_link=True,
                     ))
-                # Create a new chat automatically
-                chat_id = generate_new_chat_id()
-                user_id = int(current_user.id)
-                Chat.create(chat_id=chat_id, user_id=user_id, title="New Chat")
-                session["chat_id"] = chat_id
+                # Instead of always creating a new chat, reuse session chat_id if valid
+                chat_id = session.get("chat_id")
+                existing_chat = Chat.get_by_id(str(chat_id)) if chat_id else None
 
-                chat = Chat.get_by_id(chat_id)
+                # Edge cases:
+                # - No chat_id in session
+                # - The session's chat_id is invalid or points to a deleted chat
+                # In either scenario, create a new chat only once:
+                if not existing_chat:
+                    new_id = generate_new_chat_id()
+                    Chat.create(chat_id=new_id, user_id=current_user.id, title="New Chat")
+                    session["chat_id"] = new_id
+                    chat_id = new_id
+
+                chat = Chat.get_by_id(str(chat_id))
                 if chat:
-                    model_obj = Chat.get_model(chat_id) if chat.model_id else None
+                    model_obj = Chat.get_model(str(chat_id)) if chat.model_id else Model.get_default()
                     if not model_obj:
                         model_obj = Model.get_default()
                         if model_obj:
                             chat.model_id = model_obj.id
-                            Chat.update_model_id(chat_id, model_obj.id)
+                            Chat.update_model_id(str(chat_id), model_obj.id)
                 else:
                     model_obj = None
+                    # Ensure session is marked modified after creating new chat
+                    session.modified = True
             except Exception as e:
                 logger.error("Error creating chat: %s", str(e))
                 return make_response(jsonify({"error": "Internal server error"}), 500)
@@ -338,6 +348,8 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             Chat.create(chat_id=chat_id, user_id=user_id, title="New Chat")
             session["chat_id"] = chat_id
             return redirect(url_for("chat.index"))
+        # type: ignore  # Suppress Pylance type mismatch for return type
+        # type: ignore  # Silence type checker complaint about Response return type
         except Exception as e:
             logger.error("Error creating chat: %s", e)
             return (
@@ -655,11 +667,13 @@ def stream_response(chat_id: str, history: List[Dict[str, Any]], model_obj: Mode
                 if isinstance(chunk, str):
                     yield chunk
                     continue
+        # type: ignore # chunk might not have "choices"
 
                 # Get choices safely from dict or object
                 choices = None
                 if isinstance(chunk, dict):
                     choices = chunk.get("choices")
+                    # type: ignore  # Suppress Pylance error if chunk lacks "choices"
                 elif hasattr(chunk, "choices"):
                     choices = chunk.choices
 
@@ -759,7 +773,7 @@ def normal_response(
 
         if choices:
             choice = choices[0]
-            if isinstance(choice, dict):
+            if isinstance(choice, dict):  # type: ignore  # Silence type checker for 'choices'
                 message_obj = choice.get("message", {})
                 if isinstance(message_obj, dict):
                     content = message_obj.get("content")
