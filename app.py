@@ -343,9 +343,13 @@ def register_cli_commands(app):
 
 def create_app() -> Flask:
     from database import get_db_state  # Add missing import
+    from flask_markdown import Markdown
     from markdown import markdown
 
-    # Initialize Flask-Markdown
+    # Create app instance first
+    app = Flask(__name__)
+    
+    # Initialize Flask-Markdown after app creation
     Markdown(app)
     
     # Add markdown filter
