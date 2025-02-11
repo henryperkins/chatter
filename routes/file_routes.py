@@ -73,7 +73,10 @@ def init_file_routes(app):
         Handle file upload with token tracking and enhanced validation.
         """
         from models.token_usage import TokenUsage
+        from flask_login import current_user
         """
+        if not TokenUsage.within_rate_limit(current_user.id, 60, 5000):
+            return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
         Handle file upload request with metadata and upload to Azure OpenAI.
 
         Args:
@@ -167,7 +170,11 @@ def init_file_routes(app):
         """
         from models.uploaded_file import UploadedFile
         from models.token_usage import TokenUsage
+        from flask_login import current_user
         import os, uuid
+
+        if not TokenUsage.within_rate_limit(current_user.id, 60, 5000):
+            return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
 
         # 1. Parse required form data
         chunk_index = int(request.form.get('chunkIndex', 0))

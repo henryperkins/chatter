@@ -97,6 +97,10 @@ class ConversationManager:
     ) -> None:
         """
         Add a message to the conversation context with metadata and token management.
+        from models.token_usage import TokenUsage
+        user_id = 123  # or retrieve from your logic
+        if not TokenUsage.within_rate_limit(user_id, 30, 20000):
+            raise ValueError("Rate limit exceeded for chat messages.")
 
         Args:
             chat_id: The ID of the chat.

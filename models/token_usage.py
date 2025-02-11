@@ -69,6 +69,29 @@ class TokenUsage:
                 logger.error(f"Failed to create token usage record: {e}")
                 raise
 
+        @staticmethod
+        def within_rate_limit(user_id: int, minutes_window: int = 60, token_limit: int = 10000) -> bool:
+            """
+            Check if a user is within the specified token limit for a given time window.
+            Defaults to 10,000 tokens per 60 minutes.
+            """
+            from datetime import datetime, timedelta
+            from database import db_session
+            from sqlalchemy import text
+
+            cutoff = datetime.utcnow() - timedelta(minutes=minutes_window)
+
+            with db_session() as db:
+                row = db.execute(text("""
+                    SELECT COALESCE(SUM(tokens_used), 0) AS tokens_in_window
+                    FROM token_usage
+                    WHERE user_id = :user_id
+                      AND last_updated >= :cutoff
+                """), {"user_id": user_id, "cutoff": cutoff}).mappings().first()
+
+                tokens_in_window = row["tokens_in_window"] if row else 0
+                return tokens_in_window < token_limit
+
     @staticmethod
     def get_usage(user_id: int, chat_id: Optional[str] = None) -> Dict[str, int]:
         """Get token usage for a user/chat."""
