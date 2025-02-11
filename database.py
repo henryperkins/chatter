@@ -511,11 +511,7 @@ def init_db() -> None:
                 DROP TABLE IF EXISTS models CASCADE;
                 DROP TABLE IF EXISTS providers CASCADE;
                 DROP TABLE IF EXISTS users CASCADE;
-                DROP TABLE IF EXISTS citus_tables CASCADE;
-                DROP TABLE IF EXISTS citus_schemas CASCADE;
-                DROP TABLE IF EXISTS pg_stat_statements_info CASCADE;
-                DROP TABLE IF EXISTS pg_stat_statements CASCADE;
-                DROP TABLE IF EXISTS pg_buffercache CASCADE;
+                -- Removed system views/tables that shouldn't be managed by the app
             """))
 
             # Create fresh schema

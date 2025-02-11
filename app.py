@@ -50,6 +50,7 @@ from database import (
     db_session,
     is_initialized,
     create_default_model,
+    get_db_state
 )
 from models import User, Model, Provider
 from routes.auth_routes import bp as auth_bp
@@ -341,6 +342,8 @@ def register_cli_commands(app):
 
 
 def create_app() -> Flask:
+    from database import get_db_state  # Add missing import
+
     if hasattr(Flask, "_already_configured"):
         return Flask._app_instance  # type: ignore
 
@@ -365,20 +368,22 @@ def create_app() -> Flask:
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            engine = app._db_state["engine"]  # type: ignore
+            db_state = get_db_state(app)
+            engine = db_state["engine"]
             if not engine:
                 raise RuntimeError("Database engine not initialized")
             with engine.connect() as conn:
                 result = conn.execute(text("SELECT 1"))
                 result.scalar()
-            if not app._db_state.get("Session"):  # type: ignore
+            if not db_state.get("Session"):
                 raise RuntimeError("Database session factory not initialized")
-            break
+            break  # Break out of loop on success
         except Exception as e:
             if attempt == max_retries - 1:
                 logger.critical("Database connection failed after retries")
                 raise RuntimeError(f"Database connection failed: {str(e)}")
             time.sleep(0.5 * (attempt + 1))
+            continue  # Continue to next retry attempt
 
     if not hasattr(app, "_components_initialized"):
         try:
