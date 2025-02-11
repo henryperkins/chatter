@@ -15,6 +15,7 @@ import os
 import logging
 import json
 import datetime
+import certifi
 from typing import Optional, TypeVar, Callable, Any, Dict, Union, cast, Iterator, List
 from contextlib import contextmanager
 
