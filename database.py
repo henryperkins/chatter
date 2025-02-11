@@ -95,7 +95,12 @@ def create_db_engine(db_uri: str) -> Engine:
     """
     Create SQLAlchemy engine with optimized settings and proper SSL configuration.
     """
+    # Get SSL cert path from environment or fallback to certifi
+    ssl_cert = os.getenv('SSL_CERT_FILE') or certifi.where()
+    
+    # Import SSL context with proper cert configuration
     from azure_ssl_config import AZURE_TLS_CONTEXT
+    
     return create_engine(
         db_uri,
         future=True,
@@ -118,7 +123,8 @@ def create_db_engine(db_uri: str) -> Engine:
             "options": "-c statement_timeout=120000 -c idle_in_transaction_session_timeout=240000",
             "sslmode": "verify-full",
             "ssl": AZURE_TLS_CONTEXT,
-            "sslrootcert": certifi.where(),
+            "sslcert": ssl_cert,
+            "sslrootcert": ssl_cert,
         },
         json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
     )
