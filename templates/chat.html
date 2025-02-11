@@ -26,15 +26,16 @@
 
                 <!-- Chat Tabs - Desktop -->
                 <div class="hidden md:flex items-center gap-2 overflow-x-auto no-scrollbar">
-                    {% for chat in recent_chats %}
-                    <div class="chat-tab {% if chat.id == current_chat.id %}chat-tab-active{% else %}chat-tab-default{% endif %}"
-                        data-chat-id="{{ chat.id }}">
+                    {% for chat in conversations %}
+                    <a href="{{ url_for('chat.chat_interface', chat_id=chat.id) }}" 
+                       class="chat-tab cursor-pointer {% if chat.id == chat_id %}chat-tab-active{% else %}chat-tab-default{% endif %}"
+                       data-chat-id="{{ chat.id }}">
                         <span class="truncate max-w-[200px]">{{ chat.title }}</span>
                         <button class="chat-tab-close ml-2" data-chat-id="{{ chat.id }}"
-                            aria-label="Close chat">
+                            aria-label="Delete chat">
                             <i class="fas fa-times"></i>
                         </button>
-                    </div>
+                    </a>
                     {% endfor %}
                 </div>
 

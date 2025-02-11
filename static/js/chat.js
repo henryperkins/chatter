@@ -407,11 +407,24 @@ const CONFIG = {
             const sendButton = document.getElementById('send-button');
             const chatForm = document.getElementById('chat-form');
             const newChatBtn = document.getElementById('new-chat-btn');
+            const mobileChatSelector = document.getElementById('mobile-chat-selector');
             
             if (newChatBtn) {
                 newChatBtn.addEventListener('click', (e) => {
                     e.preventDefault();
                     createNewChat();
+                });
+            }
+
+            // Add mobile chat selector handler
+            if (mobileChatSelector) {
+                mobileChatSelector.addEventListener('change', (e) => {
+                    const selectedValue = e.target.value;
+                    if (selectedValue === 'new') {
+                        createNewChat();
+                    } else {
+                        window.location.href = `/chat/chat_interface?chat_id=${selectedValue}`;
+                    }
                 });
             }
             
@@ -489,7 +502,25 @@ const CONFIG = {
                         const data = await resp.json();
                         if (data.success) {
                             window.MessageRenderer.showSuccess('Chat title updated');
-                            location.reload();
+                            const trimmedTitle = newTitle.trim();
+                            
+                            // Update mobile selector
+                            const mobileChatSelector = document.getElementById('mobile-chat-selector');
+                            if (mobileChatSelector) {
+                                const option = mobileChatSelector.querySelector(`option[value="${window.CHAT_CONFIG.chatId}"]`);
+                                if (option) {
+                                    option.textContent = trimmedTitle;
+                                }
+                            }
+
+                            // Update desktop tab
+                            const desktopTab = document.querySelector(`.chat-tab[data-chat-id="${window.CHAT_CONFIG.chatId}"] span`);
+                            if (desktopTab) {
+                                desktopTab.textContent = trimmedTitle;
+                            }
+
+                            // Update page title
+                            document.title = `Chat - ${trimmedTitle}`;
                         } else {
                             window.MessageRenderer.showError(data.error);
                         }

@@ -1,7 +1,4 @@
-(() => {
-    'use strict';
-
-    class ChatConfig {
+class ChatConfig {
         constructor() {
             this.initialized = false;
             this.config = null;
@@ -61,14 +58,14 @@
         }
     }
 
-    // Initialize when DOM is ready
-    document.addEventListener('DOMContentLoaded', () => {
-        const config = ChatConfig.getInstance();
-        config.init().catch(error => {
-            console.error('Failed to initialize chat config:', error);
-        });
-    });
+// Export for use in other modules
+export { ChatConfig };
 
-    // Export for use in other modules
+// Initialize when DOM is ready and make globally available
+document.addEventListener('DOMContentLoaded', () => {
+    const config = ChatConfig.getInstance();
     window.ChatConfig = ChatConfig;
-})();
+    config.init().catch(error => {
+        console.error('Failed to initialize chat config:', error);
+    });
+});

@@ -10,12 +10,23 @@ class MessageRenderer {
     };
 
     static async initialize() {
+        console.log('Initializing MessageRenderer with dependencies:', {
+            md: !!window.md,
+            DOMPurify: !!window.DOMPurify,
+            Prism: !!window.Prism,
+            CHAT_CONFIG: !!window.CHAT_CONFIG
+        });
+
         if (!window.md) {
             console.error('Markdown processor not loaded');
             return;
         }
         if (!window.CHAT_CONFIG) {
             console.error('Chat config not loaded');
+            return;
+        }
+        if (!window.DOMPurify) {
+            console.error('DOMPurify not loaded');
             return;
         }
 
@@ -30,43 +41,20 @@ class MessageRenderer {
             throw new Error('Message templates not found');
         }
 
-        // Wait for dependencies with timeout
-        try {
-            await Promise.race([
-                new Promise(resolve => document.addEventListener('app:ready', resolve)),
-                new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Dependency timeout')), 5000)
-                )
-            ]);
-        } catch (error) {
-            console.error('Failed to initialize MessageRenderer:', error);
-            throw error;
-        }
-
-        // Wait for App initialization to complete
-        if (!window.App.initialized) {
-            await new Promise(resolve => {
-                document.addEventListener('app:ready', resolve, { once: true });
-            });
-        }
-
-        // Format existing messages
+        // Process existing messages
         const chatBox = document.getElementById('chat-box');
         if (chatBox) {
-            const assistantMessages = chatBox.querySelectorAll('.message-container.assistant');
+            const assistantMessages = chatBox.querySelectorAll('.assistant-message .prose');
             for (const messageDiv of assistantMessages) {
-                const messageContent = messageDiv.querySelector('[data-role="assistant-message"]');
-                if (messageContent) {
-                    const proseDiv = messageContent.querySelector('.prose');
-                    if (proseDiv) {
-                        const content = proseDiv.getAttribute('data-content');
-                        if (content) {
-                            await this.finalizeAssistantMessage(messageDiv, content);
-                        }
-                    }
+                const content = messageDiv.getAttribute('data-content');
+                if (content) {
+                    await this.finalizeAssistantMessage(messageDiv.closest('.assistant-message'), content);
                 }
             }
         }
+
+        // Dispatch event to signal MessageRenderer is ready
+        document.dispatchEvent(new Event('messagerenderer:ready'));
     }
 
     static renderAssistantMessage(content, isStreaming = false) {

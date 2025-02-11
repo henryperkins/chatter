@@ -129,6 +129,7 @@ class Provider:
     endpoint_pattern: str = field(default_factory=lambda: "")
     validation_rules: Dict[str, str] = field(default_factory=lambda: {})
     requires_authentication: bool = field(default=True)
+    is_active: bool = field(default=True)
     capabilities: Dict[str, Any] = field(default_factory=dict)
     created_at: Optional[str] = None
     api_key: Optional[str] = None

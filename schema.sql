@@ -28,6 +28,7 @@ CREATE TABLE providers (
     capabilities JSONB NOT NULL DEFAULT '{}',
     requires_authentication BOOLEAN NOT NULL DEFAULT TRUE,
     is_azure BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -45,8 +46,7 @@ CREATE TABLE users (
     is_verified BOOLEAN DEFAULT FALSE,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     otp_secret TEXT DEFAULT NULL,
-    otp_required BOOLEAN DEFAULT FALSE
-,
+    otp_required BOOLEAN DEFAULT FALSE,
     locked_until TIMESTAMP WITH TIME ZONE DEFAULT NULL,
     version INT NOT NULL DEFAULT 0
 );

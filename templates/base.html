@@ -114,25 +114,35 @@
                 <i class="fas fa-times text-xl"></i>
             </button>
         </div>
-        <nav class="px-4 py-4 space-y-2">
+        <nav class="flex flex-col px-4 py-4">
             <!-- Mobile menu items - same as desktop but styled differently -->
             <a href="{{ url_for('chat.chat_interface') }}"
-                class="mobile-menu-link {% if request.endpoint == 'chat.chat_interface' %}mobile-menu-active{% else %}mobile-menu-default{% endif %}">
+                class="mobile-menu-link mb-2 {% if request.endpoint == 'chat.chat_interface' %}mobile-menu-active{% else %}mobile-menu-default{% endif %}">
                 <i class="fas fa-home mr-2"></i>Home
             </a>
             {% if current_user.is_authenticated %}
                 {% if current_user.role == 'admin' %}
-                    <!-- Admin mobile menu items -->
-                    <!-- ... (same pattern as desktop items) ... -->
+                    <a href="{{ url_for('model.add_model_page') }}"
+                        class="mobile-menu-link mb-2 {% if request.endpoint == 'model.add_model_page' %}mobile-menu-active{% else %}mobile-menu-default{% endif %}">
+                        <i class="fas fa-plus-circle mr-2"></i>Add Model
+                    </a>
+                    <a href="{{ url_for('provider.list_providers') }}"
+                        class="mobile-menu-link mb-2 {% if request.endpoint == 'provider.list_providers' %}mobile-menu-active{% else %}mobile-menu-default{% endif %}">
+                        <i class="fas fa-server mr-2"></i>Providers
+                    </a>
+                    <a href="{{ url_for('auth.manage_users') }}"
+                        class="mobile-menu-link mb-2 {% if request.endpoint == 'auth.manage_users' %}mobile-menu-active{% else %}mobile-menu-default{% endif %}">
+                        <i class="fas fa-users mr-2"></i>Manage Users
+                    </a>
                 {% endif %}
-                <a href="{{ url_for('auth.logout') }}" class="mobile-menu-link mobile-menu-default">
+                <a href="{{ url_for('auth.logout') }}" class="mobile-menu-link mb-2 mobile-menu-default">
                     <i class="fas fa-sign-out-alt mr-2"></i>Logout
                 </a>
             {% else %}
-                <a href="{{ url_for('auth.login') }}" class="mobile-menu-link mobile-menu-default">
+                <a href="{{ url_for('auth.login') }}" class="mobile-menu-link mb-2 mobile-menu-default">
                     <i class="fas fa-sign-in-alt mr-2"></i>Login
                 </a>
-                <a href="{{ url_for('auth.register') }}" class="mobile-menu-link bg-primary-600 text-white">
+                <a href="{{ url_for('auth.register') }}" class="mobile-menu-link mb-2 bg-primary-600 text-white">
                     <i class="fas fa-user-plus mr-2"></i>Register
                 </a>
             {% endif %}
@@ -193,6 +203,13 @@
     </main>
 
     <!-- Core Libraries -->
+    <!-- External Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    
+    <!-- Local Libraries -->
     <script src="{{ url_for('static', filename='js/lib/axios.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/lib/dompurify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/lib/markdown-it.min.js') }}"></script>

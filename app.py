@@ -83,6 +83,9 @@ class SecurityMiddleware:
                 ("X-Frame-Options", "SAMEORIGIN"),
                 ("X-XSS-Protection", "1; mode=block"),
                 ("Connection", "keep-alive"),
+                ("Cache-Control", "no-cache, no-store, must-revalidate"),
+                ("Pragma", "no-cache"),
+                ("Expires", "0"),
             ]
             headers.extend(security_headers)
             return start_response(status, headers, exc_info)
@@ -184,7 +187,6 @@ def init_app_components(app: Flask) -> None:
 
     # Initialize CSRF protection first
     csrf.init_app(app)
-    csrf.exempt(app.static_folder)
     
     # Then initialize login manager
     login_manager.init_app(app)
@@ -204,20 +206,29 @@ def init_app_components(app: Flask) -> None:
     app.register_blueprint(provider_bp)
     init_file_routes(app)
 
-    app.static_folder = "static"
+    # Configure static file serving
+    static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+    app.static_folder = static_folder
     app.static_url_path = "/static"
 
-    # Configure static file MIME types
-    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0 if app.config.get('DEBUG', False) else 3600
+    # Configure static file serving
+    app.config.update({
+        'SEND_FILE_MAX_AGE_DEFAULT': 0,  # Disable caching in development
+        'STATIC_FOLDER': static_folder,
+        'STATIC_URL_PATH': '/static',
+    })
 
-    @app.route('/static/<path:filename>')
-    def serve_static(filename):
-        mimetype = None
-        if filename.endswith('.css'):
-            mimetype = 'text/css'
-        elif filename.endswith('.js'):
-            mimetype = 'application/javascript'
-        return send_from_directory(str(app.static_folder), filename, mimetype=mimetype)
+    # Exempt static files from CSRF protection
+    csrf.exempt(static_folder)
+
+    # Add markdown filter
+    @app.template_filter('markdown')
+    def markdown_filter(text):
+        markdown_processor = mistune.create_markdown(
+            plugins=['url', 'table'],
+            escape=False
+        )
+        return markdown_processor(text)
 
 
 def register_cli_commands(app):
@@ -440,8 +451,11 @@ def internal_server_error(error: HTTPException) -> Tuple[WerkzeugResponse, int]:
 
 @app.errorhandler(Exception)
 def handle_exception(e):
-    if request.path.startswith("/static/"):
-        raise e
+    # Log static file errors but let Flask handle them
+    if request.path.startswith('/static/'):
+        logger.debug(f"Static file request error: {str(e)}")
+        return app.send_static_file(request.path[8:])
+    
     logger.exception(
         "Unhandled exception occurred - URL: %s, Method: %s, User: %s, Error: %s",
         request.url,
@@ -594,7 +608,7 @@ if __name__ == "__main__":
         {
             "DEBUG": debug_mode,
             "TEMPLATES_AUTO_RELOAD": debug_mode,
-            "SEND_FILE_MAX_AGE_DEFAULT": 0 if debug_mode else 3600,  # type: ignore
+            "SEND_FILE_MAX_AGE_DEFAULT": 0,  # Disable caching completely in development
         }
     )
 
