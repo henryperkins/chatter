@@ -343,6 +343,7 @@ def register_cli_commands(app):
 
 def create_app() -> Flask:
     from database import get_db_state  # Add missing import
+    from flaskext.markdown import Markdown
     from markdown import markdown
 
     # Add markdown filter
