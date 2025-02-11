@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union
 from sqlalchemy import text
 from database import db_session
 import logging
@@ -31,7 +31,7 @@ class TokenUsage:
                         100000  -- Default limit
                     ) as token_limit
                 """)
-                token_limit = db.execute(limit_query, {"user_id": user_id}).scalar() or 100000
+                token_limit = int(db.execute(limit_query, {"user_id": user_id}).scalar() or 100000)
 
                 query = text("""
                     INSERT INTO token_usage (
@@ -51,7 +51,10 @@ class TokenUsage:
                     "metadata": {"source": "file_upload"}
                 })
                 
-                usage_id = result.scalar()
+                usage_id = int(result.scalar() or 0)
+                if not usage_id:
+                    raise ValueError("Failed to create token usage record")
+                
                 db.commit()
                 
                 return TokenUsage(
@@ -69,28 +72,31 @@ class TokenUsage:
                 logger.error(f"Failed to create token usage record: {e}")
                 raise
 
-        @staticmethod
-        def within_rate_limit(user_id: int, minutes_window: int = 60, token_limit: int = 10000) -> bool:
-            """
-            Check if a user is within the specified token limit for a given time window.
-            Defaults to 10,000 tokens per 60 minutes.
-            """
-            from datetime import datetime, timedelta
-            from database import db_session
-            from sqlalchemy import text
+    @staticmethod
+    def within_rate_limit(user_id: int, minutes_window: int = 60, token_limit: int = 10000) -> bool:
+        """
+        Check if a user is within the specified token limit for a given time window.
+        Defaults to 10,000 tokens per 60 minutes.
+        """
+        from datetime import datetime, timedelta
+        from database import db_session
+        from sqlalchemy import text
 
-            cutoff = datetime.utcnow() - timedelta(minutes=minutes_window)
+        cutoff = datetime.utcnow() - timedelta(minutes=minutes_window)
 
-            with db_session() as db:
-                row = db.execute(text("""
-                    SELECT COALESCE(SUM(tokens_used), 0) AS tokens_in_window
-                    FROM token_usage
-                    WHERE user_id = :user_id
-                      AND last_updated >= :cutoff
-                """), {"user_id": user_id, "cutoff": cutoff}).mappings().first()
+        with db_session() as db:
+            row = db.execute(text("""
+                SELECT COALESCE(SUM(tokens_used), 0) AS tokens_in_window
+                FROM token_usage
+                WHERE user_id = :user_id
+                  AND last_updated >= :cutoff
+            """), {"user_id": user_id, "cutoff": cutoff}).mappings().first()
 
-                tokens_in_window = row["tokens_in_window"] if row else 0
-                return tokens_in_window < token_limit
+            if not row:
+                return True
+
+            tokens_in_window = int(row["tokens_in_window"])
+            return tokens_in_window < token_limit
 
     @staticmethod
     def get_usage(user_id: int, chat_id: Optional[str] = None) -> Dict[str, int]:
@@ -100,7 +106,7 @@ class TokenUsage:
                 params = {"user_id": user_id}
                 query = """
                     SELECT COALESCE(SUM(tokens_used), 0) as total_used,
-                           MAX(tokens_limit) as token_limit
+                           COALESCE(MAX(tokens_limit), 100000) as token_limit
                     FROM token_usage 
                     WHERE user_id = :user_id
                 """
@@ -110,11 +116,20 @@ class TokenUsage:
                     params["chat_id"] = chat_id
 
                 result = db.execute(text(query), params).mappings().first()
+                if not result:
+                    return {
+                        "used": 0,
+                        "limit": 100000,
+                        "remaining": 100000
+                    }
+                
+                total_used = int(result["total_used"])
+                token_limit = int(result["token_limit"])
                 
                 return {
-                    "used": int(result["total_used"]),
-                    "limit": int(result["token_limit"]),
-                    "remaining": int(result["token_limit"]) - int(result["total_used"])
+                    "used": total_used,
+                    "limit": token_limit,
+                    "remaining": token_limit - total_used
                 }
 
             except Exception as e:

@@ -3,7 +3,7 @@ import os
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from werkzeug.utils import secure_filename
 
 from sqlalchemy import text
@@ -33,6 +33,7 @@ class UploadedFile:
     indexing_status: str = 'pending'
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    tokenized_text: Optional[str] = None
 
     @staticmethod
     def create(
@@ -79,11 +80,11 @@ class UploadedFile:
                     INSERT INTO uploaded_files
                     (chat_id, filename, filepath, uuid, size, mime_type, description, version,
                     azure_file_id, azure_search_id, indexing_status, last_indexed_at,
-                    created_at, updated_at)
+                    created_at, updated_at, tokenized_text)
                     VALUES
                     (:chat_id, :filename, :filepath, :uuid, :size, :mime_type, :description, :version,
                     :azure_file_id, NULL, 'pending', NULL,
-                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL)
                     RETURNING id
                 """)
                 result = db.execute(query, {
@@ -338,24 +339,36 @@ class UploadedFile:
                 logger.error(f"Error deleting file by Azure ID: {e}")
                 raise
 
-@staticmethod
-def store_tokenized_content(file_id: int, tokenized_text: str) -> None:
-    """
-    Save the tokenized version of an uploaded file's text in the DB,
-    enabling later inclusion in conversation context.
-    """
-    from database import db_session
-    from sqlalchemy import text
+    @staticmethod
+    def store_tokenized_content(file_id: int, tokenized_text: str) -> bool:
+        """
+        Save the tokenized version of an uploaded file's text in the DB.
 
-    with db_session() as db:
-        query = text("""
-            UPDATE uploaded_files
-            SET tokenized_text = :tokenized_text,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = :file_id
-        """)
-        db.execute(query, {
-            "tokenized_text": tokenized_text,
-            "file_id": file_id
-        })
-        db.commit()
+        Args:
+            file_id (int): The ID of the uploaded file
+            tokenized_text (str): The tokenized content to store
+
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        with db_session() as db:
+            try:
+                query = text("""
+                    UPDATE uploaded_files
+                    SET tokenized_text = :tokenized_text,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = :file_id
+                """)
+                result = db.execute(query, {
+                    "file_id": file_id,
+                    "tokenized_text": tokenized_text
+                })
+                db.commit()
+                success = result.rowcount > 0
+                if success:
+                    logger.info(f"Stored tokenized content for file {file_id}")
+                return success
+            except Exception as e:
+                db.rollback()
+                logger.error(f"Error storing tokenized content: {e}")
+                raise

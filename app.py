@@ -562,6 +562,29 @@ def clear_session() -> WerkzeugResponse:
     return redirect(url_for("auth.login"))
 
 
+@app.route("/api/log/error", methods=["POST"])
+def log_error():
+    """Handle client-side error logging."""
+    try:
+        error_data = request.get_json()
+        if error_data is None:
+            return create_error_response("Invalid JSON data", 400)
+            
+        extra_data = {
+            "chat_id": error_data.get("chatId") if error_data else None,
+            "user_id": error_data.get("userId") if error_data else None,
+            "user_agent": error_data.get("userAgent") if error_data else None
+        }
+        logger.error(
+            "Client Error: %s",
+            json.dumps(error_data, indent=2),
+            extra=extra_data
+        )
+        return jsonify({"status": "logged"})
+    except Exception as e:
+        logger.error("Error logging client error: %s", str(e))
+        return create_error_response("Failed to log error", 500)
+
 @app.route("/health")
 def health_check():
     health_data = {
@@ -576,21 +599,23 @@ def health_check():
             db.query(Model).count()
             with db.begin():
                 pass
+            if "components" not in health_data:
+                health_data["components"] = {}
             health_data["components"]["database"] = {
                 "status": "healthy",
                 "initialized": is_initialized(),
                 "read_write": "success",
-            }  # type: ignore
+            }
 
-        # Check system
-        health_data["components"]["system"] = {
-            "python_version": sys.version,
-            "platform": platform.platform(),
-            "memory_usage": psutil.Process().memory_info().rss,
-            "memory_percent": psutil.virtual_memory().percent,
-            "cpu_percent": psutil.cpu_percent(),
-            "disk_usage": psutil.disk_usage("/").percent,
-        }  # type: ignore
+            # Check system
+            health_data["components"]["system"] = {
+                "python_version": sys.version,
+                "platform": platform.platform(),
+                "memory_usage": psutil.Process().memory_info().rss,
+                "memory_percent": psutil.virtual_memory().percent,
+                "cpu_percent": psutil.cpu_percent(),
+                "disk_usage": psutil.disk_usage("/").percent,
+            }
 
         return jsonify(health_data)
 

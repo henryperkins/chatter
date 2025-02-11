@@ -3,7 +3,7 @@ from werkzeug.utils import secure_filename
 from flask import current_app, request, jsonify
 from typing import List, Dict, Tuple, Any, Optional
 from models.uploaded_file import UploadedFile
-from config import Config
+from config import config_instance
 from azure_search_config import AzureSearchConfig
 import hashlib
 import time
@@ -14,12 +14,11 @@ class FileUploadHandler:
         """
         Initialize the file upload handler with centralized configuration.
         """
-        self.config = Config()
-        self.ALLOWED_EXTENSIONS = self.config.ALLOWED_FILE_EXTENSIONS
-        self.MAX_FILE_SIZE = self.config.MAX_FILE_SIZE
-        self.MAX_TOTAL_SIZE = self.config.MAX_TOTAL_FILE_SIZE
-        self.QUARANTINE_FOLDER = os.path.join(self.config.UPLOAD_FOLDER, "quarantine")
-        self.MIME_TYPE_MAP = self.config.MIME_TYPE_MAP
+        self.ALLOWED_EXTENSIONS = config_instance.ALLOWED_FILE_EXTENSIONS
+        self.MAX_FILE_SIZE = config_instance.MAX_FILE_SIZE
+        self.MAX_TOTAL_SIZE = config_instance.MAX_TOTAL_FILE_SIZE
+        self.QUARANTINE_FOLDER = os.path.join(config_instance.UPLOAD_FOLDER, "quarantine")
+        self.MIME_TYPE_MAP = config_instance.MIME_TYPE_MAP
         self.SCAN_TIMEOUT = 30  # seconds for virus scan
         current_app.logger.debug(f"FileUploadHandler initialized with ALLOWED_EXTENSIONS={self.ALLOWED_EXTENSIONS}, MAX_FILE_SIZE={self.MAX_FILE_SIZE}, MAX_TOTAL_SIZE={self.MAX_TOTAL_SIZE}")
 
@@ -88,9 +87,8 @@ class FileUploadHandler:
                         return False, errors
                     pass
 
-            if mime_type not in self.config.ALLOWED_MIME_TYPES and not any(
+            if mime_type not in config_instance.ALLOWED_MIME_TYPES and not any(
                 mime_type.startswith(allowed_prefix)
-
                 for allowed_prefix in ['text/', 'application/json']
             ):
                 errors.append(f"MIME type {mime_type} not allowed")
@@ -108,6 +106,13 @@ class FileUploadHandler:
             return False, errors
 
         return True, errors
+
+    def estimate_tokens(self, file) -> int:
+        """Estimate tokens for a file based on its size and type"""
+        file.seek(0)
+        content = file.read()
+        file.seek(0)
+        return len(content) // 4  # 1 token ~4 chars
 
     def validate_files(self, files: List, user_id: Optional[int] = None) -> Tuple[List, List]:
         """
@@ -160,8 +165,8 @@ class FileUploadHandler:
             if not is_allowed:
                 error_msg = f"File validation failed for {file.filename}: {validation_errors}"
                 current_app.logger.error(error_msg)
-                current_app.logger.debug(f"Allowed extensions: {self.config.ALLOWED_FILE_EXTENSIONS}")
-                current_app.logger.debug(f"Allowed MIME types: {self.config.ALLOWED_MIME_TYPES}")
+                current_app.logger.debug(f"Allowed extensions: {config_instance.ALLOWED_FILE_EXTENSIONS}")
+                current_app.logger.debug(f"Allowed MIME types: {config_instance.ALLOWED_MIME_TYPES}")
                 errors.append(error_msg)
                 continue
 
@@ -338,7 +343,12 @@ class FileUploadHandler:
 
             if scan_result is None:
                 return "clean"
-            return scan_result[1]
+            
+            # scan_result is a dict with format {filename: result} or None
+            # Extract the result value from the first (and only) item
+            if isinstance(scan_result, dict):
+                return next(iter(scan_result.values()), "clean")
+            return "clean"
         except ImportError:
             current_app.logger.warning("pyclamd not installed, skipping virus scan")
             return "clean"
@@ -381,16 +391,16 @@ class FileUploadHandler:
             with open(file_info['filepath'], 'r', encoding='utf-8') as f:
                 content = f.read()
 
-            # Create the search document
+            # Create the search document with default values for optional fields
             document = {
                 "id": doc_id,
                 "title": file_info['filename'],
                 "content": content,
                 "filepath": file_info['filepath'],
                 "last_accessed": time.time(),
-                "mime_type": file_info['mime_type'],
-                "size": file_info['size'],
-                "description": file_info.get('description', '')
+                "mime_type": file_info.get('mime_type', 'application/octet-stream'),
+                "size": file_info.get('size', 0),
+                "description": file_info.get('description') or ''  # Ensure empty string if None
             }
 
             # Index the document
@@ -419,7 +429,7 @@ class FileUploadHandler:
 
         saved_files = []
         errors = []
-        upload_folder = os.path.join(self.config.UPLOAD_FOLDER, chat_id)
+        upload_folder = os.path.join(config_instance.UPLOAD_FOLDER, chat_id)
         descriptions = descriptions or {}
 
         if not os.path.exists(upload_folder):
@@ -427,36 +437,48 @@ class FileUploadHandler:
 
         total_tokens = 0
         for file in files:
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(upload_folder, filename)
-            description = descriptions.get(filename)
+            original_filename = secure_filename(file.filename)
+            # Get next version number
+            base_name = os.path.splitext(original_filename)[0]
+            ext = os.path.splitext(original_filename)[1]
+            import uuid
+            file_uuid = str(uuid.uuid4())
+            version = 1
+            # Use the versioned filename from the start
+            versioned_filename = f"{file_uuid}_{base_name}_v{version}{ext}"
+            filepath = os.path.join(upload_folder, versioned_filename)
+            description = descriptions.get(original_filename)
 
             try:
                 # Get MIME type with robust fallback mechanism
                 file.seek(0)
-                mime_type = None
+                mime_type = 'application/octet-stream'  # Default MIME type
 
                 # Try python-magic first
                 try:
                     import magic
-                    mime_type = magic.from_buffer(file.read(1024), mime=True)
-                    current_app.logger.debug(f"MIME type detected using python-magic: {mime_type}")
+                    detected_mime = magic.from_buffer(file.read(1024), mime=True)
+                    if detected_mime:
+                        mime_type = detected_mime
+                        current_app.logger.debug(f"MIME type detected using python-magic: {mime_type}")
                 except (ImportError, Exception) as e:
                     current_app.logger.warning(f"python-magic detection failed: {str(e)}")
 
-                # If python-magic fails, try mimetypes module
-                if not mime_type:
+                # If python-magic didn't work, try mimetypes module
+                if mime_type == 'application/octet-stream':
                     try:
                         import mimetypes
-                        ext = filename.rsplit(".", 1)[1].lower()
-                        mime_type = mimetypes.guess_type(filename)[0]
-                        current_app.logger.debug(f"MIME type detected using mimetypes: {mime_type}")
+                        ext = original_filename.rsplit(".", 1)[1].lower()
+                        detected_mime = mimetypes.guess_type(original_filename)[0]
+                        if detected_mime:
+                            mime_type = detected_mime
+                            current_app.logger.debug(f"MIME type detected using mimetypes: {mime_type}")
                     except Exception as e:
                         current_app.logger.warning(f"mimetypes detection failed: {str(e)}")
 
                 # Final fallback to extension-based detection
-                if not mime_type:
-                    ext = filename.rsplit(".", 1)[1].lower()
+                if mime_type == 'application/octet-stream':
+                    ext = original_filename.rsplit(".", 1)[1].lower()
                     mime_type = self.MIME_TYPE_MAP.get(ext, 'application/octet-stream')
                     current_app.logger.debug(f"MIME type set from extension mapping: {mime_type}")
 
@@ -476,7 +498,7 @@ class FileUploadHandler:
                         bytes_written += len(chunk)
                         if total_size > 0:
                             progress = (bytes_written / total_size) * 100
-                            current_app.logger.debug(f"Upload progress for {filename}: {progress:.1f}%")
+                            current_app.logger.debug(f"Upload progress for {original_filename}: {progress:.1f}%")
 
                 # Handle content based on file type
                 content = ""
@@ -497,9 +519,9 @@ class FileUploadHandler:
                         file_tokens = len(compressed_content.split())
 
                     except UnicodeDecodeError:
-                        current_app.logger.warning(f"Could not read {filename} as text, skipping content processing")
+                        current_app.logger.warning(f"Could not read {original_filename} as text, skipping content processing")
                 else:
-                    current_app.logger.debug(f"Skipping content processing for binary file: {filename}")
+                    current_app.logger.debug(f"Skipping content processing for binary file: {original_filename}")
 
                     # For binary files, use a token estimation based on file size
                     file_tokens = os.path.getsize(filepath) // 4  # Rough estimate
@@ -510,7 +532,7 @@ class FileUploadHandler:
                 # Create database record
                 file_id = UploadedFile.create(
                     chat_id=chat_id,
-                    filename=filename,
+                    filename=original_filename,
                     filepath=filepath,
                     mime_type=mime_type,
                     description=description
@@ -518,7 +540,7 @@ class FileUploadHandler:
 
                 file_info = {
                     "id": file_id,
-                    "filename": filename,
+                    "filename": original_filename,
                     "filepath": filepath,
                     "size": os.path.getsize(filepath),
                     "mime_type": mime_type,
@@ -530,8 +552,8 @@ class FileUploadHandler:
                 saved_files.append(file_info)
 
                 # Cache the processed content
-                cache_key = hash((filename, os.path.getsize(filepath)))
-                context_manager.context_cache[cache_key] = compressed_content
+                cache_key = hash((original_filename, os.path.getsize(filepath)))
+                context_manager.context_cache[cache_key] = [{"content": compressed_content}]
                 UploadedFile.store_tokenized_content(file_info["id"], compressed_content)
 
                 # Index the file in Azure AI Search
@@ -544,8 +566,8 @@ class FileUploadHandler:
                         pass
 
             except Exception as e:
-                current_app.logger.error(f"Error saving file {filename} to {filepath}: {str(e)}")
-                errors.append(f"Failed to save file: {filename}")
+                current_app.logger.error(f"Error saving file {original_filename} to {filepath}: {str(e)}")
+                errors.append(f"Failed to save file: {original_filename}")
                 if os.path.exists(filepath):
                     try:
                         os.remove(filepath)
@@ -573,11 +595,11 @@ class FileUploadHandler:
         """
         current_app.logger.debug(f"handle_upload called for chat_id: {chat_id}")
         try:
-            if "files[]" not in request.files:
+            if "file" not in request.files:
                 return jsonify({"error": "No files provided"}), 400
 
             # Get files and their descriptions
-            files = request.files.getlist("files[]")
+            files = request.files.getlist("file")
             descriptions = {}
 
             # Parse file descriptions from form data
@@ -601,7 +623,7 @@ class FileUploadHandler:
                     "details": errors,
                     "validation_info": {
                         "allowed_extensions": list(self.ALLOWED_EXTENSIONS),
-                        "allowed_mime_types": list(self.config.ALLOWED_MIME_TYPES)
+                        "allowed_mime_types": list(config_instance.ALLOWED_MIME_TYPES)
                     }
                 }), 400
 

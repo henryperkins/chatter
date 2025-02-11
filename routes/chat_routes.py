@@ -831,6 +831,34 @@ def normal_response(
 ##############################################################################
 # 4) Stats & Utility Routes
 ##############################################################################
+@chat_routes.route("/api/log", methods=["POST"])
+@login_required
+def log_client_event() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
+    """Handle client-side event logging from the monitoring system."""
+    try:
+        log_data = request.get_json()
+        if not log_data:
+            return make_response(jsonify({"error": "No log data provided"}), 400)
+
+        log_data.update({
+            "user_id": current_user.id,
+            "session_id": session.get("id"),
+            "ip_address": request.remote_addr,
+            "user_agent": request.headers.get("User-Agent"),
+            "timestamp": datetime.utcnow().isoformat(),
+            "request_id": request.headers.get("X-Request-ID", str(uuid.uuid4())),
+            "url": request.headers.get("Referer"),
+            "chat_id": log_data.get("chat_id") or session.get("chat_id")
+        })
+
+        user_logger = get_logger("user_actions")
+        user_logger.info("Client Event:", extra={"client_event": log_data})
+        return jsonify({"success": True}), 200
+
+    except Exception as e:
+        logger.error("Error logging client event: %s", str(e))
+        return make_response(jsonify({"error": "Internal server error"}), 500)
+
 @chat_routes.route("/api/log/error", methods=["POST"])
 @login_required
 def log_client_error() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:

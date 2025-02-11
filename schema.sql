@@ -110,7 +110,18 @@ CREATE TABLE uploaded_files (
     filename TEXT NOT NULL,
     filepath TEXT NOT NULL,
     mime_type TEXT DEFAULT NULL,
-    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    version INT NOT NULL DEFAULT 1,
+    uuid TEXT NOT NULL,
+    size BIGINT NOT NULL DEFAULT 0,
+    description TEXT,
+    azure_file_id TEXT,
+    azure_search_id TEXT,
+    indexing_status TEXT NOT NULL DEFAULT 'pending',
+    last_indexed_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    tokenized_text TEXT
 );
 
 -- Login attempts tracking
@@ -152,4 +163,6 @@ CREATE INDEX idx_model_versions_model_id ON model_versions (model_id);
 CREATE INDEX idx_model_versions_created_at ON model_versions (created_at);
 CREATE UNIQUE INDEX unique_lower_username ON users ((LOWER(username)));
 CREATE UNIQUE INDEX unique_lower_email ON users ((LOWER(email)));
+CREATE INDEX idx_uploaded_files_version ON uploaded_files (version);
+CREATE INDEX idx_uploaded_files_uuid ON uploaded_files (uuid);
 COMMIT;

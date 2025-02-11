@@ -3,7 +3,7 @@ from file_upload import FileUploadHandler
 from models.uploaded_file import UploadedFile
 import os
 import requests
-from config import Config
+from config import config_instance
 from functools import wraps
 from typing import Dict, List, Optional
 import json
@@ -43,13 +43,13 @@ def init_file_routes(app):
         """
         try:
             # Construct the Azure OpenAI API URL for file upload
-            base_url = Config.AZURE_API_ENDPOINT
+            base_url = config_instance.AZURE_API_ENDPOINT
             if not base_url.endswith('/'):
                 base_url += '/'
-            url = f"{base_url}files?api-version={Config.AZURE_API_VERSION}"
+            url = f"{base_url}files?api-version={config_instance.AZURE_API_VERSION}"
 
             headers = {
-                "api-key": Config.AZURE_API_KEY,
+                "api-key": config_instance.AZURE_OPENAI_KEY,
                 "Content-Type": "multipart/form-data"
             }
 
@@ -74,17 +74,14 @@ def init_file_routes(app):
         """
         from models.token_usage import TokenUsage
         from flask_login import current_user
-        """
-        if not TokenUsage.within_rate_limit(current_user.id, 60, 5000):
-            return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
-        Handle file upload request with metadata and upload to Azure OpenAI.
 
-        Args:
-            chat_id (str): The chat ID associated with the uploaded files.
+        # Rate limit check
+        try:
+            if not TokenUsage.within_rate_limit(current_user.id, 60, 5000):
+                return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
+        except Exception as e:
+            current_app.logger.error(f"Rate limit check failed: {str(e)}")
 
-        Returns:
-            Response: A Flask JSON response with detailed file metadata.
-        """
         try:
             # First use our existing handler to validate and save files locally
             result = file_handler.handle_upload(chat_id)
@@ -96,62 +93,53 @@ def init_file_routes(app):
             if not response_data.get('success'):
                 return result
 
-            # Now upload each saved file to Azure OpenAI
-            azure_files = []
-            for file_info in response_data['saved_files']:
-                file_path = os.path.join(Config.UPLOAD_FOLDER, chat_id, file_info['filename'])
+            saved_files = response_data['saved_files']
 
-                # Upload to Azure OpenAI
-                azure_result = upload_to_azure(file_path)
-
-                if 'error' in azure_result:
-                    return jsonify({
-                        'error': f"Azure upload failed for {file_info['filename']}: {azure_result['error']}",
-                        'status_code': azure_result.get('status_code', 500)
-                    }), azure_result.get('status_code', 500)
-
-                # Update the file info with Azure details and content
-                file_info.update({
-                    'azure_file_id': azure_result.get('id'),
-                    'azure_status': azure_result.get('status'),
-                    'azure_purpose': azure_result.get('purpose'),
-                    'content_type': 'text/plain'  # Default to text/plain for Azure OpenAI
-                })
-
-                # Cache the file content for quick access
+            # Try Azure operations only if configuration exists
+            if hasattr(config_instance, 'AZURE_API_ENDPOINT') and config_instance.AZURE_API_ENDPOINT:
                 try:
-                    # Only cache text files
-                    mime_type = file_info.get('mime_type', '')
-                    if mime_type.startswith('text/') or mime_type == 'application/json':
+                    for file_info in saved_files:
+                        file_path = os.path.join(config_instance.UPLOAD_FOLDER, chat_id, file_info['filename'])
+
+                        # Upload to Azure OpenAI
+                        azure_result = upload_to_azure(file_path)
+
+                        if 'error' not in azure_result:
+                            # Update the file info with Azure details
+                            file_info.update({
+                                'azure_file_id': azure_result.get('id'),
+                                'azure_status': azure_result.get('status'),
+                                'azure_purpose': azure_result.get('purpose'),
+                                'content_type': 'text/plain'
+                            })
+
+                            # Update the database record with Azure file ID if it exists
+                            azure_id = azure_result.get('id')
+                            if azure_id:
+                                UploadedFile.update_azure_file_id(
+                                    file_info['id'],
+                                    azure_id
+                                )
+
+                        # Cache text file content regardless of Azure upload result
                         try:
-                            with open(file_path, 'r', encoding='utf-8') as f:
-                                content = f.read()
-                                # Cache using both local file ID and Azure file ID
-                                cache_key = hash((file_info['filename'], os.path.getsize(file_path)))
-                                azure_cache_key = hash(('azure', azure_result.get('id')))
-                                from chat_utils import context_manager
-                                context_manager.context_cache[cache_key] = content
-                                context_manager.context_cache[azure_cache_key] = content
-                        except UnicodeDecodeError:
-                            current_app.logger.warning(f"Could not read {file_info['filename']} as text, skipping cache")
-                    else:
-                        current_app.logger.debug(f"Skipping cache for binary file: {file_info['filename']}")
+                            mime_type = file_info.get('mime_type', '')
+                            if mime_type.startswith('text/') or mime_type == 'application/json':
+                                with open(file_path, 'r', encoding='utf-8') as f:
+                                    content = f.read()
+                                    cache_key = hash((file_info['filename'], os.path.getsize(file_path)))
+                                    from chat_utils import context_manager
+                                    context_manager.context_cache[cache_key] = [{"content": content}]
+                        except Exception as e:
+                            current_app.logger.warning(f"Failed to cache file content: {str(e)}")
+
                 except Exception as e:
-                    current_app.logger.warning(f"Failed to cache file content: {str(e)}")
-                    current_app.logger.debug("Stack trace:", exc_info=True)
-
-                # Update the database record with Azure file ID
-                UploadedFile.update_azure_file_id(
-                    file_info['id'],
-                    azure_result.get('id')
-                )
-
-                azure_files.append(file_info)
+                    current_app.logger.error(f"Azure operations failed but continuing: {str(e)}")
 
             return jsonify({
                 'success': True,
-                'saved_files': azure_files,
-                'message': f"Successfully uploaded {len(azure_files)} files to Azure OpenAI",
+                'saved_files': saved_files,
+                'message': f"Successfully uploaded {len(saved_files)} files",
                 'total_size': response_data['total_size']
             })
 
@@ -161,7 +149,6 @@ def init_file_routes(app):
                 'error': f"File upload failed: {str(e)}",
                 'status_code': 500
             }), 500
-
 
     @file_routes.route('/chunked-upload/<chat_id>', methods=['POST'])
     def chunked_upload(chat_id: str):
@@ -173,8 +160,12 @@ def init_file_routes(app):
         from flask_login import current_user
         import os, uuid
 
-        if not TokenUsage.within_rate_limit(current_user.id, 60, 5000):
-            return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
+        # Rate limit check
+        try:
+            if not TokenUsage.within_rate_limit(current_user.id, 60, 5000):
+                return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
+        except Exception as e:
+            current_app.logger.error(f"Rate limit check failed: {str(e)}")
 
         # 1. Parse required form data
         chunk_index = int(request.form.get('chunkIndex', 0))
@@ -189,7 +180,7 @@ def init_file_routes(app):
             return jsonify({"error": "No chunk provided"}), 400
 
         # 3. Temporary storage directory
-        temp_dir = os.path.join(Config.UPLOAD_FOLDER, 'temp_chunks', chat_id, upload_id)
+        temp_dir = os.path.join(config_instance.UPLOAD_FOLDER, 'temp_chunks', chat_id, upload_id)
         os.makedirs(temp_dir, exist_ok=True)
 
         # 4. Write chunk to a temporary file
@@ -207,20 +198,14 @@ def init_file_routes(app):
                         merged_file.write(part.read())
 
             # 6. Validate + transfer the merged file to final storage
-            #    (You can reuse logic from "handle_upload" or "file_upload.py" to validate)
-            final_dest = os.path.join(Config.UPLOAD_FOLDER, chat_id)
+            final_dest = os.path.join(config_instance.UPLOAD_FOLDER, chat_id)
             os.makedirs(final_dest, exist_ok=True)
             final_path = os.path.join(final_dest, merged_filename)
             os.rename(merged_path, final_path)
 
-            # 7. (Optional) Update the DB, track token usage, etc.
-            #    Example:
-            # TokenUsage.update_usage(<some_user_id>, chat_id, <estimated_tokens_of_merged_file>)
-
             # 8. Clean up temp chunks
             for i in range(total_chunks):
                 os.remove(os.path.join(temp_dir, f"chunk_{i}"))
-            # (Optionally remove temp_dir if it’s empty)
 
             return jsonify({
                 "success": True,
@@ -232,7 +217,6 @@ def init_file_routes(app):
         # For non-final chunks, just return success
         return jsonify({"success": True, "uploadId": upload_id})
 
-
     @file_routes.route('/files', methods=['GET'])
     def list_files():
         """
@@ -242,8 +226,8 @@ def init_file_routes(app):
             Response: A Flask JSON response with list of files.
         """
         try:
-            url = f"{Config.AZURE_API_ENDPOINT}/files?api-version={Config.AZURE_API_VERSION}"
-            headers = {"api-key": Config.AZURE_API_KEY}
+            url = f"{config_instance.AZURE_API_ENDPOINT}/files?api-version={config_instance.AZURE_API_VERSION}"
+            headers = {"api-key": config_instance.AZURE_OPENAI_KEY}
 
             response = requests.get(url, headers=headers)
             result = handle_azure_response(response)
@@ -274,8 +258,8 @@ def init_file_routes(app):
             Response: A Flask JSON response indicating success or failure.
         """
         try:
-            url = f"{Config.AZURE_API_ENDPOINT}/files/{file_id}?api-version={Config.AZURE_API_VERSION}"
-            headers = {"api-key": Config.AZURE_API_KEY}
+            url = f"{config_instance.AZURE_API_ENDPOINT}/files/{file_id}?api-version={config_instance.AZURE_API_VERSION}"
+            headers = {"api-key": config_instance.AZURE_OPENAI_KEY}
 
             response = requests.delete(url, headers=headers)
             result = handle_azure_response(response)
@@ -297,8 +281,8 @@ def init_file_routes(app):
                 'status_code': 500
             }), 500
 
-    @file_routes.route('/preview/<file_id>', methods=['GET'])
-    def preview_file(file_id: str):
+    @file_routes.route('/preview/<int:file_id>', methods=['GET'])
+    def preview_file(file_id: int):
          from flask import send_file, jsonify
          file_record = UploadedFile.get_by_id(file_id)
          if not file_record:

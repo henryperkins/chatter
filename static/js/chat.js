@@ -271,8 +271,17 @@ const CONFIG = {
             if (hasFiles) {
                 try {
                     uploadedFiles = await window.fileUploadManager.uploadFiles();
+                    if (!Array.isArray(uploadedFiles) || uploadedFiles.length === 0) {
+                        throw new Error('No files were successfully uploaded');
+                    }
+                    // Verify each uploaded file has required metadata
+                    uploadedFiles.forEach((file, index) => {
+                        if (!file.id || !file.name) {
+                            throw new Error(`Invalid metadata for uploaded file ${index + 1}`);
+                        }
+                    });
                 } catch (uploadError) {
-                    window.MessageRenderer.showError('File upload failed', uploadError.file);
+                    window.MessageRenderer.showError('File upload failed: ' + (uploadError.message || 'Unknown error'), uploadError.file);
                     throw uploadError;
                 }
             }

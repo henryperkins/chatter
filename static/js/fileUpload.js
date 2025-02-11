@@ -371,17 +371,22 @@
                             }
 
                             const result = await resp.json();
-                            if (!result.success) {
-                                throw new Error(result.error || 'Upload error');
+                            if (!result.success || !result.saved_files?.length) {
+                                throw new Error(result.error || 'No saved files returned from server');
+                            }
+
+                            const savedFile = result.saved_files[0];
+                            if (!savedFile.id || !savedFile.filename) {
+                                throw new Error('Invalid file metadata returned from server');
                             }
 
                             // Return richer metadata
                             uploadedFiles.push({
-                                id: result.saved_files[0].id,
-                                name: result.saved_files[0].filename,
-                                url: result.saved_files[0].filepath,
-                                mime_type: result.saved_files[0].mime_type,
-                                size: result.saved_files[0].size,
+                                id: savedFile.id,
+                                name: savedFile.filename,
+                                url: savedFile.filepath,
+                                mime_type: savedFile.mime_type,
+                                size: savedFile.size,
                                 uploaded_at: new Date().toISOString()
                             });
 
