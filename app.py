@@ -17,8 +17,6 @@ import psutil
 import uuid
 import io
 import mistune
-from mistune import create_markdown
-from mistune.plugins import url_plugin, table_plugin
 import logging
 from datetime import timedelta, datetime
 from typing import Optional, Tuple, Union
@@ -346,18 +344,15 @@ def register_cli_commands(app):
 
 def create_app() -> Flask:
     from database import get_db_state  # Add missing import
-    from markdown import markdown
-
     # Create app instance first
     app = Flask(__name__)
     
     # Add markdown filter
     @app.template_filter('markdown')
     def markdown_filter(text):
-        renderer = mistune.HTMLRenderer(escape=False)
-        markdown_processor = create_markdown(
-            renderer=renderer,
-            plugins=[url_plugin, table_plugin]
+        markdown_processor = mistune.create_markdown(
+            plugins=['url', 'table'],
+            escape=False
         )
         return markdown_processor(text)
 
