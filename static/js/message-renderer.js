@@ -1,4 +1,4 @@
-'use strict';
+import { ChatConfig } from './chat-config.js';
 
 class MessageRenderer {
     static templates = {
@@ -54,7 +54,6 @@ class MessageRenderer {
         const messageContent = clone.querySelector('[data-role="assistant-message"]');
         const proseDiv = messageContent.querySelector('.prose');
         const timestamp = clone.querySelector('span.text-xs');
-        const regenerateButton = clone.querySelector('.regenerate-button');
         const copyButton = clone.querySelector('.copy-button');
 
         // Ensure content is never empty/undefined
@@ -70,15 +69,9 @@ class MessageRenderer {
         // Show a timestamp
         timestamp.textContent = new Date().toLocaleTimeString();
 
-        // If there's a copy button, store raw text and toggle visibility
+        // If there's a copy button, store raw text
         if (copyButton) {
             copyButton.setAttribute('data-raw-content', content);
-            copyButton.style.display = content ? 'block' : 'none';
-        }
-
-        // Hide regenerate button during streaming
-        if (isStreaming && regenerateButton) {
-            regenerateButton.style.display = 'none';
         }
 
         return clone.firstElementChild;
@@ -89,10 +82,16 @@ class MessageRenderer {
         const clone = template.content.cloneNode(true);
         const messageText = clone.querySelector('p');
         const timestamp = clone.querySelector('span.text-xs');
+        const copyButton = clone.querySelector('.copy-button');
 
         // Assign user content
         messageText.textContent = content;
         timestamp.textContent = new Date().toLocaleTimeString();
+
+        // Set up copy button
+        if (copyButton) {
+            copyButton.setAttribute('data-raw-content', content);
+        }
 
         // If user included attachments, render them
         if (files && files.length > 0) {
@@ -387,13 +386,24 @@ class MessageRenderer {
     }
 }
 
-// Make the renderer globally accessible if you want:
+// Export the MessageRenderer class
+export { MessageRenderer };
+
+// Also make globally accessible
 window.MessageRenderer = MessageRenderer;
 
-// Initialize on DOMContentLoaded
+// Initialize after ChatConfig is ready
 document.addEventListener('DOMContentLoaded', async () => {
     try {
+        // Wait for ChatConfig to initialize first
+        const config = ChatConfig.getInstance();
+        await config.init();
+        
+        // Now initialize MessageRenderer
         await MessageRenderer.initialize();
+        
+        // Dispatch event to signal MessageRenderer is ready
+        document.dispatchEvent(new Event('messagerenderer:ready'));
     } catch (error) {
         console.error('Failed to initialize MessageRenderer:', error);
     }

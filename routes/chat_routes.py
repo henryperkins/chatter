@@ -7,6 +7,7 @@ This module provides routes for managing chat interactions, including:
 - Chat session management
 - Stats and utility routes
 """
+
 import os
 import uuid
 import json
@@ -215,7 +216,8 @@ def validate_chat_request(request_data) -> Dict[str, Any]:
 def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """
     GET /chat/interface
-    Checks for models, creates new chat if needed, and renders chat.html.
+    Checks for models, creates new chat if needed, retrieves conversation history,
+    and renders chat.html.
     """
     try:
         with db_session() as db:
@@ -269,7 +271,7 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         model_name = model_obj.name if model_obj else "Default Model"
         current_model = model_obj
 
-        # Get Azure token
+        # Get Azure token if available
         azure_token = None
         if current_model and current_model.api_key:
             try:
@@ -292,14 +294,19 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             except Exception as e:
                 logger.error("Error decrypting Azure token: %s", str(e))
 
-        # Return response without using cast, so the type matches
+        # Retrieve the conversation history and sanitize user messages
+        messages = conversation_manager.get_context(chat_id)
+        for message in messages:
+            if message["role"] == "user":
+                message["content"] = bleach.clean(message["content"])
+
         return make_response(render_template(
             "chat.html",
             chat_id=chat_id,
             chat_title=chat_title,
             model_name=model_name,
             current_model=current_model,
-            messages=[],
+            messages=messages,  # Updated to pass the conversation history
             models=Model.get_all(),
             conversations=Chat.get_user_chats(current_user.id),
             now=datetime.now,
@@ -348,8 +355,6 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             Chat.create(chat_id=chat_id, user_id=user_id, title="New Chat")
             session["chat_id"] = chat_id
             return redirect(url_for("chat.index"))
-        # type: ignore  # Suppress Pylance type mismatch for return type
-        # type: ignore  # Silence type checker complaint about Response return type
         except Exception as e:
             logger.error("Error creating chat: %s", e)
             return (
@@ -667,13 +672,10 @@ def stream_response(chat_id: str, history: List[Dict[str, Any]], model_obj: Mode
                 if isinstance(chunk, str):
                     yield chunk
                     continue
-        # type: ignore # chunk might not have "choices"
-
                 # Get choices safely from dict or object
                 choices = None
                 if isinstance(chunk, dict):
                     choices = chunk.get("choices")
-                    # type: ignore  # Suppress Pylance error if chunk lacks "choices"
                 elif hasattr(chunk, "choices"):
                     choices = chunk.choices
 
@@ -773,7 +775,7 @@ def normal_response(
 
         if choices:
             choice = choices[0]
-            if isinstance(choice, dict):  # type: ignore  # Silence type checker for 'choices'
+            if isinstance(choice, dict):
                 message_obj = choice.get("message", {})
                 if isinstance(message_obj, dict):
                     content = message_obj.get("content")

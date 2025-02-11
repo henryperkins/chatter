@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block extra_head %}
 <!-- Chat-specific styles -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
@@ -106,71 +105,8 @@
 {% endblock %}
 
 {% block content %}
-<!-- Message Templates -->
-<template id="assistant-message-template">
-    <div class="message-container assistant-message" data-model-type="">
-        <div class="flex gap-3 w-full">
-            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-md" role="img" aria-label="Assistant avatar">
-                <i class="fas fa-robot text-sm"></i>
-            </div>
-            <div class="flex-1 relative group">
-                <div class="absolute right-3 top-3 flex items-center gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <button class="copy-button btn-icon" title="Copy to clipboard" aria-label="Copy message to clipboard">
-                        <i class="fas fa-copy"></i>
-                    </button>
-                    <button class="regenerate-button btn-icon" title="Regenerate response" aria-label="Regenerate response">
-                        <i class="fas fa-redo-alt"></i>
-                    </button>
-                </div>
-                
-                <div class="message-bubble">
-                    <div class="message-content" data-role="assistant-message">
-                        <div class="prose dark:prose-invert prose-sm sm:prose-base max-w-none o-series-prose"></div>
-                        <button class="toggle-more hidden">Show more</button>
-                    </div>
-                </div>
-                <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1"></span>
-            </div>
-        </div>
-    </div>
-</template>
-
-<template id="typing-indicator-template">
-    <div class="message-container assistant-message animate-pulse">
-        <div class="flex gap-3 w-full">
-            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-600 flex items-center justify-center text-white shadow-md">
-                <i class="fas fa-robot text-sm"></i>
-            </div>
-            <div class="flex-1">
-                <div class="message-bubble">
-                    <div class="flex gap-2 p-2">
-                        <div class="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-bounce"></div>
-                        <div class="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-bounce" style="animation-delay: 0.2s"></div>
-                        <div class="w-2 h-2 rounded-full bg-gray-300 dark:bg-gray-600 animate-bounce" style="animation-delay: 0.4s"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</template>
-
-<template id="user-message-template">
-    <div class="message-container user-message">
-        <div class="flex gap-3 w-full justify-end">
-            <div class="flex-1 relative">
-                <div class="message-bubble">
-                    <p class="text-[15px] leading-relaxed break-words whitespace-pre-wrap"></p>
-                </div>
-                <span class="text-xs text-gray-500 dark:text-gray-400 block mt-1 text-right"></span>
-            </div>
-            <div class="flex-shrink-0 h-8 w-8 rounded-full bg-primary-600/20 shadow-sm"></div>
-        </div>
-    </div>
-</template>
-
-<!-- Main Chat Container -->
+<!-- Server-rendered messages below -->
 <div id="chat-container" class="chat-container">
-    <!-- Chat Configuration -->
     <div id="chat-config" class="hidden"
         data-chat-id="{{ chat_id }}"
         data-csrf-token="{{ csrf_token() }}"
@@ -242,19 +178,92 @@
         </div>
     </div>
 </div>
+
+<!-- Message Templates -->
+<template id="user-message-template">
+    <div class="user-message flex items-start gap-4 p-4">
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
+            <i class="fas fa-user text-white text-sm"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                <p class="prose dark:prose-invert max-w-none"></p>
+                <div class="mt-2 flex items-center justify-between">
+                    <span class="text-xs text-gray-500 dark:text-gray-400"></span>
+                    <button class="copy-button text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="assistant-message-template">
+    <div class="message-container assistant flex items-start gap-4 p-4">
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-green-600 flex items-center justify-center">
+            <i class="fas fa-robot text-white text-sm"></i>
+        </div>
+        <div class="message-content flex-1 min-w-0">
+            <div data-role="assistant-message" class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                <div class="prose dark:prose-invert max-w-none"></div>
+                <div class="mt-2 flex items-center justify-between">
+                    <span class="text-xs text-gray-500 dark:text-gray-400"></span>
+                    <button class="copy-button text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <button class="toggle-more hidden mt-4 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                    Show more
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="typing-indicator-template">
+    <div class="message-container assistant flex items-start gap-4 p-4">
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-green-600 flex items-center justify-center">
+            <i class="fas fa-robot text-white text-sm"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                <div class="flex gap-2">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="attachment-template">
+    <div class="mt-2">
+        <div class="attachment-list space-y-2"></div>
+    </div>
+</template>
+
+<template id="attachment-item-template">
+    <div class="flex items-center gap-2 text-sm">
+        <i class="fas fa-paperclip text-gray-500 dark:text-gray-400"></i>
+        <a class="attachment-link text-blue-600 dark:text-blue-400 hover:underline" target="_blank">
+            <span class="attachment-name"></span>
+        </a>
+    </div>
+</template>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
 <!-- Chat Feature Modules -->
-<script src="{{ url_for('static', filename='js/chat-config.js') }}"></script>
-<script src="{{ url_for('static', filename='js/monitoring.js') }}"></script>
-<script src="{{ url_for('static', filename='js/fileUpload.js') }}"></script>
-<script src="{{ url_for('static', filename='js/token-usage.js') }}"></script>
-<script src="{{ url_for('static', filename='js/message-renderer.js') }}"></script>
-<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chat-config.js') }}" type="module"></script>
+<script src="{{ url_for('static', filename='js/message-renderer.js') }}" type="module"></script>
+<script src="{{ url_for('static', filename='js/chat.js') }}" type="module"></script>
 
-<script>
+<script type="module">
+import { ChatConfig } from "{{ url_for('static', filename='js/chat-config.js') }}";
+
 document.addEventListener('DOMContentLoaded', async () => {
     // Initialize chat config
     const config = ChatConfig.getInstance();
