@@ -6,7 +6,7 @@ import base64
 from cryptography.fernet import Fernet
 from pathlib import Path
 from typing import Dict, Any
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
