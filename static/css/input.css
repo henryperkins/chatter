@@ -16,7 +16,9 @@
     .chat-container {
         --chat-input-height: 180px;
         --chat-header-height: 64px;
-        @apply flex flex-col h-[calc(100vh-var(--chat-header-height))] relative;
+        @apply flex flex-col relative;
+        height: 100vh !important; /* Force full viewport height */
+        height: -webkit-fill-available !important; /* iOS Safari fix */
     }
 
     .page-container {

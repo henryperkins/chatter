@@ -169,6 +169,41 @@
     font-size: 1rem !important;
     line-height: 1.5 !important;
 }
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+  .chat-messages-scroll {
+    position: fixed;
+    top: 180px; /* Account for header + tabs */
+    bottom: 180px; /* Space for input */
+    left: 0;
+    right: 0;
+    padding-bottom: 2rem;
+  }
+  
+  .chat-input-container {
+    position: fixed;
+    bottom: var(--safe-area-bottom);
+    left: 0;
+    right: 0;
+    height: auto;
+    padding: 1rem;
+    z-index: 2000;
+  }
+}
+
+/* Z-index priorities */
+#chat-container {
+  z-index: 1000; /* Higher than nav (1000) and alerts (1300) */
+}
+
+#chat-input {
+  z-index: 2000; /* Above everything except modals */
+}
+
+#alert-container {
+  z-index: 3000; /* Keep alerts on top */
+}
 .message-bubble .prose p {
     margin-bottom: 1rem !important;
 }
