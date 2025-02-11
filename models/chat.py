@@ -167,7 +167,7 @@ class Chat:
     @staticmethod
     def get_user_chats(user_id: int, limit: int = 10, offset: int = 0) -> List[Dict[str, Union[str, int]]]:
         """
-        Retrieve paginated chat history for a user.
+        Retrieve paginated chat history for a user with message counts and last activity.
         """
         with db_session() as db:
             try:
@@ -176,12 +176,18 @@ class Chat:
                     SELECT
                         c.id, c.user_id, c.title, c.model_id,
                         c.created_at as timestamp,
-                        m.name as model_name
+                        m.name as model_name,
+                        COUNT(msg.id) as message_count,
+                        MAX(msg.timestamp) as last_activity,
+                        SUM(CASE WHEN msg.role = 'user' THEN 1 ELSE 0 END) as user_messages,
+                        SUM(CASE WHEN msg.role = 'assistant' THEN 1 ELSE 0 END) as assistant_messages
                     FROM chats c
                     LEFT JOIN models m ON c.model_id = m.id
+                    LEFT JOIN messages msg ON c.id = msg.chat_id
                     WHERE c.user_id = :user_id
                     AND (c.is_deleted = FALSE OR c.is_deleted IS NULL)
-                    ORDER by c.created_at DESC
+                    GROUP BY c.id, c.user_id, c.title, c.model_id, c.created_at, m.name
+                    ORDER by last_activity DESC NULLS LAST
                     LIMIT :limit OFFSET :offset
                     """
                 )
@@ -195,6 +201,10 @@ class Chat:
                         "model_id": chat["model_id"],
                         "model_name": chat["model_name"] or "Unknown Model",
                         "timestamp": chat["timestamp"],
+                        "message_count": chat["message_count"] or 0,
+                        "last_activity": chat["last_activity"] or chat["timestamp"],
+                        "user_messages": chat["user_messages"] or 0,
+                        "assistant_messages": chat["assistant_messages"] or 0
                     }
                     for chat in chats
                 ]

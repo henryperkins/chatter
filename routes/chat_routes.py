@@ -418,10 +418,16 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
     messages = conversation_manager.get_context(chat_id)
     if not messages:
+        # Add both welcome message and helpful instructions
         conversation_manager.add_message(
             chat_id=chat_id,
             role="system",
             content="Welcome to Azure OpenAI Chat! Start by typing a message."
+        )
+        conversation_manager.add_message(
+            chat_id=chat_id,
+            role="assistant",
+            content="Hello! I'm ready to help. You can:\n- Type a message to chat\n- Upload files for analysis\n- Change models using the dropdown\n- Start a new chat with the + button"
         )
         messages = conversation_manager.get_context(chat_id)
     
