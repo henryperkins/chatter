@@ -112,6 +112,16 @@
 {% extends "base.html" %}
 {% block extra_head %}
 <!-- Chat-specific styles -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+{% endblock %}
+
+{% block title %}Chat - Azure OpenAI{% endblock %}
+
+{% block nav_classes %}top-0{% endblock %}
+
+{% block main_classes %}relative flex-1{% endblock %}
+
+{% block content %}
 <!-- Server-rendered messages below -->
 <div id="chat-container" class="chat-container">
     <div id="chat-config" class="hidden"
@@ -126,9 +136,8 @@
     </div>
 
     <!-- Main Chat Area -->
-    <div class="chat-container">
-        <div class="flex-1 relative overflow-hidden">
-            <div id="chat-box" class="chat-messages-scroll" role="log" aria-live="polite">
+    <div class="flex-1 relative overflow-hidden">
+        <div id="chat-box" class="chat-messages-scroll" role="log" aria-live="polite">
                 <div class="max-w-4xl mx-auto w-full px-4">
                 {% if messages %}
                     {% for message in messages %}
@@ -248,9 +257,10 @@
                     </button>
                 </div>
             </form>
-        </div>
     </div>
-</div>
+</div>  <!-- Close chat-container -->
+
+{% endblock content %}
 
 <!-- Message Templates -->
 <template id="user-message-template">
