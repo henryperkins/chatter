@@ -568,6 +568,10 @@
                             if (['image/heic', 'image/heif', 'image/heic-sequence'].includes(file.type)) {
                                 return this.convertHEICtoJPG(file);
                             }
+                            else if (/\.(heic|HEIC)$/.test(file.name)) {
+                                // Fallback if MIME detection missed .HEIC
+                                return this.convertHEICtoJPG(file);
+                            }
                             // Handle other image types that might need orientation fixing
                             if (file.type.startsWith('image/')) {
                                 const orientedBlob = await this.fixImageOrientation(file);
