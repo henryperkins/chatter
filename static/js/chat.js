@@ -668,4 +668,4 @@ async function startChat() {
     }
 }
  
-document.addEventListener('DOMContentLoaded', startChat);
+window.addEventListener('load', startChat);
