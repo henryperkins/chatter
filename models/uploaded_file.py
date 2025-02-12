@@ -12,29 +12,41 @@ from database import db_session
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class UploadedFile:
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, func
+from sqlalchemy.orm import relationship
+from models.base import Base
+
+class UploadedFile(Base):
     """
     Represents an uploaded file associated with a chat.
     """
+    __tablename__ = 'uploaded_files'
 
-    id: int
-    chat_id: str
-    filename: str
-    filepath: str
-    uuid: str
-    size: int
-    description: Optional[str] = None
-    mime_type: Optional[str] = None
-    uploaded_at: Optional[datetime] = None
-    version: int = 1
-    azure_file_id: Optional[str] = None
-    azure_search_id: Optional[str] = None
-    last_indexed_at: Optional[datetime] = None
-    indexing_status: str = 'pending'
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
-    tokenized_text: Optional[str] = None
+    id = Column(Integer, primary_key=True)
+    chat_id = Column(String, ForeignKey('chats.id'), nullable=False)
+    filename = Column(String, nullable=False)
+    filepath = Column(String, nullable=False)
+    uuid = Column(String, nullable=False)
+    size = Column(Integer, nullable=False)
+    mime_type = Column(String)
+    description = Column(Text)
+    version = Column(Integer, default=1)
+    azure_file_id = Column(String)
+    azure_search_id = Column(String)
+    indexing_status = Column(String, default='pending')
+    last_indexed_at = Column(DateTime)
+    tokenized_text = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, onupdate=func.now())
+    
+    # Relationship with Chat model
+    chat = relationship("Chat", back_populates="files")
+
+    def __init__(self, **kwargs):
+        """Initialize an UploadedFile instance."""
+        super().__init__()
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     @staticmethod
     def create(
