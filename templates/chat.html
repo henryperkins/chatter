@@ -41,7 +41,8 @@
 
                 <!-- Chat Selector - Mobile -->
                 <select id="mobile-chat-selector"
-                    class="md:hidden flex-1 px-3 py-2 bg-white/95 dark:bg-gray-800/95 border border-gray-200/80 dark:border-gray-700/80 rounded-xl">
+                    class="md:hidden flex-1 px-3 py-2 bg-white/95 dark:bg-gray-800/95 border border-gray-200/80 dark:border-gray-700/80 rounded-xl"
+                    aria-label="Select chat">
                     {% for chat in conversations %}
                     <option value="{{ chat.id }}" {% if chat_id and chat.id|string|safe == chat_id|string|safe %}selected{% endif %}>
                         {{ chat.title }}
@@ -66,6 +67,7 @@
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Model:</span>
                     <select id="model-select" 
                         class="bg-transparent font-medium focus:ring-0 border-0"
+                        aria-label="Select model"
                         data-original-value="{{ current_model.id if current_model else '' }}">
                         {% for model in models %}
                         <option value="{{ model.id }}"
@@ -99,14 +101,14 @@
                 </div>
                 {% endif %}
 
-                <!-- Edit Title Button -->
+                <!-- Edit Title Buttonb  -->
                 <button id="edit-title-btn" class="btn-icon group relative"
                     data-tooltip="Edit chat title">
                     <i class="fas fa-pen"></i>
                     <span class="tooltip">Edit title</span>
                 </button>
             </div>
-                </div>
+        </div>
     </div>
 </div>
 {% endblock chat_tabs %}
@@ -197,48 +199,44 @@
 </div>
 
     <!-- Chat Input Area -->
-        <!-- Updated with method and action so the server receives POST at /api/files/upload/<chat_id> -->
-        <div id="chat-input" class="chat-input-container">
-            <form id="chat-form" 
-                  method="POST"
-                  action="{{ url_for('file_routes.upload_files', chat_id=chat_id) }}"
-                  class="max-w-4xl mx-auto h-full px-4 py-4 flex flex-col justify-between"
-                  enctype="multipart/form-data">
-                <!-- Hidden CSRF input if needed -->
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                
-                <textarea
-                    name="message"
-                    id="message-input"
-                    rows="3"
-                    class="form-input resize-none flex-1"
-                    placeholder="Type your message here..."
-                    spellcheck="true"
-                ></textarea>
-                
-                <div class="flex items-center justify-between mt-2">
-                    <div class="flex items-center gap-2">
-                        <input type="file"
-                               id="file-upload"
-                               name="files[]"
-                               class="hidden mobile-file-input"
-                               multiple
-                               accept="image/*, video/*, .pdf, .doc, .docx, .txt, .md, .heic, .heif">
-                        <label for="file-upload" class="btn btn-secondary">
-                            <i class="fas fa-paperclip mr-2"></i>
-                            <span>Attach Files</span>
-                        </label>
-                    </div>
-                    
-                    <button type="submit" id="send-button" class="btn btn-primary">
-                        <i class="fas fa-paper-plane mr-2"></i>
-                        <span>Send</span>
-                    </button>
+    <!-- Removed method="POST" and action to avoid 400 error when no files are present -->
+    <div id="chat-input" class="chat-input-container">
+        <form id="chat-form"
+              class="max-w-4xl mx-auto h-full px-4 py-4 flex flex-col justify-between"
+              enctype="multipart/form-data">
+            <!-- Hidden CSRF input if needed -->
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <textarea
+                name="message"
+                id="message-input"
+                rows="3"
+                class="form-input resize-none flex-1"
+                placeholder="Type your message here..."
+                spellcheck="true"
+            ></textarea>
+            
+            <div class="flex items-center justify-between mt-2">
+                <div class="flex items-center gap-2">
+                    <input type="file"
+                           id="file-upload"
+                           name="files[]"
+                           class="hidden mobile-file-input"
+                           multiple
+                           accept="image/*, video/*, .pdf, .doc, .docx, .txt, .md, .heic, .heif">
+                    <label for="file-upload" class="btn btn-secondary">
+                        <i class="fas fa-paperclip mr-2"></i>
+                        <span>Attach Files</span>
+                    </label>
                 </div>
-            </form>
+                
+                <button type="submit" id="send-button" class="btn btn-primary">
+                    <i class="fas fa-paper-plane mr-2"></i>
+                    <span>Send</span>
+                </button>
+            </div>
+        </form>
     </div>
-    </div>  <!-- Close chat-input -->
-</div>  <!-- Close chat-container -->
+</div>
 
 <!-- Message Templates -->
 <template id="user-message-template">

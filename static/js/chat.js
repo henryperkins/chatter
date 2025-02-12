@@ -1,6 +1,3 @@
-import { ChatConfig } from './chat-config.js';
-import { MessageRenderer } from './message-renderer.js';
-
 let scrollFrame = null;
 
 const CONFIG = {
@@ -10,13 +7,6 @@ const CONFIG = {
     O_SERIES_MODELS: ['o3-mini', 'o1', 'o1-mini', 'o1-preview'],
     DEBUG: true
 };
-
-// Debug logging utility
-function logDebug(...args) {
-    if (window.monitoring) {
-        window.monitoring.log('debug', ...args);
-    }
-}
 
 // Visual viewport handling for input positioning
 function handleViewportChanges() {
@@ -156,9 +146,12 @@ async function handleStreamingResponse(formData) {
             throw new Error('Please provide a message or upload files.');
         }
 
+        // Get uploaded files from formData
+        const uploadedFiles = formData.getAll('files[]') || [];
+        
         const jsonData = {
             message: message || '',
-            files: [],
+            files: uploadedFiles.map(file => file.id),
             chat_id: window.CHAT_CONFIG.chatId,
             stream: true
         };
@@ -667,5 +660,6 @@ async function startChat() {
         window.MessageRenderer.showError(error.message);
     }
 }
- 
+
 document.addEventListener('DOMContentLoaded', startChat);
+}
