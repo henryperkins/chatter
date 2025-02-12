@@ -579,7 +579,9 @@
                             return file;
                         })
                     );
-                    this.handleNewFiles(convertedFiles);
+                        // Group HEIC + MOV pairs if present (iOS Live Photos)
+                        const groupedFiles = this.groupLivePhotos(convertedFiles);
+                        this.handleNewFiles(groupedFiles);
                 });
 
                 // Monitor network changes
@@ -593,6 +595,10 @@
 
             adjustUploadParamsForNetwork() {
                 // Adjust chunk size based on network quality
+                if (navigator.userAgent.includes('Safari') && navigator.userAgent.includes('iPhone')) {
+                    this.CHUNK_SIZE = 512 * 1024; // 512KB
+                    return;
+                }
                 switch (this.networkType) {
                     case '4g':
                         this.CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
@@ -665,6 +671,10 @@
         
                 this.progressBar.innerHTML = progressHTML;
                 document.body.appendChild(this.progressBar);
+
+                if (/iPhone|iPad/i.test(navigator.userAgent)) {
+                    this.progressBar.querySelector('.ios-warning').style.display = 'inline';
+                }
             }
 
             updateMobileMenuVisibility() {
@@ -720,3 +730,25 @@
         window.FileUploadManager = FileUploadManager;
     }
 })();
+    groupLivePhotos(files) {
+        const paired = [];
+        const map = {};
+        for (const f of files) {
+            const base = f.name.replace(/\.(heic|HEIC|mov|MOV)$/, '');
+            if (!map[base]) map[base] = [];
+            map[base].push(f);
+        }
+        for (const base in map) {
+            // If we have both .HEIC and .MOV, handle as special case
+            if (
+                map[base].some(f => /\.mov$/i.test(f.name)) &&
+                map[base].some(f => /\.heic$/i.test(f.name))
+            ) {
+                // Decide how to handle the pair—for now, keep both
+                paired.push(...map[base]);
+            } else {
+                paired.push(...map[base]);
+            }
+        }
+        return paired;
+    }
