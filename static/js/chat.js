@@ -361,9 +361,9 @@ async function sendMessage(event) {
 async function startChat() {
     // Tab switching logic for usage tabs
     const tabButtons = document.querySelectorAll('.usage-tabs .tab');
-    const panels = document.querySelectorAll('.panel-content');
-
-    tabButtons.forEach(btn => {
+    if (tabButtons.length > 0) {
+        const panels = document.querySelectorAll('.panel-content');
+        tabButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             // Remove 'tab-active' from all tabs, hide all panels
             tabButtons.forEach(tb => tb.classList.remove('tab-active'));

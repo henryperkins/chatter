@@ -76,6 +76,33 @@
       @apply hidden opacity-0;
   }
 
+  /* Mobile optimizations */
+  @media (max-width: theme('screens.sm')) {
+    /* Tabbed panel mobile fixes */
+    #usage-panel {
+      @apply fixed bottom-[160px] left-0 right-0 z-[49];
+      @apply rounded-t-none;
+    }
+
+    .usage-tabs {
+      @apply flex-nowrap overflow-x-auto pb-2;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .panel-content {
+      @apply max-h-[30vh] overflow-y-auto;
+    }
+    
+    /* Prevent input overlap */
+    .chat-input-container {
+      bottom: env(safe-area-inset-bottom);
+    }
+
+    .usage-tabs .tab {
+      @apply text-xs px-3 py-1.5 shrink-0;
+    }
+  }
+
   /* Message containers */
   .message-container {
     @apply mb-6 max-w-4xl mx-auto w-full;
