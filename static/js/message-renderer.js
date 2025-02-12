@@ -17,19 +17,6 @@ class MessageRenderer {
             CHAT_CONFIG: !!window.CHAT_CONFIG
         });
 
-        if (!window.md) {
-            console.error('Markdown processor not loaded');
-            return;
-        }
-        if (!window.CHAT_CONFIG) {
-            console.error('Chat config not loaded');
-            return;
-        }
-        if (!window.DOMPurify) {
-            console.error('DOMPurify not loaded');
-            return;
-        }
-
         // Cache templates from the DOM
         this.templates.assistant = document.getElementById('assistant-message-template');
         this.templates.user = document.getElementById('user-message-template');
@@ -57,7 +44,7 @@ class MessageRenderer {
         document.dispatchEvent(new Event('messagerenderer:ready'));
     }
 
-    static renderAssistantMessage(content, isStreaming = false) {
+    static renderAssistantMessage(message, isStreaming = false) {
         const template = this.templates.assistant;
         const clone = template.content.cloneNode(true);
         const messageContainer = clone.firstElementChild;
@@ -66,15 +53,23 @@ class MessageRenderer {
         const timestamp = clone.querySelector('span.text-xs');
         const copyButton = clone.querySelector('.copy-button');
 
+        // Handle both string and object message formats
+        const content = typeof message === 'string' ? message : message.content;
+        const contentHtml = typeof message === 'string' ? null : message.content_html;
+
         // Ensure content is never empty/undefined
-        content = content || 'No response generated';
+        const displayContent = content || 'No response generated';
 
         // Add o-series class if needed
         messageContainer.classList.toggle('o-series-message', window.CHAT_CONFIG?.isOSeriesModel);
 
-        // Set content (plaintext by default—will be replaced in finalize)
-        proseDiv.textContent = content;
-        proseDiv.setAttribute('data-content', content);
+        // Set content - use pre-rendered HTML if available, otherwise use plain text
+        if (contentHtml && !isStreaming) {
+            proseDiv.innerHTML = contentHtml;
+        } else {
+            proseDiv.textContent = displayContent;
+        }
+        proseDiv.setAttribute('data-content', displayContent);
 
         // Show a timestamp
         timestamp.textContent = new Date().toLocaleTimeString();
@@ -162,11 +157,11 @@ class MessageRenderer {
         if (shouldCollapse) {
             messageContent.classList.add('collapsed');
             toggleButton.classList.remove('hidden');
-            
+
             // Ensure the toggle button is outside any code blocks
             toggleButton.style.position = 'relative';
             toggleButton.style.zIndex = '10';
-            
+
             toggleButton.addEventListener('click', () => {
                 messageContent.classList.toggle('collapsed');
                 toggleButton.textContent = messageContent.classList.contains('collapsed') 
@@ -314,7 +309,7 @@ class MessageRenderer {
 
         // Provide a clear prefix icon or emoji to errors
         message = `⚠️ ${message}`;
-    
+
         let errorMessage = message;
         if (file) {
             errorMessage = `[${file.name}] ${message} (${(file.size / 1024 / 1024).toFixed(2)}MB)`;
@@ -374,15 +369,15 @@ class MessageRenderer {
         }
 
         try {
-            const textContent = (typeof message === 'string') ? message : message.content;
             let messageDiv;
 
             if (!existingDiv) {
-                messageDiv = this.renderAssistantMessage(textContent, isStreaming);
+                messageDiv = this.renderAssistantMessage(message, isStreaming);
                 chatBox.appendChild(messageDiv);
             } else {
                 messageDiv = existingDiv;
-                await this.finalizeAssistantMessage(messageDiv, textContent);
+                const content = typeof message === 'string' ? message : message.content;
+                await this.finalizeAssistantMessage(messageDiv, content);
             }
 
             chatBox.scrollTop = chatBox.scrollHeight;
@@ -408,12 +403,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Wait for ChatConfig to initialize first
         const config = ChatConfig.getInstance();
         await config.init();
-        
+
         // Now initialize MessageRenderer
         await MessageRenderer.initialize();
-        
-        // Dispatch event to signal MessageRenderer is ready
-        document.dispatchEvent(new Event('messagerenderer:ready'));
     } catch (error) {
         console.error('Failed to initialize MessageRenderer:', error);
     }

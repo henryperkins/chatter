@@ -325,7 +325,7 @@ class FileUploadHandler:
         """
         current_app.logger.debug(f"scan_for_viruses called for file: {file.filename}")
         try:
-            import pyclamd
+            import pyclamd  # type: ignore
             import platform
 
             # Skip virus scan on Windows
@@ -343,7 +343,7 @@ class FileUploadHandler:
 
             if scan_result is None:
                 return "clean"
-            
+
             # scan_result is a dict with format {filename: result} or None
             # Extract the result value from the first (and only) item
             if isinstance(scan_result, dict):
@@ -411,7 +411,7 @@ class FileUploadHandler:
             current_app.logger.error(f"Failed to index file in Azure Search: {str(e)}")
             raise
 
-    def save_files(self, files: List, chat_id: str, descriptions: Dict[str, str] = None) -> List[Dict]:
+    def save_files(self, files: List, chat_id: str, descriptions: Optional[Dict[str, str]] = None) -> List[Dict]:
         """
         Save validated files to the upload folder and database with metadata.
         Uses context management for optimized file handling and token tracking.
@@ -419,7 +419,7 @@ class FileUploadHandler:
         Args:
             files (List): List of validated file objects.
             chat_id (str): The chat ID associated with the files.
-            descriptions (Dict[str, str]): Optional mapping of filenames to descriptions.
+            descriptions (Optional[Dict[str, str]]): Optional mapping of filenames to descriptions.
 
         Returns:
             List[Dict]: A list of dictionaries containing saved file details.
@@ -452,6 +452,9 @@ class FileUploadHandler:
             try:
                 # Get MIME type with robust fallback mechanism
                 file.seek(0)
+            except Exception as e:
+                current_app.logger.error(f"Error seeking file: {str(e)}")
+                raise
                 mime_type = 'application/octet-stream'  # Default MIME type
 
                 # Try python-magic first
@@ -500,48 +503,59 @@ class FileUploadHandler:
                             progress = (bytes_written / total_size) * 100
                             current_app.logger.debug(f"Upload progress for {original_filename}: {progress:.1f}%")
 
-                # Handle content based on file type
-                content = ""
-                compressed_content = ""
-                file_tokens = 0
-                if mime_type.startswith('text/') or mime_type in ['application/json', 'text/markdown']:
-                    try:
-                        with open(filepath, 'r', encoding='utf-8') as f:
-                            content = f.read()
+            # Handle content based on file type
+            content = ""
+            compressed_content = ""
+            file_tokens = 0
+            if mime_type.startswith('text/') or mime_type in ['application/json', 'text/markdown']:
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        content = f.read()
 
-                        # Use context monitor for compression only on text files
-                        compressed_content = context_monitor.compress_file_content(
-                            content,
-                            context_monitor.calculate_optimal_window_size(len(content))
-                        )
+                    # Validate text content is readable
+                    if not self._is_valid_text(content):
+                        raise ValueError(f"Invalid text content in {original_filename}")
 
-                        # Only count tokens for text files
-                        file_tokens = len(compressed_content.split())
+                    # Use context monitor for compression only on text files
+                    compressed_content = context_monitor.compress_file_content(
+                        content,
+                        context_monitor.calculate_optimal_window_size(len(content))
+                    )
 
-                    except UnicodeDecodeError:
-                        current_app.logger.warning(f"Could not read {original_filename} as text, skipping content processing")
-                else:
-                    current_app.logger.debug(f"Skipping content processing for binary file: {original_filename}")
+                    # Only count tokens for text files
+                    file_tokens = len(compressed_content.split())
 
-                    # For binary files, use a token estimation based on file size
-                    file_tokens = os.path.getsize(filepath) // 4  # Rough estimate
+                except (UnicodeDecodeError, ValueError) as e:
+                    current_app.logger.warning(f"Content processing failed for {original_filename}: {str(e)}")
+                    errors.append(f"Skipped file: {original_filename} - {str(e)}")
+                    continue
+            else:
+                current_app.logger.debug(f"Skipping content processing for binary file: {original_filename}")
+
+                # For binary files, use a token estimation based on file size
+                file_tokens = os.path.getsize(filepath) // 4  # Rough estimate
 
                 total_tokens += file_tokens
                 context_monitor.track_token_usage(file_tokens)
 
-                # Create database record
-                file_id = UploadedFile.create(
+                # Create database record and get the file record
+                file_id = int(UploadedFile.create(
                     chat_id=chat_id,
                     filename=original_filename,
                     filepath=filepath,
                     mime_type=mime_type,
                     description=description
-                )
+                ))
+                
+                # Get the updated file record with the new filepath
+                file_record = UploadedFile.get_by_id(file_id)
+                if not file_record:
+                    raise Exception(f"Failed to retrieve file record for ID: {file_id}")
 
                 file_info = {
                     "id": file_id,
                     "filename": original_filename,
-                    "filepath": filepath,
+                    "filepath": file_record.filepath,
                     "size": os.path.getsize(filepath),
                     "mime_type": mime_type,
                     "description": description,
@@ -583,7 +597,7 @@ class FileUploadHandler:
 
         return saved_files
 
-    def handle_upload(self, chat_id: str):
+    def handle_upload(self, chat_id: str, user_id: Optional[int] = None):
         """
         Handle file upload request with metadata.
 
@@ -614,7 +628,7 @@ class FileUploadHandler:
                 if hasattr(file, 'content_type'):
                     current_app.logger.debug(f"Content type from request: {file.content_type}")
 
-            valid_files, errors = self.validate_files(files)
+            valid_files, errors = self.validate_files(files, user_id)
 
             if errors:
                 current_app.logger.error(f"File validation errors: {errors}")

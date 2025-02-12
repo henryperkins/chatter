@@ -101,7 +101,7 @@ def allowed_file(filename: str) -> bool:
     Returns:
         bool: True if the file extension is allowed, False otherwise.
     """
-    allowed_extensions = {".txt", ".md", ".py", ".js", ".html", ".css", ".json", ".csv"}
+    allowed_extensions = {".txt", ".md", ".html", ".py", ".pdf", ".docx", ".pptx"}
     return os.path.splitext(filename)[1].lower() in allowed_extensions
 
 def count_file_tokens(content: str) -> int:
@@ -178,12 +178,12 @@ def process_file(file) -> Tuple[str, str, int]:
 
             # Cache the processed content
             cache_key = hash((filename, len(file_content)))
-            context_manager.context_cache[cache_key] = truncated_content
+            context_manager.context_cache[cache_key] = [{"content": truncated_content}]
 
             # Check if content was truncated
             if len(truncated_content) < len(file_content):
                 logger.info(f"File {filename} was truncated from {len(file_content)} to {len(truncated_content)} characters")
-
+            
             return filename, truncated_content, token_count
         except UnicodeDecodeError as e:
             raise ValueError(f"Failed to decode file {filename}: {e}")
@@ -216,16 +216,17 @@ def generate_chat_title(conversation_text: str) -> str:
     combined = " ".join(user_messages[:3])
     words = [word.lower() for word in combined.split() if len(word) > 3]
 
-    # Count word frequencies and get top 2 most common
+    if not words:
+        return "New Chat"
+
     word_counts = {}
     for word in words:
         word_counts[word] = word_counts.get(word, 0) + 1
-        top_words = sorted(word_counts.keys(), key=lambda x: word_counts.get(x, 0), reverse=True)[:2]
 
-        # Create title from top words or fallback to default
-        if top_words:
-            return " ".join([word.capitalize() for word in top_words])
-        return "New Chat"
+    top_words = sorted(word_counts.keys(), key=lambda x: word_counts.get(x, 0), reverse=True)[:2]
+    if top_words:
+        return " ".join([word.capitalize() for word in top_words])
+    return "New Chat"
 
 def send_email(subject: str, recipient_email: str, text_content: str, html_content: str) -> None:
     """Send an email with the specified subject and content."""

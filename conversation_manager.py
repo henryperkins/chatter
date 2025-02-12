@@ -94,6 +94,7 @@ class ConversationManager:
         model_max_tokens: Optional[int] = None,
         requires_o1_handling: bool = False,
         streaming_stats: Optional[Dict[str, Any]] = None,
+        initial_metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Add a message to the conversation context with metadata and token management.

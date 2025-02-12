@@ -17,18 +17,15 @@
                 this.MAX_TOKENS = 32000; // approximate usage limit
                 this.MAX_CONCURRENT_UPLOADS = 3;
 
-                // Allowed MIME types
+                // Allowed MIME types - must match server config
                 this.ALLOWED_FILE_TYPES = [
-                    'text/plain',
-                    'text/markdown',
-                    'text/html',
-                    'application/pdf',
-                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                    // Optionally add image types:
-                    'image/jpeg',
-                    'image/png',
-                    'image/gif'
+                    'text/plain',           // .txt
+                    'text/markdown',        // .md
+                    'text/html',           // .html
+                    'text/x-python',       // .py
+                    'application/pdf',     // .pdf
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+                    'application/vnd.openxmlformats-officedocument.presentationml.presentation' // .pptx
                 ];
 
                 // DOM references
@@ -55,12 +52,11 @@
                 input.id = 'file-input';
                 input.multiple = true;
                 input.accept = [
-                    '.txt', '.md', '.html', '.pdf', '.docx', '.pptx', '.jpeg', '.jpg', '.png', '.gif',
-                    'text/plain', 'text/markdown', 'text/html',
+                    '.txt', '.md', '.html', '.py', '.pdf', '.docx', '.pptx',
+                    'text/plain', 'text/markdown', 'text/html', 'text/x-python',
                     'application/pdf',
                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                    'image/jpeg', 'image/png', 'image/gif'
+                    'application/vnd.openxmlformats-officedocument.presentationml.presentation'
                 ].join(',');
 
                 input.style.display = 'none';
@@ -260,14 +256,11 @@
                 const typeMap = {
                     txt: 'text/plain',
                     md: 'text/markdown',
+                    html: 'text/html',
                     pdf: 'application/pdf',
                     docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                     pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                    jpg: 'image/jpeg',
-                    jpeg: 'image/jpeg',
-                    png: 'image/png',
-                    gif: 'image/gif',
-                    html: 'text/html'
+                    py: 'text/x-python'
                 };
                 return typeMap[ext] || 'application/octet-stream';
             }
@@ -313,11 +306,12 @@
                                 formData.append('uploadId', uploadId || '');
                                 formData.append('fileSize', file.size);
 
-                                const resp = await fetch(`/api/files/chunked-upload/${this.chatId}`, {
+                                const resp = await fetch(`${window.location.origin}/api/files/chunked-upload/${this.chatId}`, {
                                     method: 'POST',
                                     body: formData,
                                     headers: {
-                                        'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+                                        'X-CSRFToken': window.CHAT_CONFIG.csrfToken,
+                                        'X-Chat-ID': this.chatId
                                     }
                                 });
 
@@ -352,11 +346,12 @@
                             formData.append('file', file);
 
                             // Optional: pass chatId, userId, etc. if needed
-                            const resp = await fetch(`/api/files/upload/${this.chatId}`, {
+                            const resp = await fetch(`${window.location.origin}/api/files/upload/${this.chatId}`, {
                                 method: 'POST',
                                 body: formData,
                                 headers: {
-                                    'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+                                    'X-CSRFToken': window.CHAT_CONFIG.csrfToken,
+                                    'X-Chat-ID': this.chatId
                                 }
                             });
 
@@ -371,24 +366,30 @@
                             }
 
                             const result = await resp.json();
-                            if (!result.success || !result.saved_files?.length) {
-                                throw new Error(result.error || 'No saved files returned from server');
-                            }
 
-                            const savedFile = result.saved_files[0];
-                            if (!savedFile.id || !savedFile.filename) {
-                                throw new Error('Invalid file metadata returned from server');
-                            }
+                            // Revised logic: separate check for success vs. saved_files presence
+                            if (!result.success) {
+                                throw new Error(result.error || 'File upload unsuccessful');
+                            } else if (!result.saved_files?.length) {
+                                // If the server indicates success but returned no saved files,
+                                // we won't treat it as an error, but log a warning to console.
+                                console.warn('No saved files were returned by the server. Possibly invalid or empty upload.');
+                            } else {
+                                const savedFile = result.saved_files[0];
+                                if (!savedFile.id || !savedFile.filename) {
+                                    throw new Error('Invalid file metadata returned from server');
+                                }
 
-                            // Return richer metadata
-                            uploadedFiles.push({
-                                id: savedFile.id,
-                                name: savedFile.filename,
-                                url: savedFile.filepath,
-                                mime_type: savedFile.mime_type,
-                                size: savedFile.size,
-                                uploaded_at: new Date().toISOString()
-                            });
+                                // Return richer metadata
+                                uploadedFiles.push({
+                                    id: savedFile.id,
+                                    name: savedFile.filename,
+                                    url: savedFile.filepath,
+                                    mime_type: savedFile.mime_type,
+                                    size: savedFile.size,
+                                    uploaded_at: new Date().toISOString()
+                                });
+                            }
 
                             // As soon as we finish this file, update progress
                             const percent = Math.round(((fileIndex + 1) / this.uploadedFiles.length) * 100);
@@ -512,10 +513,10 @@
                 // If you have a global usage manager:
                 if (window.tokenUsageManager) {
                     window.tokenUsageManager.updateTokenCount(totalTokens);
-      // Warn if the corresponding DOM element isn't present
-      if (!document.getElementById('tokens-used')) {
-        console.warn('tokens-used element not present in DOM, skipping usage display.');
-      }
+                    // Warn if the corresponding DOM element isn't present
+                    if (!document.getElementById('tokens-used')) {
+                        console.warn('tokens-used element not present in DOM, skipping usage display.');
+                    }
                 }
 
                 // Or simply put it in a DOM element:

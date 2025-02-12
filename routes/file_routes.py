@@ -84,7 +84,7 @@ def init_file_routes(app):
 
         try:
             # First use our existing handler to validate and save files locally
-            result = file_handler.handle_upload(chat_id)
+            result = file_handler.handle_upload(chat_id, user_id=current_user.id)
 
             if isinstance(result, tuple) and result[1] != 200:
                 return result
@@ -288,6 +288,45 @@ def init_file_routes(app):
          if not file_record:
              return jsonify({"error": "File not found"}), 404
          return send_file(file_record.filepath, mimetype=file_record.mime_type)
+
+    @file_routes.route('/contents/<int:file_id>', methods=['GET'])
+    def get_file_contents(file_id: int):
+        """
+        Retrieve the contents of an uploaded file.
+        """
+        from flask_login import current_user
+        from models.uploaded_file import UploadedFile
+
+        try:
+            # Get the file record
+            file_record = UploadedFile.get_by_id(file_id)
+            if not file_record:
+                return jsonify({"error": "File not found"}), 404
+
+            # Verify the user has access to this file
+            if not current_user.is_authenticated:
+                return jsonify({"error": "Authentication required"}), 401
+
+            # Check if the file exists
+            if not os.path.exists(file_record.filepath):
+                return jsonify({"error": "File content not found"}), 404
+
+            # Read and return the file contents
+            with open(file_record.filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            return jsonify({
+                "success": True,
+                "content": content,
+                "mime_type": file_record.mime_type
+            })
+
+        except Exception as e:
+            current_app.logger.error(f"Error retrieving file contents: {str(e)}")
+            return jsonify({
+                "error": "Failed to retrieve file contents",
+                "details": str(e)
+            }), 500
 
     # Register the blueprint with a URL prefix
     app.register_blueprint(file_routes, url_prefix='/api/files')
