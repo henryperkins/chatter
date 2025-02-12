@@ -740,25 +740,3 @@
         window.FileUploadManager = FileUploadManager;
     }
 })();
-    groupLivePhotos(files) {
-        const paired = [];
-        const map = {};
-        for (const f of files) {
-            const base = f.name.replace(/\.(heic|HEIC|mov|MOV)$/, '');
-            if (!map[base]) map[base] = [];
-            map[base].push(f);
-        }
-        for (const base in map) {
-            // If we have both .HEIC and .MOV, handle as special case
-            if (
-                map[base].some(f => /\.mov$/i.test(f.name)) &&
-                map[base].some(f => /\.heic$/i.test(f.name))
-            ) {
-                // Decide how to handle the pair—for now, keep both
-                paired.push(...map[base]);
-            } else {
-                paired.push(...map[base]);
-            }
-        }
-        return paired;
-    }
