@@ -376,6 +376,54 @@ async function startChat() {
         });
     });
 
+    // Initialize file panel
+    const uploadTrigger = document.getElementById('upload-trigger');
+    const fileInput = document.getElementById('file-upload');
+
+    if (uploadTrigger && fileInput) {
+        uploadTrigger.addEventListener('click', () => {
+            fileInput.click();
+        });
+    }
+
+    // Update file list when files change
+    if (window.fileUploadManager) {
+        window.fileUploadManager.onFilesChanged = updateFileList;
+    }
+
+    function updateFileList() {
+        const fileList = document.getElementById('file-list');
+        if (!fileList || !window.fileUploadManager?.uploadedFiles) return;
+
+        fileList.innerHTML = window.fileUploadManager.uploadedFiles.map(file => `
+            <div class="file-item">
+                <div class="flex items-center gap-2 flex-1">
+                    <i class="fas fa-file-alt text-gray-400"></i>
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-size">${formatFileSize(file.size)}</span>
+                </div>
+                <button class="remove-btn" data-filename="${file.name}">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `).join('');
+
+        // Add remove handlers
+        fileList.querySelectorAll('.remove-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                window.fileUploadManager.removeFile(btn.dataset.filename);
+            });
+        });
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
     try {
         const configDiv = document.getElementById('chat-config');
         if (!configDiv) {
