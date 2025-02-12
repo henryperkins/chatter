@@ -1,0 +1,176 @@
+<!-- User Message Template -->
+<template id="user-message-template">
+    <div class="user-message flex items-start gap-4 p-4">
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-secondary-600 dark:bg-secondary-500 flex items-center justify-center">
+            <i class="fas fa-user text-white text-sm"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                <p class="prose dark:prose-invert max-w-none"></p>
+                <div class="mt-2 flex items-center justify-between">
+                    <span class="text-xs text-gray-500 dark:text-gray-400"></span>
+                    <button class="copy-button text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" aria-label="Copy message">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Assistant Message Template -->
+<template id="assistant-message-template">
+    <div class="message-container assistant flex items-start gap-4 p-4">
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 dark:bg-primary-500 flex items-center justify-center">
+            <i class="fas fa-robot text-white text-sm"></i>
+        </div>
+        <div class="message-content flex-1 min-w-0">
+            <div data-role="assistant-message" class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                <div class="prose dark:prose-invert max-w-none"></div>
+                <div class="mt-2 flex items-center justify-between">
+                    <span class="text-xs text-gray-500 dark:text-gray-400"></span>
+                    <div class="flex items-center gap-2">
+                        <button class="regenerate-button text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" aria-label="Regenerate response">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                        <button class="copy-button text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" aria-label="Copy message">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+                <button class="toggle-more hidden mt-4 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                    Show more
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Typing Indicator Template -->
+<template id="typing-indicator-template">
+    <div class="message-container assistant flex items-start gap-4 p-4">
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 dark:bg-primary-500 flex items-center justify-center">
+            <i class="fas fa-robot text-white text-sm"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                <div class="flex gap-2">
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- File Attachment Templates -->
+<template id="attachment-template">
+    <div class="mt-2">
+        <div class="attachment-list space-y-2"></div>
+    </div>
+</template>
+
+<template id="attachment-item-template">
+    <div class="flex items-center gap-2 text-sm">
+        <i class="fas fa-paperclip text-gray-500 dark:text-gray-400"></i>
+        <a class="attachment-link text-blue-600 dark:text-blue-400 hover:underline" target="_blank">
+            <span class="attachment-name"></span>
+        </a>
+        <span class="file-size text-gray-500 dark:text-gray-400"></span>
+    </div>
+</template>
+
+<!-- Error Message Template -->
+<template id="error-message-template">
+    <div class="error-message bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 p-4 rounded-lg my-2">
+        <div class="flex items-center gap-2">
+            <i class="fas fa-exclamation-circle"></i>
+            <span class="error-text"></span>
+        </div>
+    </div>
+</template>
+
+<!-- System Message Template -->
+<template id="system-message-template">
+    <div class="system-message flex items-start gap-4 p-4">
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-600 dark:bg-gray-500 flex items-center justify-center">
+            <i class="fas fa-cog text-white text-sm"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <div class="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-4 shadow-sm border border-gray-200/50 dark:border-gray-700/50">
+                <p class="prose dark:prose-invert max-w-none italic text-gray-600 dark:text-gray-300"></p>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Code Block Template -->
+<template id="code-block-template">
+    <div class="code-block-wrapper relative">
+        <pre><code></code></pre>
+        <button class="copy-code absolute top-2 right-2 p-2 bg-gray-800/10 dark:bg-gray-200/10 rounded-lg hover:bg-gray-800/20 dark:hover:bg-gray-200/20 transition-colors" aria-label="Copy code">
+            <i class="fas fa-copy"></i>
+        </button>
+    </div>
+</template>
+
+<!-- File Upload Progress Template -->
+<template id="upload-progress-template">
+    <div class="upload-progress bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700 mt-2">
+        <div class="flex items-center justify-between mb-2">
+            <span class="filename text-sm font-medium"></span>
+            <span class="percentage text-sm text-gray-500 dark:text-gray-400"></span>
+        </div>
+        <div class="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+            <div class="progress-bar h-full bg-blue-600 dark:bg-blue-500 transition-all duration-300"></div>
+        </div>
+    </div>
+</template>
+
+<style>
+/* Typing indicator animation */
+.typing-dot {
+    @apply w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full;
+    animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(1) { animation-delay: 0s; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing {
+    0%, 60%, 100% {
+        transform: translateY(0);
+    }
+    30% {
+        transform: translateY(-4px);
+    }
+}
+
+/* Message animations */
+.message-container {
+    animation: messageSlideIn 0.3s ease-out forwards;
+}
+
+@keyframes messageSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Code block copy button hover effect */
+.copy-code {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.code-block-wrapper:hover .copy-code {
+    opacity: 1;
+}
+</style>
