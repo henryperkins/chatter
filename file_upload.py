@@ -40,6 +40,15 @@ class FileUploadHandler:
         Returns:
             Tuple[bool, List[str]]: (True, []) if allowed, (False, errors) if not
         """
+        # Add mobile-specific MIME types
+        mobile_mime_map = {
+            'heic': 'image/heif',
+            'heif': 'image/heif', 
+            'mov': 'video/quicktime',
+            'mp4': 'video/mp4'
+        }
+        self.MIME_TYPE_MAP.update(mobile_mime_map)
+        
         current_app.logger.debug(f"allowed_file called with filename: {filename}")
         errors = []
 
