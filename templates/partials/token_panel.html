@@ -2,7 +2,11 @@
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
             <div class="flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 px-4 py-2 rounded-xl">
-                <span id="tokens-used" class="text-sm font-medium" role="status" aria-live="polite">0</span>
+                <span id="tokens-used" 
+                      class="text-sm font-medium" 
+                      role="status" 
+                      aria-live="polite"
+                      aria-atomic="true">0</span>
                 <span id="tokens-limit" class="text-sm text-gray-500 dark:text-gray-400">/ 0 max</span>
             </div>
             <span id="tokens-left" class="text-sm text-gray-500 dark:text-gray-400 bg-white/50 dark:bg-gray-800/50 px-4 py-2 rounded-xl">
@@ -13,8 +17,11 @@
             <span id="token-percentage" class="text-sm font-medium bg-white/50 dark:bg-gray-800/50 px-4 py-2 rounded-xl">
                 0%
             </span>
-            <button id="toggle-stats-btn" class="btn-icon" title="Toggle token usage statistics">
-                <i class="fas fa-chart-pie"></i>
+            <button id="toggle-stats-btn" 
+                    class="btn-icon" 
+                    title="Toggle token usage statistics"
+                    aria-label="Toggle token usage statistics">
+                <i class="fas fa-chart-pie" aria-hidden="true"></i>
             </button>
         </div>
     </div>

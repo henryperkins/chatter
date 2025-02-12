@@ -41,7 +41,7 @@ Replace your current usage panel section with this updated version:
                     <i class="fas fa-upload"></i>
                     Upload File
                 </button>
-                <span class="text-xs text-gray-500 dark:text-gray-400">
+                <span class="text-xs text-gray-600 dark:text-gray-300">
                     Max size: 10MB
                 </span>
             </div>
