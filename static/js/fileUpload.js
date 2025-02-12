@@ -701,7 +701,7 @@
                 const types = {
                     camera: 'image/*;capture=camera',
                     gallery: 'image/*',
-                    files: this.ALLOWED_FILE_TYPES.join(',')
+                    files: this.ALLOWED_FILE_TYPES.join(',')  // ensure no "capture" appended
                 };
 
                 Object.entries(types).forEach(([type, accept]) => {
