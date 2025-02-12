@@ -1,4 +1,20 @@
 @layer components {
+  /* Tooltips */
+  .btn-icon {
+    @apply relative;
+
+    .tooltip {
+      @apply absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 rounded-lg text-xs font-medium;
+      @apply bg-gray-900 text-white dark:bg-gray-700 dark:text-gray-100;
+      @apply opacity-0 invisible transition-opacity duration-200 pointer-events-none;
+      @apply whitespace-nowrap;
+    }
+
+    &:hover .tooltip {
+      @apply opacity-100 visible;
+    }
+  }
+
   /* Chat tabs */
   .chat-tab {
     @apply flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200;

@@ -47,9 +47,13 @@
 
   /* Mobile optimizations */
   @media (max-width: theme('screens.sm')) {
-    .chat-input-container {
-      @apply p-4;
-      height: 120px !important;
+    .chat-controls button {
+      @apply min-h-[44px] min-w-[44px] p-2;
+      @apply transition-transform active:scale-95;
+    }
+    
+    .message-container {
+      @apply mb-3 active:bg-gray-100/50 dark:active:bg-gray-700/50;
     }
 
     .chat-messages-scroll {

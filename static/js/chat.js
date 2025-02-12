@@ -359,6 +359,23 @@ async function sendMessage(event) {
 
 // Initialize chat
 async function startChat() {
+    // Tab switching logic for usage tabs
+    const tabButtons = document.querySelectorAll('.usage-tabs .tab');
+    const panels = document.querySelectorAll('.panel-content');
+
+    tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Remove 'tab-active' from all tabs, hide all panels
+            tabButtons.forEach(tb => tb.classList.remove('tab-active'));
+            panels.forEach(p => p.classList.add('hidden'));
+
+            // Activate the clicked button
+            btn.classList.add('tab-active');
+            const targetId = btn.getAttribute('data-panel');
+            document.getElementById(targetId).classList.remove('hidden');
+        });
+    });
+
     try {
         const configDiv = document.getElementById('chat-config');
         if (!configDiv) {
@@ -410,10 +427,24 @@ async function startChat() {
 
         const modelSelect = document.getElementById('model-select');
         if (modelSelect) {
+            // Update model icon color on change
+            const modelIcon = document.querySelector('.model-selector svg');
+            modelSelect.addEventListener('change', () => {
+                const selected = modelSelect.options[modelSelect.selectedIndex];
+                if (modelIcon && selected.dataset.color) {
+                    modelIcon.style.color = selected.dataset.color;
+                }
+            });
+
             modelSelect.addEventListener('change', async () => {
                 const selectedOption = modelSelect.selectedOptions[0];
                 const modelType = selectedOption.dataset.modelType;
                 window.CHAT_CONFIG.isOSeriesModel = CONFIG.O_SERIES_MODELS.includes(modelType);
+
+                // Set initial color
+                if (modelIcon && selectedOption.dataset.color) {
+                    modelIcon.style.color = selectedOption.dataset.color;
+                }
 
                 const newModelId = modelSelect.value;
                 const chatId = window.CHAT_CONFIG.chatId;
