@@ -168,6 +168,14 @@
   }
 
   /* Mobile optimizations */
+  .mobile-file-input {
+    min-width: 300px;
+    padding: 1.5rem;
+    font-size: 1.2rem;
+    border: 2px dashed #ccc;
+    border-radius: 15px;
+  }
+
   @media (max-width: theme('screens.sm')) {
     .message-container {
       &.user-message,
