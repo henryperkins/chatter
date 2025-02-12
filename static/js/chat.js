@@ -667,5 +667,5 @@ async function startChat() {
         window.MessageRenderer.showError(error.message);
     }
 }
-
-window.addEventListener('load', startChat);
+ 
+document.addEventListener('DOMContentLoaded', startChat);
