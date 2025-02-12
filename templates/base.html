@@ -218,6 +218,10 @@
 
     <!-- Core Utilities -->
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+<script>
+// Configure Axios to include CSRF token in all requests
+window.axios.defaults.headers.common['X-CSRFToken'] = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+</script>
     <script src="{{ url_for('static', filename='js/monitoring.js') }}"></script>
     <script src="{{ url_for('static', filename='js/base.js') }}"></script>
     <script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
