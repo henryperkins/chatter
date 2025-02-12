@@ -4,17 +4,18 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, List, Dict, Any
+
 from werkzeug.utils import secure_filename
 
-from sqlalchemy import text
+from sqlalchemy import text, Column, Integer, String, ForeignKey, Text, DateTime, func
+from sqlalchemy.orm import relationship
 from database import db_session
+from models.base import Base
+# Import the Chat model so that SQLAlchemy can properly map the relationship
+from models.chat import Chat
 
 logger = logging.getLogger(__name__)
 
-
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime, func
-from sqlalchemy.orm import relationship
-from models.base import Base
 
 class UploadedFile(Base):
     """
@@ -36,9 +37,12 @@ class UploadedFile(Base):
     indexing_status = Column(String, default='pending')
     last_indexed_at = Column(DateTime)
     tokenized_text = Column(Text)
+    text_content = Column(Text)  # Stores extracted text for AI context
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
-    
+
+    # Relationship with Chat model
+    chat = relationship("Chat", back_populates="files")
 
     def __init__(self, **kwargs):
         """Initialize an UploadedFile instance."""
@@ -90,12 +94,12 @@ class UploadedFile(Base):
                 query = text("""
                     INSERT INTO uploaded_files
                     (chat_id, filename, filepath, uuid, size, mime_type, description, version,
-                    azure_file_id, azure_search_id, indexing_status, last_indexed_at,
-                    created_at, updated_at, tokenized_text)
+                     azure_file_id, azure_search_id, indexing_status, last_indexed_at,
+                     created_at, updated_at, tokenized_text)
                     VALUES
                     (:chat_id, :filename, :filepath, :uuid, :size, :mime_type, :description, :version,
-                    :azure_file_id, NULL, 'pending', NULL,
-                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL)
+                     :azure_file_id, NULL, 'pending', NULL,
+                     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL)
                     RETURNING id
                 """)
                 result = db.execute(query, {
@@ -210,13 +214,6 @@ class UploadedFile(Base):
     def update_azure_file_id(file_id: int, azure_file_id: str) -> bool:
         """
         Update the Azure file ID for an uploaded file.
-
-        Args:
-            file_id (int): The ID of the uploaded file
-            azure_file_id (str): The Azure OpenAI file ID
-
-        Returns:
-            bool: True if successful, False otherwise
         """
         with db_session() as db:
             try:
@@ -244,14 +241,6 @@ class UploadedFile(Base):
     def update_search_status(file_id: int, status: str, search_id: Optional[str] = None) -> bool:
         """
         Update the Azure Search indexing status for a file.
-
-        Args:
-            file_id (int): The ID of the uploaded file
-            status (str): The indexing status ('pending', 'indexed', 'failed')
-            search_id (Optional[str]): The Azure Search document ID if indexed successfully
-
-        Returns:
-            bool: True if successful, False otherwise
         """
         with db_session() as db:
             try:
@@ -285,9 +274,6 @@ class UploadedFile(Base):
     def get_unindexed_files() -> List["UploadedFile"]:
         """
         Get all files that haven't been indexed in Azure Search.
-
-        Returns:
-            List[UploadedFile]: List of files with pending indexing status
         """
         with db_session() as db:
             try:
@@ -307,12 +293,6 @@ class UploadedFile(Base):
     def delete_by_azure_file_id(azure_file_id: str) -> bool:
         """
         Delete an uploaded file by its Azure file ID.
-
-        Args:
-            azure_file_id (str): The Azure OpenAI file ID
-
-        Returns:
-            bool: True if successful, False otherwise
         """
         with db_session() as db:
             try:
@@ -354,13 +334,6 @@ class UploadedFile(Base):
     def store_tokenized_content(file_id: int, tokenized_text: str) -> bool:
         """
         Save the tokenized version of an uploaded file's text in the DB.
-
-        Args:
-            file_id (int): The ID of the uploaded file
-            tokenized_text (str): The tokenized content to store
-
-        Returns:
-            bool: True if successful, False otherwise
         """
         with db_session() as db:
             try:

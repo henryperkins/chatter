@@ -655,11 +655,23 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             error_json.status_code = 400
             return error_json
 
+        # Get file content from uploaded files
+        file_contents = []
+        if 'file_ids' in data:
+            from models.uploaded_file import UploadedFile
+            for file_id in data['file_ids']:
+                file_record = UploadedFile.get_by_id(file_id)
+                if file_record and file_record.text_content:
+                    file_contents.append({
+                        'filename': file_record.filename,
+                        'content': file_record.text_content
+                    })
+
         # Combine message + file contents
         combined_message = message
-        if files_data:
+        if file_contents:
             combined_message += "\n\nAttached files:\n" + "\n".join(
-                f"[{f['filename']}]\n{f['content']}" for f in files_data
+                f"[{fc['filename']}]\n{fc['content']}" for fc in file_contents
             )
 
         # Sanitize user content

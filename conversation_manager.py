@@ -2,7 +2,7 @@
 
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, TypedDict, cast
+from typing import Any, Dict, List, Optional, TypedDict
 
 from tiktoken import get_encoding
 from sqlalchemy import text
@@ -21,7 +21,6 @@ class TokenBreakdown(TypedDict):
     user: int
     assistant: int
     system: int
-
 
 # Get loggers
 logger = get_logger(__name__)
@@ -44,6 +43,20 @@ class ConversationManager:
         # Cache each chat's "optimized" context if needed
         self.context_cache: Dict[str, List[Dict[str, Any]]] = {}
 
+    def _process_attachments(self, content: str) -> str:
+        """
+        Stub for processing attachments. 
+        For now, just return the content unmodified.
+        """
+        return content
+
+    def _add_file_messages(self, chat_id: str, file_content: str) -> None:
+        """
+        Stub method for adding file messages to the conversation.
+        In a real scenario, we might parse file_content into one or more Chat messages.
+        """
+        logger.debug(f"Stub: add_file_messages for chat {chat_id}, content length {len(file_content)}.")
+
     def get_context(
         self,
         chat_id: str,
@@ -64,12 +77,12 @@ class ConversationManager:
         logger.debug(f"Retrieved {len(messages)} messages for chat {chat_id}")
         context: List[Dict[str, str]] = []
 
-        # Get the chat's model to check if it's an o-series model
+        # Check if it's an O-series model
         chat = Chat.get_by_id(chat_id)
         model = Chat.get_model(chat_id) if chat else None
         is_o_series = model and getattr(model, "model_type", "").lower() in ["o3-mini", "o1", "o1-mini", "o1-preview"]
 
-        # Only add markdown formatting request for o-series models
+        # Add special note for O-series if needed
         if is_o_series:
             markdown_request = {
                 "role": "developer",
@@ -80,7 +93,6 @@ class ConversationManager:
         for msg in messages:
             role = msg.get("role")
             content = msg.get("content")
-
             if isinstance(role, str) and isinstance(content, str):
                 context.append({"role": role, "content": content})
 
@@ -95,9 +107,11 @@ class ConversationManager:
         requires_o1_handling: bool = False,
         streaming_stats: Optional[Dict[str, Any]] = None,
         initial_metadata: Optional[Dict[str, Any]] = None,
+        **kwargs
     ) -> None:
         """
         Add a message to the conversation context with metadata and token management.
+
         from models.token_usage import TokenUsage
         user_id = 123  # or retrieve from your logic
         if not TokenUsage.within_rate_limit(user_id, 30, 20000):
@@ -111,14 +125,17 @@ class ConversationManager:
             requires_o1_handling: Flag for special handling (e.g., O1 transformations).
             streaming_stats: Optional dict containing streaming statistics.
         """
-        # Process file attachments if present
-        file_attachments = []
-        if isinstance(content, str) and "Here are the contents of the uploaded files:" in content:
-            # Keep the full content including attachments for the model
-            file_attachments = self._extract_file_attachments(content)
-
-            # Don't split the content - keep it as is for the model to process
-            # This ensures the model sees both the message and file contents
+        # Enhanced processing for attachments
+        if kwargs.get('has_attachments'):
+            file_content = self._process_attachments(content)
+            self._add_file_messages(chat_id, file_content)
+            file_attachments = []
+        else:
+            file_attachments = []
+            if isinstance(content, str) and "Here are the contents of the uploaded files:" in content:
+                # Keep the full content with attachments
+                file_attachments = self._extract_file_attachments(content)
+            # Build minimal metadata
             metadata = {
                 "has_attachments": True,
                 "attachments": file_attachments
@@ -148,17 +165,17 @@ class ConversationManager:
         if role == "assistant":
             metadata["raw_content"] = content
 
-        # Truncate user message if it exceeds token limit
+        # Enforce per-message token limit
         if role == "user" and tokens > MAX_MESSAGE_TOKENS:
             content = self._truncate_content(content, get_encoding("cl100k_base"))
             metadata["truncated"] = True
 
-        # Add message and get the new message ID
+        # Save message
         message_id = Chat.add_message(
             chat_id=chat_id, role=role, content=content, metadata=metadata
         )
 
-        # Lint the assistant's message after recording it
+        # Lint if needed
         if role == "assistant":
             self.lint_message(chat_id, message_id)
 
@@ -168,12 +185,6 @@ class ConversationManager:
     def _extract_file_attachments(self, content: str) -> List[Dict[str, str]]:
         """
         Extract file attachments from message content.
-
-        Args:
-            content: The message content containing file attachments.
-
-        Returns:
-            A list of dictionaries containing file name and content.
         """
         file_attachments = []
         if "Here are the contents of the uploaded files:" in content:
@@ -183,16 +194,15 @@ class ConversationManager:
             current_file = {"name": "", "content": ""}
             for line in attachments_text.split('\n'):
                 if line.startswith('[File:') and line.endswith(']'):
-                    # Save previous file if exists
+                    # Save old file, start new
                     if current_file["name"] and current_file["content"]:
                         file_attachments.append(current_file.copy())
-                    # Start new file
-                    current_file["name"] = line[7:-1]  # Remove '[File: ' and ']'
+                    current_file["name"] = line[7:-1]
                     current_file["content"] = ""
                 else:
                     current_file["content"] += line + "\n"
 
-            # Add last file
+            # Last file
             if current_file["name"] and current_file["content"]:
                 file_attachments.append(current_file)
 
@@ -200,14 +210,7 @@ class ConversationManager:
 
     def _truncate_content(self, content: str, encoding: Any) -> str:
         """
-        Truncate content to fit within the token limit.
-
-        Args:
-            content: The original message content.
-            encoding: The tiktoken encoding to use.
-
-        Returns:
-            The truncated content with a note appended.
+        Truncate content to fit within MAX_MESSAGE_TOKENS.
         """
         tokens = encoding.encode(content)[:MAX_MESSAGE_TOKENS]
         truncated = encoding.decode(tokens)
@@ -215,143 +218,100 @@ class ConversationManager:
 
     def _manage_context_window(self, chat_id: str, max_tokens: Optional[int]) -> None:
         """
-        Manage context window using advanced context management techniques.
-
-        Args:
-            chat_id: The ID of the chat.
-            max_tokens: The maximum token limit for the model.
+        Manage advanced context with partial retrieval if needed.
         """
         try:
             messages = Chat.get_messages(chat_id)
             logger.debug("Retrieved %d messages for chat %s", len(messages), chat_id)
 
-            # Attempt to get an optimized context from context_manager
             if hasattr(self.context_manager, "get_context"):
                 optimized_context = self.context_manager.get_context(messages)
             else:
                 optimized_context = messages
-                logger.warning(
-                    "ContextManager.get_context not available, using full context"
-                )
+                logger.warning("ContextManager.get_context unavailable, using all messages.")
 
-            # Process messages with attachments
+            # Rebuild attachments
             for msg in optimized_context:
                 if not isinstance(msg, dict):
                     continue
-                    
                 metadata = msg.get("metadata", {})
                 if not isinstance(metadata, dict):
                     continue
 
-                if metadata.get("has_attachments"):
+                if bool(metadata.get("has_attachments")):
                     attachments = metadata.get("attachments", [])
                     if not isinstance(attachments, list):
                         continue
 
-                    # Reconstruct content with attachments
                     original_content = str(msg.get("content", ""))
                     attachment_text = "\n\nAttached files:\n"
-                    
-                    # Ensure attachments is a list of dicts
                     valid_attachments = [
-                        a for a in attachments 
+                        a for a in attachments
                         if isinstance(a, dict) and "name" in a and "content" in a
                     ]
-                    
                     for attachment in valid_attachments:
                         attachment_text += f"\n[{attachment['name']}]:\n{attachment['content']}"
 
-                    # Update message content
                     msg["content"] = original_content + attachment_text
-                    logger.debug(
-                        "Reconstructed message content with %d attachments",
-                        len(valid_attachments)
-                    )
+                    logger.debug("Reconstructed content: now has attachments")
 
             current_tokens = count_conversation_tokens(optimized_context)
 
-            # If messages were truncated, remove the excluded messages from the DB
+            # Handle any truncated messages
             if len(optimized_context) < len(messages):
                 keep_ids: List[int] = []
-                for msg in optimized_context:
-                    if not isinstance(msg, dict):
+                for m in optimized_context:
+                    if not isinstance(m, dict):
                         continue
-                    msg_id = msg.get("id")
+                    msg_id = m.get("id")
                     if isinstance(msg_id, int):
                         keep_ids.append(msg_id)
                     elif isinstance(msg_id, str) and msg_id.isdigit():
                         keep_ids.append(int(msg_id))
-                    else:
-                        logger.warning("Invalid message ID type: %s", type(msg_id))
                 if keep_ids:
                     self._remove_old_messages(chat_id, keep_ids)
 
-            # Update context cache
             self.context_cache[chat_id] = optimized_context
 
-            # Track token usage and optimize compression if available
-            if hasattr(self.context_manager, "track_token_usage") and callable(getattr(self.context_manager, "track_token_usage")):
-                self.context_manager.track_token_usage(current_tokens)  # type: ignore
-            if hasattr(self.context_manager, "optimize_compression") and callable(getattr(self.context_manager, "optimize_compression")):
-                self.context_manager.optimize_compression()  # type: ignore
+            # Track usage
+            if hasattr(self.context_manager, "track_token_usage"):
+                self.context_manager.track_token_usage(current_tokens)
+            if hasattr(self.context_manager, "optimize_compression"):
+                self.context_manager.optimize_compression()
 
         except Exception as e:
-            logger.error("Error managing context window for chat %s: %s", chat_id, e)
-            # Fallback to keeping all messages if an error occurs
+            logger.error("Error in _manage_context_window for chat %s: %s", chat_id, e)
             self.context_cache[chat_id] = Chat.get_messages(chat_id)
 
     def lint_message(self, chat_id: str, message_id: int) -> None:
         """
-        Lint the message content and update it in the database if necessary.
-
-        Args:
-            chat_id: The ID of the chat.
-            message_id: The ID of the message to lint.
+        Lint the content of an assistant message.
         """
         logger.debug("Linting message %d in chat %s", message_id, chat_id)
         with db_session() as db:
             try:
-                query = text(
-                    """
+                query = text("""
                     SELECT content FROM messages
                     WHERE id = :message_id AND chat_id = :chat_id
-                    """
-                )
-                result = (
-                    db.execute(query, {"message_id": message_id, "chat_id": chat_id})
-                    .mappings()
-                    .first()
-                )
+                """)
+                result = db.execute(query, {
+                    "message_id": message_id,
+                    "chat_id": chat_id
+                }).mappings().first()
                 if result:
                     content = result["content"]
-                    linted_content = self.perform_linting(content)
-                    if linted_content != content:
-                        update_query = text(
-                            """
+                    new_content = self.perform_linting(content)
+                    if new_content != content:
+                        update_query = text("""
                             UPDATE messages
-                            SET content = :content
+                            SET content = :new_content
                             WHERE id = :message_id
-                            """
-                        )
-                        db.execute(
-                            update_query, {"content": linted_content, "message_id": message_id}
-                        )
+                        """)
+                        db.execute(update_query, {"new_content": new_content, "message_id": message_id})
                         db.commit()
-                        logger.info(
-                            "Message %d in chat %s was linted and updated",
-                            message_id,
-                            chat_id,
-                        )
-                    else:
-                        logger.debug(
-                            "No changes needed after linting message %d in chat %s",
-                            message_id,
-                            chat_id,
-                        )
+                        logger.info("Message %d in chat %s was linted", message_id, chat_id)
                 else:
-                    logger.error(
-                        "Message with id %d not found in chat %s", message_id, chat_id
-                    )
+                    logger.error("Message id %d not found in chat %s", message_id, chat_id)
             except Exception as e:
                 db.rollback()
                 logger.error("Error linting message %d in chat %s: %s", message_id, chat_id, e)
@@ -359,56 +319,42 @@ class ConversationManager:
 
     def perform_linting(self, content: str) -> str:
         """
-        Perform linting on the message content.
-
-        Args:
-            content: The original message content.
-
-        Returns:
-            The linted message content.
+        Perform basic linting on assistant's content.
         """
-        # Fix code blocks and markdown formatting
-        linted_content = self._fix_code_blocks(content)
-        linted_content = self._fix_markdown_spacing(linted_content)
-        return linted_content
+        # Just fix code blocks, spacing
+        c = self._fix_code_blocks(content)
+        c = self._fix_markdown_spacing(c)
+        return c
 
     def _fix_code_blocks(self, content: str) -> str:
         """
-        Fix code block formatting and ensure proper closure.
+        Ensure code blocks are properly enclosed.
         """
         code_block_delimiter = "```"
         lines = content.split("\n")
         result = []
-        in_code_block = False
+        in_block = False
         language = ""
 
         for line in lines:
             if line.startswith(code_block_delimiter):
-                if not in_code_block:
-                    # Starting a code block
-                    in_code_block = True
-                    # Extract language if specified
+                if not in_block:
+                    in_block = True
                     language = line[3:].strip()
-                    # Add empty line before code block if needed
                     if result and result[-1].strip():
                         result.append("")
                     result.append(f"```{language}")
                 else:
-                    # Ending a code block
-                    in_code_block = False
+                    in_block = False
                     result.append("```")
-                    # Add empty line after code block
                     result.append("")
             else:
-                # Inside code block: preserve indentation
-                if in_code_block:
+                if in_block:
                     result.append(line)
                 else:
-                    # Outside code block: normalize spacing
                     result.append(line.rstrip())
 
-        # Close any unclosed code block
-        if in_code_block:
+        if in_block:
             result.append("```")
             result.append("")
 
@@ -416,77 +362,55 @@ class ConversationManager:
 
     def _fix_markdown_spacing(self, content: str) -> str:
         """
-        Fix markdown spacing and formatting issues.
+        Basic fix for markdown spacing & formatting.
         """
         lines = content.split("\n")
-        result = []
-        prev_line_empty = True
+        res = []
+        prev_empty = True
 
         for line in lines:
             line = line.rstrip()
-
-            # Skip multiple empty lines
             if not line:
-                if not prev_line_empty:
-                    result.append("")
-                    prev_line_empty = True
+                if not prev_empty:
+                    res.append("")
+                    prev_empty = True
                 continue
 
-            # Handle headers and lists
-            if line.startswith(("#", "-", "*", "1.")):
-                if not prev_line_empty:
-                    result.append("")
-                result.append(line)
-                prev_line_empty = False
-                continue
+            if line.startswith(("#", "-", "*", "1.")) and not prev_empty:
+                res.append("")
+            res.append(line)
+            prev_empty = False
 
-            result.append(line)
-            prev_line_empty = False
-
-        return "\n".join(result).strip()
+        return "\n".join(res).strip()
 
     def _remove_old_messages(self, chat_id: str, keep_ids: List[int]) -> None:
         """
-        Remove old messages while keeping specified ones.
-
-        Args:
-            chat_id: The ID of the chat.
-            keep_ids: The IDs of messages to keep.
+        Remove messages not in keep_ids.
         """
         if not keep_ids:
             return
 
         try:
             with db_session() as db:
-                query = text(
-                    """
+                query = text("""
                     DELETE FROM messages
                     WHERE chat_id = :chat_id
                     AND id NOT IN :keep_ids
-                    """
-                )
+                """)
                 db.execute(query, {"chat_id": chat_id, "keep_ids": tuple(keep_ids)})
                 db.commit()
         except Exception as e:
-            logger.error("Error removing old messages from chat %s: %s", chat_id, e)
+            logger.error("Error removing old messages in chat %s: %s", chat_id, e)
             raise
 
     def get_usage_stats(self, chat_id: str) -> Dict[str, Any]:
         """
-        Get detailed usage statistics for a given chat.
-
-        Args:
-            chat_id: The ID of the chat.
-
-        Returns:
-            A dictionary containing various statistics about the conversation.
+        Return conversation usage stats (token usage, etc).
         """
-        logger.debug("Getting usage stats for chat %s", chat_id)
+        logger.debug("Collecting usage stats for chat %s", chat_id)
         messages = Chat.get_messages(chat_id, include_system=True)
-        logger.debug("Found %d messages for chat %s", len(messages), chat_id)
         messages = [m for m in messages if isinstance(m, dict)]
 
-        # Initialize stats with default values
         stats: Dict[str, Any] = {
             "total_messages": len(messages),
             "total_tokens": 0,
@@ -495,54 +419,44 @@ class ConversationManager:
             "system_messages": 0,
             "token_breakdown": TokenBreakdown(user=0, assistant=0, system=0),
             "average_tokens_per_message": 0,
-            "largest_message": {"role": "", "tokens": 0}
+            "largest_message": {"role": "", "tokens": 0},
         }
 
-        for msg in messages:
-            if not isinstance(msg, dict):
-                continue
-
-            role = str(msg.get("role", ""))
-            metadata = msg.get("metadata", {})
-            if not isinstance(metadata, dict):
-                metadata = {}
-
+        for m in messages:
+            role = str(m.get("role", ""))
+            meta = m.get("metadata", {})
+            if not isinstance(meta, dict):
+                meta = {}
             try:
-                token_count = metadata.get("token_count", 0)
-                tokens = int(token_count) if token_count is not None else 0
+                tok_count = int(meta.get("token_count", 0))
             except (ValueError, TypeError):
-                logger.warning("Invalid token count in metadata: %s", metadata.get("token_count"))
-                tokens = 0
+                tok_count = 0
 
-            stats["total_tokens"] += tokens
-
-            # Update token breakdown
+            stats["total_tokens"] += tok_count
             if role in ["user", "assistant", "system"]:
-                stats["token_breakdown"][role] += tokens
+                stats["token_breakdown"][role] += tok_count
                 stats[f"{role}_messages"] += 1
 
-                # Track largest message
-                if tokens > stats["largest_message"]["tokens"]:
-                    stats["largest_message"] = {"role": role, "tokens": tokens}
+                if tok_count > stats["largest_message"]["tokens"]:
+                    stats["largest_message"] = {"role": role, "tokens": tok_count}
 
-        # Calculate average tokens per message
         if stats["total_messages"] > 0:
             stats["average_tokens_per_message"] = round(stats["total_tokens"] / stats["total_messages"])
 
-        # Add model limits
         stats["model_limits"] = {
             "max_tokens": MAX_TOKENS,
             "max_message_tokens": MAX_MESSAGE_TOKENS,
             "tokens_left": max(0, MAX_TOKENS - stats["total_tokens"]),
-            "tokens_used_percentage": round((stats["total_tokens"] / MAX_TOKENS * 100) if MAX_TOKENS > 0 else 0, 1)
+            "tokens_used_percentage": round((stats["total_tokens"] / MAX_TOKENS * 100), 1) if MAX_TOKENS > 0 else 0
         }
 
-        logger.debug("Final stats for chat %s: %s", chat_id, stats)
+        logger.debug("Stats for chat %s: %s", chat_id, stats)
         return stats
 
 
-# Export an instance of ConversationManager
+# Export an instance
 conversation_manager = ConversationManager()
+
 def incorporate_file_content(self, chat_id: str, file_id: int) -> None:
     from models.uploaded_file import UploadedFile
     file_record = UploadedFile.get_by_id(file_id)
@@ -550,7 +464,6 @@ def incorporate_file_content(self, chat_id: str, file_id: int) -> None:
         logger.warning("No tokenized text found for file_id %d", file_id)
         return
 
-    # Insert a new system message referencing the file content
     Chat.add_message(
         chat_id=chat_id,
         role="system",

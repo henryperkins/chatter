@@ -1,4 +1,5 @@
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, request, current_app, send_file
+from flask_login import login_required
 from file_upload import FileUploadHandler
 from models.uploaded_file import UploadedFile
 import os
@@ -7,6 +8,8 @@ from config import config_instance
 from functools import wraps
 from typing import Dict, List, Optional
 import json
+import time
+import uuid
 
 def init_file_routes(app):
     """Initialize file upload routes"""
@@ -42,18 +45,15 @@ def init_file_routes(app):
             Dict: Response from Azure OpenAI API
         """
         try:
-            # Construct the Azure OpenAI API URL for file upload
             base_url = config_instance.AZURE_API_ENDPOINT
             if not base_url.endswith('/'):
                 base_url += '/'
             url = f"{base_url}files?api-version={config_instance.AZURE_API_VERSION}"
 
             headers = {
-                "api-key": config_instance.AZURE_OPENAI_KEY,
-                "Content-Type": "multipart/form-data"
+                "api-key": config_instance.AZURE_OPENAI_KEY
             }
 
-            # Prepare the file for upload
             with open(file_path, 'rb') as f:
                 files = {
                     'file': (os.path.basename(file_path), f),
@@ -68,9 +68,11 @@ def init_file_routes(app):
             return {'error': str(e), 'status_code': 500}
 
     @file_routes.route('/upload/<chat_id>', methods=['POST'])
+    @login_required
     def upload_files(chat_id: str):
         """
         Handle file upload with token tracking and enhanced validation.
+        Returns array of file IDs for message association.
         """
         from models.token_usage import TokenUsage
         from flask_login import current_user
@@ -81,9 +83,10 @@ def init_file_routes(app):
                 return jsonify({"error": "Rate limit exceeded. Please try again later."}), 429
         except Exception as e:
             current_app.logger.error(f"Rate limit check failed: {str(e)}")
+            return jsonify({"error": "Internal server error"}), 500
 
         try:
-            # First use our existing handler to validate and save files locally
+            # Use our existing handler to validate and save files locally
             result = file_handler.handle_upload(chat_id, user_id=current_user.id)
 
             if isinstance(result, tuple) and result[1] != 200:
@@ -95,9 +98,28 @@ def init_file_routes(app):
 
             saved_files = response_data['saved_files']
 
-            # Try Azure operations only if configuration exists
-            if hasattr(config_instance, 'AZURE_API_ENDPOINT') and config_instance.AZURE_API_ENDPOINT:
-                try:
+            # Validate Azure configuration
+            if not all([
+                hasattr(config_instance, 'AZURE_API_ENDPOINT'),
+                config_instance.AZURE_API_ENDPOINT,
+                hasattr(config_instance, 'AZURE_OPENAI_KEY'),
+                config_instance.AZURE_OPENAI_KEY
+            ]):
+                current_app.logger.warning("Azure configuration incomplete - skipping cloud upload")
+                return jsonify({
+                    'success': True,
+                    'saved_files': saved_files,
+                    'message': 'Files saved locally (cloud storage not configured)'
+                })
+
+            try:
+                # Only attempt Azure operations if configuration is valid
+                if all([
+                    hasattr(config_instance, 'AZURE_API_ENDPOINT'),
+                    config_instance.AZURE_API_ENDPOINT,
+                    hasattr(config_instance, 'AZURE_OPENAI_KEY'),
+                    config_instance.AZURE_OPENAI_KEY
+                ]):
                     for file_info in saved_files:
                         file_path = os.path.join(config_instance.UPLOAD_FOLDER, chat_id, file_info['filename'])
 
@@ -105,7 +127,7 @@ def init_file_routes(app):
                         azure_result = upload_to_azure(file_path)
 
                         if 'error' not in azure_result:
-                            # Update the file info with Azure details
+                            # Update file info with Azure details
                             file_info.update({
                                 'azure_file_id': azure_result.get('id'),
                                 'azure_status': azure_result.get('status'),
@@ -113,28 +135,35 @@ def init_file_routes(app):
                                 'content_type': 'text/plain'
                             })
 
-                            # Update the database record with Azure file ID if it exists
-                            azure_id = azure_result.get('id')
-                            if azure_id:
-                                UploadedFile.update_azure_file_id(
-                                    file_info['id'],
-                                    azure_id
-                                )
+                            # Update DB record
+                            if azure_result.get('id'):
+                                UploadedFile.update_azure_file_id(file_info['id'], azure_result['id'])
 
-                        # Cache text file content regardless of Azure upload result
-                        try:
-                            mime_type = file_info.get('mime_type', '')
-                            if mime_type.startswith('text/') or mime_type == 'application/json':
-                                with open(file_path, 'r', encoding='utf-8') as f:
-                                    content = f.read()
-                                    cache_key = hash((file_info['filename'], os.path.getsize(file_path)))
-                                    from chat_utils import context_manager
-                                    context_manager.context_cache[cache_key] = [{"content": content}]
-                        except Exception as e:
-                            current_app.logger.warning(f"Failed to cache file content: {str(e)}")
+                            # Cache content securely
+                            try:
+                                mime_type = file_info.get('mime_type', '')
+                                if mime_type.startswith('text/') or mime_type == 'application/json':
+                                    full_path = os.path.join(config_instance.UPLOAD_FOLDER, chat_id, file_info['filename'])
+                                    if os.path.exists(full_path):
+                                        with open(full_path, 'r', encoding='utf-8') as f:
+                                            content = f.read()
+                                            cache_key = hash((
+                                                current_user.id,
+                                                file_info['filename'],
+                                                os.path.getsize(full_path),
+                                                file_info['id']
+                                            ))
+                                            from chat_utils import context_manager
+                                            context_manager.context_cache[cache_key] = [{
+                                                "content": content,
+                                                "owner": current_user.id,
+                                                "expires": time.time() + 3600
+                                            }]
+                            except Exception as e:
+                                current_app.logger.warning(f"Content caching failed: {str(e)}")
 
-                except Exception as e:
-                    current_app.logger.error(f"Azure operations failed but continuing: {str(e)}")
+            except Exception as e:
+                current_app.logger.error(f"Azure file operations failed: {str(e)}")
 
             return jsonify({
                 'success': True,
@@ -158,7 +187,6 @@ def init_file_routes(app):
         from models.uploaded_file import UploadedFile
         from models.token_usage import TokenUsage
         from flask_login import current_user
-        import os, uuid
 
         # Rate limit check
         try:
@@ -167,27 +195,22 @@ def init_file_routes(app):
         except Exception as e:
             current_app.logger.error(f"Rate limit check failed: {str(e)}")
 
-        # 1. Parse required form data
         chunk_index = int(request.form.get('chunkIndex', 0))
         total_chunks = int(request.form.get('totalChunks', 1))
         original_name = request.form.get('originalFilename', 'untitled')
         upload_id = request.form.get('uploadId') or str(uuid.uuid4())
         file_size = request.form.get('fileSize', type=int)
 
-        # 2. Get the chunk data
         file_chunk = request.files.get('file')
         if not file_chunk:
             return jsonify({"error": "No chunk provided"}), 400
 
-        # 3. Temporary storage directory
         temp_dir = os.path.join(config_instance.UPLOAD_FOLDER, 'temp_chunks', chat_id, upload_id)
         os.makedirs(temp_dir, exist_ok=True)
 
-        # 4. Write chunk to a temporary file
         chunk_path = os.path.join(temp_dir, f"chunk_{chunk_index}")
         file_chunk.save(chunk_path)
 
-        # 5. If this is the final chunk, merge them
         if chunk_index == total_chunks - 1:
             merged_filename = f"merged_{original_name}"
             merged_path = os.path.join(temp_dir, merged_filename)
@@ -197,13 +220,11 @@ def init_file_routes(app):
                     with open(part_path, 'rb') as part:
                         merged_file.write(part.read())
 
-            # 6. Validate + transfer the merged file to final storage
             final_dest = os.path.join(config_instance.UPLOAD_FOLDER, chat_id)
             os.makedirs(final_dest, exist_ok=True)
             final_path = os.path.join(final_dest, merged_filename)
             os.rename(merged_path, final_path)
 
-            # 8. Clean up temp chunks
             for i in range(total_chunks):
                 os.remove(os.path.join(temp_dir, f"chunk_{i}"))
 
@@ -214,16 +235,12 @@ def init_file_routes(app):
                 "message": "All chunks merged successfully"
             })
 
-        # For non-final chunks, just return success
         return jsonify({"success": True, "uploadId": upload_id})
 
     @file_routes.route('/files', methods=['GET'])
     def list_files():
         """
         List all files uploaded to Azure OpenAI.
-
-        Returns:
-            Response: A Flask JSON response with list of files.
         """
         try:
             url = f"{config_instance.AZURE_API_ENDPOINT}/files?api-version={config_instance.AZURE_API_VERSION}"
@@ -267,7 +284,6 @@ def init_file_routes(app):
             if 'error' in result:
                 return jsonify(result), result.get('status_code', 500)
 
-            # Also delete local record if it exists
             UploadedFile.delete_by_azure_file_id(file_id)
 
             return jsonify({
@@ -283,11 +299,18 @@ def init_file_routes(app):
 
     @file_routes.route('/preview/<int:file_id>', methods=['GET'])
     def preview_file(file_id: int):
-         from flask import send_file, jsonify
-         file_record = UploadedFile.get_by_id(file_id)
-         if not file_record:
-             return jsonify({"error": "File not found"}), 404
-         return send_file(file_record.filepath, mimetype=file_record.mime_type)
+        from flask import jsonify
+        file_record = UploadedFile.get_by_id(file_id)
+        if not file_record:
+            return jsonify({"error": "File not found"}), 404
+
+        path_val = str(file_record.filepath) if file_record.filepath is not None else ""
+        mime_val = str(file_record.mime_type) if file_record.mime_type is not None else ""
+
+        if path_val.strip() == "" or not os.path.exists(path_val):
+            return jsonify({"error": "File not found on disk"}), 404
+
+        return send_file(path_val, mimetype=mime_val if mime_val.strip() else None)
 
     @file_routes.route('/contents/<int:file_id>', methods=['GET'])
     def get_file_contents(file_id: int):
@@ -295,30 +318,27 @@ def init_file_routes(app):
         Retrieve the contents of an uploaded file.
         """
         from flask_login import current_user
-        from models.uploaded_file import UploadedFile
 
         try:
-            # Get the file record
             file_record = UploadedFile.get_by_id(file_id)
             if not file_record:
                 return jsonify({"error": "File not found"}), 404
 
-            # Verify the user has access to this file
             if not current_user.is_authenticated:
                 return jsonify({"error": "Authentication required"}), 401
 
-            # Check if the file exists
-            if not os.path.exists(file_record.filepath):
+            path_val = str(file_record.filepath) if file_record.filepath is not None else ""
+            if path_val.strip() == "" or not os.path.exists(path_val):
                 return jsonify({"error": "File content not found"}), 404
 
-            # Read and return the file contents
-            with open(file_record.filepath, 'r', encoding='utf-8') as f:
+            with open(path_val, 'r', encoding='utf-8') as f:
                 content = f.read()
 
+            mime_val = str(file_record.mime_type) if file_record.mime_type is not None else None
             return jsonify({
                 "success": True,
                 "content": content,
-                "mime_type": file_record.mime_type
+                "mime_type": mime_val
             })
 
         except Exception as e:

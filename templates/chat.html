@@ -153,11 +153,19 @@
         </div>
 
         <!-- Chat Input Area -->
+        <!-- Updated with method and action so the server receives POST at /api/files/upload/<chat_id> -->
         <div id="chat-input" class="chat-input-container">
-            <form id="chat-form" class="max-w-4xl mx-auto h-full px-4 py-4 flex flex-col justify-between" enctype="multipart/form-data">
-                <textarea 
-                    name="message" 
-                    id="message-input" 
+            <form id="chat-form" 
+                  method="POST"
+                  action="{{ url_for('file_routes.upload_files', chat_id=chat_id) }}"
+                  class="max-w-4xl mx-auto h-full px-4 py-4 flex flex-col justify-between"
+                  enctype="multipart/form-data">
+                <!-- Hidden CSRF input if needed -->
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <textarea
+                    name="message"
+                    id="message-input"
                     rows="3"
                     class="form-input resize-none flex-1"
                     placeholder="Type your message here..."
@@ -166,10 +174,10 @@
                 
                 <div class="flex items-center justify-between mt-2">
                     <div class="flex items-center gap-2">
-                        <input type="file" 
-                               id="file-upload" 
-                               name="files[]" 
-                               class="hidden mobile-file-input" 
+                        <input type="file"
+                               id="file-upload"
+                               name="files[]"
+                               class="hidden mobile-file-input"
                                multiple
                                accept="image/*, video/*, .pdf, .doc, .docx, .txt, .md, .heic, .heif">
                         <style>

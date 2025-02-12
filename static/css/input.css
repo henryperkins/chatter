@@ -4,7 +4,7 @@
 
 @layer components {
   .chat-container {
-    @apply flex flex-col h-[calc(100vh-4rem)];  /* 64px height for header */
+    @apply flex flex-col h-[calc(100vh-8rem)];  /* Increased total offset to 8rem */
   }
 
   .chat-messages-container {

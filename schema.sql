@@ -121,7 +121,8 @@ CREATE TABLE uploaded_files (
     last_indexed_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    tokenized_text TEXT
+    tokenized_text TEXT,
+    text_content TEXT
 );
 
 -- Login attempts tracking

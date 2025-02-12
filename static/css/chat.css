@@ -60,13 +60,13 @@
     }
   }
 
-  .assistant-message .message-bubble {
-    @apply bg-gray-100 dark:bg-gray-800;
+.assistant-message .message-bubble {
+  @apply bg-gray-100 dark:bg-gray-800/95 text-gray-800 dark:text-gray-100;
+}
 
-    .prose {
-      @apply text-gray-900 dark:text-gray-100;
-    }
-  }
+.user-message .message-bubble {
+  @apply bg-primary-700 text-gray-50 dark:bg-primary-800;
+}
 
   /* Message content */
   .message-content {

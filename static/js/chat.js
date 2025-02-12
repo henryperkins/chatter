@@ -79,16 +79,40 @@ async function handleNormalResponse(formData) {
         chat_id: window.CHAT_CONFIG.chatId
     };
 
-    const response = await fetch('/chat/send', {
+      let response;
+      
+      if (window.fileUploadManager?.uploadedFiles?.length > 0) {
+        // Upload files first
+        const uploadResponse = await fetch(`/api/files/upload/${window.CHAT_CONFIG.chatId}`, {
+          method: 'POST',
+          body: new FormData(document.getElementById('chat-form')),
+          headers: {
+            'X-Chat-ID': window.CHAT_CONFIG.chatId,
+            'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+          }
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error(`File upload failed: ${uploadResponse.status}`);
+        }
+        
+        const { file_ids: fileIds } = await uploadResponse.json();
+        
+        // Add file IDs to message payload
+        jsonData.file_ids = fileIds;
+      }
+
+      // Send message with or without files
+      response = await fetch('/chat/send', {
         method: 'POST',
         body: JSON.stringify(jsonData),
         headers: {
-            'X-Chat-ID': window.CHAT_CONFIG.chatId,
-            'api-key': window.CHAT_CONFIG.azureToken,
-            'Content-Type': 'application/json',
-            'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+          'X-Chat-ID': window.CHAT_CONFIG.chatId,
+          'api-key': window.CHAT_CONFIG.azureToken,
+          'Content-Type': 'application/json',
+          'X-CSRFToken': window.CHAT_CONFIG.csrfToken
         }
-    });
+      });
 
     if (!response.ok) {
         throw new Error(`Request failed: ${response.status}`);
