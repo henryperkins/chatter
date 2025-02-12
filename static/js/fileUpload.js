@@ -9,6 +9,10 @@
 
                 // In-memory file list (pending uploads)
                 this.uploadedFiles = [];
+        
+                // Mobile-specific properties
+                this.isMobile = /Mobile|Android|iPhone/i.test(navigator.userAgent);
+                this.networkType = navigator.connection?.type || 'unknown';
 
                 // Basic constraints
                 this.MAX_FILES = 5;
@@ -70,7 +74,11 @@
             async initializeFileUpload() {
                 if (this.initialized) return true;
                 try {
-                    this.setupDragAndDrop();
+                    if (this.isMobile) {
+                        await this.setupMobileSpecificHandling();
+                    } else {
+                        this.setupDragAndDrop();
+                    }
                     this.setupEventListeners();
                     this.setupMobileUpload();
                     this.initialized = true;
@@ -544,6 +552,66 @@
                 if (!this.mobileUploadMenu) return;
                 this.updateMobileMenuVisibility();
                 this.setupMobileUploadMenu();
+        
+                if (this.isMobile) {
+                    this.createMobileProgressUI();
+                }
+            }
+
+            async setupMobileSpecificHandling() {
+                // Handle iOS HEIC/HEIF conversion
+                this.uploadButton.addEventListener('change', async (e) => {
+                    const files = Array.from(e.target.files);
+                    const convertedFiles = await Promise.all(
+                        files.map(async file => {
+                            if (['image/heic', 'image/heif'].includes(file.type)) {
+                                return this.convertHEICtoJPG(file);
+                            }
+                            return file;
+                        })
+                    );
+                    this.handleNewFiles(convertedFiles);
+                });
+            }
+
+            async convertHEICtoJPG(file) {
+                try {
+                    const heic2any = (await import('heic2any')).default;
+                    const convertedBlob = await heic2any({
+                        blob: file,
+                        toType: 'image/jpeg',
+                        quality: 0.8
+                    });
+                    return new File([convertedBlob], `${file.name.split('.')[0]}.jpg`, {
+                        type: 'image/jpeg'
+                    });
+                } catch (error) {
+                    console.error('HEIC conversion failed:', error);
+                    return file;
+                }
+            }
+
+            createMobileProgressUI() {
+                this.progressBar = document.createElement('div');
+                this.progressBar.className = 'mobile-progress-bar';
+        
+                const progressHTML = `
+                    <div class="upload-status">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <div class="network-status">
+                            <i class="fas fa-signal"></i>
+                            <span>Using ${this.networkType} connection</span>
+                        </div>
+                        <button class="pause-resume-btn">
+                            <i class="fas fa-pause"></i>
+                        </button>
+                    </div>
+                `;
+        
+                this.progressBar.innerHTML = progressHTML;
+                document.body.appendChild(this.progressBar);
             }
 
             updateMobileMenuVisibility() {

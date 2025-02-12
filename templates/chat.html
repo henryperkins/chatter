@@ -166,7 +166,22 @@
                 
                 <div class="flex items-center justify-between mt-2">
                     <div class="flex items-center gap-2">
-                        <input type="file" id="file-upload" name="files[]" class="hidden" multiple accept=".txt,.pdf,.doc,.docx,.md">
+                        <input type="file" 
+                               id="file-upload" 
+                               name="files[]" 
+                               class="hidden mobile-file-input" 
+                               multiple
+                               accept="image/*, video/*, .pdf, .doc, .docx, .txt, .md, .heic, .heif"
+                               capture="environment">
+                        <style>
+                          .mobile-file-input {
+                            min-width: 300px;
+                            padding: 1.5rem;
+                            font-size: 1.2rem;
+                            border: 2px dashed #ccc;
+                            border-radius: 15px;
+                          }
+                        </style>
                         <label for="file-upload" class="btn btn-secondary">
                             <i class="fas fa-paperclip mr-2"></i>
                             <span>Attach Files</span>
