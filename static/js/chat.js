@@ -1,3 +1,7 @@
+// Enhanced logic to keep the usage panel connected above the chat input
+
+"use strict";
+
 let scrollFrame = null;
 
 const CONFIG = {
@@ -7,6 +11,29 @@ const CONFIG = {
     O_SERIES_MODELS: ['o3-mini', 'o1', 'o1-mini', 'o1-preview'],
     DEBUG: true
 };
+
+// Dynamically position the usage panel above the chat input
+function updateUsagePanelPosition() {
+    const usagePanel = document.getElementById('usage-panel');
+    const chatInput = document.getElementById('chat-input');
+    if (!usagePanel || !chatInput) return;
+
+    // Calculate how tall the chat input is and reposition usage panel just above it
+    const inputRect = chatInput.getBoundingClientRect();
+    // For a fixed position usage panel, set bottom equal to chat input's total height
+    const chatInputHeight = inputRect.height || 0;
+
+    // Update usage panel's bottom to place it just above the chat input
+    usagePanel.style.position = 'fixed';
+    usagePanel.style.left = '0';
+    usagePanel.style.right = '0';
+    usagePanel.style.bottom = `${chatInputHeight}px`;
+    // Optional: bump up z-index if needed
+    usagePanel.style.zIndex = '9999';
+
+    // If there's any transform from visualViewport adjustments, reset usagePanel transform so it remains pinned
+    usagePanel.style.transform = 'none';
+}
 
 // Visual viewport handling for input positioning
 function handleViewportChanges() {
@@ -18,16 +45,26 @@ function handleViewportChanges() {
         const offsetTop = visualViewport.offsetTop;
         const delta = window.innerHeight - viewportHeight - offsetTop;
 
+        // Move chat input so it's visible above the keyboard
         chatInput.style.transform = `translateY(${Math.max(delta, 0)}px)`;
     }
+
+    updateUsagePanelPosition();
 }
 
+// Attach these listeners to keep everything aligned on viewport change
 if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', handleViewportChanges);
     window.visualViewport.addEventListener('scroll', handleViewportChanges);
 }
 
-// Create a new chat session
+// Also reposition usage panel when window resizes in normal situations
+window.addEventListener('resize', updateUsagePanelPosition);
+
+// ==========================================================================
+// Existing chat.js code below
+// ==========================================================================
+
 async function createNewChat() {
     try {
         const sendBtn = document.getElementById('new-chat-btn');
@@ -61,7 +98,22 @@ async function createNewChat() {
     }
 }
 
-// Handle normal (non-streaming) responses
+/**
+ * handlePotentialFetchResponse()
+ */
+async function handlePotentialFetchResponse(response) {
+    if (response && typeof response === 'object' && 'ok' in response && 'status' in response) {
+        if (!response.ok) {
+            console.error('Full fetch response:', response);
+            throw new Error(`Request failed: ${response.status}`);
+        }
+        return await response.json();
+    } else {
+        return response;
+    }
+}
+
+// Normal response handler
 async function handleNormalResponse(formData) {
     const message = formData.get('message') || '';
     const jsonData = {
@@ -69,56 +121,58 @@ async function handleNormalResponse(formData) {
         chat_id: window.CHAT_CONFIG.chatId
     };
 
-      let response;
-      
-      if (window.fileUploadManager?.uploadedFiles?.length > 0) {
-        // Upload files first
+    if (window.fileUploadManager?.uploadedFiles?.length > 0) {
         const uploadResponse = await fetch(`/api/files/upload/${window.CHAT_CONFIG.chatId}`, {
-          method: 'POST',
-          body: new FormData(document.getElementById('chat-form')),
-          headers: {
-            'X-Chat-ID': window.CHAT_CONFIG.chatId,
-            'X-CSRFToken': window.CHAT_CONFIG.csrfToken
-          }
+            method: 'POST',
+            body: new FormData(document.getElementById('chat-form')),
+            headers: {
+                'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+            }
         });
-        
         if (!uploadResponse.ok) {
-          throw new Error(`File upload failed: ${uploadResponse.status}`);
+            throw new Error(`File upload failed: ${uploadResponse.status}`);
         }
-        
         const { file_ids: fileIds } = await uploadResponse.json();
-        
-        // Add file IDs to message payload
         jsonData.file_ids = fileIds;
-      }
-
-      // Send message with or without files
-      response = await window.utils.fetchWithCSRF('/chat/send', {
-        method: 'POST',
-        headers: {
-          'X-Chat-ID': window.CHAT_CONFIG.chatId,
-          'api-key': window.CHAT_CONFIG.azureToken,
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: jsonData
-      });
-
-    if (!response.ok) {
-        throw new Error(`Request failed: ${response.status}`);
     }
 
-    const data = await response.json();
-    if (data.error) {
-        throw new Error(data.error);
+    let fetchResponse;
+    try {
+        fetchResponse = await window.utils.fetchWithCSRF('/chat/send', {
+            method: 'POST',
+            headers: {
+                'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                'api-key': window.CHAT_CONFIG.azureToken,
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: jsonData
+        });
+    } catch (err) {
+        console.error('Error calling fetchWithCSRF:', err);
+        throw err;
     }
 
+    let data;
+    try {
+        data = await handlePotentialFetchResponse(fetchResponse);
+    } catch (err) {
+        console.error('Error in handleNormalResponse:', err);
+        throw err;
+    }
+
+    if (!data || typeof data !== 'object') {
+        throw new Error('No valid JSON data returned from server');
+    }
+    if (!data.success && !data.message) {
+        throw new Error('Request was not successful');
+    }
     if (!data.message || typeof data.message !== 'object') {
-        throw new Error('Invalid or empty response from server');
+        throw new Error('Invalid or empty "message" field in server response');
     }
 
-    const content = data.message.content;
-    const contentHtml = data.message.content_html;
+    const { content, content_html: contentHtml } = data.message;
     if (!content || !contentHtml) {
         throw new Error('Empty content in response');
     }
@@ -130,7 +184,7 @@ async function handleNormalResponse(formData) {
     window.MessageRenderer.showSuccess('Assistant responded successfully');
 }
 
-// Handle streaming responses
+// Streaming response handler
 async function handleStreamingResponse(formData) {
     let accumulatedContent = '';
     let messageDiv = null;
@@ -146,9 +200,7 @@ async function handleStreamingResponse(formData) {
             throw new Error('Please provide a message or upload files.');
         }
 
-        // Get uploaded files from formData
         const uploadedFiles = formData.getAll('files[]') || [];
-        
         const jsonData = {
             message: message || '',
             files: uploadedFiles.map(file => file.id),
@@ -156,33 +208,56 @@ async function handleStreamingResponse(formData) {
             stream: true
         };
 
-        const response = await window.utils.fetchWithCSRF('/chat/send?stream=true', {
-            method: 'POST',
-            headers: {
-                'X-Chat-ID': window.CHAT_CONFIG.chatId,
-                'api-key': window.CHAT_CONFIG.azureToken,
-                'Content-Type': 'application/json',
-                'Accept': 'text/event-stream',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: jsonData
-        });
+        let response;
+        try {
+            response = await window.utils.fetchWithCSRF('/chat/send?stream=true', {
+                method: 'POST',
+                headers: {
+                    'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                    'api-key': window.CHAT_CONFIG.azureToken,
+                    'X-CSRFToken': window.CHAT_CONFIG.csrfToken,
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: jsonData
+            });
+        } catch (err) {
+            console.error('Streaming error:', err);
+            throw err;
+        }
+
+        if (!(response instanceof Response)) {
+            if (!response.success) {
+                throw new Error('Request was not successful (non-streaming server response).');
+            }
+            if (!response.message) {
+                throw new Error('No "message" in non-streaming server response.');
+            }
+            const { content, content_html } = response.message;
+            const nextMessage = content_html || content || 'No content';
+            messageDiv = window.MessageRenderer.renderAssistantMessage(nextMessage, false);
+            document.getElementById('chat-box').appendChild(messageDiv);
+            window.MessageRenderer.showSuccess('Assistant responded successfully (non-stream fallback).');
+            return;
+        }
 
         if (!response.ok) {
             const text = await response.text();
-            let errorMessage = `Server error: ${response.status}`;
+            let errorMsg = `Server error: ${response.status}`;
             try {
                 const errorData = JSON.parse(text);
                 if (errorData.error) {
-                    errorMessage = errorData.error;
+                    errorMsg = errorData.error;
                 }
-            } catch { /* fallback */ }
-            throw new Error(errorMessage);
+            } catch {
+                // fallback
+            }
+            throw new Error(errorMsg);
         }
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-
         let streamComplete = false;
         let updateQueue = [];
         let updateScheduled = false;
@@ -223,13 +298,13 @@ async function handleStreamingResponse(formData) {
                 if (!match) continue;
 
                 try {
-                    const data = JSON.parse(match[1]);
-                    if (data.error) throw new Error(data.error);
-
-                    if (data.content) {
-                        accumulatedContent += data.content;
+                    const parsed = JSON.parse(match[1]);
+                    if (parsed.error) {
+                        throw new Error(parsed.error);
+                    }
+                    if (parsed.content) {
+                        accumulatedContent += parsed.content;
                         updateQueue.push(accumulatedContent);
-
                         if (!updateScheduled) {
                             updateScheduled = true;
                             requestAnimationFrame(processUpdate);
@@ -240,14 +315,11 @@ async function handleStreamingResponse(formData) {
                 }
             }
 
-            // Auto-scroll if near bottom
             const chatBox = document.getElementById('chat-box');
             if (!chatBox) continue;
-
             const scrollPos = chatBox.scrollTop;
-            const isNearBottom = chatBox.scrollHeight - chatBox.clientHeight - scrollPos < 100;
-
-            if (isNearBottom) {
+            const nearBottom = chatBox.scrollHeight - chatBox.clientHeight - scrollPos < 100;
+            if (nearBottom) {
                 cancelAnimationFrame(scrollFrame);
                 scrollFrame = requestAnimationFrame(() => {
                     chatBox.scrollTop = chatBox.scrollHeight;
@@ -255,11 +327,9 @@ async function handleStreamingResponse(formData) {
             }
         }
 
-        // Final render with Markdown + syntax highlighting
         if (messageDiv) {
             window.MessageRenderer.finalizeAssistantMessage(messageDiv, accumulatedContent);
         }
-
         window.MessageRenderer.showSuccess('Assistant responded successfully (stream).');
     } catch (error) {
         window.MessageRenderer.showError(`API Error: ${error.message}`);
@@ -274,7 +344,6 @@ async function sendMessage(event) {
     if (event) {
         event.preventDefault();
     }
-
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
 
@@ -285,12 +354,10 @@ async function sendMessage(event) {
     if (sendButton.disabled) return;
 
     sendButton.disabled = true;
-
     try {
         const message = messageInput.value.trim();
         let uploadedFiles = [];
 
-        // Only attempt file upload if there are actually files to upload
         if (window.fileUploadManager?.uploadedFiles?.length > 0) {
             try {
                 uploadedFiles = await window.fileUploadManager.uploadFiles();
@@ -305,8 +372,6 @@ async function sendMessage(event) {
 
         const formData = new FormData();
         formData.append('message', message);
-
-        // Add uploaded files to formData if any were successfully uploaded
         if (uploadedFiles.length > 0) {
             uploadedFiles.forEach(file => {
                 formData.append('files[]', file);
@@ -320,18 +385,16 @@ async function sendMessage(event) {
         if (modelSelect && modelSelect.selectedOptions.length) {
             const selectedOption = modelSelect.selectedOptions[0];
             const modelType = selectedOption.dataset.modelType;
-
             isOSeriesModel = CONFIG.O_SERIES_MODELS.includes(modelType);
-            modelSupportsStreaming = modelType === 'o3-mini';
-
+            modelSupportsStreaming = (modelType === 'o3-mini');
             window.CHAT_CONFIG.isOSeriesModel = isOSeriesModel;
         }
 
         window.MessageRenderer.appendUserMessage(message, uploadedFiles);
         messageInput.value = '';
         window.fileUploadManager?.clearFiles();
-
         window.MessageRenderer.showTypingIndicator();
+
         if (modelSupportsStreaming) {
             await handleStreamingResponse(formData);
         } else {
@@ -350,36 +413,29 @@ async function sendMessage(event) {
     }
 }
 
-// Initialize chat
 async function startChat() {
-    // Tab switching logic for usage tabs
     const tabButtons = document.querySelectorAll('.usage-tabs .tab');
     if (tabButtons.length > 0) {
         const panels = document.querySelectorAll('.panel-content');
         tabButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            // Remove 'tab-active' from all tabs, hide all panels
-            tabButtons.forEach(tb => tb.classList.remove('tab-active'));
-            panels.forEach(p => p.classList.add('hidden'));
-
-            // Activate the clicked button
-            btn.classList.add('tab-active');
-            const targetId = btn.getAttribute('data-panel');
-            document.getElementById(targetId).classList.remove('hidden');
+            btn.addEventListener('click', () => {
+                tabButtons.forEach(tb => tb.classList.remove('tab-active'));
+                panels.forEach(p => p.classList.add('hidden'));
+                btn.classList.add('tab-active');
+                const targetId = btn.getAttribute('data-panel');
+                document.getElementById(targetId).classList.remove('hidden');
+            });
         });
-    });
+    }
 
-    // Initialize file panel
     const uploadTrigger = document.getElementById('upload-trigger');
     const fileInput = document.getElementById('file-upload');
-
     if (uploadTrigger && fileInput) {
         uploadTrigger.addEventListener('click', () => {
             fileInput.click();
         });
     }
 
-    // Update file list when files change
     if (window.fileUploadManager) {
         window.fileUploadManager.onFilesChanged = updateFileList;
     }
@@ -401,7 +457,6 @@ async function startChat() {
             </div>
         `).join('');
 
-        // Add remove handlers
         fileList.querySelectorAll('.remove-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 window.fileUploadManager.removeFile(btn.dataset.filename);
@@ -426,10 +481,10 @@ async function startChat() {
 
         let attempts = 0;
         while (!window.MessageRenderer && attempts < CONFIG.MAX_DEPENDENCY_ATTEMPTS) {
+            // wait for global scripts to load
             await new Promise(resolve => setTimeout(resolve, 100));
             attempts++;
         }
-
         if (!window.MessageRenderer) {
             throw new Error('MessageRenderer not available');
         }
@@ -468,7 +523,6 @@ async function startChat() {
 
         const modelSelect = document.getElementById('model-select');
         if (modelSelect) {
-            // Update model icon color on change
             const modelIcon = document.querySelector('.model-selector svg');
             modelSelect.addEventListener('change', () => {
                 const selected = modelSelect.options[modelSelect.selectedIndex];
@@ -482,7 +536,6 @@ async function startChat() {
                 const modelType = selectedOption.dataset.modelType;
                 window.CHAT_CONFIG.isOSeriesModel = CONFIG.O_SERIES_MODELS.includes(modelType);
 
-                // Set initial color
                 if (modelIcon && selectedOption.dataset.color) {
                     modelIcon.style.color = selectedOption.dataset.color;
                 }
@@ -610,22 +663,18 @@ async function startChat() {
                         window.MessageRenderer.showSuccess('Chat title updated');
                         const trimmedTitle = newTitle.trim();
 
-                        // Update mobile selector
-                        const mobileChatSelector = document.getElementById('mobile-chat-selector');
-                        if (mobileChatSelector) {
-                            const option = mobileChatSelector.querySelector(`option[value="${window.CHAT_CONFIG.chatId}"]`);
-                            if (option) {
-                                option.textContent = trimmedTitle;
+                        const mobileSel = document.getElementById('mobile-chat-selector');
+                        if (mobileSel) {
+                            const opt = mobileSel.querySelector(`option[value="${window.CHAT_CONFIG.chatId}"]`);
+                            if (opt) {
+                                opt.textContent = trimmedTitle;
                             }
                         }
 
-                        // Update desktop tab
                         const desktopTab = document.querySelector(`.chat-tab[data-chat-id="${window.CHAT_CONFIG.chatId}"] span`);
                         if (desktopTab) {
                             desktopTab.textContent = trimmedTitle;
                         }
-
-                        // Update page title
                         document.title = `Chat - ${trimmedTitle}`;
                     } else {
                         window.MessageRenderer.showError(data.error);
@@ -655,6 +704,9 @@ async function startChat() {
             });
         });
 
+        // Make sure the usage panel is placed above the chat input on load
+        handleViewportChanges();
+        updateUsagePanelPosition();
     } catch (error) {
         window.monitoring?.logError('Failed to initialize chat:', error);
         window.MessageRenderer.showError(error.message);
@@ -662,4 +714,3 @@ async function startChat() {
 }
 
 document.addEventListener('DOMContentLoaded', startChat);
-}

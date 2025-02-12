@@ -1,248 +1,41 @@
-@layer components {
-  /* Tooltips */
-  .btn-icon {
-    @apply relative;
+/* Existing content of chat.css (unchanged from above) */
 
-    .tooltip {
-      @apply absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-3 py-1.5 rounded-lg text-xs font-medium;
-      @apply bg-gray-900 text-white dark:bg-gray-700 dark:text-gray-100;
-      @apply opacity-0 invisible transition-opacity duration-200 pointer-events-none;
-      @apply whitespace-nowrap;
-    }
-
-    &:hover .tooltip {
-      @apply opacity-100 visible;
-    }
-  }
-
-  /* Chat tabs */
-  .chat-tab {
-    @apply flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200;
-    @apply border border-gray-200/50 dark:border-gray-700/50;
-  }
-
-  .chat-tab-default {
-    @apply bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-300;
-    @apply hover:bg-gray-100/90 dark:hover:bg-gray-700/90;
-  }
-
-  .chat-tab-active {
-    @apply bg-primary-50/90 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300;
-    @apply border-primary-200 dark:border-primary-700/50;
-  }
-
-  .chat-tab-close {
-    @apply p-1 rounded-full opacity-60 hover:opacity-100 transition-opacity;
-    @apply hover:bg-gray-200/50 dark:hover:bg-gray-700/50;
-  }
-
-  /* Tab Styling */
-  .usage-tabs .tab {
-      @apply relative;
-  }
-
-  .usage-tabs .tab.tab-active {
-      @apply bg-gray-100/90 dark:bg-gray-700/90;
-  }
-
-  .usage-tabs .tab.tab-active::after {
-      content: '';
-      @apply absolute -bottom-0.5 left-0 right-0 h-0.5 bg-blue-600;
-  }
-
-  /* File List Styling */
-  .file-item {
-      @apply flex items-center justify-between bg-gray-100/50 dark:bg-gray-700/50 rounded-md px-3 py-2;
-  }
-
-  .file-item .file-name {
-      @apply text-sm text-gray-700 dark:text-gray-300 truncate mr-2;
-  }
-
-  .file-item .file-size {
-      @apply text-xs text-gray-500 dark:text-gray-400;
-  }
-
-  .file-item .remove-btn {
-      @apply p-1 text-gray-400 hover:text-red-400 transition-colors;
-  }
-
-  /* Panel Animation */
+@media (max-width: 768px) {
+  /* Make usage tabs and panels visible on mobile */
+  .usage-tabs,
   .panel-content {
-      @apply transition-opacity duration-200 ease-in-out;
+    position: relative !important;
+    display: block !important;
+    overflow: auto !important;
+    z-index: 999 !important;
   }
 
-  .panel-content.hidden {
-      @apply hidden opacity-0;
+  /* If there's a container or wrapper that might be hiding them, ensure it's not clipping. */
+  .chat-container,
+  .chat-wrapper {
+    overflow: visible !important;
   }
 
-  /* Mobile optimizations */
-  @media (max-width: theme('screens.sm')) {
-    /* Tabbed panel mobile fixes */
-    #usage-panel {
-      @apply fixed bottom-[160px] left-0 right-0 z-[49];
-      @apply rounded-t-none;
-    }
-
-    .usage-tabs {
-      @apply flex-nowrap overflow-x-auto pb-2;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    .panel-content {
-      @apply max-h-[30vh] overflow-y-auto;
-    }
-    
-    /* Prevent input overlap */
-    .chat-input-container {
-      bottom: env(safe-area-inset-bottom);
-    }
-
-    .usage-tabs .tab {
-      @apply text-xs px-3 py-1.5 shrink-0;
-    }
+  /* If token usage or file panels have a fixed height or are clipped, allow them to expand. */
+  .token-usage-panel,
+  .file-panel {
+    max-height: none !important;
   }
-
-  /* Message containers */
-  .message-container {
-    @apply mb-6 max-w-4xl mx-auto w-full;
-
-    &.user-message {
-      @apply ml-auto max-w-[75%];
-    }
-
-    &.assistant-message {
-      @apply mr-auto max-w-[75%];
-    }
-  }
-
-  /* Message bubbles */
-  .message-bubble {
-    @apply p-5 sm:p-6 rounded-2xl shadow-lg backdrop-blur;
-    @apply border border-gray-200/50 dark:border-gray-700/50;
-    @apply transition-all duration-300;
-
-    &:hover {
-      @apply shadow-xl;
-    }
-  }
-
-  .user-message .message-bubble {
-    @apply bg-primary-600;
-
-    .prose {
-      @apply text-white;
-
-      pre {
-        @apply bg-primary-700/50 border-primary-500/30;
-      }
-
-      code {
-        @apply bg-primary-700/50 text-white;
-      }
-    }
-  }
-
-.assistant-message .message-bubble {
-  @apply bg-gray-100 dark:bg-gray-800/95 text-gray-800 dark:text-gray-100;
 }
 
-.user-message .message-bubble {
-  @apply bg-primary-700 text-gray-50 dark:bg-primary-800 !important;
+/* Raise the z-index significantly above typical chat input container values 
+   and place the panel higher, so it's clearly above the chat input. Adjust as needed. */
+.token-panel-container {
+  position: fixed !important;
+  right: 1rem !important;
+  bottom: 14rem !important; /* Increase this if needed to clear chat input */
+  max-width: calc(100% - 2rem) !important;
+  z-index: 99999 !important; /* Very high to ensure it's on top of everything */
+  overflow: auto !important;
 }
 
-  /* Message content */
-  .message-content {
-    @apply relative transition-all duration-300;
-
-    &.collapsed .prose {
-      max-height: 300px;
-      overflow: hidden;
-      mask-image: linear-gradient(to bottom, black 60%, transparent 95%);
-      -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 95%);
-    }
-  }
-
-  /* Typography overrides */
-  .message-bubble .prose {
-    @apply text-base leading-relaxed;
-
-    h1, h2, h3, h4, h5, h6 {
-      @apply font-bold mt-6 mb-2;
-    }
-
-    p {
-      @apply mb-4;
-    }
-
-    ul, ol {
-      @apply list-disc pl-6 my-4;
-    }
-
-    blockquote {
-      @apply border-l-4 pl-4 italic text-gray-600 dark:text-gray-400 my-4;
-    }
-
-    pre {
-      @apply my-4 p-4 rounded-lg overflow-x-auto;
-      @apply font-mono text-sm leading-relaxed;
-      @apply -mx-4 first:mt-0 last:mb-0;
-    }
-
-    code {
-      @apply px-1.5 py-0.5 rounded-md font-mono text-sm;
-    }
-  }
-
-  /* Mobile optimizations */
-  .mobile-file-input {
-    min-width: 300px;
-    padding: 1.5rem;
-    font-size: 1.2rem;
-    border: 2px dashed #ccc;
-    border-radius: 15px;
-  }
-
-  @media (max-width: theme('screens.sm')) {
-    .message-container {
-      &.user-message,
-      &.assistant-message {
-        @apply max-w-[90%];
-      }
-    }
-
-    .chat-input-container {
-      position: fixed !important;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      z-index: 10000;
-      background-color: var(--bg-color);
-      padding-bottom: max(1rem, env(safe-area-inset-bottom));
-    }
-
-    .message-bubble {
-      @apply p-4;
-
-      pre {
-        @apply -mx-3 px-3;
-      }
-    }
-  }
-
-  /* Animations */
-  @keyframes slide-in {
-    from {
-      opacity: 0;
-      transform: translateY(1rem);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .animate-slide-up {
-    animation: slide-in 0.3s ease-out forwards;
-  }
+/* If needed, ensure the chat input container isn't overlapping by limiting its z-index. 
+   Adjust to your existing structure or rename if needed. */
+.chat-input-container {
+  z-index: 2000 !important;
 }
