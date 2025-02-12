@@ -1,41 +1,162 @@
-/* Existing content of chat.css (unchanged from above) */
-
-@media (max-width: 768px) {
-  /* Make usage tabs and panels visible on mobile */
-  .usage-tabs,
-  .panel-content {
-    position: relative !important;
-    display: block !important;
-    overflow: auto !important;
-    z-index: 999 !important;
-  }
-
-  /* If there's a container or wrapper that might be hiding them, ensure it's not clipping. */
-  .chat-container,
-  .chat-wrapper {
-    overflow: visible !important;
-  }
-
-  /* If token usage or file panels have a fixed height or are clipped, allow them to expand. */
-  .token-usage-panel,
-  .file-panel {
-    max-height: none !important;
-  }
+/* CSS Variables */
+:root {
+    --nav-height: 4rem;
+    --tabs-height: 2.5rem;
+    --panel-content-height: 3.5rem;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --chat-input-height: 5rem;
+    --panel-spacing: 1rem;
 }
 
-/* Remove the forced fixed positioning so the token panel stays within the new tab layout.
-   This allows the .token-panel-container to flow where it's placed in chat.html. */
-.token-panel-container {
-  position: static !important;
-  right: auto !important;
-  bottom: auto !important;
-  max-width: 100% !important;
-  z-index: auto !important;
-  overflow: auto !important;
+/* Chat container and layout */
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--nav-height));
+    position: relative;
 }
 
-/* If needed, ensure the chat input container isn't overlapping by limiting its z-index.
-   Adjust to your existing structure or rename if needed. */
+.chat-messages-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: calc(var(--chat-input-height) + var(--tabs-height) + var(--panel-content-height) + var(--safe-bottom));
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Usage panel positioning and styling */
+#usage-panel {
+    position: fixed;
+    bottom: calc(var(--chat-input-height) + var(--safe-bottom));
+    backdrop-filter: blur(8px);
+    border-top: 1px solid rgba(229, 231, 235, 0.5);
+    z-index: 1100;
+}
+
+/* Form input styling */
+.form-input {
+    width: 100%;
+    min-height: 60px;
+    max-height: 200px;
+    background-color: white;
+    color: #111827;
+    padding: 0.5rem 0.75rem;
+    line-height: 1.5;
+    border-color: #D1D5DB;
+    border-radius: 0.5rem;
+}
+
+.dark .form-input {
+    background-color: #374151;
+    color: #F3F4F6;
+    border-color: #4B5563;
+    border-width: 1px;
+}
+
+.dark #usage-panel {
+    background: rgba(31, 41, 55, 0.98);
+    border-color: rgba(75, 85, 99, 0.5);
+    color: #F3F4F6;
+}
+
+.panel-content {
+    background: inherit;
+    backdrop-filter: inherit;
+}
+
+/* Chat input container positioning */
 .chat-input-container {
-  z-index: 2000 !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid rgba(229, 231, 235, 0.5);
+    padding-bottom: var(--safe-bottom);
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.05);
+    transform: translateZ(0);
+    z-index: 1200;
+    height: calc(var(--chat-input-height) + var(--safe-bottom));
+}
+
+.dark .chat-input-container {
+    background-color: rgba(31, 41, 55, 0.98);
+    border-color: rgba(75, 85, 99, 0.5);
+}
+
+/* Tab styling */
+.tab.tab-active {
+    background-color: rgba(249, 250, 251, 0.95);
+    border: 1px solid rgba(229, 231, 235, 0.8);
+    border-bottom: none;
+    position: relative;
+}
+
+.tab.tab-active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: inherit;
+}
+
+.dark .tab.tab-active {
+    background-color: rgba(17, 24, 39, 0.95);
+    border-color: rgba(75, 85, 99, 0.8);
+}
+
+/* File list styling */
+#file-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+#file-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#file-list::-webkit-scrollbar-thumb {
+    background: rgba(156, 163, 175, 0.5);
+    border-radius: 2px;
+}
+
+/* Mobile optimizations */
+@media (max-width: 640px) {
+    :root {
+        --tabs-height: 2.25rem;
+        --panel-content-height: 3rem;
+        --chat-input-height: 4rem;
+        --panel-spacing: 0.5rem;
+    } 
+    
+    .form-input {
+        min-height: 44px;
+    }
+}
+
+/* Panel content styling */
+.panel-content {
+    min-height: var(--panel-content-height);
+    overflow: hidden;
+    transition: height 0.2s ease-in-out;
+}
+
+/* Token panel container */
+.token-panel-container {
+    max-width: 4xl;
+    margin: 0 auto;
+}
+
+.panel-content.expanded {
+    height: auto;
+    max-height: calc(30vh - var(--tabs-height));
+}
+
+.dark #usage-panel {
+    border-color: rgba(75, 85, 99, 0.5);
+}
+
+.btn.btn-primary {
+    background-color: rgb(79, 70, 229);
 }

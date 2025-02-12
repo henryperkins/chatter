@@ -83,28 +83,66 @@ class MessageRenderer {
     }
 
     static renderUserMessage(content, files = []) {
-        const template = this.templates.user;
-        const clone = template.content.cloneNode(true);
-        const messageText = clone.querySelector('p');
-        const timestamp = clone.querySelector('span.text-xs');
-        const copyButton = clone.querySelector('.copy-button');
-
-        // Assign user content
+      if (!content || typeof content !== 'string') {
+        console.error('Invalid message content:', content);
+        content = ''; // ensure we handle unexpected input
+      }
+  
+      const template = this.templates.user;
+      if (!template?.content) {
+        console.error('User message template missing. Rendering fallback.');
+        const div = document.createElement('div');
+        div.className = 'fallback-user-message';
+        div.textContent = content || 'User message';
+        return div;
+      }
+  
+      const clone = template.content.cloneNode(true);
+      const messageText = clone.querySelector('p');
+      const timestamp = clone.querySelector('span.text-xs');
+      const copyButton = clone.querySelector('.copy-button');
+  
+      // Assign user content with null checks
+      if (messageText) {
         messageText.textContent = content;
+      } else {
+        console.error('Message text element not found in template');
+      }
+  
+      // Add timestamp with null check
+      if (timestamp) {
         timestamp.textContent = new Date().toLocaleTimeString();
-
-        // Set up copy button
-        if (copyButton) {
-            copyButton.setAttribute('data-raw-content', content);
-        }
-
-        // If user included attachments, render them
-        if (files && files.length > 0) {
-            const attachments = this.renderAttachments(files);
+      }
+  
+      // Set up copy button if available
+      if (copyButton) {
+        copyButton.setAttribute('data-raw-content', content);
+      } else if (content.length > 100) {
+        console.warn('Copy button missing for long user message');
+      }
+  
+      // If user included attachments, render them with error handling
+      if (files?.length > 0) {
+        try {
+          const attachments = this.renderAttachments(files);
+          if (messageText?.parentNode) {
             messageText.parentNode.appendChild(attachments);
+          } else {
+            console.error('Parent node missing for attachments');
+          }
+        } catch (error) {
+          console.error('Failed to render attachments:', error);
         }
-
-        return clone.firstElementChild;
+      }
+  
+      return clone.firstElementChild || this.createFallbackUserMessage(content);
+    }
+  
+    static createFallbackUserMessage(content) {
+      const div = document.createElement('div');
+      div.className = 'fallback-user-message bg-blue-50 dark:bg-gray-800 p-4 rounded-xl my-2';
+      div.textContent = content || 'User message (fallback rendering)';
+      return div;
     }
 
     static renderAttachments(files) {
