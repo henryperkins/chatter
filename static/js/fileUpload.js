@@ -559,18 +559,63 @@
             }
 
             async setupMobileSpecificHandling() {
-                // Handle iOS HEIC/HEIF conversion
+                // Handle iOS HEIC/HEIF conversion and other mobile-specific formats
                 this.uploadButton.addEventListener('change', async (e) => {
                     const files = Array.from(e.target.files);
                     const convertedFiles = await Promise.all(
                         files.map(async file => {
-                            if (['image/heic', 'image/heif'].includes(file.type)) {
+                            // Handle HEIC/HEIF images
+                            if (['image/heic', 'image/heif', 'image/heic-sequence'].includes(file.type)) {
                                 return this.convertHEICtoJPG(file);
+                            }
+                            // Handle other image types that might need orientation fixing
+                            if (file.type.startsWith('image/')) {
+                                const orientedBlob = await this.fixImageOrientation(file);
+                                return new File([orientedBlob], file.name, {
+                                    type: file.type,
+                                    lastModified: file.lastModified
+                                });
                             }
                             return file;
                         })
                     );
                     this.handleNewFiles(convertedFiles);
+                });
+
+                // Monitor network changes
+                if ('connection' in navigator) {
+                    navigator.connection.addEventListener('change', () => {
+                        this.networkType = navigator.connection.type || 'unknown';
+                        this.adjustUploadParamsForNetwork();
+                    });
+                }
+            }
+
+            adjustUploadParamsForNetwork() {
+                // Adjust chunk size based on network quality
+                switch (this.networkType) {
+                    case '4g':
+                        this.CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+                        break;
+                    case '3g':
+                        this.CHUNK_SIZE = 1 * 1024 * 1024; // 1MB
+                        break;
+                    default:
+                        this.CHUNK_SIZE = 512 * 1024; // 512KB
+                }
+            }
+
+            async fixImageOrientation(blob) {
+                const image = await createImageBitmap(blob);
+                const canvas = document.createElement('canvas');
+                canvas.width = image.width;
+                canvas.height = image.height;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(image, 0, 0);
+                
+                return new Promise(resolve => {
+                    canvas.toBlob(resolve, 'image/jpeg', 0.8);
                 });
             }
 
@@ -582,8 +627,16 @@
                         toType: 'image/jpeg',
                         quality: 0.8
                     });
-                    return new File([convertedBlob], `${file.name.split('.')[0]}.jpg`, {
-                        type: 'image/jpeg'
+
+                    // Fix orientation issues
+                    const orientedBlob = await this.fixImageOrientation(convertedBlob);
+                    
+                    // Preserve original filename but change extension
+                    const newName = file.name.replace(/\.[^/.]+$/, '.jpg');
+                    
+                    return new File([orientedBlob], newName, {
+                        type: 'image/jpeg',
+                        lastModified: file.lastModified
                     });
                 } catch (error) {
                     console.error('HEIC conversion failed:', error);
