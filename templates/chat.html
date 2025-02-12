@@ -24,24 +24,9 @@
                     <span class="font-medium">New Chat</span>
                 </button>
 
-                <!-- Chat Tabs - Desktop -->
-                <div class="hidden md:flex items-center gap-2 overflow-x-auto no-scrollbar">
-                    {% for chat in conversations %}
-                    <a href="{{ url_for('chat.chat_interface', chat_id=chat.id) }}" 
-                       class="chat-tab cursor-pointer {% if chat.id == chat_id %}chat-tab-active{% else %}chat-tab-default{% endif %}"
-                       data-chat-id="{{ chat.id }}">
-                        <span class="truncate max-w-[200px]">{{ chat.title }}</span>
-                        <button class="chat-tab-close ml-2" data-chat-id="{{ chat.id }}"
-                            aria-label="Delete chat">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </a>
-                    {% endfor %}
-                </div>
-
-                <!-- Chat Selector - Mobile -->
-                <select id="mobile-chat-selector"
-                    class="md:hidden flex-1 px-3 py-2 bg-white/95 dark:bg-gray-800/95 border border-gray-200/80 dark:border-gray-700/80 rounded-xl"
+                <!-- Chat Selector -->
+                <select id="chat-selector"
+                    class="flex-1 px-3 py-2 bg-white/95 dark:bg-gray-800/95 border border-gray-200/80 dark:border-gray-700/80 rounded-xl"
                     aria-label="Select chat">
                     {% for chat in conversations %}
                     <option value="{{ chat.id }}" {% if chat_id and chat.id|string|safe == chat_id|string|safe %}selected{% endif %}>
@@ -65,7 +50,7 @@
                         <path fill="currentColor" d="M12 2L2 7l10 5l10-5l-10-5zM2 17l10 5l10-5M2 12l10 5l10-5"/>
                     </svg>
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Model:</span>
-                    <select id="model-select" 
+                    <select id="model-select"
                         class="bg-transparent font-medium focus:ring-0 border-0"
                         aria-label="Select model"
                         data-original-value="{{ current_model.id if current_model else '' }}">
@@ -101,12 +86,58 @@
                 </div>
                 {% endif %}
 
-                <!-- Edit Title Buttonb  -->
+                <!-- Edit Title Button -->
                 <button id="edit-title-btn" class="btn-icon group relative"
                     data-tooltip="Edit chat title">
                     <i class="fas fa-pen"></i>
                     <span class="tooltip">Edit title</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tokens/Files Usage Tabs -->
+    <div id="usage-panel" class="w-full bg-white/95 dark:bg-gray-800/95 p-2 rounded-t-md shadow-inner border-t border-gray-200 dark:border-gray-700">
+        <!-- Tab Buttons -->
+        <div class="usage-tabs flex gap-4 border-b border-gray-200 dark:border-gray-700 mb-2 px-2">
+            <button class="tab flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100/90 dark:hover:bg-gray-700/90 transition-colors tab-active"
+                    data-panel="token-usage-panel">
+                <i class="fas fa-chart-pie"></i>
+                Tokens
+            </button>
+            <button class="tab flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100/90 dark:hover:bg-gray-700/90 transition-colors"
+                    data-panel="file-usage-panel">
+                <i class="fas fa-file-upload"></i>
+                Files
+            </button>
+        </div>
+
+        <!-- Token Usage Panel -->
+        <div id="token-usage-panel" class="panel-content">
+            <div class="token-panel-container">
+                {% include 'partials/token_panel.html' %}
+            </div>
+        </div>
+
+        <!-- File Usage Panel -->
+        <div id="file-usage-panel" class="panel-content hidden">
+            <div class="p-2">
+                <!-- File List -->
+                <div id="file-list" class="space-y-2 max-h-32 overflow-y-auto mb-3">
+                    <!-- Files will be dynamically inserted here -->
+                </div>
+
+                <!-- Upload Button -->
+                <div class="flex justify-between items-center">
+                    <button id="upload-trigger"
+                            class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors">
+                        <i class="fas fa-upload"></i>
+                        Upload File
+                    </button>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                        Max size: 10MB
+                    </span>
+                </div>
             </div>
         </div>
     </div>
@@ -147,59 +178,11 @@
                         <p class="text-xs mt-2">Your messages are end-to-end encrypted</p>
                     </div>
                 {% endif %}
-                </div>
             </div>
         </div>
     </div>
-
-<!-- Multi-Tab Usage Panel -->
-<div id="usage-panel" class="w-full bg-white/95 dark:bg-gray-800/95 p-2 rounded-t-md shadow-inner border-t border-gray-200 dark:border-gray-700">
-    <!-- Tab Buttons -->
-    <div class="usage-tabs flex gap-4 border-b border-gray-200 dark:border-gray-700 mb-2 px-2">
-        <button class="tab flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100/90 dark:hover:bg-gray-700/90 transition-colors tab-active" 
-                data-panel="token-usage-panel">
-            <i class="fas fa-chart-pie"></i>
-            Token Usage
-        </button>
-        <button class="tab flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100/90 dark:hover:bg-gray-700/90 transition-colors" 
-                data-panel="file-usage-panel">
-            <i class="fas fa-file-upload"></i>
-            Files
-        </button>
-    </div>
-
-    <!-- Token Usage Panel -->
-    <div id="token-usage-panel" class="panel-content">
-        <div class="token-panel-container">
-            {% include 'partials/token_panel.html' %}
-        </div>
-    </div>
-
-    <!-- File Usage Panel -->
-    <div id="file-usage-panel" class="panel-content hidden">
-        <div class="p-2">
-            <!-- File List -->
-            <div id="file-list" class="space-y-2 max-h-32 overflow-y-auto mb-3">
-                <!-- Files will be dynamically inserted here -->
-            </div>
-
-            <!-- Upload Button -->
-            <div class="flex justify-between items-center">
-                <button id="upload-trigger" 
-                        class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors">
-                    <i class="fas fa-upload"></i>
-                    Upload File
-                </button>
-                <span class="text-xs text-gray-500 dark:text-gray-400">
-                    Max size: 10MB
-                </span>
-            </div>
-        </div>
-    </div>
-</div>
 
     <!-- Chat Input Area -->
-    <!-- Removed method="POST" and action to avoid 400 error when no files are present -->
     <div id="chat-input" class="chat-input-container">
         <form id="chat-form"
               class="max-w-4xl mx-auto h-full px-4 py-4 flex flex-col justify-between"
@@ -216,19 +199,7 @@
             ></textarea>
             
             <div class="flex items-center justify-between mt-2">
-                <div class="flex items-center gap-2">
-                    <input type="file"
-                           id="file-upload"
-                           name="files[]"
-                           class="hidden mobile-file-input"
-                           multiple
-                           accept="image/*, video/*, .pdf, .doc, .docx, .txt, .md, .heic, .heif">
-                    <label for="file-upload" class="btn btn-secondary">
-                        <i class="fas fa-paperclip mr-2"></i>
-                        <span>Attach Files</span>
-                    </label>
-                </div>
-                
+                <!-- Removed redundant Attach Files button -->
                 <button type="submit" id="send-button" class="btn btn-primary">
                     <i class="fas fa-paper-plane mr-2"></i>
                     <span>Send</span>
@@ -237,82 +208,7 @@
         </form>
     </div>
 </div>
-
-<!-- Message Templates -->
-<template id="user-message-template">
-    <div class="user-message flex items-start gap-4 p-4">
-        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
-            <i class="fas fa-user text-white text-sm"></i>
-        </div>
-        <div class="flex-1 min-w-0">
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                <p class="prose dark:prose-invert max-w-none"></p>
-                <div class="mt-2 flex items-center justify-between">
-                    <span class="text-xs text-gray-500 dark:text-gray-400"></span>
-                    <button class="copy-button text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                        <i class="fas fa-copy"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-</template>
-
-<template id="assistant-message-template">
-    <div class="message-container assistant flex items-start gap-4 p-4">
-        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-green-600 flex items-center justify-center">
-            <i class="fas fa-robot text-white text-sm"></i>
-        </div>
-        <div class="message-content flex-1 min-w-0">
-            <div data-role="assistant-message" class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                <div class="prose dark:prose-invert max-w-none"></div>
-                <div class="mt-2 flex items-center justify-between">
-                    <span class="text-xs text-gray-500 dark:text-gray-400"></span>
-                    <button class="copy-button text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                        <i class="fas fa-copy"></i>
-                    </button>
-                </div>
-                <button class="toggle-more hidden mt-4 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                    Show more
-                </button>
-            </div>
-        </div>
-    </div>
-</template>
-
-<template id="typing-indicator-template">
-    <div class="message-container assistant flex items-start gap-4 p-4">
-        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-green-600 flex items-center justify-center">
-            <i class="fas fa-robot text-white text-sm"></i>
-        </div>
-        <div class="flex-1 min-w-0">
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                <div class="flex gap-2">
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-</template>
-
-<template id="attachment-template">
-    <div class="mt-2">
-        <div class="attachment-list space-y-2"></div>
-    </div>
-</template>
-
-<template id="attachment-item-template">
-    <div class="flex items-center gap-2 text-sm">
-        <i class="fas fa-paperclip text-gray-500 dark:text-gray-400"></i>
-        <a class="attachment-link text-blue-600 dark:text-blue-400 hover:underline" target="_blank">
-            <span class="attachment-name"></span>
-        </a>
-    </div>
-</template>
-
-{% endblock %}
+{% endblock content %}
 
 {% block scripts %}
 {{ super() }}
@@ -341,4 +237,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 </script>
-{% endblock %}
+{% endblock scripts %}

@@ -1,58 +1,60 @@
-<div id="token-usage" class="flex flex-col space-y-3">
-    <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <div class="flex items-center gap-2 bg-white/50 dark:bg-gray-800/50 px-4 py-2 rounded-xl">
+<div id="token-usage" class="p-4 border border-gray-200 dark:border-gray-600 rounded-md bg-white/90 dark:bg-gray-800/70 flex flex-col gap-3">
+    <!-- Horizontal row for primary token usage metrics -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-6">
+        <!-- Token Counts and Progress -->
+        <div class="flex flex-col gap-1">
+            <div class="flex items-center gap-2">
                 <span id="tokens-used" 
                       class="text-sm font-medium" 
                       role="status" 
                       aria-live="polite"
                       aria-atomic="true">0</span>
                 <span id="tokens-limit" class="text-sm text-gray-500 dark:text-gray-400">/ 0 max</span>
+                <span id="tokens-left" class="text-sm text-gray-500 dark:text-gray-400">
+                    (0 remaining)
+                </span>
+                <span id="token-percentage" class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    0%
+                </span>
             </div>
-            <span id="tokens-left" class="text-sm text-gray-500 dark:text-gray-400 bg-white/50 dark:bg-gray-800/50 px-4 py-2 rounded-xl">
-                (0 remaining)
-            </span>
+            <div class="w-full bg-gray-200/90 dark:bg-gray-700/90 rounded-xl h-2 overflow-hidden">
+                <div id="token-progress" 
+                     class="bg-gradient-to-r from-primary-500 to-secondary-500 h-full rounded-xl transition-all duration-300" 
+                     style="width: 0%">
+                </div>
+            </div>
         </div>
-        <div class="flex items-center gap-3">
-            <span id="token-percentage" class="text-sm font-medium bg-white/50 dark:bg-gray-800/50 px-4 py-2 rounded-xl">
-                0%
-            </span>
-            <button id="toggle-stats-btn" 
-                    class="btn-icon" 
-                    title="Toggle token usage statistics"
-                    aria-label="Toggle token usage statistics">
-                <i class="fas fa-chart-pie" aria-hidden="true"></i>
-            </button>
-        </div>
+        <!-- Optional toggle button -->
+        <button id="toggle-stats-btn" 
+                class="btn-icon ml-auto sm:ml-0" 
+                title="Toggle token usage statistics"
+                aria-label="Toggle token usage statistics">
+            <i class="fas fa-chart-pie" aria-hidden="true"></i>
+        </button>
     </div>
-
-    <div class="w-full bg-gray-200/90 dark:bg-gray-700/90 rounded-xl h-2 overflow-hidden">
-        <div id="token-progress" class="bg-gradient-to-r from-primary-500 to-secondary-500 h-full rounded-xl transition-all duration-300" style="width: 0%">
-        </div>
-    </div>
-
-    <div id="token-breakdown" class="bg-gray-50/90 dark:bg-gray-700/50 rounded-xl p-4">
-        <div class="flex justify-between items-center mb-3">
+    <!-- Distribution Panel (arranged horizontally) -->
+    <div id="token-breakdown" class="bg-gray-50/90 dark:bg-gray-700/50 rounded-xl px-4 py-3 flex items-center gap-6 flex-wrap justify-start sm:justify-between">
+        <div class="flex items-center gap-4">
             <span class="font-medium text-gray-700 dark:text-gray-300">Token Distribution</span>
             <span id="avg-tokens" class="text-xs text-gray-500 dark:text-gray-400">Avg: 0 per message</span>
         </div>
-
-        <div class="grid grid-cols-3 gap-4">
-            <div class="token-stat-card">
+        <!-- Stats Cards -->
+        <div class="flex items-center gap-6">
+            <div class="token-stat-card flex flex-col items-center">
                 <div class="flex items-center gap-2">
                     <i class="fas fa-user text-primary-500"></i>
                     <span class="font-medium">User</span>
                 </div>
                 <span id="user-tokens" class="mt-2">0</span>
             </div>
-            <div class="token-stat-card">
+            <div class="token-stat-card flex flex-col items-center">
                 <div class="flex items-center gap-2">
                     <i class="fas fa-robot text-secondary-500"></i>
                     <span class="font-medium">Assistant</span>
                 </div>
                 <span id="assistant-tokens" class="mt-2">0</span>
             </div>
-            <div class="token-stat-card">
+            <div class="token-stat-card flex flex-col items-center">
                 <div class="flex items-center gap-2">
                     <i class="fas fa-cog text-purple-500"></i>
                     <span class="font-medium">System</span>
@@ -60,8 +62,8 @@
                 <span id="system-tokens" class="mt-2">0</span>
             </div>
         </div>
-
-        <div class="flex justify-between items-center mt-3 pt-3 border-t border-gray-200 dark:border-gray-600">
+        <!-- Messages & Largest Info -->
+        <div class="flex items-center gap-4 border-l border-gray-200 dark:border-gray-600 pl-4">
             <span id="message-count" class="text-xs text-gray-500 dark:text-gray-400">Messages: 0</span>
             <span id="largest-message" class="text-xs text-gray-500 dark:text-gray-400">Largest: 0 tokens</span>
         </div>

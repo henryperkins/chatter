@@ -23,18 +23,18 @@
   }
 }
 
-/* Raise the z-index significantly above typical chat input container values 
-   and place the panel higher, so it's clearly above the chat input. Adjust as needed. */
+/* Remove the forced fixed positioning so the token panel stays within the new tab layout.
+   This allows the .token-panel-container to flow where it's placed in chat.html. */
 .token-panel-container {
-  position: fixed !important;
-  right: 1rem !important;
-  bottom: 14rem !important; /* Increase this if needed to clear chat input */
-  max-width: calc(100% - 2rem) !important;
-  z-index: 99999 !important; /* Very high to ensure it's on top of everything */
+  position: static !important;
+  right: auto !important;
+  bottom: auto !important;
+  max-width: 100% !important;
+  z-index: auto !important;
   overflow: auto !important;
 }
 
-/* If needed, ensure the chat input container isn't overlapping by limiting its z-index. 
+/* If needed, ensure the chat input container isn't overlapping by limiting its z-index.
    Adjust to your existing structure or rename if needed. */
 .chat-input-container {
   z-index: 2000 !important;
