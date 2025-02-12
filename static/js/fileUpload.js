@@ -667,6 +667,12 @@
                             <i class="fas fa-pause"></i>
                         </button>
                     </div>
+                </div>
+                <div class="mobile-tips">
+                  <span class="ios-warning" style="display: none;">
+                    Tip for iOS: Keep Safari in the foreground for uninterrupted upload.
+                  </span>
+                </div>
                 `;
         
                 this.progressBar.innerHTML = progressHTML;
