@@ -5,6 +5,7 @@ module.exports = {
     './templates/**/*.jinja2',
     './static/js/**/*.js',
     './static/css/**/*.css',
+    './node_modules/flyonui/dist/js/*.js'
   ],
   theme: {
     extend: {
@@ -191,6 +192,8 @@ module.exports = {
     require('@tailwindcss/forms'),
     require('@tailwindcss/typography'),
     require('tailwind-scrollbar'),
+    require("flyonui"),
+    require("flyonui/plugin"),
   ],
   darkMode: 'class',
 };
