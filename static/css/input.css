@@ -61,7 +61,7 @@
     }
 
     .message-container {
-      @apply max-w-[90%];
+      @apply max-w-[90%] !important;
     }
   }
 }

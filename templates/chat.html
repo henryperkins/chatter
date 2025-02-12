@@ -111,11 +111,9 @@
 </div>
 {% endblock chat_tabs %}
 
-{% block nav_classes %}top-0{% endblock %}
-
-{% block main_classes %}relative flex-1{% endblock %}
-
 {% block content %}
+{% block nav_classes %}top-0{% endblock %}
+{% block main_classes %}relative flex-1{% endblock %}
 <!-- Server-rendered messages below -->
 <div id="chat-container" class="chat-container">
     <div id="chat-config" class="hidden"
@@ -132,7 +130,7 @@
     <!-- Main Chat Area -->
     <div class="flex-1 relative overflow-hidden">
         <div id="chat-box" class="chat-messages-scroll" role="log" aria-live="polite">
-                <div class="max-w-4xl mx-auto w-full px-4">
+            <div class="max-w-4xl mx-auto w-full px-4">
                 {% if messages %}
                     {% for message in messages %}
                         {% if message.role == 'assistant' %}
