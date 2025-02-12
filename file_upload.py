@@ -20,7 +20,10 @@ class FileUploadHandler:
         self.QUARANTINE_FOLDER = os.path.join(config_instance.UPLOAD_FOLDER, "quarantine")
         self.MIME_TYPE_MAP = config_instance.MIME_TYPE_MAP
         self.SCAN_TIMEOUT = 30  # seconds for virus scan
-        current_app.logger.debug(f"FileUploadHandler initialized with ALLOWED_EXTENSIONS={self.ALLOWED_EXTENSIONS}, MAX_FILE_SIZE={self.MAX_FILE_SIZE}, MAX_TOTAL_SIZE={self.MAX_TOTAL_SIZE}")
+        current_app.logger.debug(
+            f"FileUploadHandler initialized with ALLOWED_EXTENSIONS={self.ALLOWED_EXTENSIONS}, "
+            f"MAX_FILE_SIZE={self.MAX_FILE_SIZE}, MAX_TOTAL_SIZE={self.MAX_TOTAL_SIZE}"
+        )
 
         # Ensure the quarantine folder exists
         os.makedirs(self.QUARANTINE_FOLDER, exist_ok=True)
@@ -87,9 +90,10 @@ class FileUploadHandler:
                         return False, errors
                     pass
 
-            if mime_type not in config_instance.ALLOWED_MIME_TYPES and not any(
-                mime_type.startswith(allowed_prefix)
-                for allowed_prefix in ['text/', 'application/json']
+            if (
+                mime_type not in config_instance.ALLOWED_MIME_TYPES
+                and not any(mime_type.startswith(allowed_prefix)
+                            for allowed_prefix in ['text/', 'application/json'])
             ):
                 errors.append(f"MIME type {mime_type} not allowed")
                 return False, errors
@@ -108,7 +112,7 @@ class FileUploadHandler:
         return True, errors
 
     def estimate_tokens(self, file) -> int:
-        """Estimate tokens for a file based on its size and type"""
+        """Estimate tokens for a file based on its size and type."""
         file.seek(0)
         content = file.read()
         file.seek(0)
@@ -149,7 +153,10 @@ class FileUploadHandler:
                 usage = TokenUsage.get_usage(user_id)
                 estimated_tokens = sum(self.estimate_tokens(f) for f in files)
                 if usage["remaining"] < estimated_tokens:
-                    msg = f"Token limit exceeded. Required: {estimated_tokens}, Remaining: {usage['remaining']}"
+                    msg = (
+                        f"Token limit exceeded. Required: {estimated_tokens}, "
+                        f"Remaining: {usage['remaining']}"
+                    )
                     current_app.logger.error(msg)
                     errors.append(msg)
                     return valid_files, errors
@@ -159,8 +166,6 @@ class FileUploadHandler:
         for file in files:
             file.seek(0)
             current_app.logger.debug(f"Validating file: {file.filename}")
-            # Basic validation
-            current_app.logger.debug(f"Starting validation for file: {file.filename}")
             is_allowed, validation_errors = self.allowed_file(file.filename, file)
             if not is_allowed:
                 error_msg = f"File validation failed for {file.filename}: {validation_errors}"
@@ -174,7 +179,10 @@ class FileUploadHandler:
             current_app.logger.debug(f"File size: {file_size} bytes")
 
             if file_size > self.MAX_FILE_SIZE:
-                error_msg = f"File too large: {file.filename} ({file_size} bytes) exceeds the {self.MAX_FILE_SIZE} byte limit."
+                error_msg = (
+                    f"File too large: {file.filename} ({file_size} bytes) exceeds "
+                    f"the {self.MAX_FILE_SIZE} byte limit."
+                )
                 current_app.logger.error(error_msg)
                 errors.append(error_msg)
                 continue
@@ -212,7 +220,9 @@ class FileUploadHandler:
             valid_files.append(file)
             current_app.logger.debug(f"File {file.filename} passed all validations")
 
-        current_app.logger.debug(f"Validation complete. Valid files: {len(valid_files)}, Errors: {len(errors)}")
+        current_app.logger.debug(
+            f"Validation complete. Valid files: {len(valid_files)}, Errors: {len(errors)}"
+        )
         return valid_files, errors
 
     def calculate_file_hash(self, file) -> str:
@@ -237,7 +247,7 @@ class FileUploadHandler:
     def validate_file_content(self, file) -> bool:
         """
         Verify file content matches its extension with more lenient text file handling.
-
+        
         Args:
             file: The file object.
 
@@ -282,7 +292,7 @@ class FileUploadHandler:
         if ext == 'py':
             try:
                 file.seek(0)
-                content = file.read(1024).decode('utf-8')
+                file.read(1024).decode('utf-8')
                 file.seek(0)
                 current_app.logger.debug(f"Python file {file.filename} validated as UTF-8 text")
                 return True
@@ -294,7 +304,7 @@ class FileUploadHandler:
         if ext == 'md':
             try:
                 file.seek(0)
-                content = file.read(1024).decode('utf-8')
+                file.read(1024).decode('utf-8')
                 file.seek(0)
                 current_app.logger.debug(f"Markdown file {file.filename} validated as UTF-8 text")
                 return True
@@ -309,7 +319,9 @@ class FileUploadHandler:
 
         expected_mime = mime_map.get(ext, "")
         result = mime.startswith(expected_mime) if expected_mime else False
-        current_app.logger.debug(f"File {file.filename} content validation result: {result} (expected: {expected_mime})")
+        current_app.logger.debug(
+            f"File {file.filename} content validation result: {result} (expected: {expected_mime})"
+        )
         return result
 
     def scan_for_viruses(self, file) -> str:
@@ -400,18 +412,25 @@ class FileUploadHandler:
                 "last_accessed": time.time(),
                 "mime_type": file_info.get('mime_type', 'application/octet-stream'),
                 "size": file_info.get('size', 0),
-                "description": file_info.get('description') or ''  # Ensure empty string if None
+                "description": file_info.get('description') or ''
             }
 
             # Index the document
             search_config.index_document(document)
-            current_app.logger.info(f"Successfully indexed file {file_info['filename']} in Azure Search")
+            current_app.logger.info(
+                f"Successfully indexed file {file_info['filename']} in Azure Search"
+            )
 
         except Exception as e:
             current_app.logger.error(f"Failed to index file in Azure Search: {str(e)}")
             raise
 
-    def save_files(self, files: List, chat_id: str, descriptions: Optional[Dict[str, str]] = None) -> List[Dict]:
+    def save_files(
+        self,
+        files: List,
+        chat_id: str,
+        descriptions: Optional[Dict[str, str]] = None
+    ) -> List[Dict]:
         """
         Save validated files to the upload folder and database with metadata.
         Uses context management for optimized file handling and token tracking.
@@ -438,7 +457,6 @@ class FileUploadHandler:
         total_tokens = 0
         for file in files:
             original_filename = secure_filename(file.filename)
-            # Get next version number
             base_name = os.path.splitext(original_filename)[0]
             ext = os.path.splitext(original_filename)[1]
             import uuid
@@ -452,12 +470,7 @@ class FileUploadHandler:
             try:
                 # Get MIME type with robust fallback mechanism
                 file.seek(0)
-            except Exception as e:
-                current_app.logger.error(f"Error seeking file: {str(e)}")
-                raise
                 mime_type = 'application/octet-stream'  # Default MIME type
-
-                # Try python-magic first
                 try:
                     import magic
                     detected_mime = magic.from_buffer(file.read(1024), mime=True)
@@ -467,7 +480,6 @@ class FileUploadHandler:
                 except (ImportError, Exception) as e:
                     current_app.logger.warning(f"python-magic detection failed: {str(e)}")
 
-                # If python-magic didn't work, try mimetypes module
                 if mime_type == 'application/octet-stream':
                     try:
                         import mimetypes
@@ -479,7 +491,6 @@ class FileUploadHandler:
                     except Exception as e:
                         current_app.logger.warning(f"mimetypes detection failed: {str(e)}")
 
-                # Final fallback to extension-based detection
                 if mime_type == 'application/octet-stream':
                     ext = original_filename.rsplit(".", 1)[1].lower()
                     mime_type = self.MIME_TYPE_MAP.get(ext, 'application/octet-stream')
@@ -492,62 +503,53 @@ class FileUploadHandler:
                 bytes_written = 0
                 chunk_size = 8192  # 8KB chunks
 
-                with open(filepath, 'wb') as f:
+                with open(filepath, 'wb') as f_out:
                     while True:
                         chunk = file.read(chunk_size)
                         if not chunk:
                             break
-                        f.write(chunk)
+                        f_out.write(chunk)
                         bytes_written += len(chunk)
                         if total_size > 0:
                             progress = (bytes_written / total_size) * 100
                             current_app.logger.debug(f"Upload progress for {original_filename}: {progress:.1f}%")
 
-            # Handle content based on file type
-            content = ""
-            compressed_content = ""
-            file_tokens = 0
-            if mime_type.startswith('text/') or mime_type in ['application/json', 'text/markdown']:
-                try:
-                    with open(filepath, 'r', encoding='utf-8') as f:
-                        content = f.read()
+                content = ""
+                compressed_content = ""
+                file_tokens = 0
+                if mime_type.startswith('text/') or mime_type in ['application/json', 'text/markdown']:
+                    try:
+                        with open(filepath, 'r', encoding='utf-8') as f_in:
+                            content = f_in.read()
 
-                    # Validate text content is readable
-                    if not self._is_valid_text(content):
-                        raise ValueError(f"Invalid text content in {original_filename}")
-
-                    # Use context monitor for compression only on text files
-                    compressed_content = context_monitor.compress_file_content(
-                        content,
-                        context_monitor.calculate_optimal_window_size(len(content))
+                        compressed_content = context_monitor.compress_file_content(
+                            content,
+                            context_monitor.calculate_optimal_window_size(len(content))
+                        )
+                        file_tokens = len(compressed_content.split())
+                    except UnicodeDecodeError:
+                        current_app.logger.warning(
+                            f"Could not read {original_filename} as text, skipping content processing"
+                        )
+                else:
+                    current_app.logger.debug(
+                        f"Skipping content processing for binary file: {original_filename}"
                     )
-
-                    # Only count tokens for text files
-                    file_tokens = len(compressed_content.split())
-
-                except (UnicodeDecodeError, ValueError) as e:
-                    current_app.logger.warning(f"Content processing failed for {original_filename}: {str(e)}")
-                    errors.append(f"Skipped file: {original_filename} - {str(e)}")
-                    continue
-            else:
-                current_app.logger.debug(f"Skipping content processing for binary file: {original_filename}")
-
-                # For binary files, use a token estimation based on file size
-                file_tokens = os.path.getsize(filepath) // 4  # Rough estimate
+                    file_tokens = os.path.getsize(filepath) // 4  # Rough estimate for binary
 
                 total_tokens += file_tokens
                 context_monitor.track_token_usage(file_tokens)
 
-                # Create database record and get the file record
-                file_id = int(UploadedFile.create(
-                    chat_id=chat_id,
-                    filename=original_filename,
-                    filepath=filepath,
-                    mime_type=mime_type,
-                    description=description
-                ))
-                
-                # Get the updated file record with the new filepath
+                file_id = int(
+                    UploadedFile.create(
+                        chat_id=chat_id,
+                        filename=original_filename,
+                        filepath=filepath,
+                        mime_type=mime_type,
+                        description=description
+                    )
+                )
+
                 file_record = UploadedFile.get_by_id(file_id)
                 if not file_record:
                     raise Exception(f"Failed to retrieve file record for ID: {file_id}")
@@ -560,22 +562,22 @@ class FileUploadHandler:
                     "mime_type": mime_type,
                     "description": description,
                     "token_count": file_tokens,
-                    "is_truncated": len(compressed_content) < len(content)
+                    "is_truncated": len(compressed_content) < len(content),
                 }
 
                 saved_files.append(file_info)
 
-                # Cache the processed content
                 cache_key = hash((original_filename, os.path.getsize(filepath)))
                 context_manager.context_cache[cache_key] = [{"content": compressed_content}]
                 UploadedFile.store_tokenized_content(file_info["id"], compressed_content)
 
-                # Index the file in Azure AI Search
                 if mime_type.startswith('text/') or mime_type in ['application/json', 'text/markdown']:
                     try:
                         self.index_file_in_search(file_info)
                     except Exception as index_error:
-                        current_app.logger.error(f"Failed to index file in Azure Search: {str(index_error)}")
+                        current_app.logger.error(
+                            f"Failed to index file in Azure Search: {str(index_error)}"
+                        )
                         # Don't fail the upload if indexing fails
                         pass
 
@@ -586,7 +588,9 @@ class FileUploadHandler:
                     try:
                         os.remove(filepath)
                     except Exception as cleanup_error:
-                        current_app.logger.error(f"Failed to clean up file {filepath}: {cleanup_error}")
+                        current_app.logger.error(
+                            f"Failed to clean up file {filepath}: {cleanup_error}"
+                        )
 
         if errors:
             current_app.logger.warning(f"Encountered errors while saving files: {errors}")
@@ -603,16 +607,16 @@ class FileUploadHandler:
 
         Args:
             chat_id (str): The chat ID associated with the uploaded files.
+            user_id (Optional[int]): The ID of the user uploading files.
 
         Returns:
-            Response: A Flask JSON response with detailed file metadata.
+            Response: A Flask JSON response with file metadata or error details.
         """
         current_app.logger.debug(f"handle_upload called for chat_id: {chat_id}")
         try:
             if "file" not in request.files:
                 return jsonify({"error": "No files provided"}), 400
 
-            # Get files and their descriptions
             files = request.files.getlist("file")
             descriptions = {}
 
@@ -622,7 +626,6 @@ class FileUploadHandler:
                     filename = key.replace('description_', '')
                     descriptions[filename] = value
 
-            # Log incoming files for debugging
             for file in files:
                 current_app.logger.debug(f"Processing file: {file.filename}")
                 if hasattr(file, 'content_type'):
@@ -643,7 +646,6 @@ class FileUploadHandler:
 
             saved_files = self.save_files(valid_files, chat_id, descriptions)
 
-            # Enhance response with more metadata
             response_files = []
             for file_info in saved_files:
                 file_data = {
@@ -662,7 +664,6 @@ class FileUploadHandler:
                 "message": f"Successfully uploaded {len(saved_files)} files",
                 "total_size": sum(f["size"] for f in saved_files)
             })
-
         except Exception as e:
             current_app.logger.error(f"Error in handle_upload: {str(e)}", exc_info=True)
             return jsonify({
