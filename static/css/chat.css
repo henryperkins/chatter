@@ -36,6 +36,46 @@
     @apply hover:bg-gray-200/50 dark:hover:bg-gray-700/50;
   }
 
+  /* Tab Styling */
+  .usage-tabs .tab {
+      @apply relative;
+  }
+
+  .usage-tabs .tab.tab-active {
+      @apply bg-gray-100/90 dark:bg-gray-700/90;
+  }
+
+  .usage-tabs .tab.tab-active::after {
+      content: '';
+      @apply absolute -bottom-0.5 left-0 right-0 h-0.5 bg-blue-600;
+  }
+
+  /* File List Styling */
+  .file-item {
+      @apply flex items-center justify-between bg-gray-100/50 dark:bg-gray-700/50 rounded-md px-3 py-2;
+  }
+
+  .file-item .file-name {
+      @apply text-sm text-gray-700 dark:text-gray-300 truncate mr-2;
+  }
+
+  .file-item .file-size {
+      @apply text-xs text-gray-500 dark:text-gray-400;
+  }
+
+  .file-item .remove-btn {
+      @apply p-1 text-gray-400 hover:text-red-400 transition-colors;
+  }
+
+  /* Panel Animation */
+  .panel-content {
+      @apply transition-opacity duration-200 ease-in-out;
+  }
+
+  .panel-content.hidden {
+      @apply hidden opacity-0;
+  }
+
   /* Message containers */
   .message-container {
     @apply mb-6 max-w-4xl mx-auto w-full;
