@@ -39,8 +39,6 @@ class UploadedFile(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, onupdate=func.now())
     
-    # Relationship with Chat model
-    chat = relationship("Chat", back_populates="files")
 
     def __init__(self, **kwargs):
         """Initialize an UploadedFile instance."""
