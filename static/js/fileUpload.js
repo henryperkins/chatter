@@ -89,7 +89,7 @@
 
                     // Upload button click (desktop) and touch (mobile)
                     this.uploadButton?.addEventListener('click', () => this.fileInput.click());
-                    this.uploadButton?.addEventListener('touchend', (e) => {
+                    this.uploadButton?.addEventListener('touchstart', (e) => {
                         this.fileInput.click();
                     });
 
