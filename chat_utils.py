@@ -448,3 +448,26 @@ def format_file_contents_for_o1(files_data: List[Dict[str, str]], message: str =
     formatted_content.append("\n=== End of Files ===\n")
     
     return "\n".join(formatted_content)
+
+def process_uploaded_files(files_list):
+    """
+    Re-introduced so chat_routes.py can import successfully.
+    This function calls process_file() to handle each file.
+    Returns a tuple of (included_files, excluded_files, total_tokens, file_contents).
+    """
+    included_files = []
+    excluded_files = []
+    total_tokens = 0
+    file_contents = []
+    for f in files_list:
+        try:
+            filename, truncated_content, token_count = process_file(f)
+            included_files.append(f)
+            file_contents.append({
+                "filename": filename,
+                "content": truncated_content
+            })
+            total_tokens += token_count
+        except ValueError as e:
+            excluded_files.append({f.filename: str(e)})
+    return (included_files, excluded_files, total_tokens, file_contents)
