@@ -1052,6 +1052,18 @@ def get_chat_stats(chat_id: str) -> Union[FlaskResponse, Tuple[FlaskResponse, in
             error_json.status_code = 404
             return error_json
 
+        # Handle file attachments if present
+        file_ids = data.get('file_ids', [])
+        for fid in file_ids:
+            file_record = UploadedFile.get_by_id(fid)
+            if file_record and file_record.text_content:
+                # Insert file content into conversation
+                conversation_manager.add_message(
+                    chat_id=chat_id,
+                    role="system", 
+                    content=f"[File: {file_record.filename}]\n{file_record.text_content}"
+                )
+
         # Get detailed stats from conversation manager
         stats = conversation_manager.get_usage_stats(chat_id)
 

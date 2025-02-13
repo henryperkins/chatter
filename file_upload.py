@@ -121,11 +121,17 @@ class FileUploadHandler:
         return True, errors
 
     def estimate_tokens(self, file) -> int:
-        """Estimate tokens for a file based on its size and type."""
+        """Estimate tokens using tiktoken for accurate counting."""
         file.seek(0)
-        content = file.read()
+        content_bytes = file.read()
         file.seek(0)
-        return len(content) // 4  # 1 token ~4 chars
+        try:
+            text = content_bytes.decode('utf-8')
+        except UnicodeDecodeError:
+            text = content_bytes.decode('latin-1', errors='ignore')
+
+        enc = tiktoken.get_encoding("cl100k_base")
+        return len(enc.encode(text))
 
     def validate_files(self, files: List, user_id: Optional[int] = None) -> Tuple[List, List]:
         """

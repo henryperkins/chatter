@@ -185,6 +185,23 @@ def process_file(file) -> Tuple[str, str, int]:
     if not ext:
         raise ValueError("File must have an extension")
 
+    # Extract text content based on mime type
+    if mime_type in ['application/pdf', 'application/msword',
+                   'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
+        try:
+            file.seek(0)
+            extracted_text = extract_text_from_file(file, mime_type)
+        except ValueError as e:
+            current_app.logger.error(f"Extraction failed for {filename}: {e}")
+            extracted_text = ""
+    else:
+        # For text/* or fallback if we suspect it's textual
+        file.seek(0)
+        try:
+            extracted_text = file.read().decode('utf-8')
+        except UnicodeDecodeError:
+            extracted_text = ""
+
     # Check file size
     file.seek(0, os.SEEK_END)
     file_length = file.tell()
