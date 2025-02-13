@@ -1,4 +1,4 @@
-// Enhanced logic to keep the usage panel connected above the chat input
+// Enhanced chat interface with mobile optimizations
 
 "use strict";
 
@@ -12,27 +12,138 @@ const CONFIG = {
     DEBUG: true
 };
 
-// Dynamically position the usage panel above the chat input
+// -----------------------------------------------------------------------------
+// Enhanced usage panel management
+// -----------------------------------------------------------------------------
+class UsagePanelManager {
+    constructor() {
+        this.panel = document.getElementById('usage-panel');
+        this.chatInput = document.getElementById('chat-input');
+        this.tabs = document.querySelectorAll('.usage-tabs .tab');
+        this.panels = document.querySelectorAll('.panel-content');
+        this.dragStartY = 0;
+        this.startHeight = 0;
+        this.currentHeight = 0;
+        this.isExpanded = false;
+
+        this.setupEventListeners();
+        this.setupTouchHandling();
+    }
+
+    setupEventListeners() {
+        // Tab switching with loading states
+        this.tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetId = tab.getAttribute('data-panel');
+                this.switchTab(tab, targetId);
+            });
+        });
+
+        // Add handle for touch/drag interactions
+        const handle = document.createElement('div');
+        handle.className = 'panel-handle';
+        this.panel.insertBefore(handle, this.panel.firstChild);
+    }
+
+    setupTouchHandling() {
+        const handle = this.panel.querySelector('.panel-handle');
+        if (!handle) return;
+
+        handle.addEventListener('touchstart', (e) => {
+            this.dragStartY = e.touches[0].clientY;
+            this.startHeight = this.panel.offsetHeight;
+            this.panel.classList.add('dragging');
+        });
+
+        handle.addEventListener('touchmove', (e) => {
+            if (!this.dragStartY) return;
+            
+            const deltaY = this.dragStartY - e.touches[0].clientY;
+            const newHeight = Math.min(
+                Math.max(this.startHeight + deltaY, 60),
+                window.innerHeight * 0.5
+            );
+            
+            this.panel.style.height = `${newHeight}px`;
+            this.currentHeight = newHeight;
+        });
+
+        handle.addEventListener('touchend', () => {
+            this.dragStartY = 0;
+            this.panel.classList.remove('dragging');
+            
+            if (this.currentHeight > 100) {
+                this.expand();
+            } else {
+                this.collapse();
+            }
+        });
+    }
+
+    switchTab(selectedTab, targetId) {
+        // Add loading state
+        selectedTab.classList.add('loading');
+        
+        // Switch tabs
+        this.tabs.forEach(t => t.classList.remove('tab-active'));
+        selectedTab.classList.add('tab-active');
+        
+        // Switch panels with transition
+        this.panels.forEach(panel => {
+            if (panel.id === targetId) {
+                panel.classList.remove('hidden');
+                setTimeout(() => {
+                    selectedTab.classList.remove('loading');
+                }, 500);
+            } else {
+                panel.classList.add('hidden');
+            }
+        });
+    }
+
+    expand() {
+        this.panel.classList.add('expanded');
+        this.panel.classList.remove('collapsed');
+        this.isExpanded = true;
+    }
+
+    collapse() {
+        this.panel.classList.remove('expanded');
+        this.panel.classList.add('collapsed');
+        this.isExpanded = false;
+    }
+
+    toggle() {
+        if (this.isExpanded) {
+            this.collapse();
+        } else {
+            this.expand();
+        }
+    }
+
+    updatePosition() {
+        if (!this.panel || !this.chatInput) return;
+
+        const inputRect = this.chatInput.getBoundingClientRect();
+        const chatInputHeight = inputRect.height || 0;
+
+        this.panel.style.position = 'fixed';
+        this.panel.style.left = '0';
+        this.panel.style.right = '0';
+        this.panel.style.bottom = `${chatInputHeight}px`;
+        this.panel.style.zIndex = '1100';
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Global usage panel manager and helper functions
+// -----------------------------------------------------------------------------
+let usagePanelManager;
+
 function updateUsagePanelPosition() {
-    const usagePanel = document.getElementById('usage-panel');
-    const chatInput = document.getElementById('chat-input');
-    if (!usagePanel || !chatInput) return;
-
-    // Calculate how tall the chat input is and reposition usage panel just above it
-    const inputRect = chatInput.getBoundingClientRect();
-    // For a fixed position usage panel, set bottom equal to chat input's total height
-    const chatInputHeight = inputRect.height || 0;
-
-    // Update usage panel's bottom to place it just above the chat input
-    usagePanel.style.position = 'fixed';
-    usagePanel.style.left = '0';
-    usagePanel.style.right = '0';
-    usagePanel.style.bottom = `${chatInputHeight}px`;
-    // Optional: bump up z-index if needed
-    usagePanel.style.zIndex = '9999';
-
-    // If there's any transform from visualViewport adjustments, reset usagePanel transform so it remains pinned
-    usagePanel.style.transform = 'none';
+    if (usagePanelManager) {
+        usagePanelManager.updatePosition();
+    }
 }
 
 // Visual viewport handling for input positioning
@@ -52,18 +163,377 @@ function handleViewportChanges() {
     updateUsagePanelPosition();
 }
 
-// Attach these listeners to keep everything aligned on viewport change
+// Attach viewport listeners
 if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', handleViewportChanges);
     window.visualViewport.addEventListener('scroll', handleViewportChanges);
 }
-
-// Also reposition usage panel when window resizes in normal situations
 window.addEventListener('resize', updateUsagePanelPosition);
 
-// ==========================================================================
-// Existing chat.js code below
-// ==========================================================================
+// -----------------------------------------------------------------------------
+// Chat Interface Initialization
+// -----------------------------------------------------------------------------
+async function startChat() {
+    try {
+        // Initialize usage panel manager
+        usagePanelManager = new UsagePanelManager();
+        
+        // Handle token usage updates
+        if (window.tokenUsageManager) {
+            const tokenPanel = document.getElementById('token-usage-panel');
+            const tokenTab = document.querySelector('[data-panel="token-usage-panel"]');
+            
+            window.tokenUsageManager.onUpdateStart = () => {
+                tokenTab?.classList.add('loading');
+                tokenPanel?.classList.add('loading');
+            };
+            
+            window.tokenUsageManager.onUpdateComplete = () => {
+                tokenTab?.classList.remove('loading');
+                tokenPanel?.classList.remove('loading');
+            };
+        }
+
+        // Handle file upload progress and file list updates
+        if (window.fileUploadManager) {
+            window.fileUploadManager.onProgress = (file, progress) => {
+                const progressBar = document.querySelector(`[data-file-id="${file.id}"] .file-progress-bar`);
+                if (progressBar) {
+                    progressBar.style.width = `${progress}%`;
+                }
+            };
+
+            window.fileUploadManager.onFilesChanged = updateFileList;
+        }
+
+        // Initialize components
+        const configDiv = document.getElementById('chat-config');
+        if (!configDiv) {
+            throw new Error('Chat configuration not found');
+        }
+
+        // Wait for dependencies (e.g. MessageRenderer)
+        let attempts = 0;
+        while (!window.MessageRenderer && attempts < CONFIG.MAX_DEPENDENCY_ATTEMPTS) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            attempts++;
+        }
+        if (!window.MessageRenderer) {
+            throw new Error('MessageRenderer not available');
+        }
+
+        // Initialize managers (file upload and token usage)
+        try {
+            if (!window.fileUploadManager) {
+                const uploadButton = document.getElementById('file-upload');
+                window.fileUploadManager = new window.FileUploadManager(
+                    configDiv.dataset.chatId,
+                    configDiv.dataset.userId,
+                    uploadButton
+                );
+                await window.fileUploadManager.initializeFileUpload();
+            }
+
+            if (!window.tokenUsageManager && window.CHAT_CONFIG?.chatId) {
+                window.tokenUsageManager = new window.TokenUsageManager(window.CHAT_CONFIG);
+                await window.tokenUsageManager.initialize();
+            }
+        } catch (error) {
+            window.monitoring?.logError('Component init failed', error);
+            window.MessageRenderer.showError('Failed to initialize chat components: ' + error.message);
+            return;
+        }
+
+        // Setup UI event listeners
+        setupUIEventListeners();
+
+        // Make sure the usage panel is positioned correctly
+        handleViewportChanges();
+        updateUsagePanelPosition();
+
+    } catch (error) {
+        window.monitoring?.logError('Failed to initialize chat:', error);
+        window.MessageRenderer.showError(error.message);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// UI Event Listeners
+// -----------------------------------------------------------------------------
+function setupUIEventListeners() {
+    const uploadTrigger = document.getElementById('upload-trigger');
+    const fileInput = document.getElementById('file-upload');
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const chatForm = document.getElementById('chat-form');
+    const newChatBtn = document.getElementById('new-chat-btn');
+    const modelSelect = document.getElementById('model-select');
+    const editTitleBtn = document.getElementById('edit-title-btn');
+
+    // File upload handling
+    if (uploadTrigger && fileInput) {
+        uploadTrigger.addEventListener('click', () => fileInput.click());
+    }
+
+    // Chat form submission
+    if (chatForm) {
+        chatForm.addEventListener('submit', handleSubmit);
+    }
+
+    // Message input handling with debounce
+    if (messageInput) {
+        const debouncedKeydown = debounce(handleKeydown, 100);
+        messageInput.addEventListener('keydown', debouncedKeydown);
+    }
+
+    // New chat button
+    if (newChatBtn) {
+        newChatBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            createNewChat();
+        });
+    }
+
+    // Model selection
+    if (modelSelect) {
+        modelSelect.addEventListener('change', handleModelChange);
+    }
+
+    // Edit title button
+    if (editTitleBtn) {
+        editTitleBtn.addEventListener('click', handleEditTitle);
+    }
+
+    // Copy buttons
+    document.querySelectorAll('.copy-button').forEach(btn => {
+        btn.addEventListener('click', handleCopyClick);
+    });
+
+    // Delete chat buttons
+    document.querySelectorAll('button[aria-label="Delete chat"]').forEach(btn => {
+        btn.addEventListener('click', handleDeleteChat);
+    });
+
+    // Regenerate buttons
+    document.querySelectorAll('.regenerate-button').forEach(btn => {
+        btn.addEventListener('click', handleRegenerate);
+    });
+}
+
+// -----------------------------------------------------------------------------
+// Event Handlers and Helpers
+// -----------------------------------------------------------------------------
+function handleSubmit(e) {
+    e.preventDefault();
+    sendMessage(e);
+}
+
+function handleKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage(e);
+    }
+}
+
+async function handleModelChange() {
+    const modelSelect = document.getElementById('model-select');
+    const selectedOption = modelSelect.selectedOptions[0];
+    const modelType = selectedOption.dataset.modelType;
+    const modelIcon = document.querySelector('.model-selector svg');
+
+    window.CHAT_CONFIG.isOSeriesModel = CONFIG.O_SERIES_MODELS.includes(modelType);
+
+    if (modelIcon && selectedOption.dataset.color) {
+        modelIcon.style.color = selectedOption.dataset.color;
+    }
+
+    try {
+        const resp = await fetch('/chat/update_model', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+            },
+            body: JSON.stringify({
+                chat_id: window.CHAT_CONFIG.chatId,
+                model_id: modelSelect.value
+            })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            window.MessageRenderer.showSuccess('Chat model updated');
+        } else {
+            window.MessageRenderer.showError(data.error || 'Failed to update chat model');
+        }
+    } catch (err) {
+        window.MessageRenderer.showError('Failed to update chat model');
+    }
+}
+
+async function handleEditTitle() {
+    const newTitle = prompt('Enter new chat title:');
+    if (!newTitle || newTitle.trim() === '') return;
+
+    try {
+        const resp = await fetch(`/chat/update_chat_title/${window.CHAT_CONFIG.chatId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+            },
+            body: JSON.stringify({ title: newTitle.trim() })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            window.MessageRenderer.showSuccess('Chat title updated');
+            updateTitleElements(newTitle.trim());
+        } else {
+            window.MessageRenderer.showError(data.error);
+        }
+    } catch (err) {
+        window.MessageRenderer.showError('Failed to update chat title');
+    }
+}
+
+function updateTitleElements(title) {
+    const mobileSel = document.getElementById('mobile-chat-selector');
+    if (mobileSel) {
+        const opt = mobileSel.querySelector(`option[value="${window.CHAT_CONFIG.chatId}"]`);
+        if (opt) opt.textContent = title;
+    }
+
+    const desktopTab = document.querySelector(`.chat-tab[data-chat-id="${window.CHAT_CONFIG.chatId}"] span`);
+    if (desktopTab) desktopTab.textContent = title;
+
+    document.title = `Chat - ${title}`;
+}
+
+function handleCopyClick(e) {
+    e.stopPropagation();
+    const rawContent = e.currentTarget.getAttribute('data-raw-content');
+    if (rawContent && window.utils?.copyToClipboard) {
+        window.utils.copyToClipboard(rawContent);
+    }
+}
+
+async function handleDeleteChat(e) {
+    e.stopPropagation();
+    const chatId = e.currentTarget.getAttribute('data-chat-id');
+    if (!chatId) return;
+    if (!confirm('Are you sure you want to delete this chat?')) return;
+
+    try {
+        const resp = await fetch(`/chat/delete_chat/${chatId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+            }
+        });
+        const data = await resp.json();
+        if (data.success) {
+            window.MessageRenderer.showSuccess('Chat deleted');
+            window.location.href = '/chat/interface';
+        } else {
+            window.MessageRenderer.showError(data.error);
+        }
+    } catch (err) {
+        window.MessageRenderer.showError('Delete failed');
+    }
+}
+
+function handleRegenerate(e) {
+    e.stopPropagation();
+    if (confirm('Do you want to regenerate the assistant response?')) {
+        window.MessageRenderer.showSuccess('Regeneration triggered (feature not fully implemented)');
+    }
+}
+
+function updateFileList() {
+    const fileList = document.getElementById('file-list');
+    if (!fileList || !window.fileUploadManager?.uploadedFiles) return;
+
+    fileList.innerHTML = window.fileUploadManager.uploadedFiles.map(file => `
+        <div class="file-item" data-file-id="${file.id}">
+            <div class="file-info">
+                <i class="fas fa-file-alt text-gray-400"></i>
+                <span class="file-name">${file.name}</span>
+                <span class="file-size">${formatFileSize(file.size)}</span>
+            </div>
+            <button class="remove-file-btn" data-filename="${file.name}">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="file-progress">
+                <div class="file-progress-bar" style="width: 0%"></div>
+            </div>
+        </div>
+    `).join('');
+
+    fileList.querySelectorAll('.remove-file-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            window.fileUploadManager.removeFile(btn.dataset.filename);
+        });
+    });
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// -----------------------------------------------------------------------------
+// Initialize on DOMContentLoaded
+// -----------------------------------------------------------------------------
+document.addEventListener('DOMContentLoaded', () => {
+    startChat();
+    updateMobileLayout();
+
+    function updateMobileLayout() {
+        handleViewportChanges();
+        // Add any additional layout changes for mobile here
+    }
+
+    // Update layout on resize
+    window.addEventListener('resize', () => {
+        updateMobileLayout();
+        updateUsagePanelPosition();
+    });
+
+    // Handle token usage updates (if applicable)
+    if (window.tokenUsageManager) {
+        const tokenPanel = document.getElementById('token-usage-panel');
+        const tokenTab = document.querySelector('[data-panel="token-usage-panel"]');
+        
+        window.tokenUsageManager.onUpdateStart = () => {
+            tokenTab?.classList.add('loading');
+            tokenPanel?.classList.add('loading');
+        };
+        
+        window.tokenUsageManager.onUpdateComplete = () => {
+            tokenTab?.classList.remove('loading');
+            tokenPanel?.classList.remove('loading');
+        };
+    }
+});
+
+// -----------------------------------------------------------------------------
+// Existing Chat Functions
+// -----------------------------------------------------------------------------
 
 async function createNewChat() {
     try {
@@ -339,7 +809,6 @@ async function handleStreamingResponse(formData) {
     }
 }
 
-// Send a message
 async function sendMessage(event) {
     if (event) {
         event.preventDefault();
@@ -412,305 +881,3 @@ async function sendMessage(event) {
         window.MessageRenderer.removeTypingIndicator();
     }
 }
-
-async function startChat() {
-    const tabButtons = document.querySelectorAll('.usage-tabs .tab');
-    if (tabButtons.length > 0) {
-        const panels = document.querySelectorAll('.panel-content');
-        tabButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                tabButtons.forEach(tb => tb.classList.remove('tab-active'));
-                panels.forEach(p => p.classList.add('hidden'));
-                btn.classList.add('tab-active');
-                const targetId = btn.getAttribute('data-panel');
-                document.getElementById(targetId).classList.remove('hidden');
-            });
-        });
-    }
-
-    const uploadTrigger = document.getElementById('upload-trigger');
-    const fileInput = document.getElementById('file-upload');
-    if (uploadTrigger && fileInput) {
-        uploadTrigger.addEventListener('click', () => {
-            fileInput.click();
-        });
-    }
-
-    if (window.fileUploadManager) {
-        window.fileUploadManager.onFilesChanged = updateFileList;
-    }
-
-    function updateFileList() {
-        const fileList = document.getElementById('file-list');
-        if (!fileList || !window.fileUploadManager?.uploadedFiles) return;
-
-        fileList.innerHTML = window.fileUploadManager.uploadedFiles.map(file => `
-            <div class="file-item">
-                <div class="flex items-center gap-2 flex-1">
-                    <i class="fas fa-file-alt text-gray-400"></i>
-                    <span class="file-name">${file.name}</span>
-                    <span class="file-size">${formatFileSize(file.size)}</span>
-                </div>
-                <button class="remove-btn" data-filename="${file.name}">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `).join('');
-
-        fileList.querySelectorAll('.remove-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                window.fileUploadManager.removeFile(btn.dataset.filename);
-            });
-        });
-    }
-
-    function formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    try {
-        const configDiv = document.getElementById('chat-config');
-        if (!configDiv) {
-            throw new Error('Chat configuration not found');
-        }
-        window.CHAT_CONFIG.isOSeriesModel = false;
-
-        let attempts = 0;
-        while (!window.MessageRenderer && attempts < CONFIG.MAX_DEPENDENCY_ATTEMPTS) {
-            // wait for global scripts to load
-            await new Promise(resolve => setTimeout(resolve, 100));
-            attempts++;
-        }
-        if (!window.MessageRenderer) {
-            throw new Error('MessageRenderer not available');
-        }
-
-        try {
-            const FileUploadManagerClass = window.FileUploadManager;
-            if (!FileUploadManagerClass) {
-                throw new Error('FileUploadManager class not loaded');
-            }
-            if (!window.fileUploadManager) {
-                const uploadButton = document.getElementById('file-upload');
-                window.fileUploadManager = new FileUploadManagerClass(
-                    configDiv.dataset.chatId,
-                    configDiv.dataset.userId,
-                    uploadButton
-                );
-            }
-
-            const TokenUsageManagerClass = window.TokenUsageManager;
-            if (!TokenUsageManagerClass) {
-                throw new Error('TokenUsageManager class not loaded');
-            }
-            if (!window.tokenUsageManager && window.CHAT_CONFIG?.chatId) {
-                window.tokenUsageManager = new TokenUsageManagerClass(window.CHAT_CONFIG);
-                await window.tokenUsageManager.initialize();
-            }
-        } catch (error) {
-            window.monitoring?.logError('Component init failed', error);
-            window.MessageRenderer.showError('Failed to initialize chat components: ' + error.message);
-            return;
-        }
-
-        if (window.fileUploadManager) {
-            await window.fileUploadManager.initializeFileUpload();
-        }
-
-        const modelSelect = document.getElementById('model-select');
-        if (modelSelect) {
-            const modelIcon = document.querySelector('.model-selector svg');
-            modelSelect.addEventListener('change', () => {
-                const selected = modelSelect.options[modelSelect.selectedIndex];
-                if (modelIcon && selected.dataset.color) {
-                    modelIcon.style.color = selected.dataset.color;
-                }
-            });
-
-            modelSelect.addEventListener('change', async () => {
-                const selectedOption = modelSelect.selectedOptions[0];
-                const modelType = selectedOption.dataset.modelType;
-                window.CHAT_CONFIG.isOSeriesModel = CONFIG.O_SERIES_MODELS.includes(modelType);
-
-                if (modelIcon && selectedOption.dataset.color) {
-                    modelIcon.style.color = selectedOption.dataset.color;
-                }
-
-                const newModelId = modelSelect.value;
-                const chatId = window.CHAT_CONFIG.chatId;
-                try {
-                    const resp = await fetch('/chat/update_model', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': window.CHAT_CONFIG.csrfToken
-                        },
-                        body: JSON.stringify({ chat_id: chatId, model_id: newModelId })
-                    });
-                    const data = await resp.json();
-                    if (data.success) {
-                        window.MessageRenderer.showSuccess('Chat model updated');
-                    } else {
-                        window.MessageRenderer.showError(data.error || 'Failed to update chat model');
-                    }
-                } catch (err) {
-                    window.MessageRenderer.showError('Failed to update chat model');
-                }
-            });
-        }
-
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const chatForm = document.getElementById('chat-form');
-        const newChatBtn = document.getElementById('new-chat-btn');
-        const mobileChatSelector = document.getElementById('mobile-chat-selector');
-
-        if (newChatBtn) {
-            newChatBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                createNewChat();
-            });
-        }
-
-        if (mobileChatSelector) {
-            mobileChatSelector.addEventListener('change', (e) => {
-                const selectedValue = e.target.value;
-                if (selectedValue === 'new') {
-                    createNewChat();
-                } else {
-                    window.location.href = `/chat/chat_interface?chat_id=${selectedValue}`;
-                }
-            });
-        }
-
-        if (chatForm) {
-            chatForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                sendMessage(e);
-            });
-        }
-
-        if (messageInput) {
-            const debounce = (func, wait) => {
-                let timeout;
-                return function executedFunction(...args) {
-                    const later = () => {
-                        clearTimeout(timeout);
-                        func(...args);
-                    };
-                    clearTimeout(timeout);
-                    timeout = setTimeout(later, wait);
-                };
-            };
-
-            const debouncedKeydown = debounce(e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage(e);
-                }
-            }, 100);
-
-            messageInput.addEventListener('keydown', debouncedKeydown);
-        }
-
-        document.querySelectorAll('button[aria-label="Delete chat"]').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                e.stopPropagation();
-                const chatId = btn.getAttribute('data-chat-id');
-                if (!chatId) return;
-                if (!confirm('Are you sure you want to delete this chat?')) return;
-                try {
-                    const resp = await fetch(`/chat/delete_chat/${chatId}`, {
-                        method: 'DELETE',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': window.CHAT_CONFIG.csrfToken
-                        }
-                    });
-                    const data = await resp.json();
-                    if (data.success) {
-                        window.MessageRenderer.showSuccess('Chat deleted');
-                        window.location.href = '/chat/interface';
-                    } else {
-                        window.MessageRenderer.showError(data.error);
-                    }
-                } catch (err) {
-                    window.MessageRenderer.showError('Delete failed');
-                }
-            });
-        });
-
-        const editTitleBtn = document.getElementById('edit-title-btn');
-        if (editTitleBtn) {
-            editTitleBtn.addEventListener('click', async () => {
-                const newTitle = prompt('Enter new chat title:');
-                if (!newTitle || newTitle.trim() === '') return;
-                try {
-                    const resp = await fetch(`/chat/update_chat_title/${window.CHAT_CONFIG.chatId}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRFToken': window.CHAT_CONFIG.csrfToken
-                        },
-                        body: JSON.stringify({ title: newTitle.trim() })
-                    });
-                    const data = await resp.json();
-                    if (data.success) {
-                        window.MessageRenderer.showSuccess('Chat title updated');
-                        const trimmedTitle = newTitle.trim();
-
-                        const mobileSel = document.getElementById('mobile-chat-selector');
-                        if (mobileSel) {
-                            const opt = mobileSel.querySelector(`option[value="${window.CHAT_CONFIG.chatId}"]`);
-                            if (opt) {
-                                opt.textContent = trimmedTitle;
-                            }
-                        }
-
-                        const desktopTab = document.querySelector(`.chat-tab[data-chat-id="${window.CHAT_CONFIG.chatId}"] span`);
-                        if (desktopTab) {
-                            desktopTab.textContent = trimmedTitle;
-                        }
-                        document.title = `Chat - ${trimmedTitle}`;
-                    } else {
-                        window.MessageRenderer.showError(data.error);
-                    }
-                } catch (err) {
-                    window.MessageRenderer.showError('Failed to update chat title');
-                }
-            });
-        }
-
-        document.querySelectorAll('.copy-button').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const rawContent = btn.getAttribute('data-raw-content');
-                if (rawContent && window.utils?.copyToClipboard) {
-                    window.utils.copyToClipboard(rawContent);
-                }
-            });
-        });
-
-        document.querySelectorAll('.regenerate-button').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (confirm('Do you want to regenerate the assistant response?')) {
-                    window.MessageRenderer.showSuccess('Regeneration triggered (feature not fully implemented)');
-                }
-            });
-        });
-
-        // Make sure the usage panel is placed above the chat input on load
-        handleViewportChanges();
-        updateUsagePanelPosition();
-    } catch (error) {
-        window.monitoring?.logError('Failed to initialize chat:', error);
-        window.MessageRenderer.showError(error.message);
-    }
-}
-
-document.addEventListener('DOMContentLoaded', startChat);

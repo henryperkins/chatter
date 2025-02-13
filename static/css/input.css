@@ -8,60 +8,37 @@
   }
 
   .chat-messages-container {
-    @apply flex-1 overflow-hidden relative;
+      @apply flex-1 overflow-hidden relative;
   }
-
+  
   .chat-messages-scroll {
-    @apply flex-1 pb-[160px] !important;  /* Space for input */
-    min-height: calc(100vh - 160px - 4rem);
-    @apply overflow-y-auto overscroll-contain;
+      @apply flex-1 overflow-y-auto overscroll-contain;
+      padding-bottom: calc(var(--chat-input-height) + var(--safe-bottom) + 56px);
   }
-
+  
   .chat-input-container {
-    @apply fixed bottom-0 left-0 right-0 z-[50] h-40;
-    @apply bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg;
-    @apply border-t border-gray-200/50 dark:border-gray-700/50;
-    @apply shadow-lg;
-    padding-top: 1rem;
-    /* Safe area handling for mobile */
-    padding-bottom: max(1rem, env(safe-area-inset-bottom));
-  }
-
-  @supports (padding: max(0px)) {
-    .chat-input-container {
+      @apply fixed bottom-0 left-0 right-0 z-[50];
+      @apply bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg;
+      @apply border-t border-gray-200/50 dark:border-gray-700/50;
+      @apply shadow-lg;
+      padding: 1rem;
       padding-bottom: max(1rem, env(safe-area-inset-bottom));
-    }
   }
-
-  .chat-controls {
-    @apply flex items-center gap-3 px-4 py-3;
-    @apply bg-white/95 dark:bg-gray-800/95;
-    @apply border-b border-gray-200/50 dark:border-gray-700/50;
-    @apply shadow-sm backdrop-blur-md;
-  }
-
-  .token-panel-container {
-    @apply fixed right-4 z-[60] w-96 max-w-[calc(100%-2rem)];
-    bottom: calc(var(--chat-input-height) + theme('spacing.4'));
-  }
-
+  
   /* Mobile optimizations */
   @media (max-width: theme('screens.sm')) {
-    .chat-controls button {
-      @apply min-h-[44px] min-w-[44px] p-2;
-      @apply transition-transform active:scale-95;
-    }
-    
-    .message-container {
-      @apply mb-3 active:bg-gray-100/50 dark:active:bg-gray-700/50;
-    }
-
-    .chat-messages-scroll {
-      bottom: 120px !important;
-    }
-
-    .message-container {
-      @apply max-w-[90%] !important;
-    }
+      .message-container {
+          @apply mb-3;
+          @apply active:bg-gray-100/50 dark:active:bg-gray-700/50;
+      }
+  
+      .form-input {
+          min-height: 44px;
+      }
+  
+      .btn-icon {
+          @apply min-h-[44px] min-w-[44px] p-2;
+          @apply transition-transform active:scale-95;
+      }
   }
 }

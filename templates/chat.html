@@ -12,130 +12,111 @@
 {% block main_classes %}relative flex-1{% endblock %}
 
 {% block chat_tabs %}
-<div class="chat-tabs-container fixed w-full top-12 z-[1100]">
-    <!-- Chat Tabs Header -->
-    <div class="h-16 bg-gradient-to-b from-white/95 to-gray-100/95 dark:from-gray-800/95 dark:to-gray-900/95 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full">
-            <div class="flex items-center gap-4 h-full">
-                <!-- New Chat Button -->
-                <button id="new-chat-btn"
-                    class="flex items-center gap-2 px-4 py-2 bg-gray-100/90 dark:bg-gray-700/90 hover:bg-gray-200/90 dark:hover:bg-gray-600/90 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 text-gray-700 dark:text-gray-300"
-                    aria-label="Start new chat">
-                    <i class="fas fa-plus text-sm"></i>
-                    <span class="font-medium">New Chat</span>
+<!-- Chat Header -->
+<div class="fixed w-full top-16 z-[1100] bg-white/95 dark:bg-gray-800/95 border-b border-gray-200/50 dark:border-gray-700/50 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 py-2">
+        <div class="flex items-center justify-between gap-3">
+            <!-- Left: Chat Controls -->
+            <div class="flex items-center gap-2 flex-1 min-w-0">
+                <button id="new-chat-btn" class="btn-icon group" aria-label="New chat">
+                    <i class="fas fa-plus"></i>
                 </button>
-
-                <!-- Chat Selector -->
-                <select id="chat-selector"
-                    class="flex-1 px-3 py-2 bg-white/95 dark:bg-gray-800/95 border border-gray-200/80 dark:border-gray-700/80 rounded-xl"
-                    aria-label="Select chat">
-                    {% for chat in conversations %}
-                    <option value="{{ chat.id }}" {% if chat_id and chat.id|string|safe == chat_id|string|safe %}selected{% endif %}>
-                        {{ chat.title }}
-                    </option>
-                    {% endfor %}
-                    <option value="new">+ New Chat</option>
-                </select>
-            </div>
-        </div>
-    </div>
-
-    <!-- Chat Controls -->
-    <div class="bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border-b border-gray-200/50 dark:border-gray-700/50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <div class="flex items-center gap-4">
-                <!-- Model Selection -->
-                {% if models %}
-                <div class="model-selector flex items-center gap-2 bg-gray-100/90 dark:bg-gray-700/90 px-3 py-2 rounded-xl">
-                    <svg class="w-5 h-5 text-primary-500 shrink-0" viewBox="0 0 24 24">
-                        <path fill="currentColor" d="M12 2L2 7l10 5l10-5l-10-5zM2 17l10 5l10-5M2 12l10 5l10-5"/>
-                    </svg>
-                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Model:</span>
-                    <select id="model-select"
-                        class="bg-transparent font-medium focus:ring-0 border-0"
-                        aria-label="Select model"
-                        data-original-value="{{ current_model.id if current_model else '' }}">
-                        {% for model in models %}
-                        <option value="{{ model.id }}"
-                            data-requires-o1-handling="{{ 'true' if model.requires_o1_handling else 'false' }}"
-                            data-supports-streaming="{{ 'true' if model.supports_streaming else 'false' }}"
-                            data-model-type="{{ model.model_type|default('', true) }}"
-                            data-max-completion-tokens="{{ model.max_completion_tokens|default(0, true) }}"
-                            {% if current_model and model.id|string|safe == current_model.id|string|safe %}selected{% endif %}
-                            {% if not current_model and model.is_default %}selected{% endif %}>
-                            {{ model.name }}{% if model.is_default %} (Default){% endif %}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% endif %}
-
-                <!-- Admin Controls -->
-                {% if current_user.role == 'admin' %}
-                <div class="flex items-center gap-3">
-                    <a href="{{ url_for('model.add_model_page') }}"
-                        class="btn-icon group relative"
-                        data-tooltip="Add new model">
-                        <i class="fas fa-plus-circle"></i>
-                        <span class="tooltip">Add model</span>
-                    </a>
-                    <button id="edit-model-btn" class="btn-icon group relative"
-                        data-tooltip="Edit current model">
-                        <i class="fas fa-cog"></i>
-                        <span class="tooltip">Edit model</span>
+                
+                <div class="flex-1 min-w-0 relative">
+                    <button id="chat-selector-btn" 
+                            class="w-full flex items-center gap-2 px-3 py-2 bg-gray-100/90 dark:bg-gray-700/90 rounded-lg hover:bg-gray-200/90 dark:hover:bg-gray-600/90 transition-colors text-left">
+                        <i class="fas fa-comments text-gray-500 dark:text-gray-400"></i>
+                        <span class="flex-1 truncate font-medium">{{ chat_title }}</span>
+                        <i class="fas fa-chevron-down text-gray-500 dark:text-gray-400"></i>
                     </button>
-                </div>
-                {% endif %}
-
-                <!-- Edit Title Button -->
-                <button id="edit-title-btn" class="btn-icon group relative"
-                    data-tooltip="Edit chat title">
-                    <i class="fas fa-pen"></i>
-                    <span class="tooltip">Edit title</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tokens/Files Usage Tabs -->
-    <div id="usage-panel" class="fixed bottom-0 left-0 right-0 z-[1100] bg-white/95 dark:bg-gray-800/95">
-        <div class="max-w-4xl mx-auto">
-            <!-- Tab Buttons -->
-            <div class="border-t border-gray-200 dark:border-gray-700">
-                <div class="usage-tabs flex gap-2 px-4 pt-2">
-                    <button class="tab flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100/90 dark:hover:bg-gray-700/90 rounded-t-lg transition-colors tab-active"
-                            data-panel="token-usage-panel">
-                        <i class="fas fa-chart-pie"></i>
-                        Tokens
-                    </button>
-                    <button class="tab flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100/90 dark:hover:bg-gray-700/90 rounded-t-lg transition-colors"
-                            data-panel="file-usage-panel">
-                        <i class="fas fa-file-upload"></i>
-                        Files
-                    </button>
-                </div>
-
-                <!-- Panel Content Area -->
-                <div class="bg-gray-50/95 dark:bg-gray-900/95 border-t border-gray-200 dark:border-gray-700">
-                    <!-- Token Usage Panel -->
-                    <div id="token-usage-panel" class="panel-content px-4 py-2">
-                        <div class="token-panel-container">
-                            {% include 'partials/token_panel.html' %}
-                        </div>
-                    </div>
-
-                    <!-- File Usage Panel -->
-                    <div id="file-usage-panel" class="panel-content hidden px-4 py-2">
-                        <!-- File List -->
-                        <div id="file-list" class="space-y-2 max-h-24 overflow-y-auto mb-2">
-                            <!-- Files will be dynamically inserted here -->
-                        </div>
-                        <button id="upload-trigger" class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
-                            <i class="fas fa-upload"></i>
-                            Upload File (Max 10MB)
+                    
+                    <!-- Chat List Dropdown -->
+                    <div id="chat-list-dropdown" class="hidden absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 max-h-64 overflow-y-auto w-[20rem]">
+                        {% for chat in conversations %}
+                        <button class="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-left {% if chat.id == chat_id %}bg-gray-50 dark:bg-gray-700{% endif %}"
+                                data-chat-id="{{ chat.id }}">
+                            <span class="flex-1 truncate">{{ chat.title }}</span>
+                            {% if chat.id == chat_id %}
+                            <i class="fas fa-check text-blue-500"></i>
+                            {% endif %}
                         </button>
+                        {% endfor %}
                     </div>
                 </div>
+                
+                <button id="edit-title-btn" class="btn-icon group" aria-label="Edit title">
+                    <i class="fas fa-pen"></i>
+                </button>
+            </div>
+
+            <!-- Right: Model Selection -->
+            <div class="flex items-center gap-2">
+                {% if models %}
+                <div class="relative">
+                    <button id="model-selector-btn" 
+                            class="flex items-center gap-2 px-3 py-2 bg-gray-100/90 dark:bg-gray-700/90 rounded-lg hover:bg-gray-200/90 dark:hover:bg-gray-600/90 transition-colors">
+                        <i class="fas fa-robot text-primary-500"></i>
+                        <span class="hidden sm:inline font-medium">
+                            {{ current_model.name if current_model else 'Select Model' }}
+                        </span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+
+                    <!-- Model Dropdown -->
+                    <div id="model-dropdown" class="hidden absolute right-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+                        {% for model in models %}
+                        <button class="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-left {% if current_model and model.id == current_model.id %}bg-gray-50 dark:bg-gray-700{% endif %}"
+                                data-model-id="{{ model.id }}"
+                                data-model-type="{{ model.model_type }}"
+                                data-supports-streaming="{{ 'true' if model.supports_streaming else 'false' }}">
+                            <i class="fas fa-robot text-primary-500"></i>
+                            <span class="flex-1 truncate">{{ model.name }}</span>
+                            {% if current_model and model.id == current_model.id %}
+                            <i class="fas fa-check text-blue-500"></i>
+                            {% endif %}
+                        </button>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if current_user.role == 'admin' %}
+                <button id="edit-model-btn" class="btn-icon group" aria-label="Edit model">
+                    <i class="fas fa-cog"></i>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Token/File Usage Panel -->
+<div id="usage-panel" class="fixed bottom-0 left-0 right-0 z-[1100] bg-white/95 dark:bg-gray-800/95 border-t border-gray-200/50 dark:border-gray-700/50 backdrop-blur-md transition-transform duration-200">
+    <div class="max-w-4xl mx-auto w-full">
+        <div class="usage-tabs">
+            <button class="tab flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium tab-active" data-panel="token-usage-panel">
+                <i class="fas fa-chart-pie"></i>
+                <span class="hidden sm:inline">Tokens</span>
+            </button>
+            <button class="tab flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium" data-panel="file-usage-panel">
+                <i class="fas fa-file-upload"></i>
+                <span class="hidden sm:inline">Files</span>
+            </button>
+        </div>
+        
+        <div class="panel-content bg-gray-50/95 dark:bg-gray-900/95 border-t border-gray-200/50 dark:border-gray-700/50">
+            <div id="token-usage-panel" class="p-2 sm:p-3">
+                <div class="token-panel-container">
+                    {% include 'partials/token_panel.html' %}
+                </div>
+            </div>
+            
+            <div id="file-usage-panel" class="hidden p-2 sm:p-3">
+                <div id="file-list" class="space-y-2 max-h-24 overflow-y-auto mb-2"></div>
+                <button id="upload-trigger" class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+                    <i class="fas fa-upload"></i>
+                    <span>Upload File</span>
+                </button>
             </div>
         </div>
     </div>
@@ -216,8 +197,8 @@
 {% block scripts %}
 {{ super() }}
 <!-- Chat Feature Modules -->
-<script src="{{ url_for('static', filename='js/chat-config.js') }}" type="module"></script>
 <script src="{{ url_for('static', filename='js/message-renderer.js') }}" type="module"></script>
+<script src="{{ url_for('static', filename='js/chat-config.js') }}" type="module"></script>
 <script src="{{ url_for('static', filename='js/chat.js') }}" type="module"></script>
 
 <!-- Add CSRF token to all AJAX requests -->
@@ -226,13 +207,13 @@ import { ChatConfig } from "{{ url_for('static', filename='js/chat-config.js') }
 const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
 
 document.addEventListener('DOMContentLoaded', async () => {
-// Initialize chat config with CSRF token
-const config = ChatConfig.getInstance();
-await config.init({
-    headers: {
-        'X-CSRFToken': csrfToken
-    }
-});
+    // Initialize chat config with CSRF token
+    const config = ChatConfig.getInstance();
+    await config.init({
+        headers: {
+            'X-CSRFToken': csrfToken
+        }
+    });
     
     if (!window.CHAT_CONFIG?.chatId) {
         console.warn('No valid chatId found, skipping TokenUsageManager initialization.');
