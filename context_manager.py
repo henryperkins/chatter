@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Any, TypedDict, Union
 
 from logging_config import get_logger
+from analysis.semantic_analyzer import SemanticAnalyzer
 from token_utils import (
     count_message_tokens,
     count_conversation_tokens,
@@ -29,6 +30,7 @@ class ContextManager:
         """
         self.model_max_tokens = model_max_tokens
         self.model_type = model_type
+        self.analyzer = SemanticAnalyzer()
         
         # Adjust max tokens for o-series models
         if model_type and model_type.lower() in ["o3-mini", "o1", "o1-mini", "o1-preview"]:

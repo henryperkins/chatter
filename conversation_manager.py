@@ -226,6 +226,19 @@ class ConversationManager:
             messages = Chat.get_messages(chat_id)
             logger.debug("Retrieved %d messages for chat %s", len(messages), chat_id)
 
+            # Process user messages for semantic analysis
+            for msg in messages:
+                if isinstance(msg, dict) and msg.get("role") == "user":
+                    content = msg.get("content", "")
+                    if content and isinstance(content, str):
+                        analysis = self.analyzer.process_text(content)
+                        logger.debug("Semantic analysis for message: entities=%d, edges=%d",
+                                   len(analysis["entities"]), len(analysis["graph_edges"]))
+                        # Store analysis in message metadata for future use
+                        if "metadata" not in msg:
+                            msg["metadata"] = {}
+                        msg["metadata"]["semantic_analysis"] = analysis
+
             if hasattr(self.context_manager, "get_context"):
                 optimized_context = self.context_manager.get_context(messages)
             else:
