@@ -6,13 +6,19 @@ logger = get_logger(__name__)
 
 class SemanticAnalyzer:
     def __init__(self):
+        try:
+            import spacy
+        except ImportError as e:
+            logger.critical("spaCy is not installed. Please install with 'pip install spacy'")
+            raise RuntimeError("spaCy required - see logs for details") from e
+
         # Load a lightweight English model
         try:
             self.nlp = spacy.load("en_core_web_sm")
         except OSError:
-            logger.warning("Downloading spacy model 'en_core_web_sm'...")
+            logger.warning("Downloading spacy model 'en_core_web_sm'... Run this manually if needed: python -m spacy download en_core_web_sm")
             import subprocess
-            subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
+            subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"], check=True)
             self.nlp = spacy.load("en_core_web_sm")
 
     def process_text(self, text: str) -> Dict[str, Any]:
