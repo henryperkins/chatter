@@ -368,8 +368,13 @@
     }
 
     .chat-input-container {
-        padding: 0.25rem;
-        padding-bottom: max(0.25rem, var(--safe-bottom));
+        padding: 0.125rem;
+        padding-bottom: max(0.125rem, var(--safe-bottom));
+    }
+
+    .chat-bubble {
+        padding-top: 0.25rem;
+        padding-bottom: 0.25rem;
     }
 
     #usage-panel {
