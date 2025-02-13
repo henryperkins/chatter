@@ -1,5 +1,6 @@
 /* CSS Variables */
 :root {
+    /* Layout */
     --nav-height: 4rem;
     --tabs-height: 3rem;
     --panel-content-height: 4rem;
@@ -7,175 +8,314 @@
     --chat-input-height: 4rem;
     --panel-spacing: 1rem;
     --total-bottom-height: calc(var(--chat-input-height) + var(--tabs-height) + var(--panel-content-height) + var(--safe-bottom));
-}
-.token-panel-container p {
-    line-height: 1.2;
+    
+    /* Message Styling */
+    --msg-padding: 12px;
+    --msg-radius: 12px;
+    --msg-gap-same: 8px;
+    --msg-gap-diff: 16px;
+    --avatar-size: 32px;
+    
+    /* Colors */
+    --user-msg-bg: #2C2C2C;
+    --bot-msg-bg: #1E1E1E;
+    --timestamp-color: #A0A0A0;
+    --text-primary: #FFFFFF;
+    --button-primary: #2D7CFF;
+    
+    /* UI Component Sizes */
+    --icon-size: 20px;
+    --input-height: 40px;
+    --status-number-size: 14px;
 }
 
-/* Chat container and layout */
-.chat-container {
-    display: flex;
-    flex-direction: column;
-    height: calc(100vh - var(--nav-height));
+/* Message Styling (kept from previous update) */
+.message-group {
+    margin-bottom: var(--msg-gap-diff);
+    animation: messageSlideIn 0.3s ease-out forwards;
+}
+
+.message-group.same-sender {
+    margin-top: calc(-1 * var(--msg-gap-diff) + var(--msg-gap-same));
+}
+
+.message-group .avatar-container {
+    width: var(--avatar-size);
+    height: var(--avatar-size);
+    flex-shrink: 0;
+}
+
+.message-bubble {
+    padding: var(--msg-padding);
+    border-radius: var(--msg-radius);
+    max-width: 80%;
     position: relative;
+    transition: background-color 0.2s ease;
 }
 
-
-/* Usage Panel Core Styles */
-#usage-panel {
-    position: fixed;
-    bottom: var(--chat-input-height);
-    background-color: rgba(255, 255, 255, 0.98);
-    border-top: 1px solid rgba(229, 231, 235, 0.8);
-    backdrop-filter: blur(12px);
-    color: rgb(31, 41, 55);
-    z-index: 1100;
-    width: 100%;
-    box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
-    min-height: calc(var(--tabs-height) + var(--panel-content-height));
-}
-
-.dark #usage-panel {
-    background-color: rgba(31, 41, 55, 0.95);
-    border-color: rgba(75, 85, 99, 0.5);
-    color: rgb(243, 244, 246);
-}
-
-/* Panel States */
-#usage-panel.loading {
-    opacity: 0.7;
-    pointer-events: none;
-}
-
-#usage-panel.collapsed {
-    transform: translateY(calc(100% - var(--tabs-height)));
-}
-
-#usage-panel.expanded {
-    height: auto;
-    max-height: 50vh;
-}
-
-/* Touch Handle */
-.panel-handle {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%) translateY(-50%);
-    width: 36px;
-    height: 4px;
-    background: rgba(156, 163, 175, 0.5);
-    border-radius: 2px;
-    cursor: grab;
-}
-
-.panel-handle:active {
-    cursor: grabbing;
-}
-
-/* Form input styling */
-.form-input {
-    width: 100%;
-    min-height: 60px;
-    max-height: 200px;
-    background-color: white;
-    color: #111827;
-    padding: 0.5rem 0.75rem;
-    padding-right: 6rem;
-    line-height: 1.5;
-    border-color: #D1D5DB;
-    border-radius: 0.5rem;
-}
-
-#send-button {
-    min-height: 44px;
-    min-width: 80px;
-    transition: all 0.2s ease;
+.user-message .message-bubble {
+    background-color: var(--user-msg-bg);
+    color: var(--text-primary);
+    border-radius: var(--msg-radius) var(--msg-radius) 0 var(--msg-radius);
     margin-left: auto;
-    align-self: center;
 }
 
-#send-button:hover {
-    transform: translateY(-1px);
+.assistant-message .message-bubble {
+    background-color: var(--bot-msg-bg);
+    color: var(--text-primary);
+    border-radius: var(--msg-radius) var(--msg-radius) var(--msg-radius) 0;
 }
 
-.dark .form-input {
-    background-color: #374151;
-    color: #F3F4F6;
-    border-color: #4B5563;
-    border-width: 1px;
-}
-
-.panel-content {
+/* Tab Navigation - Updated */
+.usage-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    padding: 12px 16px;
+    position: relative;
+    z-index: 1150;
+    border-bottom: 1px solid rgba(229, 231, 235, 0.2);
+    margin: 0 auto;
+    max-width: 24rem;
     background: inherit;
-    backdrop-filter: inherit;
-    margin-top: 0;
 }
 
-/* Chat input container positioning */
+.tab {
+    position: relative;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    color: rgb(209, 213, 219);
+    user-select: none;
+    height: 44px;
+    min-width: 120px;
+    max-width: 160px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+    border: 1px solid transparent;
+}
+
+.tab i {
+    width: var(--icon-size);
+    height: var(--icon-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--icon-size);
+}
+
+.tab:hover {
+    background-color: rgba(45, 124, 255, 0.1);
+    color: #FFFFFF;
+    border-color: rgba(45, 124, 255, 0.2);
+}
+
+.tab.tab-active {
+    background-color: var(--button-primary);
+    color: white;
+    font-weight: 600;
+}
+
+.tab.tab-active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 2px;
+    background-color: currentColor;
+    border-radius: 1px;
+}
+
+/* Token Counter - Updated */
+.token-counter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: var(--status-number-size);
+    color: rgb(209, 213, 219);
+    line-height: 1;
+    padding: 12px 0;
+}
+
+.token-counter .number {
+    font-weight: 600;
+    color: rgb(229, 231, 235);
+}
+
+.token-counter .separator {
+    color: rgb(156, 163, 175);
+    margin: 0 4px;
+}
+
+.token-counter .max {
+    color: rgb(156, 163, 175);
+}
+
+.token-counter .percentage {
+    color: rgb(139, 92, 246);
+    margin-left: 8px;
+}
+
+/* Status Numbers - Updated */
+.status-numbers {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 8px;
+}
+
+.status-number {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--status-number-size);
+    color: rgb(209, 213, 219);
+}
+
+.status-number i {
+    width: var(--icon-size);
+    height: var(--icon-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--icon-size);
+}
+
+/* Input Area - Updated */
 .chat-input-container {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    background-color: rgba(255, 255, 255, 0.98);
+    background-color: rgba(31, 41, 55, 0.98);
     backdrop-filter: blur(12px);
-    border-top: 1px solid rgba(229, 231, 235, 0.8);
-    padding: 0.5rem;
-    padding-bottom: max(1rem, var(--safe-bottom));
-    box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
-    transform: translateZ(0);
+    border-top: 1px solid rgba(75, 85, 99, 0.5);
+    padding: 12px;
+    padding-bottom: max(12px, var(--safe-bottom));
     z-index: 1200;
     height: var(--chat-input-height);
     display: flex;
     align-items: center;
+    gap: 12px;
 }
 
-.dark .chat-input-container {
-    background-color: rgba(31, 41, 55, 0.98);
-    border-color: rgba(75, 85, 99, 0.5);
+.form-input {
+    width: 100%;
+    height: var(--input-height);
+    background-color: rgb(55, 65, 81);
+    color: rgb(229, 231, 235);
+    padding: 12px;
+    padding-right: calc(80px + 24px);
+    line-height: 1.5;
+    border: 1px solid rgb(75, 85, 99);
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s ease;
 }
 
-/* Tab Navigation */
-.usage-tabs {
+.form-input::placeholder {
+    color: rgb(156, 163, 175);
+    padding-left: 4px;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--button-primary);
+    box-shadow: 0 0 0 2px rgba(45, 124, 255, 0.2);
+}
+
+#send-button {
+    position: absolute;
+    right: 24px;
+    height: var(--input-height);
+    min-width: 80px;
+    padding: 0 16px;
+    background-color: var(--button-primary);
+    color: white;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
     display: flex;
-    gap: 0.5rem;
-    padding: 0.25rem 0.5rem;
-    position: relative;
-    z-index: 2;
-    border-bottom: 1px solid rgba(229, 231, 235, 0.5);
-    margin-bottom: 0;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+#send-button:hover {
+    background-color: rgb(28, 100, 242);
+    transform: translateY(-1px);
+}
+
+#send-button:active {
+    transform: translateY(0);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 640px) {
+    :root {
+        --chat-input-height: 3.5rem;
+        --tabs-height: 3rem;
+    margin: 0 auto;
+    max-width: 24rem;
+    background: inherit;
 }
 
 .tab {
     position: relative;
-    padding: 0.5rem 0.75rem;
+    padding: 0.625rem 1rem;
     font-size: 0.875rem;
     font-weight: 500;
     color: rgb(107, 114, 128);
     user-select: none;
     min-height: 44px;
-    border-radius: 0.5rem;
+    min-width: 120px;
+    max-width: 160px;
+    border-radius: 0.75rem;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+    border: 1px solid transparent;
 }
 
 .tab:hover {
-    background-color: rgba(243, 244, 246, 0.9);
-    color: rgb(55, 65, 81);
+    background-color: rgba(243, 244, 246, 0.8);
+    color: rgb(31, 41, 55);
+    border-color: rgba(209, 213, 219, 0.5);
+    transform: translateY(-1px);
 }
 
 .tab.tab-active {
     background-color: rgb(37, 99, 235);
     color: white;
     font-weight: 600;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
+    border-color: rgb(37, 99, 235);
+}
+
+.tab.tab-active:hover {
+    background-color: rgb(29, 78, 216);
+    transform: none;
 }
 
 .tab i {
     font-size: 1rem;
+    transition: transform 0.2s ease;
+}
+
+.tab:hover i {
+    transform: scale(1.1);
 }
 
 .dark .tab {
@@ -183,25 +323,20 @@
 }
 
 .dark .tab:hover {
-    background-color: rgba(55, 65, 81, 0.9);
+    background-color: rgba(55, 65, 81, 0.8);
     color: rgb(209, 213, 219);
+    border-color: rgba(75, 85, 99, 0.5);
 }
 
 .dark .tab.tab-active {
     background-color: rgb(59, 130, 246);
     color: white;
+    border-color: rgb(59, 130, 246);
+    box-shadow: 0 2px 4px rgba(59, 130, 246, 0.15);
 }
 
-.btn-tab {
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
-    background-color: rgb(229, 231, 235);
-    transition: background-color 0.2s;
-}
-
-
-.dark .btn-tab {
-    background-color: rgb(55, 65, 81);
+.dark .tab.tab-active:hover {
+    background-color: rgb(37, 99, 235);
 }
 .tab.tab-active::after {
     content: '';
@@ -314,13 +449,27 @@
     color: rgb(209, 213, 219);
 }
 
-.file-size {
+.file-size, .file-tokens {
     font-size: 0.75rem;
     color: rgb(107, 114, 128);
+    margin-left: 0.5rem;
 }
 
-.dark .file-size {
+.dark .file-size, .dark .file-tokens {
     color: rgb(156, 163, 175);
+}
+
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 1rem;
+    background-color: rgb(37, 99, 235);
+    color: white;
+    margin-left: 0.5rem;
+}
+
+.dark .status-badge {
+    background-color: rgb(59, 130, 246);
 }
 
 /* File Actions */
@@ -502,7 +651,9 @@
 
 /* Upload Controls */
 #upload-trigger {
-    width: 100%;
+    width: auto;
+    min-width: 160px;
+    max-width: 240px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -513,19 +664,54 @@
     transition: all 0.2s ease;
     background-color: rgb(37, 99, 235);
     color: white;
-    border-radius: 0.5rem;
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+#upload-trigger::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.1), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
 }
 
 #upload-trigger:hover {
     background-color: rgb(29, 78, 216);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.15);
+}
+
+#upload-trigger:hover::before {
+    transform: translateX(100%);
 }
 
 #upload-trigger i {
     font-size: 1.125rem;
+    transition: transform 0.2s ease;
+}
+
+#upload-trigger:hover i {
+    transform: scale(1.1);
 }
 
 #upload-trigger:active {
-    transform: scale(0.98);
+    transform: scale(0.98) translateY(0);
+}
+
+@media (max-width: 640px) {
+    #upload-trigger {
+        width: 100%;
+        max-width: none;
+        border-radius: 0.5rem;
+        padding: 0.625rem 1rem;
+    }
 }
 
 /* File Preview Icons */

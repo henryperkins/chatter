@@ -1,12 +1,311 @@
     'use strict';
 
-    class FileUploadManager {
-                constructor(chatId, userId, uploadButton) {
-                    this.chatId = chatId;
-                    this.userId = userId;
+    // Accurate token counting with type-specific handlers
+    class TokenCounter {
+        constructor() {
+            this.typeHandlers = new Map([
+                ['text/plain', this.countTextTokens.bind(this)],
+                ['application/pdf', this.countPDFTokens.bind(this)],
+                ['application/msword', this.countWordTokens.bind(this)],
+                ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', this.countWordTokens.bind(this)]
+            ]);
+        }
 
-                    // In-memory file list (pending uploads)
-                    this.uploadedFiles = [];
+        async countTokens(file) {
+            const handler = this.typeHandlers.get(file.type) || this.estimateTokens.bind(this);
+            const count = await handler(file);
+            await this.validateAgainstLimits(count);
+            return count;
+        }
+
+        async countTextTokens(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const text = e.target.result;
+                    // More accurate token estimation: ~4 chars per token
+                    const tokenCount = Math.ceil(text.length / 4);
+                    resolve(tokenCount);
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        async countPDFTokens(file) {
+            // Estimate PDF tokens based on size with a more accurate multiplier
+            return Math.ceil(file.size / 500); // ~500 bytes per token for PDFs
+        }
+
+        async countWordTokens(file) {
+            // Word docs typically have more formatting overhead
+            return Math.ceil(file.size / 750); // ~750 bytes per token for Word docs
+        }
+
+        estimateTokens(file) {
+            // Fallback estimation for unknown types
+            return Math.ceil(file.size / 1000); // Conservative estimate
+        }
+
+        async validateAgainstLimits(count) {
+            const systemLimits = { maxTokens: 32000 }; // Could be fetched from server
+            if (count > systemLimits.maxTokens) {
+                throw new Error(`Token limit exceeded: ${count} tokens (max: ${systemLimits.maxTokens})`);
+            }
+            return true;
+        }
+    }
+
+    // Proper file tracking and system integration
+    class FileTracker {
+        constructor() {
+            this.stagedFiles = new Map();
+            this.uploadedFiles = new Map();
+            this.tokenCounter = new TokenCounter();
+        }
+
+        async addFile(file) {
+            const fileId = await this.generateUniqueId(file);
+            
+            if (this.stagedFiles.has(fileId) || this.uploadedFiles.has(fileId)) {
+                throw new Error('File already exists in the system');
+            }
+
+            // Validate token count before staging
+            const tokenCount = await this.tokenCounter.countTokens(file);
+            file.tokenCount = tokenCount;
+
+            this.stagedFiles.set(fileId, {
+                file,
+                tokenCount,
+                status: 'staged',
+                timestamp: new Date().toISOString()
+            });
+
+            return fileId;
+        }
+
+        async generateUniqueId(file) {
+            // Generate a unique ID based on file properties
+            const fileInfo = `${file.name}-${file.size}-${file.lastModified}`;
+            // Use SubtleCrypto for secure hash generation
+            const msgBuffer = new TextEncoder().encode(fileInfo);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        removeFile(fileId) {
+            const wasStaged = this.stagedFiles.delete(fileId);
+            const wasUploaded = this.uploadedFiles.delete(fileId);
+            return wasStaged || wasUploaded;
+        }
+
+        getFile(fileId) {
+            return this.stagedFiles.get(fileId) || this.uploadedFiles.get(fileId);
+        }
+
+        moveToUploaded(fileId, uploadResult) {
+            const fileData = this.stagedFiles.get(fileId);
+            if (!fileData) return false;
+
+            this.stagedFiles.delete(fileId);
+            this.uploadedFiles.set(fileId, {
+                ...fileData,
+                status: 'uploaded',
+                uploadResult
+            });
+            return true;
+        }
+
+        getTotalTokens() {
+            let total = 0;
+            for (const [_, data] of this.stagedFiles) {
+                total += data.tokenCount;
+            }
+            for (const [_, data] of this.uploadedFiles) {
+                total += data.tokenCount;
+            }
+            return total;
+        }
+    }
+
+    // Enhanced mobile upload handling
+    class MobileUploadManager {
+        constructor() {
+            this.networkMonitor = {
+                type: navigator.connection?.type || 'unknown',
+                isReliable: () => {
+                    const connection = navigator.connection;
+                    if (!connection) return true;
+                    return !['slow-2g', '2g'].includes(connection.effectiveType);
+                }
+            };
+            this.uploadQueue = new Map();
+            this.CHUNK_SIZE = 5 * 1024 * 1024; // 5MB default
+            this.setupNetworkListeners();
+        }
+
+        setupNetworkListeners() {
+            if ('connection' in navigator) {
+                navigator.connection.addEventListener('change', () => {
+                    this.networkMonitor.type = navigator.connection.type;
+                    this.adjustChunkSize();
+                });
+            }
+        }
+
+        adjustChunkSize() {
+            const connection = navigator.connection;
+            if (!connection) return;
+
+            switch (connection.effectiveType) {
+                case '4g':
+                    this.CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+                    break;
+                case '3g':
+                    this.CHUNK_SIZE = 1 * 1024 * 1024; // 1MB
+                    break;
+                default:
+                    this.CHUNK_SIZE = 512 * 1024; // 512KB
+            }
+        }
+
+        async upload(file, uploadUrl, headers = {}) {
+            if (!this.networkMonitor.isReliable()) {
+                return this.queueForLater(file);
+            }
+
+            if (file.size > this.CHUNK_SIZE) {
+                return this.chunkedUpload(file, uploadUrl, headers);
+            }
+
+            return this.reliableUpload(file, uploadUrl, headers);
+        }
+
+        async reliableUpload(file, uploadUrl, headers, retries = 3) {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await fetch(uploadUrl, {
+                    method: 'POST',
+                    body: formData,
+                    headers,
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Upload failed: ${response.statusText}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                if (retries > 0 && this.isRetryableError(error)) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    return this.reliableUpload(file, uploadUrl, headers, retries - 1);
+                }
+                throw error;
+            }
+        }
+
+        isRetryableError(error) {
+            return error.message.includes('network') || 
+                   error.message.includes('timeout') ||
+                   error.message.includes('connection');
+        }
+
+        async chunkedUpload(file, uploadUrl, headers) {
+            const chunks = Math.ceil(file.size / this.CHUNK_SIZE);
+            const uploadId = await this.initializeChunkedUpload(file, uploadUrl, headers);
+
+            for (let i = 0; i < chunks; i++) {
+                const start = i * this.CHUNK_SIZE;
+                const end = Math.min(start + this.CHUNK_SIZE, file.size);
+                const chunk = file.slice(start, end);
+
+                await this.uploadChunk(chunk, i, chunks, uploadId, uploadUrl, headers);
+            }
+
+            return this.finalizeChunkedUpload(uploadId, uploadUrl, headers);
+        }
+
+        async initializeChunkedUpload(file, uploadUrl, headers) {
+            const response = await fetch(`${uploadUrl}/init`, {
+                method: 'POST',
+                headers: {
+                    ...headers,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    filename: file.name,
+                    size: file.size,
+                    type: file.type
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to initialize chunked upload');
+            }
+
+            const result = await response.json();
+            return result.uploadId;
+        }
+
+        async uploadChunk(chunk, index, total, uploadId, uploadUrl, headers) {
+            const formData = new FormData();
+            formData.append('chunk', chunk);
+            formData.append('index', index);
+            formData.append('total', total);
+            formData.append('uploadId', uploadId);
+
+            const response = await fetch(`${uploadUrl}/chunk`, {
+                method: 'POST',
+                body: formData,
+                headers
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to upload chunk ${index + 1}/${total}`);
+            }
+
+            return response.json();
+        }
+
+        async finalizeChunkedUpload(uploadId, uploadUrl, headers) {
+            const response = await fetch(`${uploadUrl}/finalize`, {
+                method: 'POST',
+                headers: {
+                    ...headers,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ uploadId })
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to finalize upload');
+            }
+
+            return response.json();
+        }
+
+        queueForLater(file) {
+            const queueId = Date.now().toString();
+            this.uploadQueue.set(queueId, {
+                file,
+                timestamp: new Date(),
+                retryCount: 0
+            });
+            return { queued: true, queueId };
+        }
+    }
+
+    class FileUploadManager {
+        constructor(chatId, userId, uploadButton) {
+            this.chatId = chatId;
+            this.userId = userId;
+
+            // Enhanced file tracking
+            this.fileTracker = new FileTracker();
+            this.mobileUploadManager = new MobileUploadManager();
             
                     // Mobile-specific properties
                     this.isMobile = /Mobile|Android|iPhone/i.test(navigator.userAgent);
@@ -758,7 +1057,82 @@
                 }
             }
 
-    // Expose the class globally
+    // Layout management for proper panel visibility
+    class LayoutManager {
+        constructor() {
+            this.panels = new Set();
+            this.visibilityObserver = new IntersectionObserver(
+                this.handleVisibilityChange.bind(this),
+                {
+                    threshold: 0.5
+                }
+            );
+            this.setupPanelObservers();
+        }
+
+        setupPanelObservers() {
+            // Observe chat messages for visibility
+            document.querySelectorAll('.chat-message').forEach(message => {
+                this.visibilityObserver.observe(message);
+            });
+
+            // Track panel states
+            document.querySelectorAll('.panel').forEach(panel => {
+                this.panels.add(panel);
+            });
+        }
+
+        handleVisibilityChange(entries) {
+            for (const entry of entries) {
+                if (entry.target.classList.contains('chat-message') && 
+                    entry.intersectionRatio < 0.5) {
+                    this.adjustPanels();
+                }
+            }
+        }
+
+        adjustPanels() {
+            const chatVisible = this.ensureChatVisible();
+            if (!chatVisible) {
+                this.collapsePanels();
+            }
+        }
+
+        ensureChatVisible() {
+            const chatContainer = document.querySelector('.chat-container');
+            if (!chatContainer) return true;
+
+            const rect = chatContainer.getBoundingClientRect();
+            const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+
+            if (!isVisible) {
+                chatContainer.scrollIntoView({ behavior: 'smooth' });
+            }
+
+            return isVisible;
+        }
+
+        collapsePanels() {
+            this.panels.forEach(panel => {
+                if (panel.classList.contains('expanded')) {
+                    panel.classList.remove('expanded');
+                    panel.style.height = 'var(--panel-content-height)';
+                }
+            });
+        }
+
+        observeNewMessage(message) {
+            this.visibilityObserver.observe(message);
+        }
+
+        destroy() {
+            this.visibilityObserver.disconnect();
+            this.panels.clear();
+        }
+    }
+
+    // Expose classes globally
     if (typeof window !== 'undefined') {
         window.FileUploadManager = FileUploadManager;
+        window.LayoutManager = LayoutManager;
     }

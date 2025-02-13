@@ -1,15 +1,18 @@
-<div class="user-message flex items-start gap-4 p-4">
-  <div class="flex-shrink-0 w-8 h-8 rounded-full bg-secondary-600 dark:bg-secondary-500 flex items-center justify-center">
+<div class="message-group user-message flex items-start gap-4 p-4" data-sender="user">
+  <div class="avatar-container rounded-full bg-secondary-600 dark:bg-secondary-500 flex items-center justify-center">
     <i class="fas fa-user text-white text-sm"></i>
   </div>
   <div class="flex-1 min-w-0">
-    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+    <div class="message-bubble shadow-sm">
       <p class="prose dark:prose-invert max-w-none">{{ message.content }}</p>
-      <div class="mt-2 flex items-center justify-between">
-        <span class="text-xs text-gray-500 dark:text-gray-400">{{ message.timestamp|default(None, true) }}</span>
-        <button class="copy-button text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" data-raw-content="{{ message.content }}">
-          <i class="fas fa-copy"></i>
-        </button>
+      <div class="flex items-center justify-between">
+        <span class="timestamp">{{ message.timestamp|default(None, true) }}</span>
+        <div class="flex items-center gap-2">
+          <span class="message-status"></span>
+          <button class="copy-button p-2 text-gray-400 hover:text-gray-300 transition-colors" data-raw-content="{{ message.content }}">
+            <i class="fas fa-copy text-lg"></i>
+          </button>
+        </div>
       </div>
     </div>
   </div>

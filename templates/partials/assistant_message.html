@@ -1,11 +1,22 @@
-<div class="assistant-message flex items-start gap-4 p-4">
-  <div class="flex-shrink-0 w-8 h-8 rounded-full bg-primary-600 dark:bg-primary-500 flex items-center justify-center">
+<div class="message-group assistant-message flex items-start gap-4 p-4" data-sender="assistant">
+  <div class="avatar-container rounded-full bg-primary-600 dark:bg-primary-500 flex items-center justify-center">
     <i class="fas fa-robot text-white text-sm"></i>
   </div>
   <div class="flex-1 min-w-0">
-    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+    <div class="message-bubble shadow-sm">
       <div class="prose dark:prose-invert max-w-none" data-content="{{ message.content }}">
         {{ message.content_html|safe }}
+      </div>
+      <div class="flex items-center justify-between">
+        <span class="timestamp">{{ message.timestamp|default(None, true) }}</span>
+        <div class="flex items-center gap-2">
+          <button class="regenerate-button p-2 text-gray-400 hover:text-gray-300 transition-colors" aria-label="Regenerate response">
+            <i class="fas fa-redo text-lg"></i>
+          </button>
+          <button class="copy-button p-2 text-gray-400 hover:text-gray-300 transition-colors" data-raw-content="{{ message.content }}">
+            <i class="fas fa-copy text-lg"></i>
+          </button>
+        </div>
       </div>
     </div>
   </div>

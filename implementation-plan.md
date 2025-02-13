@@ -1,346 +1,250 @@
-# JavaScript Initialization Improvement Plan
+# File Upload Interface Improvement Plan - Core Issues
 
-## Current Script Loading Analysis
+## 1. File Integration & Staging Issues
 
-### Base Template Scripts (in order)
-1. External Libraries
-   - markdown-it
-   - dompurify
-   - prism
+### Problem
+- Files appear as duplicates because they're not properly integrated with the backend
+- Files are just visual placeholders without proper system integration
+- Close buttons lack proper system feedback
 
-2. Local Libraries
-   - axios
-   - dompurify
-   - markdown-it
-   - prism
-
-3. Core Utilities
-   - utils.js
-   - monitoring.js
-   - base.js
-   - alerts.js
-   - dark-mode.js
-   - form_handler.js
-   - shared-validation.js
-   - fileUpload.js
-   - token-usage.js
-   - core.js
-
-### Chat Template Additional Scripts (ES modules)
-- message-renderer.js
-- chat-config.js
-- chat.js
-
-## Initialization Issues
-
-1. **Script Loading Order**
-   - core.js loads last but needs to coordinate initialization
-   - Modules with dependencies load before their dependencies
-   - No clear separation between library loading and app initialization
-
-2. **Dependency Management**
-   - chat-config.js needed by token-usage.js and message-renderer.js
-   - utils.js needed by most components
-   - monitoring.js should initialize early for error tracking
-
-3. **Multiple Initialization Points**
-   - DOMContentLoaded listeners in multiple files
-   - Redundant initialization checks
-   - Race conditions between components
-
-## Simplified Solution
-
-### 1. Reorder Script Loading
-
-```html
-<!-- base.html -->
-<!-- 1. External Libraries -->
-<script src="markdown-it.min.js"></script>
-<script src="dompurify.min.js"></script>
-<script src="prism.min.js"></script>
-
-<!-- 2. Core Utilities (non-module) -->
-<script src="js/utils.js"></script>
-<script src="js/monitoring.js"></script>
-
-<!-- 3. Core App -->
-<script src="js/core.js"></script>
-
-<!-- 4. Feature Modules -->
-<script src="js/alerts.js"></script>
-<script src="js/dark-mode.js"></script>
-<script src="js/form_handler.js"></script>
-<script src="js/shared-validation.js"></script>
-<script src="js/fileUpload.js"></script>
-<script src="js/token-usage.js"></script>
-<script src="js/base.js"></script>
-
-<!-- 5. ES Modules (for chat pages) -->
-<script type="module" src="js/chat-config.js"></script>
-<script type="module" src="js/message-renderer.js"></script>
-<script type="module" src="js/chat.js"></script>
+### Solution
+1. Implement proper file tracking:
+```javascript
+class FileTracker {
+    constructor() {
+        this.stagedFiles = new Map(); // Track files by unique ID
+        this.uploadedFiles = new Map(); // Track successfully uploaded files
+    }
+    
+    addFile(file) {
+        const fileId = generateUniqueId(file);
+        if (!this.stagedFiles.has(fileId) && !this.uploadedFiles.has(fileId)) {
+            this.stagedFiles.set(fileId, file);
+            return true;
+        }
+        return false;
+    }
+}
 ```
 
-### 2. Enhance core.js
-
+2. Implement proper backend integration:
 ```javascript
-window.App = {
-    initialized: false,
-    components: {},
+async function uploadFile(file) {
+    // Generate unique file ID
+    const fileId = await generateFileId(file);
+    
+    // Check if file already exists in system
+    const exists = await checkFileExists(fileId);
+    if (exists) {
+        return { error: 'File already exists' };
+    }
+    
+    // Upload and verify
+    const result = await uploadToServer(file);
+    if (result.success) {
+        // Update system records
+        await updateSystemRecords(fileId, result.metadata);
+        return result;
+    }
+}
+```
 
-    async init() {
-        if (this.initialized) return;
+3. Add proper system feedback:
+```javascript
+async function removeFile(fileId) {
+    // Remove from backend first
+    const removed = await removeFromSystem(fileId);
+    if (removed) {
+        // Then update UI
+        this.stagedFiles.delete(fileId);
+        this.updateUI();
+    }
+    return removed;
+}
+```
 
+## 2. Mobile Upload Reliability
+
+### Problem
+- Upload button frequently fails on mobile devices
+- No proper error handling or recovery
+- No network condition handling
+
+### Solution
+1. Implement proper mobile upload handling:
+```javascript
+class MobileUploadManager {
+    constructor() {
+        this.networkMonitor = new NetworkMonitor();
+        this.uploadQueue = new UploadQueue();
+    }
+    
+    async upload(file) {
+        // Check network conditions
+        if (!this.networkMonitor.isReliable()) {
+            return this.queueForLater(file);
+        }
+        
+        // Implement chunked upload for large files
+        if (file.size > CHUNK_SIZE) {
+            return this.chunkedUpload(file);
+        }
+        
+        // Regular upload with retry logic
+        return this.reliableUpload(file);
+    }
+    
+    async reliableUpload(file, retries = 3) {
         try {
-            // 1. Initialize monitoring first
-            if (window.monitoring) {
-                this.components.monitoring = true;
-                console.log('Monitoring initialized');
-            }
-
-            // 2. Initialize utils
-            if (window.utils) {
-                this.components.utils = true;
-                console.log('Utils initialized');
-            }
-
-            // 3. Initialize core dependencies
-            await Promise.all([
-                this.initializeMarkdown(),
-                this.initializePrism(),
-                this.initializeDarkMode()
-            ]);
-
-            // 4. Initialize chat-specific components if on chat page
-            if (document.getElementById('chat-container')) {
-                await this.initializeChatComponents();
-            }
-
-            this.initialized = true;
-            document.dispatchEvent(new Event('app:ready'));
+            return await this.uploadWithProgress(file);
         } catch (error) {
-            console.error('App initialization failed:', error);
-            if (window.monitoring) {
-                window.monitoring.logError('Initialization failed', error);
+            if (retries > 0 && this.isRetryableError(error)) {
+                await this.wait(1000);
+                return this.reliableUpload(file, retries - 1);
+            }
+            throw error;
+        }
+    }
+}
+```
+
+## 3. Token Counting Accuracy
+
+### Problem
+- Token counts are inaccurate
+- No proper validation against system limits
+- No handling of different file types
+
+### Solution
+1. Implement accurate token counting:
+```javascript
+class TokenCounter {
+    constructor() {
+        this.typeHandlers = new Map([
+            ['text/plain', this.countTextTokens],
+            ['application/pdf', this.countPDFTokens],
+            ['application/msword', this.countWordTokens]
+        ]);
+    }
+    
+    async countTokens(file) {
+        const handler = this.typeHandlers.get(file.type);
+        if (!handler) {
+            return this.estimateTokens(file);
+        }
+        
+        const count = await handler(file);
+        await this.validateAgainstLimits(count);
+        return count;
+    }
+    
+    async validateAgainstLimits(count) {
+        const systemLimits = await getSystemLimits();
+        if (count > systemLimits.maxTokens) {
+            throw new TokenLimitError(count, systemLimits.maxTokens);
+        }
+    }
+}
+```
+
+## 4. Interface Layout & Visibility
+
+### Problem
+- Chat window being obscured by panels
+- Inactive grey protrusion above tab menu
+- Poor layout on mobile devices
+
+### Solution
+1. Implement proper layout management:
+```javascript
+class LayoutManager {
+    constructor() {
+        this.panels = new Set();
+        this.visibilityObserver = new IntersectionObserver(
+            this.handleVisibilityChange.bind(this)
+        );
+    }
+    
+    handleVisibilityChange(entries) {
+        for (const entry of entries) {
+            if (entry.target.classList.contains('chat-message') && 
+                entry.intersectionRatio < 0.5) {
+                this.adjustPanels();
             }
         }
-    },
-
-    async initializeChatComponents() {
-        // Wait for ChatConfig
-        const config = window.ChatConfig.getInstance();
-        await config.init();
-        this.components.chatConfig = true;
-
-        // Initialize MessageRenderer
-        if (window.MessageRenderer) {
-            await window.MessageRenderer.initialize();
-            this.components.messageRenderer = true;
-        }
-
-        // Initialize TokenUsageManager if needed
-        if (window.TokenUsageManager && window.CHAT_CONFIG?.chatId) {
-            window.tokenUsageManager = new TokenUsageManager(window.CHAT_CONFIG);
-            await window.tokenUsageManager.initialize();
-            this.components.tokenUsage = true;
-        }
-
-        // Initialize chat interface
-        if (window.startChat) {
-            await window.startChat();
-            this.components.chat = true;
-        }
     }
-};
-```
-
-### 3. Update Component Initialization
-
-1. **monitoring.js**
-```javascript
-// Remove auto-initialization
-window.Monitoring = Monitoring;
-```
-
-2. **chat-config.js**
-```javascript
-// Keep ES module format but remove auto-initialization
-export class ChatConfig {
-    // ... existing code ...
-}
-window.ChatConfig = ChatConfig;
-```
-
-3. **token-usage.js**
-```javascript
-// Remove dependency polling
-class TokenUsageManager {
-    async initialize() {
-        if (!window.utils || !window.CHAT_CONFIG) {
-            throw new Error('Required dependencies not available');
+    
+    adjustPanels() {
+        const chatVisible = this.ensureChatVisible();
+        if (!chatVisible) {
+            this.collapsePanels();
         }
-        // ... rest of initialization
     }
 }
 ```
 
-## Implementation Steps
+## Implementation Strategy
 
-1. **Update Script Loading Order**
-   - Reorder scripts in base.html
-   - Move monitoring and utils earlier
-   - Group ES modules together
+1. Phase 1: Core System Integration
+- Implement FileTracker
+- Add proper backend integration
+- Set up system validation
 
-2. **Update core.js**
-   - Add component tracking
-   - Add chat-specific initialization
-   - Enhance error handling
+2. Phase 2: Mobile Reliability
+- Implement MobileUploadManager
+- Add network monitoring
+- Implement retry logic
 
-3. **Remove Auto-initialization**
-   - Remove DOMContentLoaded listeners
-   - Update component exports
-   - Keep FileUploadManager pattern
+3. Phase 3: Token Accuracy
+- Implement TokenCounter
+- Add proper validation
+- Implement type-specific handlers
 
-4. **Testing**
-   - Test initialization sequence
-   - Verify error handling
-   - Check component states
+4. Phase 4: Layout Fixes
+- Implement LayoutManager
+- Fix panel behavior
+- Ensure chat visibility
 
-## Benefits
+## Success Criteria
 
-1. **Clear Loading Order**
-   - Libraries load first
-   - Core utilities next
-   - Feature modules last
-   - ES modules properly grouped
+1. System Integration
+- No duplicate files possible
+- All files properly tracked in system
+- Proper feedback for all operations
 
-2. **Better Error Tracking**
-   - Monitoring available early
-   - Centralized error handling
-   - Clear initialization status
+2. Mobile Reliability
+- Successful uploads on various network conditions
+- Proper error recovery
+- Progress tracking and resume capability
 
-3. **Simplified Dependencies**
-   - No dependency polling
-   - Clear initialization order
-   - Proper error handling
+3. Token Accuracy
+- Accurate counts for all file types
+- Proper system limit validation
+- Clear feedback on limits
 
-4. **Minimal Changes**
-   - Keeps existing code structure
-   - Maintains ES module usage
-   - Simple to implement and test
+4. Layout
+- Chat always visible
+- No UI glitches
+- Proper mobile layout
 
-This solution focuses on proper script loading order and initialization sequence while maintaining the current architecture and module patterns.
+## Testing Requirements
 
-## Implementation Progress
+1. Integration Tests
+- File tracking accuracy
+- System synchronization
+- Error handling
 
-### 1. Script Loading Order Updated ✅
-Base template (base.html) now loads scripts in the correct order:
-1. External Libraries
-2. Core Foundation (utils.js, monitoring.js, core.js)
-3. UI Components
-4. Form Handling
-5. Feature Modules
-6. ES Modules (in chat.html)
+2. Mobile Tests
+- Network condition handling
+- Upload reliability
+- Error recovery
 
-### 2. Core Components Updated ✅
+3. Token Tests
+- Counting accuracy
+- Limit validation
+- Type handling
 
-#### core.js
-- Added component state tracking
-- Enhanced initialization sequence
-- Added comprehensive debug logging
-- Improved error handling
-- Manages dependencies properly
-
-#### monitoring.js
-- Removed auto-initialization
-- Added debug logging
-- Starts disabled until core.js initializes
-- Enhanced error tracking
-
-#### chat-config.js
-- Converted to ES module
-- Removed auto-initialization
-- Added configuration loading logging
-- Enhanced error handling
-- Improved dependency checking
-
-#### message-renderer.js
-- Converted to ES module
-- Added template loading logging
-- Enhanced dependency verification
-- Improved error messages
-- Better message processing tracking
-
-#### token-usage.js
-- Removed dependency polling
-- Added initialization logging
-- Enhanced error handling
-- Improved stats tracking
-- Better dependency verification
-
-### 3. Current State
-
-#### Completed
-1. Script loading order reorganization
-2. Component initialization system
-3. Debug logging implementation
-4. Error handling improvements
-5. Dependency management
-6. Auto-initialization removal
-
-#### Pending
-1. Testing the initialization sequence
-2. Verifying error handling
-3. Testing component interactions
-4. Performance monitoring
-5. Load time optimization
-
-### 4. Next Steps
-
-#### Immediate
-1. Test initialization sequence
-2. Verify error handling
-3. Check component interactions
-
-#### Short Term
-1. Monitor performance impact
-2. Optimize load times
-3. Review error logs
-
-#### Long Term
-1. Add performance benchmarks
-2. Implement load time tracking
-3. Add automated testing
-
-### 5. Current Dependencies
-
-```
-core.js
-├── monitoring.js
-├── utils.js
-└── chat components
-    ├── chat-config.js
-    │   └── token-usage.js
-    └── message-renderer.js
-        ├── markdown-it
-        ├── DOMPurify
-        └── Prism
-```
-
-### 6. Debug Logging
-
-All key components now include comprehensive debug logging:
-- Initialization sequence
-- Dependency checking
-- Component state changes
-- Error conditions
-- Performance metrics
-
-### 7. Error Handling
-
-Enhanced error handling across all components:
-- Early dependency checking
-- Detailed error messages
-- Stack traces for missing dependencies
-- Graceful fallbacks
-- User-friendly error displays
+4. Layout Tests
+- Visibility checks
+- Panel behavior
+- Mobile responsiveness

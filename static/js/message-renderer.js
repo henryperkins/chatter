@@ -9,6 +9,8 @@ class MessageRenderer {
         typingIndicator: null
     };
 
+    static lastSender = null;
+
     static async initialize() {
         try {
             console.debug('MessageRenderer: Starting initialization');
@@ -37,6 +39,23 @@ class MessageRenderer {
             const chatBox = document.getElementById('chat-box');
             console.debug('MessageRenderer: Processing existing messages');
             if (chatBox) {
+                const messages = chatBox.querySelectorAll('.message-group');
+                let prevSender = null;
+                messages.forEach(message => {
+                    const sender = message.dataset.sender;
+                    if (sender === prevSender) {
+                        message.classList.add('same-sender');
+                    }
+                    prevSender = sender;
+
+                    // Format timestamps
+                    const timestamp = message.querySelector('.timestamp');
+                    if (timestamp && timestamp.textContent) {
+                        timestamp.textContent = this.formatTimestamp(new Date(timestamp.textContent));
+                    }
+                });
+
+                // Process assistant messages content
                 const assistantMessages = chatBox.querySelectorAll('.assistant-message .prose');
                 for (const messageDiv of assistantMessages) {
                     const content = messageDiv.getAttribute('data-content');
@@ -54,13 +73,29 @@ class MessageRenderer {
         }
     }
 
-    static renderAssistantMessage(message, isStreaming = false) {
+    static formatTimestamp(date) {
+        return new Date(date).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+    }
+
+    static handleMessageGrouping(messageDiv) {
+        const sender = messageDiv.dataset.sender;
+        if (this.lastSender === sender) {
+            messageDiv.classList.add('same-sender');
+        }
+        this.lastSender = sender;
+    }
+
+    static renderAssistantMessage(message, isStreaming = false, timestamp = new Date()) {
         const template = this.templates.assistant;
         const clone = template.content.cloneNode(true);
         const messageContainer = clone.firstElementChild;
         const messageContent = clone.querySelector('[data-role="assistant-message"]');
         const proseDiv = messageContent.querySelector('.prose');
-        const timestamp = clone.querySelector('span.text-xs');
+        const timestampEl = clone.querySelector('.timestamp');
         const copyButton = clone.querySelector('.copy-button');
 
         // Handle both string and object message formats
@@ -81,78 +116,87 @@ class MessageRenderer {
         }
         proseDiv.setAttribute('data-content', displayContent);
 
-        // Show a timestamp
-        timestamp.textContent = new Date().toLocaleTimeString();
+        // Show a formatted timestamp
+        if (timestampEl) {
+            timestampEl.textContent = this.formatTimestamp(timestamp);
+        }
 
         // If there's a copy button, store raw text
         if (copyButton) {
             copyButton.setAttribute('data-raw-content', content);
         }
 
-        return clone.firstElementChild;
+        // Handle message grouping
+        this.handleMessageGrouping(messageContainer);
+
+        return messageContainer;
     }
 
-    static renderUserMessage(content, files = []) {
-      if (!content || typeof content !== 'string') {
-        console.error('Invalid message content:', content);
-        content = ''; // ensure we handle unexpected input
-      }
-  
-      const template = this.templates.user;
-      if (!template?.content) {
-        console.error('User message template missing. Rendering fallback.');
-        const div = document.createElement('div');
-        div.className = 'fallback-user-message';
-        div.textContent = content || 'User message';
-        return div;
-      }
-  
-      const clone = template.content.cloneNode(true);
-      const messageText = clone.querySelector('p');
-      const timestamp = clone.querySelector('span.text-xs');
-      const copyButton = clone.querySelector('.copy-button');
-  
-      // Assign user content with null checks
-      if (messageText) {
-        messageText.textContent = content;
-      } else {
-        console.error('Message text element not found in template');
-      }
-  
-      // Add timestamp with null check
-      if (timestamp) {
-        timestamp.textContent = new Date().toLocaleTimeString();
-      }
-  
-      // Set up copy button if available
-      if (copyButton) {
-        copyButton.setAttribute('data-raw-content', content);
-      } else if (content.length > 100) {
-        console.warn('Copy button missing for long user message');
-      }
-  
-      // If user included attachments, render them with error handling
-      if (files?.length > 0) {
-        try {
-          const attachments = this.renderAttachments(files);
-          if (messageText?.parentNode) {
-            messageText.parentNode.appendChild(attachments);
-          } else {
-            console.error('Parent node missing for attachments');
-          }
-        } catch (error) {
-          console.error('Failed to render attachments:', error);
+    static renderUserMessage(content, files = [], timestamp = new Date()) {
+        if (!content || typeof content !== 'string') {
+            console.error('Invalid message content:', content);
+            content = ''; // ensure we handle unexpected input
         }
-      }
-  
-      return clone.firstElementChild || this.createFallbackUserMessage(content);
+    
+        const template = this.templates.user;
+        if (!template?.content) {
+            console.error('User message template missing. Rendering fallback.');
+            const div = document.createElement('div');
+            div.className = 'fallback-user-message';
+            div.textContent = content || 'User message';
+            return div;
+        }
+    
+        const clone = template.content.cloneNode(true);
+        const messageText = clone.querySelector('p');
+        const timestampEl = clone.querySelector('.timestamp');
+        const copyButton = clone.querySelector('.copy-button');
+        const messageContainer = clone.firstElementChild;
+    
+        // Assign user content with null checks
+        if (messageText) {
+            messageText.textContent = content;
+        } else {
+            console.error('Message text element not found in template');
+        }
+    
+        // Add formatted timestamp
+        if (timestampEl) {
+            timestampEl.textContent = this.formatTimestamp(timestamp);
+        }
+    
+        // Set up copy button if available
+        if (copyButton) {
+            copyButton.setAttribute('data-raw-content', content);
+        } else if (content.length > 100) {
+            console.warn('Copy button missing for long user message');
+        }
+    
+        // Handle message grouping
+        this.handleMessageGrouping(messageContainer);
+    
+        // If user included attachments, render them with error handling
+        if (files?.length > 0) {
+            try {
+                const attachments = this.renderAttachments(files);
+                if (messageText?.parentNode) {
+                    messageText.parentNode.appendChild(attachments);
+                } else {
+                    console.error('Parent node missing for attachments');
+                }
+            } catch (error) {
+                console.error('Failed to render attachments:', error);
+            }
+        }
+    
+        return messageContainer || this.createFallbackUserMessage(content);
     }
-  
+
     static createFallbackUserMessage(content) {
-      const div = document.createElement('div');
-      div.className = 'fallback-user-message bg-blue-50 dark:bg-gray-800 p-4 rounded-xl my-2';
-      div.textContent = content || 'User message (fallback rendering)';
-      return div;
+        const div = document.createElement('div');
+        div.className = 'fallback-user-message bg-blue-50 dark:bg-gray-800 p-4 rounded-xl my-2';
+        div.textContent = content || 'User message (fallback rendering)';
+        return div;
     }
 
     static renderAttachments(files) {

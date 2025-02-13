@@ -84,9 +84,11 @@ class ConversationManager:
 
         # Add special note for O-series if needed
         if is_o_series:
+            from os import getenv
+            developer_msg = getenv("DEVELOPER_MESSAGE", "Formatting re-enabled - please enclose code blocks with appropriate markdown tags.")
             markdown_request = {
                 "role": "developer",
-                "content": "Formatting re-enabled - please enclose code blocks with appropriate markdown tags."
+                "content": developer_msg
             }
             context.append(markdown_request)
 
@@ -274,10 +276,7 @@ class ConversationManager:
             self.context_cache[chat_id] = optimized_context
 
             # Track usage
-            if hasattr(self.context_manager, "track_token_usage"):
-                self.context_manager.track_token_usage(current_tokens)
-            if hasattr(self.context_manager, "optimize_compression"):
-                self.context_manager.optimize_compression()
+            # Removed references to track_token_usage and optimize_compression
 
         except Exception as e:
             logger.error("Error in _manage_context_window for chat %s: %s", chat_id, e)
@@ -460,7 +459,10 @@ conversation_manager = ConversationManager()
 def incorporate_file_content(self, chat_id: str, file_id: int) -> None:
     from models.uploaded_file import UploadedFile
     file_record = UploadedFile.get_by_id(file_id)
-    if not file_record or not file_record.tokenized_text:
+    if file_record is None:
+        logger.warning("No tokenized text found for file_id %d", file_id)
+        return
+    if file_record.tokenized_text is None or file_record.tokenized_text.strip() == "":
         logger.warning("No tokenized text found for file_id %d", file_id)
         return
 
