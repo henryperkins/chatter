@@ -7,7 +7,7 @@ from typing import List, Dict, Tuple, Any
 from werkzeug.utils import secure_filename as werkzeug_secure_filename
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from flask import jsonify
+from flask import jsonify, current_app
 import tiktoken
 from token_utils import count_tokens, truncate_content, get_encoding
 from context_manager import ContextManager, ContextMonitor
