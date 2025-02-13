@@ -677,12 +677,16 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                             'content': file_record.text_content
                         })
 
-        # Combine message + file contents
-        combined_message = message
-        if file_contents:
-            combined_message += "\n\nAttached files:\n" + "\n".join(
-                f"[{fc['filename']}]\n{fc['content']}" for fc in file_contents
-            )
+        # Combine message + file contents with model-specific formatting
+        if model_obj.model_type.lower() in ['o1', 'o1-mini', 'o1-preview']:
+            from chat_utils import format_file_contents_for_o1
+            combined_message = format_file_contents_for_o1(file_contents, message)
+        else:
+            combined_message = message
+            if file_contents:
+                combined_message += "\n\nAttached files:\n" + "\n".join(
+                    f"[{fc['filename']}]\n{fc['content']}" for fc in file_contents
+                )
 
         # Sanitize user content
         combined_message = bleach.clean(combined_message)

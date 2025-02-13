@@ -2,13 +2,57 @@ import uuid
 import os
 import smtplib
 import logging
+import hashlib
 from typing import List, Dict, Tuple, Any
 from werkzeug.utils import secure_filename as werkzeug_secure_filename
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import jsonify
+import tiktoken
 from token_utils import count_tokens, truncate_content, get_encoding
 from context_manager import ContextManager, ContextMonitor
+
+# File processing constants
+MAX_INPUT_TOKENS = int(os.getenv("MAX_INPUT_TOKENS", "32000"))  # Default to 32k tokens
+
+def scan_file(content: bytes) -> bool:
+    """Stub virus scanning - integrate actual scanner here"""
+    # Implement actual virus scanning integration
+    return True  # Temporarily allow all files
+
+def extract_text_from_file(file, mime_type: str) -> str:
+    """
+    Extract text content from non-text files using appropriate libraries.
+    
+    Args:
+        file: File object to process
+        mime_type: Detected MIME type of the file
+        
+    Returns:
+        Extracted text content as string
+    """
+    try:
+        file.seek(0)
+        content = file.read()
+        
+        if mime_type == 'application/pdf':
+            from pypdf import PdfReader
+            reader = PdfReader(file)
+            return "\n".join(page.extract_text() for page in reader.pages)
+            
+        elif mime_type in ['application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                          'application/msword']:
+            from docx import Document
+            doc = Document(file)
+            return "\n".join(para.text for para in doc.paragraphs)
+            
+        else:
+            raise ValueError(f"Unsupported file type for text extraction: {mime_type}")
+            
+    except ImportError as e:
+        raise ValueError(f"Required library not installed for {mime_type} processing: {e}")
+    except Exception as e:
+        raise ValueError(f"Failed to extract text from {file.filename}: {e}")
 
 # Constants
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")  # Default model name
@@ -294,42 +338,140 @@ def send_verification_email(recipient_email: str, verification_token: str) -> No
     html = f"<html><body><p>{text}</p><a href='{verification_url}'>{verification_url}</a></body></html>"
     send_email(subject, recipient_email, text, html)
 
-def process_uploaded_files(files: List[Any]) -> Tuple[List[str], List[Dict[str, str]], int, List[Dict[str, str]]]:
+def process_uploaded_files(files: List[Any]) -> Tuple[List[Dict], List[Dict], int, List[Dict]]:
     """
-    Process multiple uploaded files, validating and processing each one.
-
-    Args:
-        files: List of file objects from request.files
-
+    Process uploaded files with improved text extraction and tokenization.
+    
     Returns:
         Tuple containing:
-        - List of included filenames
-        - List of excluded files with error messages
-        - Total token count
-        - List of processed file contents with filenames
-
-    Raises:
-        ValueError: If no valid files are provided or if processing fails
+        - List of included files
+        - List of excluded files
+        - Total tokens
+        - Processed file contents
     """
-    if not files:
-        raise ValueError("No files provided")
-
     included_files = []
     excluded_files = []
     total_tokens = 0
     file_contents = []
-
+    
     for file in files:
+        if not file or not file.filename:
+            continue
+            
         try:
-            filename, content, token_count = process_file(file)
-            included_files.append(filename)
-            total_tokens += token_count
-            file_contents.append({
-                "filename": filename,
-                "content": content
-            })
-        except ValueError as e:
-            excluded_files.append({"filename": file.filename, "error": str(e)})
-            logger.warning(f"File excluded: {file.filename} - {str(e)}")
+            # Get file content and mime type
+            content = file.read()
+            file.seek(0)
+            
+            # Detect mime type
+            try:
+                import magic
+                mime_type = magic.from_buffer(content, mime=True)
+            except ImportError:
+                mime_type = file.content_type or 'application/octet-stream'
+            
+            # Process based on mime type
+            if mime_type.startswith('text/'):
+                # For text files, decode content
+                try:
+                    text_content = content.decode('utf-8')
+                except UnicodeDecodeError:
+                    text_content = content.decode('latin-1')
+            else:
+                # For non-text files, attempt extraction if supported
+                text_content = extract_text_from_file(file, mime_type)
+            
+            # Tokenize content
+            try:
+                encoding = tiktoken.encoding_for_model('gpt-4')
+                tokens = encoding.encode(text_content)
+                token_count = len(tokens)
+            except Exception as e:
+                logger.warning(f"Tokenization failed: {e}")
+                token_count = len(text_content.split())
+            
+            # Security check - virus scanning
+            if not scan_file(content):
+                excluded_files.append({
+                    'filename': file.filename, 
+                    'reason': 'File failed security scan'
+                })
+                continue
 
+            # Add to included files if within limits
+            if token_count <= MAX_INPUT_TOKENS:
+                included_files.append({
+                    'filename': file.filename,
+                    'size': len(content),
+                    'mime_type': mime_type,
+                    'token_count': token_count,
+                    'sha256_hash': hashlib.sha256(content).hexdigest()
+                })
+                
+                file_contents.append({
+                    'filename': file.filename,
+                    'content': text_content,
+                    'mime_type': mime_type,
+                    'token_count': token_count
+                })
+                
+                total_tokens += token_count
+            else:
+                excluded_files.append({
+                    'filename': file.filename,
+                    'reason': f'Token count ({token_count}) exceeds limit'
+                })
+                
+        except Exception as e:
+            excluded_files.append({
+                'filename': file.filename,
+                'reason': str(e)
+            })
+            
     return included_files, excluded_files, total_tokens, file_contents
+
+def format_file_contents_for_o1(files_data: List[Dict[str, str]], message: str = "") -> str:
+    """
+    Format file contents in a way that's optimized for o1 series models.
+    
+    Args:
+        files_data: List of dictionaries containing file info and content
+        message: Optional user message to include
+    
+    Returns:
+        Formatted string combining message and file contents
+    """
+    formatted_content = []
+    
+    # Add user message if present
+    if message.strip():
+        formatted_content.append(f"User Message: {message.strip()}\n")
+    
+    # Add file contents with clear section markers
+    if files_data:
+        formatted_content.append("\n=== Uploaded Files Content ===\n")
+        
+        for idx, file_data in enumerate(files_data, 1):
+            filename = file_data.get('filename', f'File {idx}')
+            content = file_data.get('content', '').strip()
+            mime_type = file_data.get('mime_type', 'text/plain')
+            
+            # Add file metadata header
+            formatted_content.append(f"\n--- File {idx}: {filename} ({mime_type}) ---\n")
+            
+            # Format content based on type
+            if mime_type.startswith('text/'):
+                # For text files, add line numbers and clear section markers
+                lines = content.split('\n')
+                formatted_lines = [f"{i+1:4d} | {line}" for i, line in enumerate(lines)]
+                formatted_content.append('\n'.join(formatted_lines))
+            else:
+                # For other types, just add the content with a type indicator
+                formatted_content.append(f"[Content Type: {mime_type}]\n{content}")
+                
+            formatted_content.append("\n" + "-" * 50 + "\n")
+    
+    # Add a clear end marker
+    formatted_content.append("\n=== End of Files ===\n")
+    
+    return "\n".join(formatted_content)

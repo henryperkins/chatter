@@ -950,7 +950,7 @@ async function sendMessage(event) {
         let uploadedFiles = [];
 
         // Validate message content
-        if (!message && (!window.fileUploadManager?.uploadedFiles?.length)) {
+        if (!message && (!window.fileUploadManager?.uploadedFiles?.length || window.fileUploadManager.uploadedFiles.length === 0)) {
             window.MessageRenderer.showError('Please provide a message or upload files');
             return;
         }
