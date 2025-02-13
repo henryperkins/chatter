@@ -112,7 +112,7 @@ def manage_users():
 
 
 @bp.route("/login", methods=["GET", "POST"])
-@limiter.limit("5 per minute")
+@limiter.limit("10/minute;100/day")
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("chat.chat_interface"))
@@ -120,6 +120,13 @@ def login():
     form = LoginForm()
 
     if form.validate_on_submit():
+        # Account lockout check
+        user = User.get_by_username(form.username.data.strip())
+        if user and user.account_locked_until and user.account_locked_until > datetime.now(timezone.utc):
+            logger.warning(f"Login attempt for locked account: {user.username}")
+            flash("Account locked for 15 minutes due to multiple failed attempts", "error")
+            return render_template("login.html", form=form)
+
         # Add CSRF debugging
         logger.debug(f"CSRF data in form object: {form.csrf_token.data}")
         logger.debug(f"Raw form data for csrf_token: {request.form.get('csrf_token')}")
@@ -144,10 +151,21 @@ def login():
                 flash("Invalid credentials", "error")
                 return render_template("login.html", form=form)
 
+            # Track failed attempts
             if not user.check_password(password):
-                logger.warning(f"Invalid password for user: {username}")
+                user.failed_login_attempts += 1
+                if user.failed_login_attempts >= 5:
+                    user.account_locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+                user.save()
+                
+                logger.warning(f"Invalid password for user: {username} (Attempt {user.failed_login_attempts}/5)")
                 flash("Invalid credentials", "error")
                 return render_template("login.html", form=form)
+
+            # Reset failed attempts on successful login
+            user.failed_login_attempts = 0
+            user.account_locked_until = None
+            user.save()
 
             login_user(user, remember=form.remember.data)
             logger.info(f"User logged in: {user.id} ({username})")

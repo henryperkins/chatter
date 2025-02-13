@@ -28,6 +28,13 @@ class UsagePanelManager {
 
         this.setupEventListeners();
         this.setupTouchHandling();
+        
+        // Set initial active tab
+        const firstTab = document.querySelector('.usage-tabs .tab');
+        const firstPanelId = firstTab?.getAttribute('data-panel');
+        if (firstTab && firstPanelId) {
+            this.switchTab(firstTab, firstPanelId);
+        }
     }
 
     setupEventListeners() {
@@ -88,15 +95,15 @@ class UsagePanelManager {
         selectedTab.classList.add('tab-active');
         
         // Hide all panels
-        document.querySelectorAll('.panel-content > div').forEach(panel => {
-            panel.classList.add('hidden');
+        document.querySelectorAll('.panel-content').forEach(panel => {
+            if (panel.id === targetId) {
+                panel.style.display = 'block';
+                panel.classList.remove('hidden');
+            } else {
+                panel.style.display = 'none';
+                panel.classList.add('hidden');
+            }
         });
-        
-        // Show selected panel
-        const targetPanel = document.getElementById(targetId);
-        if (targetPanel) {
-            targetPanel.classList.remove('hidden');
-        }
     }
 
     expand() {
@@ -227,13 +234,27 @@ async function startChat() {
         // Initialize managers (file upload and token usage)
         try {
             if (!window.fileUploadManager) {
-                const uploadButton = document.getElementById('file-upload');
+                const uploadButton = document.getElementById('upload-trigger');
+                if (!uploadButton) {
+                    console.error('Upload button not found');
+                    throw new Error('Upload button not found');
+                }
+                
+                console.log('Initializing FileUploadManager');
                 window.fileUploadManager = new window.FileUploadManager(
                     configDiv.dataset.chatId,
                     configDiv.dataset.userId,
                     uploadButton
                 );
-                await window.fileUploadManager.initializeFileUpload();
+                
+                // Initialize file upload manager
+                try {
+                    await window.fileUploadManager.initializeFileUpload();
+                    console.log('FileUploadManager initialized');
+                } catch (error) {
+                    console.error('Failed to initialize FileUploadManager:', error);
+                    throw error;
+                }
             }
 
             if (!window.tokenUsageManager && window.CHAT_CONFIG?.chatId) {
@@ -346,10 +367,7 @@ function setupUIEventListeners() {
         });
     }
 
-    // File upload handling
-    if (uploadTrigger && fileInput) {
-        uploadTrigger.addEventListener('click', () => fileInput.click());
-    }
+    // File upload handling is now managed by FileUploadManager
 
     // Chat form submission
     if (chatForm) {
@@ -537,6 +555,12 @@ const fileListUpdateDebounce = debounce((files) => {
     fileList.innerHTML = '';
 
     if (!files || !files.length) {
+        // Show empty state
+        fileList.innerHTML = `
+            <div class="file-list-empty text-gray-500 dark:text-gray-400 text-sm text-center py-4">
+                <i class="fas fa-file-upload text-2xl mb-2 opacity-50"></i>
+                <p>No files attached yet</p>
+            </div>`;
         return;
     }
 

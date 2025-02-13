@@ -1,8 +1,6 @@
-    (() => {
-        'use strict';
+    'use strict';
 
-        if (!window.FileUploadManager) {
-            class FileUploadManager {
+    class FileUploadManager {
                 constructor(chatId, userId, uploadButton) {
                     this.chatId = chatId;
                     this.userId = userId;
@@ -21,16 +19,11 @@
                     this.MAX_TOKENS = 32000; // approximate usage limit
                     this.MAX_CONCURRENT_UPLOADS = 3;
 
-                    // Allowed MIME types - must match server config
-                    this.ALLOWED_FILE_TYPES = [
-                        'text/plain',           // .txt
-                        'text/markdown',        // .md
-                        'text/html',           // .html
-                        'text/x-python',       // .py
-                        'application/pdf',     // .pdf
-                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-                        'application/vnd.openxmlformats-officedocument.presentationml.presentation' // .pptx
-                    ];
+                    // Allowed file extensions - must match server config
+                    this.ALLOWED_EXTENSIONS = ['.txt', '.pdf', '.doc', '.docx'];
+                    
+                    // File input accept attribute extensions
+                    this.ACCEPT_TYPES = '.txt,.pdf,.doc,.docx';
 
                     // DOM references
                     this.uploadButton = uploadButton || document.getElementById('upload-trigger');
@@ -52,15 +45,9 @@
                 createFileInput() {
                     const input = document.createElement('input');
                     input.type = 'file';
-                    input.id = 'file-input';
+                    input.id = 'file-upload';
                     input.multiple = true;
-                    input.accept = [
-                        '.txt', '.md', '.html', '.py', '.pdf', '.docx', '.pptx',
-                        'text/plain', 'text/markdown', 'text/html', 'text/x-python',
-                        'application/pdf',
-                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                        'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-                    ].join(',');
+                    input.accept = this.ACCEPT_TYPES;
 
                     input.style.display = 'none';
                     document.body.appendChild(input);
@@ -96,6 +83,8 @@
                     this.fileInput.addEventListener('change', async (e) => {
                         const files = Array.from(e.target.files);
                         await this.handleNewFiles(files);
+                        // Reset file input to allow selecting the same file again
+                        e.target.value = '';
                     });
 
                     // Upload button click (desktop)
@@ -114,7 +103,10 @@
                  * Processes newly added files: validates them, adds to queue, shows errors if any.
                  */
                 async handleNewFiles(files) {
+                    console.log('Processing files:', files);
                     const { validFiles, errors } = await this.processFiles(files);
+                    console.log('Valid files:', validFiles);
+                    console.log('Errors:', errors);
 
                     // Show any errors
                     errors.forEach(({ file, errors }) => {
@@ -124,12 +116,22 @@
                     // Append valid files to local queue and update UI
                     if (validFiles.length) {
                         this.uploadedFiles.push(...validFiles);
+                        console.log('Updated uploadedFiles:', this.uploadedFiles);
+                        
+                        // Update the file list UI
+                        this.updateFileList();
+                        console.log('File list updated');
+                        
                         // Trigger the onFilesChanged callback if it exists
                         if (typeof this.onFilesChanged === 'function') {
                             this.onFilesChanged(this.uploadedFiles);
+                            console.log('onFilesChanged callback triggered');
                         }
+                        
                         // Update token display
                         this.updateTokenDisplay();
+                    } else {
+                        console.log('No valid files to process');
                     }
                 }
 
@@ -188,8 +190,11 @@
                     const fileType = this.getMimeType(file);
 
                     // Check if the type is allowed
-                    if (!this.ALLOWED_FILE_TYPES.includes(fileType)) {
-                        errors.push(`Unsupported file type: ${fileType}`);
+                    const allowedExtensions = ['.txt', '.pdf', '.doc', '.docx'];
+                    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                    
+                    if (!allowedExtensions.includes(fileExtension)) {
+                        errors.push(`Unsupported file type: ${fileExtension}`);
                     }
 
                     // Max size per file
@@ -228,12 +233,9 @@
                     const ext = filename.split('.').pop().toLowerCase();
                     const typeMap = {
                         txt: 'text/plain',
-                        md: 'text/markdown',
-                        html: 'text/html',
                         pdf: 'application/pdf',
-                        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                        pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                        py: 'text/x-python'
+                        doc: 'application/msword',
+                        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                     };
                     return typeMap[ext] || 'application/octet-stream';
                 }
@@ -339,35 +341,38 @@
                                 }
 
                                 const result = await resp.json();
+                                console.log('Upload response:', result);
 
-                                // Revised logic: separate check for success vs. saved_files presence
                                 if (!result.success) {
                                     throw new Error(result.error || 'File upload unsuccessful');
-                                } else if (!result.saved_files?.length) {
-                                    // If the server indicates success but returned no saved files,
-                                    // we won't treat it as an error, but log a warning to console.
-                                    console.warn('No saved files were returned by the server. Possibly invalid or empty upload.');
-                                } else {
-                                    const savedFile = result.saved_files[0];
-                                    if (!savedFile.id || !savedFile.filename) {
-                                        throw new Error('Invalid file metadata returned from server');
-                                    }
-
-                                    // Return richer metadata
-                                    uploadedFiles.push({
-                                        id: savedFile.id,
-                                        name: savedFile.filename,
-                                        url: savedFile.filepath,
-                                        mime_type: savedFile.mime_type,
-                                        size: savedFile.size,
-                                        uploaded_at: new Date().toISOString()
-                                    });
                                 }
 
-                                // As soon as we finish this file, update progress
-                                const percent = Math.round(((fileIndex + 1) / this.uploadedFiles.length) * 100);
-                                this.updateProgress(percent);
+                                // Handle various response formats
+                                const fileMetadata = {
+                                    id: result.file_id || result.id || file.name,
+                                    name: result.filename || file.name,
+                                    size: result.size || file.size,
+                                    mime_type: result.mime_type || file.type,
+                                    uploaded_at: new Date().toISOString()
+                                };
+
+                                console.log('File metadata:', fileMetadata);
+                                uploadedFiles.push(fileMetadata);
+                                
+                                // Update UI immediately after successful upload
+                                this.uploadedFiles = [...this.uploadedFiles, file];
+                                this.updateFileList();
+                                
+                                // Switch to Files tab if not already active
+                                const filesTab = document.querySelector('[data-panel="file-usage-panel"]');
+                                if (filesTab && !filesTab.classList.contains('tab-active')) {
+                                    filesTab.click();
+                                }
                             }
+                            
+                            // As soon as we finish this file, update progress
+                            const percent = Math.round(((fileIndex + 1) / this.uploadedFiles.length) * 100);
+                            this.updateProgress(percent);
                         } catch (error) {
                             this.showError(`Failed to upload ${file.name}: ${error.message}`, file);
                             throw error; // Let the caller (chat.js) handle overall error
@@ -434,19 +439,38 @@
                  * Displays updated file list in the UI and updates token usage.
                  */
                 updateFileList() {
+                    console.log('Updating file list. Current files:', this.uploadedFiles);
                     const fileList = document.getElementById('file-list');
-                    if (!fileList) return;
+                    if (!fileList) {
+                        console.error('File list element not found');
+                        return;
+                    }
 
+                    if (!this.uploadedFiles.length) {
+                        console.log('No files to display, showing empty state');
+                        fileList.innerHTML = `
+                            <div class="file-list-empty text-gray-500 dark:text-gray-400 text-sm text-center py-4">
+                                <i class="fas fa-file-upload text-2xl mb-2 opacity-50"></i>
+                                <p>No files attached yet</p>
+                            </div>`;
+                        return;
+                    }
+
+                    console.log('Rendering file list items');
                     fileList.innerHTML = this.uploadedFiles.map(file => `
-                        <div class="file-item flex items-center justify-between" data-filename="${file.name}">
-                            <span>${file.name}</span>
-                            <button class="remove-file" data-filename="${file.name}">
+                        <div class="file-item" data-filename="${file.name}">
+                            <div class="file-info">
+                                <i class="fas fa-file-alt text-gray-400"></i>
+                                <span class="file-name">${file.name}</span>
+                                <span class="file-size">${this.formatFileSize(file.size)}</span>
+                            </div>
+                            <button class="remove-file-btn" data-filename="${file.name}">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
                     `).join('');
 
-                    fileList.querySelectorAll('.remove-file').forEach(btn => {
+                    fileList.querySelectorAll('.remove-file-btn').forEach(btn => {
                         btn.addEventListener('click', () => {
                             this.removeFile(btn.dataset.filename);
                         });
@@ -676,7 +700,7 @@
                     const types = {
                         camera: 'image/*;capture=camera',
                         gallery: 'image/*',
-                        files: this.ALLOWED_FILE_TYPES.join(',')  // ensure no "capture" appended
+                        files: this.ACCEPT_TYPES  // ensure no "capture" appended
                     };
 
                     Object.entries(types).forEach(([type, accept]) => {
@@ -711,7 +735,7 @@
                 }
             }
 
-            // Expose the class globally
-            window.FileUploadManager = FileUploadManager;
-        }
-    })();
+    // Expose the class globally
+    if (typeof window !== 'undefined') {
+        window.FileUploadManager = FileUploadManager;
+    }

@@ -102,15 +102,15 @@
         </div>
 
         <!-- Panel Content -->
-        <div class="panel-content">
-            <div id="token-usage-panel">
+        <div class="panels-container">
+            <div id="token-usage-panel" class="panel-content">
                 {% include 'partials/token_panel.html' %}
             </div>
             
-            <div id="file-usage-panel" class="panel-content hidden">
+            <div id="file-usage-panel" class="panel-content">
                 <div class="p-4">
                     <div class="flex flex-col gap-4">
-                        <!-- File List -->
+                        <!-- File List (removed "hidden" class so it's visible by default) -->
                         <div id="file-list" class="space-y-3 max-h-48 overflow-y-auto">
                             <div class="file-list-empty text-gray-500 dark:text-gray-400 text-sm text-center py-4">
                                 <i class="fas fa-file-upload text-2xl mb-2 opacity-50"></i>
@@ -125,6 +125,7 @@
                                 <i class="fas fa-upload"></i>
                                 <span>Upload File</span>
                             </button>
+            <input type="file" id="file-upload" class="hidden" multiple accept=".pdf,.txt,.doc,.docx" />
                             <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
                                 <i class="fas fa-info-circle"></i>
                                 <span>Supported: PDF, TXT, DOC, DOCX (Max: 10MB)</span>
@@ -187,18 +188,18 @@
                   enctype="multipart/form-data">
                 <!-- Hidden CSRF input if needed -->
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <textarea
-                    name="message"
-                    id="message-input"
-                    rows="1"
-                    class="form-input resize-none flex-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500 dark:focus:ring-primary-400"
-                    placeholder="Type your message here..."
-                    spellcheck="true"
-                ></textarea>
-                
-                <div class="flex items-center justify-end mt-2">
+                <div class="relative flex-1">
+                    <textarea
+                        name="message"
+                        id="message-input"
+                        rows="1"
+                        class="form-input resize-none w-full pr-24 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600 focus:border-primary-500 dark:focus:border-primary-400 focus:ring-primary-500 dark:focus:ring-primary-400"
+                        placeholder="Type your message here..."
+                        spellcheck="true"
+                    ></textarea>
+                    
                     <!-- Send Button -->
-                    <button type="submit" id="send-button" class="btn btn-primary px-4 py-2 text-sm">
+                    <button type="submit" id="send-button" class="btn btn-primary absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 text-sm">
                         <i class="fas fa-paper-plane mr-2"></i>
                         <span>Send</span>
                     </button>
@@ -216,4 +217,6 @@
 <script src="{{ url_for('static', filename='js/chat.js') }}" type="module"></script>
 {% endblock modules %}
 
-{% block scripts %}{{ super() }}{% endblock scripts %}
+{% block scripts %}
+{{ super() }}
+{% endblock scripts %}
