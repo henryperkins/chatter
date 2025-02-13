@@ -1,4 +1,4 @@
-// Enhanced chat interface with mobile optimizations
+xz // Enhanced chat interface with mobile optimizations
 
 "use strict";
 
@@ -81,24 +81,22 @@ class UsagePanelManager {
     }
 
     switchTab(selectedTab, targetId) {
-        // Add loading state
-        selectedTab.classList.add('loading');
-        
-        // Switch tabs
+        // Remove active class from all tabs
         this.tabs.forEach(t => t.classList.remove('tab-active'));
+        
+        // Add active class to selected tab
         selectedTab.classList.add('tab-active');
         
-        // Switch panels with transition
-        this.panels.forEach(panel => {
-            if (panel.id === targetId) {
-                panel.classList.remove('hidden');
-                setTimeout(() => {
-                    selectedTab.classList.remove('loading');
-                }, 500);
-            } else {
-                panel.classList.add('hidden');
-            }
+        // Hide all panels
+        document.querySelectorAll('.panel-content > div').forEach(panel => {
+            panel.classList.add('hidden');
         });
+        
+        // Show selected panel
+        const targetPanel = document.getElementById(targetId);
+        if (targetPanel) {
+            targetPanel.classList.remove('hidden');
+        }
     }
 
     expand() {
@@ -271,8 +269,82 @@ function setupUIEventListeners() {
     const sendButton = document.getElementById('send-button');
     const chatForm = document.getElementById('chat-form');
     const newChatBtn = document.getElementById('new-chat-btn');
-    const modelSelect = document.getElementById('model-select');
+    const modelSelectorBtn = document.getElementById('model-selector-btn');
+    const modelDropdown = document.getElementById('model-dropdown');
+    const chatSelectorBtn = document.getElementById('chat-selector-btn');
+    const chatListDropdown = document.getElementById('chat-list-dropdown');
     const editTitleBtn = document.getElementById('edit-title-btn');
+
+    // Chat list item navigation
+    if (chatListDropdown) {
+        chatListDropdown.querySelectorAll('button[data-chat-url]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const url = btn.dataset.chatUrl;
+                if (url) {
+                    window.location.href = url;
+                }
+            });
+        });
+    }
+
+    // Chat list dropdown
+    if (chatSelectorBtn && chatListDropdown) {
+        chatSelectorBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            chatListDropdown.classList.toggle('hidden');
+        });
+        
+        document.addEventListener('click', (evt) => {
+            if (!chatListDropdown.contains(evt.target) && evt.target !== chatSelectorBtn) {
+                chatListDropdown.classList.add('hidden');
+            }
+        });
+    }
+
+    // Model selection dropdown
+    if (modelSelectorBtn && modelDropdown) {
+        modelSelectorBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            modelDropdown.classList.toggle('hidden');
+        });
+        
+        document.addEventListener('click', (evt) => {
+            if (!modelDropdown.contains(evt.target) && evt.target !== modelSelectorBtn) {
+                modelDropdown.classList.add('hidden');
+            }
+        });
+
+        // Model selection buttons
+        modelDropdown.querySelectorAll('button[data-model-id]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const modelId = btn.dataset.modelId;
+                try {
+                    const resp = await fetch('/chat/update_model', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+                        },
+                        body: JSON.stringify({
+                            chat_id: window.CHAT_CONFIG.chatId,
+                            model_id: modelId
+                        })
+                    });
+                    const data = await resp.json();
+                    if (data.success) {
+                        window.MessageRenderer.showSuccess('Chat model updated');
+                        modelSelectorBtn.querySelector('span').textContent = btn.textContent.trim();
+                        modelDropdown.classList.add('hidden');
+                    } else {
+                        window.MessageRenderer.showError(data.error || 'Failed to update chat model');
+                    }
+                } catch (err) {
+                    window.MessageRenderer.showError('Failed to update chat model');
+                }
+            });
+        });
+    }
 
     // File upload handling
     if (uploadTrigger && fileInput) {
@@ -298,8 +370,6 @@ function setupUIEventListeners() {
         });
     }
 
-    // Model selection with custom dropdown
-    const modelDropdown = document.getElementById('model-dropdown');
     if (modelDropdown) {
         modelDropdown.querySelectorAll('button[data-model-id]').forEach((btn) => {
             btn.addEventListener('click', handleModelChange);

@@ -137,10 +137,10 @@ class Chat(Base):
                 query = text("""
                     SELECT
                         c.id, c.user_id, c.title, c.model_id,
-                        c.created_at as timestamp,
+                        c.created_at AT TIME ZONE 'UTC' as created_at,
                         m.name as model_name,
                         COUNT(msg.id) as message_count,
-                        MAX(msg.timestamp) as last_activity,
+                        MAX(msg.timestamp) AT TIME ZONE 'UTC' as last_activity,
                         SUM(CASE WHEN msg.role = 'user' THEN 1 ELSE 0 END) as user_messages,
                         SUM(CASE WHEN msg.role = 'assistant' THEN 1 ELSE 0 END) as assistant_messages
                     FROM chats c
@@ -148,7 +148,7 @@ class Chat(Base):
                     LEFT JOIN messages msg ON c.id = msg.chat_id
                     WHERE c.user_id = :user_id
                     AND (c.is_deleted = FALSE OR c.is_deleted IS NULL)
-                    GROUP BY c.id, c.user_id, c.title, c.model_id, c.created_at, m.name
+                    GROUP BY c.id, c.user_id, c.title, c.model_id, c.created_at, m.name, c.created_at
                     ORDER by last_activity DESC NULLS LAST
                     LIMIT :limit OFFSET :offset
                 """)
@@ -156,15 +156,24 @@ class Chat(Base):
 
             chats = []
             for row in rows:
+                try:
+                    created_at = row["created_at"].isoformat() if row["created_at"] else None
+                    last_activity = (row["last_activity"].isoformat() if row["last_activity"] 
+                                   else created_at)
+                except Exception as e:
+                    logger.error(f"Error formatting timestamps: {e}")
+                    created_at = None
+                    last_activity = None
+
                 chats.append({
                     "id": row["id"],
                     "user_id": row["user_id"],
                     "title": row["title"],
                     "model_id": row["model_id"],
                     "model_name": row["model_name"] or "Unknown Model",
-                    "timestamp": row["timestamp"],
+                    "created_at": created_at,
                     "message_count": row["message_count"] or 0,
-                    "last_activity": row["last_activity"] or row["timestamp"],
+                    "last_activity": last_activity,
                     "user_messages": row["user_messages"] or 0,
                     "assistant_messages": row["assistant_messages"] or 0
                 })
@@ -223,12 +232,16 @@ class Chat(Base):
         try:
             with db_session() as db:
                 stmt = text("""
-                    INSERT INTO chats (id, user_id, title, model_id)
-                    VALUES (:chat_id, :user_id, :title, :model_id)
+                    INSERT INTO chats (id, user_id, title, model_id, created_at)
+                    VALUES (:chat_id, :user_id, :title, :model_id, NOW())
+                    RETURNING id, TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MSZ') as created_at
                 """)
-                db.execute(stmt, {"chat_id": chat_id, "user_id": user_id, "title": cleaned_title, "model_id": model_id})
+                result = db.execute(stmt, {"chat_id": chat_id, "user_id": user_id, "title": cleaned_title, "model_id": model_id}).mappings().first()
                 db.commit()
-            logger.info(f"Chat created: {chat_id} for user {user_id} with model {model_id or 'default'}")
+                if not result:
+                    raise ValueError("Failed to create chat - no result returned")
+                created_at = result["created_at"]
+                logger.info(f"Chat created: {chat_id} for user {user_id} with model {model_id or 'default'} at {created_at or 'unknown time'}")
         except Exception as e:
             logger.error(f"Failed to create chat {chat_id}: {e}")
             raise

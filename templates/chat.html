@@ -32,16 +32,12 @@
                     
                     <!-- Chat List Dropdown -->
                     <div id="chat-list-dropdown" class="hidden absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 max-h-64 overflow-y-auto w-[20rem] z-[2000]">
+                        <!-- Updated to simpler onclick approach as per user feedback -->
                         {% for chat in conversations %}
-                        <button class="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-left {% if chat.id == chat_id %}bg-gray-50 dark:bg-gray-700{% endif %}"
-                                data-chat-id="{{ chat.id }}"
-                                data-chat-title="{{ chat.title }}"
-                                data-chat-date="">
-                            <span class="flex-1 truncate">{{ chat.title }}</span>
-                            <span class="text-xs text-gray-500 dark:text-gray-400">{{ chat.created_at.strftime('%b %d') }}</span>
-                            {% if chat.id == chat_id %}
-                            <i class="fas fa-check text-blue-500 ml-2"></i>
-                            {% endif %}
+                        <button class="block w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                data-chat-url="{{ url_for('chat.chat_interface', chat_id=chat.id) }}">
+                            {{ chat.title }}
+                            <span class="sr-only">Switch to chat</span>
                         </button>
                         {% endfor %}
                     </div>
@@ -59,24 +55,16 @@
                     <button id="model-selector-btn" 
                             class="flex items-center gap-2 px-3 py-2 bg-gray-100/90 dark:bg-gray-700/90 rounded-lg hover:bg-gray-200/90 dark:hover:bg-gray-600/90 transition-colors">
                         <i class="fas fa-robot text-primary-500"></i>
-                        <span class="hidden sm:inline font-medium">
-                            {{ current_model.name if current_model else 'Select Model' }}
-                        </span>
+                        <span class="hidden sm:inline font-medium">{{ current_model.name if current_model else 'Select Model' }}</span>
                         <i class="fas fa-chevron-down"></i>
                     </button>
 
                     <!-- Model Dropdown -->
                     <div id="model-dropdown" class="hidden absolute right-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-                        {% for model in models %}
-                        <button class="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-left {% if current_model and model.id == current_model.id %}bg-gray-50 dark:bg-gray-700{% endif %}"
-                                data-model-id="{{ model.id }}"
-                                data-model-type="{{ model.model_type }}"
-                                data-supports-streaming="{{ 'true' if model.supports_streaming else 'false' }}">
-                            <i class="fas fa-robot text-primary-500"></i>
-                            <span class="flex-1 truncate">{{ model.name }}</span>
-                            {% if current_model and model.id == current_model.id %}
-                            <i class="fas fa-check text-blue-500"></i>
-                            {% endif %}
+                        {% for m in models %}
+                        <button class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                data-model-id="{{ m.id }}">
+                            {{ m.name }}
                         </button>
                         {% endfor %}
                     </div>
@@ -87,6 +75,11 @@
                 <button id="edit-model-btn" class="btn-icon group" aria-label="Edit model">
                     <i class="fas fa-cog"></i>
                 </button>
+                <script>
+                  document.getElementById('edit-model-btn')?.addEventListener('click', () => {
+                    window.location.href = "/admin/models";
+                  });
+                </script>
                 {% endif %}
             </div>
         </div>
@@ -95,28 +88,31 @@
 
 <!-- Token/File Usage Panel -->
 <div id="usage-panel" class="fixed bottom-0 left-0 right-0 z-[1100] bg-white/95 dark:bg-gray-800/95 border-t border-gray-200/50 dark:border-gray-700/50 backdrop-blur-md transition-transform duration-200">
-    <div class="max-w-4xl mx-auto w-full">
-        <div class="usage-tabs">
-            <button class="tab flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium tab-active" data-panel="token-usage-panel">
-                <i class="fas fa-chart-pie"></i>
-                <span class="hidden sm:inline">Tokens</span>
+    <div class="max-w-4xl mx-auto w-full usage-tabs">
+        <!-- Tab Buttons -->
+        <div class="usage-tabs flex items-center space-x-2 p-2">
+            <button class="tab tab-active" data-panel="token-usage-panel">
+              <i class="fas fa-chart-pie"></i> Tokens
             </button>
-            <button class="tab flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium" data-panel="file-usage-panel">
-                <i class="fas fa-file-upload"></i>
-                <span class="hidden sm:inline">Files</span>
+            <button class="tab" data-panel="file-usage-panel">
+              <i class="fas fa-file-upload"></i> Files
             </button>
         </div>
-        
-        <div class="panel-content bg-gray-50/95 dark:bg-gray-900/95 border-t border-gray-200/50 dark:border-gray-700/50">
-            <div id="token-usage-panel" class="p-2 sm:p-3">
-                <div class="token-panel-container">
-                    {% include 'partials/token_panel.html' %}
-                </div>
+
+        <!-- Panel Content -->
+        <div class="panel-content">
+            <div id="token-usage-panel">
+                {% include 'partials/token_panel.html' %}
             </div>
             
-            <div id="file-usage-panel" class="hidden p-2 sm:p-3">
-                <div id="file-list" class="space-y-2 max-h-24 overflow-y-auto mb-2"></div>
-                <button id="upload-trigger" class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+            <div id="file-usage-panel" class="panel-content hidden p-3">
+                <div id="file-list" class="space-y-2 max-h-32 overflow-y-auto mb-3">
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">
+                        No files attached yet.
+                    </p>
+                </div>
+                <button id="upload-trigger" 
+                        class="btn-primary">
                     <i class="fas fa-upload"></i>
                     <span>Upload File</span>
                 </button>
@@ -128,7 +124,7 @@
 
 {% block content %}
 <!-- Server-rendered messages below -->
-<div id="chat-container" class="chat-container">
+<div id="chat-container" class="chat-container pt-20">
     <!-- Message Templates -->
     {% include 'partials/message_templates.html' %}
 
