@@ -153,19 +153,39 @@ def login():
 
             # Track failed attempts
             if not user.check_password(password):
-                user.failed_login_attempts += 1
-                if user.failed_login_attempts >= 5:
-                    user.account_locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
-                user.save()
-                
-                logger.warning(f"Invalid password for user: {username} (Attempt {user.failed_login_attempts}/5)")
-                flash("Invalid credentials", "error")
-                return render_template("login.html", form=form)
+                with db_session() as db:
+                    # Update failed attempts atomically
+                    result = db.execute(
+                        text("""
+                            UPDATE users 
+                            SET failed_login_attempts = failed_login_attempts + 1,
+                                account_locked_until = CASE 
+                                    WHEN failed_login_attempts + 1 >= 5 
+                                    THEN NOW() + INTERVAL '15 minutes'
+                                    ELSE NULL 
+                                END
+                            WHERE id = :user_id
+                            RETURNING failed_login_attempts
+                        """),
+                        {"user_id": user.id}
+                    ).scalar()
+                    
+                    attempts = result if result is not None else 1
+                    logger.warning(f"Invalid password for user: {username} (Attempt {attempts}/5)")
+                    flash("Invalid credentials", "error")
+                    return render_template("login.html", form=form)
 
             # Reset failed attempts on successful login
-            user.failed_login_attempts = 0
-            user.account_locked_until = None
-            user.save()
+            with db_session() as db:
+                db.execute(
+                    text("""
+                        UPDATE users
+                        SET failed_login_attempts = 0,
+                            account_locked_until = NULL
+                        WHERE id = :user_id
+                    """),
+                    {"user_id": user.id}
+                )
 
             login_user(user, remember=form.remember.data)
             logger.info(f"User logged in: {user.id} ({username})")

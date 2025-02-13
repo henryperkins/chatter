@@ -467,6 +467,32 @@ class User(UserMixin):
             logger.error(f"Error updating role for user {user_id}: {e}")
             return False
 
+    def save(self) -> bool:
+        """Save current user state to database."""
+        try:
+            with db_session() as db:
+                result = db.execute(
+                    text("""
+                        UPDATE users 
+                        SET failed_login_attempts = :attempts,
+                            account_locked_until = :locked_until
+                        WHERE id = :user_id
+                        RETURNING id
+                    """),
+                    {
+                        "attempts": self.failed_login_attempts,
+                        "locked_until": self.account_locked_until,
+                        "user_id": self.id
+                    }
+                )
+                success = result.scalar() is not None
+                if success:
+                    logger.info(f"Updated user {self.id} state")
+                return success
+        except Exception as e:
+            logger.error(f"Error saving user {self.id} state: {e}")
+            return False
+
     def change_password(self, new_password: str) -> bool:
         """Change user's password and clear any reset token data."""
         try:
