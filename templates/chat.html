@@ -50,7 +50,6 @@
                     <i class="fas fa-tools"></i>
                 </button>
             </div>
-
             <!-- Right: Model Selection -->
             <div class="flex items-center gap-2">
                 {% if models %}
@@ -211,6 +210,25 @@
         </div>
     </div>
 </div>
+
+<!-- Developer Message Modal -->
+<div id="dev-msg-modal" class="hidden fixed inset-0 z-[2000] flex items-center justify-center bg-black/70">
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 w-full max-w-md relative">
+    <h2 class="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">Customize Developer Message</h2>
+    <textarea id="dev-msg-input" class="w-full h-40 p-2 border rounded focus:outline-none bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100" placeholder="Enter your developer message here..."></textarea>
+    <div class="flex justify-end mt-4 gap-2">
+      <button id="dev-msg-cancel" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600">
+        Cancel
+      </button>
+      <button id="dev-msg-save" class="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700">
+        Save
+      </button>
+    </div>
+    <button id="dev-msg-modal-close" class="absolute top-2 right-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+      <i class="fas fa-times"></i>
+    </button>
+  </div>
+</div>
 {% endblock content %}
 
 {% block modules %}
@@ -221,8 +239,6 @@
 {% endblock modules %}
 
 {% block scripts %}
-{{ super() }}
-{% endblock scripts %}
 {{ super() }}
 {% endblock scripts %}
 

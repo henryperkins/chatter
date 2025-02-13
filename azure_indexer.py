@@ -12,6 +12,7 @@ from azure.search.documents.indexes.models import (
     SearchField,
     VectorSearch,
     HnswAlgorithmConfiguration,
+    HnswParameters,
     VectorSearchProfile,
     AzureOpenAIVectorizer,
     AzureOpenAIVectorizerParameters
@@ -33,6 +34,8 @@ def get_search_credential():
         if MANAGED_IDENTITY_CLIENT_ID:
             return ManagedIdentityCredential(client_id=MANAGED_IDENTITY_CLIENT_ID)
         return DefaultAzureCredential()
+    if not AZURE_SEARCH_KEY:
+        raise ValueError("AZURE_SEARCH_KEY is required when not using managed identity")
     return AzureKeyCredential(AZURE_SEARCH_KEY)
 
 def create_index():
@@ -55,18 +58,18 @@ def create_index():
                 type=SearchFieldDataType.Collection(SearchFieldDataType.Single),
                 vector_search_dimensions=EMBEDDING_DIMENSIONS,
                 vector_search_profile_name="defaultVectorProfile"
-            )
+                        )
         ],
         vector_search=VectorSearch(
             algorithms=[
                 HnswAlgorithmConfiguration(
                     name="defaultHnsw",
-                    parameters={
-                        "m": 4,  # Number of bi-directional links created for each new node during indexing
-                        "efConstruction": 400,  # Number of nearest neighbors to inspect during index construction
-                        "efSearch": 500,  # Number of nearest neighbors to inspect during search
-                        "metric": "cosine"  # Distance metric for vector similarity
-                    }
+                    parameters=HnswParameters(
+                        m=4,  # Number of bi-directional links created for each new node during indexing
+                        ef_construction=400,  # Number of nearest neighbors to inspect during index construction
+                        ef_search=500,  # Number of nearest neighbors to inspect during search
+                        metric='cosine'  # Distance metric for vector similarity
+                    )
                 )
             ],
             profiles=[

@@ -121,3 +121,5 @@ wrapt==1.17.1
 WTForms==3.2.1
 yarl==1.18.3
 zipp==3.21.0
+html2text==2024.2.26
+validators==0.22.0

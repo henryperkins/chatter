@@ -1,6 +1,6 @@
 // Enhanced chat interface with mobile optimizations
 
-"use strict";
+'use strict';
 
 let scrollFrame = null;
 
@@ -413,6 +413,46 @@ function setupUIEventListeners() {
     document.querySelectorAll('.regenerate-button').forEach(btn => {
         btn.addEventListener('click', handleRegenerate);
     });
+
+    // Developer message modal setup
+    const devMsgModalBtn = document.getElementById('dev-msg-modal-btn');
+    const devMsgModal = document.getElementById('dev-msg-modal');
+    const devMsgInput = document.getElementById('dev-msg-input');
+    const devMsgCancel = document.getElementById('dev-msg-cancel');
+    const devMsgSave = document.getElementById('dev-msg-save');
+    const devMsgModalClose = document.getElementById('dev-msg-modal-close');
+
+    if (devMsgModalBtn && devMsgModal && devMsgModalClose && devMsgCancel && devMsgSave && devMsgInput) {
+        // Open modal
+        devMsgModalBtn.addEventListener('click', () => {
+            // Load existing developer message from localStorage or fallback
+            const storedDevMsg = localStorage.getItem('developerMessage') || '';
+            devMsgInput.value = storedDevMsg;
+            devMsgModal.classList.remove('hidden');
+        });
+
+        // Close modal (X button)
+        devMsgModalClose.addEventListener('click', () => {
+            devMsgModal.classList.add('hidden');
+        });
+
+        // Cancel
+        devMsgCancel.addEventListener('click', () => {
+            devMsgModal.classList.add('hidden');
+        });
+
+        // Save developer message
+        devMsgSave.addEventListener('click', () => {
+            const newDevMsg = devMsgInput.value.trim();
+            if (!newDevMsg) {
+                window.MessageRenderer.showError('Developer message cannot be empty');
+                return;
+            }
+            localStorage.setItem('developerMessage', newDevMsg);
+            devMsgModal.classList.add('hidden');
+            window.MessageRenderer.showSuccess('Developer message saved locally');
+        });
+    }
 }
 
 // -----------------------------------------------------------------------------

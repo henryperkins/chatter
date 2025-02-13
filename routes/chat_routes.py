@@ -42,6 +42,7 @@ from extensions import csrf
 from chat_api import get_azure_response, scrape_data
 from azure_search_client import AzureOpenAI
 from chat_utils import generate_new_chat_id, process_uploaded_files
+from utils.web_scraper import detect_urls, scrape_url, format_scraped_data
 from conversation_manager import conversation_manager
 from database import db_session
 from models.chat import Chat
@@ -690,6 +691,30 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
         # Sanitize user content
         combined_message = bleach.clean(combined_message)
+
+        # Detect and scrape URLs from the message
+        try:
+            urls = detect_urls(combined_message)
+            scraped_content = []
+            
+            for url in urls:
+                try:
+                    raw_html = scrape_url(url)
+                    if raw_html:
+                        formatted_text = format_scraped_data(raw_html)
+                        if formatted_text:
+                            scraped_content.append(f"\n\n***Scraped Content from {url}***\n{formatted_text}")
+                except Exception as e:
+                    logger.error(f"Error scraping URL {url}: {str(e)}")
+                    continue
+            
+            # Append scraped content to the message
+            if scraped_content:
+                combined_message += "\n".join(scraped_content)
+
+        except Exception as e:
+            logger.error(f"Error in URL detection/scraping: {str(e)}")
+            # Continue with original message if scraping fails
 
         # Add user message to conversation
         conversation_manager.add_message(
