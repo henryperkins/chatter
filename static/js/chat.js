@@ -203,7 +203,11 @@ async function startChat() {
                 }
             };
 
-            window.fileUploadManager.onFilesChanged = updateFileList;
+            window.fileUploadManager.onFilesChanged = (files) => {
+                if (typeof fileListUpdateDebounce === 'function') {
+                    fileListUpdateDebounce(files);
+                }
+            };
         }
 
         // Initialize components
@@ -449,32 +453,64 @@ function handleRegenerate(e) {
     }
 }
 
-function updateFileList() {
+const fileListUpdateDebounce = debounce((files) => {
     const fileList = document.getElementById('file-list');
-    if (!fileList || !window.fileUploadManager?.uploadedFiles) return;
+    if (!fileList) {
+        console.error('File list element not found');
+        return;
+    }
 
-    fileList.innerHTML = window.fileUploadManager.uploadedFiles.map(file => `
-        <div class="file-item" data-file-id="${file.id}">
-            <div class="file-info">
-                <i class="fas fa-file-alt text-gray-400"></i>
-                <span class="file-name">${file.name}</span>
-                <span class="file-size">${formatFileSize(file.size)}</span>
-            </div>
-            <button class="remove-file-btn" data-filename="${file.name}">
-                <i class="fas fa-times"></i>
-            </button>
-            <div class="file-progress">
-                <div class="file-progress-bar" style="width: 0%"></div>
-            </div>
-        </div>
-    `).join('');
+    // Clear existing content
+    fileList.innerHTML = '';
 
-    fileList.querySelectorAll('.remove-file-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            window.fileUploadManager.removeFile(btn.dataset.filename);
+    if (!files || !files.length) {
+        return;
+    }
+
+    // Create document fragment for better performance
+    const fragment = document.createDocumentFragment();
+
+    // Create file items
+    files.forEach(file => {
+        const safeName = window.utils.sanitizeHTML(file.name);
+        const div = document.createElement('div');
+        div.className = 'file-item';
+        div.dataset.fileId = file.id;
+        
+        // Create file info container
+        const fileInfo = document.createElement('div');
+        fileInfo.className = 'file-info';
+        fileInfo.innerHTML = `
+            <i class="fas fa-file-alt text-gray-400"></i>
+            <span class="file-name">${safeName}</span>
+            <span class="file-size">${formatFileSize(file.size)}</span>
+        `;
+        
+        // Create remove button
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-file-btn';
+        removeBtn.dataset.filename = file.name;
+        removeBtn.innerHTML = '<i class="fas fa-times"></i>';
+        removeBtn.addEventListener('click', () => {
+            window.fileUploadManager?.removeFile(file.name);
         });
+        
+        // Create progress bar
+        const progressContainer = document.createElement('div');
+        progressContainer.className = 'file-progress';
+        progressContainer.innerHTML = '<div class="file-progress-bar" style="width: 0%"></div>';
+        
+        // Assemble the file item
+        div.appendChild(fileInfo);
+        div.appendChild(removeBtn);
+        div.appendChild(progressContainer);
+        
+        fragment.appendChild(div);
     });
-}
+
+    // Add all items to DOM at once
+    fileList.appendChild(fragment);
+});
 
 function formatFileSize(bytes) {
     if (bytes === 0) return '0 Bytes';

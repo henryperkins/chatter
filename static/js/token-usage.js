@@ -169,11 +169,6 @@
                         this.elements.tokensLimit.textContent = `/ ${limit.toLocaleString()} max`;
                     }
 
-                    // Update tokens left
-                    if (this.elements.tokensLeft) {
-                        this.elements.tokensLeft.textContent = `(${tokensLeft.toLocaleString()} remaining)`;
-                    }
-
                     // Update token breakdown
                     if (this.elements.userTokens) {
                         this.elements.userTokens.textContent = (breakdown.user || 0).toLocaleString();
@@ -183,18 +178,6 @@
                     }
                     if (this.elements.systemTokens) {
                         this.elements.systemTokens.textContent = (breakdown.system || 0).toLocaleString();
-                    }
-
-                    // Update additional stats
-                    if (this.elements.avgTokens) {
-                        const avgTokens = Math.round(used / (stats.total_messages || 1));
-                        this.elements.avgTokens.textContent = `Avg: ${avgTokens.toLocaleString()} per message`;
-                    }
-                    if (this.elements.messageCount) {
-                        this.elements.messageCount.textContent = `Messages: ${stats.total_messages.toLocaleString()}`;
-                    }
-                    if (this.elements.largestMessage && stats.largest_message) {
-                        this.elements.largestMessage.textContent = `Largest: ${stats.largest_message.tokens.toLocaleString()} tokens`;
                     }
 
                     console.log('TokenUsageManager: Stats updated successfully');
