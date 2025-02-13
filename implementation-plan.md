@@ -5,48 +5,64 @@
 This document outlines a comprehensive strategy for building and improving a Web Intelligence System. It integrates requirements for ethical and adaptive web scraping, multi-modal content processing, knowledge-graph-driven analysis, caching, versioning, monitoring, and search expansion. The unified focus is to ensure robust, scalable, and compliant operations that can handle dynamic websites, large volumes of requests, high performance demands, and advanced analytics. It also covers deployment, testing, and success criteria for a production-ready system.
 
 ────────────────────────────────────────────────────────────────────────
-## 2. REQUIREMENTS & ADDITIONS
+## 2. SYSTEM COMPONENTS & REQUIREMENTS
 ────────────────────────────────────────────────────────────────────────
 
-2.1 Core Intelligence Requirements
+2.1 Scraping & Content Acquisition
 • URL Detection & Validation  
   – Automatic URL detection in user input  
   – Format validation  
   – Robots.txt compliance & dynamic access checks  
-
 • Content Extraction 
   – Static & dynamic (JS-rendered) scraping  
   – Multi-format parsing (HTML, PDF, Doc, Media)  
   – Adaptive scraping (auto-detect if client-side rendering is required)  
+• Ethical Compliance
+  – Dynamic proxy rotation for high-volume scraping
+  – Access validation and rate limiting
+  – Custom analytics & metrics
 
-• Data Processing
-  – Text cleaning and normalization  
-  – Entity extraction and relationship mapping (knowledge graph)  
-  – Content quality scoring & threshold-based expansions  
+2.2 Knowledge Graph & Analysis
+• Entity Extraction
+  – Named entity recognition
+  – Relationship mapping
+  – Graph database integration
+• Semantic Analysis
+  – Content quality scoring
+  – Context expansion triggers
+  – Entity relationship weighting
+• Graph Operations
+  – Query optimization
+  – Path analysis
+  – Dynamic updates
 
-• Search & Analysis
-  – Search context expansion via external APIs (e.g., Tavily, SerpAPI)  
-  – Multi-modal embedding generation (text + media)  
-  – Summarization and semantic analysis  
+2.3 Multi-Modal Processing
+• Text Processing
+  – Cleaning and normalization
+  – Language detection
+  – Format conversion
+• Media Analysis
+  – Image/video embedding
+  – Cross-modal alignment
+  – Quality assessment
+• Embedding Generation
+  – Text vectorization
+  – Media feature extraction
+  – Combined representations
 
+2.4 Infrastructure & Operations
 • Storage & Caching
-  – Version control for content (delta tracking)  
-  – Distributed caching for quick retrieval  
-  – Metadata and entity relationship preservation  
-
+  – Version control for content
+  – Distributed caching
+  – Metadata preservation
 • Monitoring & Compliance
-  – Ethical scraping with proxy rotation  
-  – Access validation and robots.txt compliance  
-  – Custom analytics & metrics (Prometheus/Grafana)  
-  – Circuit breaker patterns for external dependencies  
-
-2.2 Newly Added & Enhanced Features
-• Client-side rendering detection using hybrid HEAD/BrowserStack checks  
-• Semantic relationship mapping via knowledge graph techniques  
-• Automated content quality scoring to drive context expansions  
-• Multi-modal embedding support (text + media)  
-• Dynamic proxy rotation for high-volume, ethical scraping  
-• Automated versioning and archiving of content  
+  – Custom analytics & metrics
+  – Circuit breaker patterns
+  – Performance tracking
+• Security & Access
+  – Rate limiting
+  – Authentication
+  – Audit logging
 
 ────────────────────────────────────────────────────────────────────────
 ## 1. TECHNOLOGY STACK
