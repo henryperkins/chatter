@@ -98,6 +98,8 @@
     min-height: 44px;
     min-width: 80px;
     transition: all 0.2s ease;
+    margin-left: auto;
+    align-self: center;
 }
 
 #send-button:hover {
@@ -114,6 +116,7 @@
 .panel-content {
     background: inherit;
     backdrop-filter: inherit;
+    margin-top: 0.25rem;
 }
 
 /* Chat input container positioning */
@@ -126,7 +129,7 @@
     backdrop-filter: blur(12px);
     border-top: 1px solid rgba(229, 231, 235, 0.8);
     padding: 0.5rem;
-    padding-bottom: max(0.5rem, var(--safe-bottom));
+    padding-bottom: max(1rem, var(--safe-bottom));
     box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
     transform: translateZ(0);
     z-index: 1200;
@@ -148,6 +151,7 @@
     position: relative;
     z-index: 2;
     border-bottom: 1px solid rgba(229, 231, 235, 0.5);
+    margin-bottom: 0;
 }
 
 .tab {
