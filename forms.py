@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 # Utility Functions
 # ------------------------------------------------------------------------
 
-def validate_azure_deployment(deployment_name, subscription_id, resource_group, account_name):
+def validate_azure_deployment(self, deployment_name: str, subscription_id: str, resource_group: str, account_name: str) -> bool:
     """
     Validate that the specified Azure deployment exists.
     """
@@ -66,8 +66,19 @@ def validate_azure_deployment(deployment_name, subscription_id, resource_group, 
         return True
         
     try:
+        from azure.identity import DefaultAzureCredential
+        from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
+        
         credential = DefaultAzureCredential()
-        client = CognitiveServicesManagementClient(credential, subscription_id)
+        client = CognitiveServicesManagementClient(
+            credential=credential,
+            subscription_id=subscription_id
+        )
+        deployments = client.deployments.list(
+            resource_group_name=resource_group,
+            account_name=account_name,
+            deployment_name=deployment_name
+        )
         deployments = client.deployments.list(resource_group, account_name)
         return any(d.name == deployment_name for d in deployments)
     except Exception as e:
@@ -142,6 +153,7 @@ class LoginForm(FlaskForm):
     """
     Form for user login.
     """
+    csrf_token = HiddenField('CSRF Token')
     username = StringField(
         "Username",
         validators=[DataRequired(message="Username is required.")],
@@ -163,20 +175,20 @@ class LoginForm(FlaskForm):
         try:
             with db_session() as db:
                 # 1) Check if account is locked
-                locked_until = db.execute(
+                account_locked_until = db.execute(
                     text("""
-                        SELECT locked_until
+                        SELECT account_locked_until
                         FROM users
                         WHERE username = :username
                     """),
                     {"username": username}
                 ).scalar()
 
-                if locked_until is not None and locked_until > datetime.utcnow():
+                if account_locked_until is not None and account_locked_until > datetime.utcnow():
                     logger.error("Account locked", extra={
                         'username': username,
                         'ip': ip_address,
-                        'locked_until': locked_until
+                        'locked_until': account_locked_until
                     })
                     raise ValidationError("Account temporarily locked - please try again later.")
 
@@ -190,9 +202,9 @@ class LoginForm(FlaskForm):
                         AND attempted_at > NOW() - INTERVAL '15 minutes'
                     """),
                     {"username": username, "ip": ip_address}
-                ).scalar()
+                ).scalar() or 0  # Handle NULL case
 
-                if recent_failures >= 5:
+                if recent_failures and recent_failures >= 5:
                     extra_failures = recent_failures - 5
                     lock_minutes = 15 * (2 ** min(extra_failures, 5))  # exponential backoff
                     lock_time = datetime.utcnow() + timedelta(minutes=lock_minutes)

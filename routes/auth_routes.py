@@ -121,7 +121,11 @@ def login():
 
     if form.validate_on_submit():
         # Account lockout check
-        user = User.get_by_username(form.username.data.strip())
+        username = form.username.data
+        if not username:
+            flash("Username is required", "error")
+            return render_template("login.html", form=form)
+        user = User.get_by_username(username.strip())
         if user and user.account_locked_until and user.account_locked_until > datetime.now(timezone.utc):
             logger.warning(f"Login attempt for locked account: {user.username}")
             flash("Account locked for 15 minutes due to multiple failed attempts", "error")
@@ -137,7 +141,7 @@ def login():
             username = form.username.data
             if not username or not isinstance(username, str):
                 raise ValueError("Invalid username")
-            username = username.strip()
+            username = username.strip() if username else ""
 
             password = form.password.data
             if not password or not isinstance(password, str):

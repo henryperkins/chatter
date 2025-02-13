@@ -125,13 +125,11 @@
                     console.debug('TokenUsageManager: Starting stats update for chat', this.chatId);
                     const url = `/chat/stats/${this.chatId}`;
 
-                    const response = await fetch(url, {
+                    const response = await fetch(`/chat/stats/${encodeURIComponent(this.chatId)}`, {
                         method: 'GET',
                         headers: {
-                            'Accept': 'application/json',
-                            'X-CSRFToken': window.CHAT_CONFIG.csrfToken
-                        },
-                        credentials: 'same-origin'
+                            'X-Chat-ID': this.chatId
+                        }
                     });
 
                     if (response.status === 429) {
