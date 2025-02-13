@@ -358,9 +358,9 @@
 
 @media (max-width: 640px) {
     :root {
-        --chat-input-height: 5rem;
-        --tabs-height: 3.5rem;
-        --panel-content-height: 4.5rem;
+        --chat-input-height: 3.5rem;
+        --tabs-height: 3rem;
+        --panel-content-height: 3rem;
     }
 
     .chat-messages-scroll {
@@ -368,8 +368,8 @@
     }
 
     .chat-input-container {
-        padding: 0.75rem;
-        padding-bottom: max(0.75rem, var(--safe-bottom));
+        padding: 0.25rem;
+        padding-bottom: max(0.25rem, var(--safe-bottom));
     }
 
     #usage-panel {
