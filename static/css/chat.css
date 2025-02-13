@@ -4,7 +4,7 @@
     --tabs-height: 3rem;
     --panel-content-height: 4rem;
     --safe-bottom: env(safe-area-inset-bottom, 0px);
-    --chat-input-height: 6rem;
+    --chat-input-height: 4rem;
     --panel-spacing: 1rem;
     --total-bottom-height: calc(var(--chat-input-height) + var(--tabs-height) + var(--panel-content-height) + var(--safe-bottom));
 }
@@ -125,8 +125,8 @@
     background-color: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(12px);
     border-top: 1px solid rgba(229, 231, 235, 0.8);
-    padding: 1rem;
-    padding-bottom: max(1rem, var(--safe-bottom));
+    padding: 0.5rem;
+    padding-bottom: max(0.5rem, var(--safe-bottom));
     box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
     transform: translateZ(0);
     z-index: 1200;
