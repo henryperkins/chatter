@@ -16,10 +16,12 @@ class SemanticAnalyzer:
         try:
             self.nlp = spacy.load("en_core_web_sm")
         except OSError:
-            logger.warning("Downloading spacy model 'en_core_web_sm'... Run this manually if needed: python -m spacy download en_core_web_sm")
+            import sys
             import subprocess
-            subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"], check=True)
+            logger.warning("Downloading spacy model 'en_core_web_sm'... Run this manually if needed: %s -m spacy download en_core_web_sm", sys.executable)
+            subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"], check=True)
             self.nlp = spacy.load("en_core_web_sm")
+            logger.info("Successfully loaded spacy model 'en_core_web_sm'")
 
     def process_text(self, text: str) -> Dict[str, Any]:
         """
