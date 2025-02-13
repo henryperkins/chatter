@@ -15,6 +15,7 @@ from token_utils import (
     count_conversation_tokens,
     count_message_tokens,
 )
+from expansions.search_expander import SearchExpander
 
 # TypedDict for strict token breakdown fields
 class TokenBreakdown(TypedDict):
@@ -42,6 +43,7 @@ class ConversationManager:
         self.context_manager = ContextManager(MAX_TOKENS)
         # Cache each chat's "optimized" context if needed
         self.context_cache: Dict[str, List[Dict[str, Any]]] = {}
+        self.search_expander = SearchExpander()
 
     def _process_attachments(self, content: str) -> str:
         """
