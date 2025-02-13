@@ -4,6 +4,7 @@ import os
 from typing import Optional, List, Dict, Union, Generator, Any, Mapping
 import requests
 from openai import AzureOpenAI
+from scraping.ethical_scraper import EthicalScraper
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 from openai.types.chat.chat_completion_message import ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice
@@ -304,18 +305,11 @@ def scrape_data(query: str) -> str:
         raise ChatAPIError("Invalid query provided", 400)
 
     try:
-        headers = {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/91.0.4472.124 Safari/537.36"
-            )
-        }
-
-        response = requests.get(query, headers=headers, timeout=30, verify=True)
-
-        response.raise_for_status()
-        return response.text
+        scraper = EthicalScraper()
+        if not scraper.validate_access(query):
+            raise ChatAPIError("Scraping not allowed by policy", 403)
+            
+        return scraper.scrape(query)
 
     except requests.Timeout:
         raise ChatAPIError("Request timed out", 504)

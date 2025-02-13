@@ -128,6 +128,14 @@
             }
         }
 
+        async logScrapeAction(url, success) {
+            this.log('info', 'Scrape action', {
+                url: url,
+                success: success,
+                timestamp: new Date().toISOString()
+            });
+        }
+
         initNetworkMonitoring() {
             // Monitor fetch requests
             const originalFetch = window.fetch;
@@ -135,6 +143,10 @@
                 const startTime = performance.now();
                 try {
                     const response = await originalFetch(...args);
+                    // Track scraping actions
+                    if (args[0].includes('/scrape')) {
+                        this.logScrapeAction(args[0], response.ok);
+                    }
                     this.logApiCall('Fetch success', {
                         url: args[0],
                         duration: performance.now() - startTime,
@@ -142,6 +154,9 @@
                     });
                     return response;
                 } catch (error) {
+                    if (args[0].includes('/scrape')) {
+                        this.logScrapeAction(args[0], false);
+                    }
                     this.logApiCall('Fetch error', {
                         url: args[0],
                         duration: performance.now() - startTime,
