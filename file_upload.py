@@ -1,6 +1,7 @@
 import os
 import tiktoken
 from werkzeug.utils import secure_filename
+from chat_utils import extract_text_from_file
 from flask import current_app, request, jsonify
 from typing import List, Dict, Tuple, Any, Optional
 from models.uploaded_file import UploadedFile
