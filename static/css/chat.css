@@ -8,6 +8,9 @@
     --panel-spacing: 1rem;
     --total-bottom-height: calc(var(--chat-input-height) + var(--tabs-height) + var(--panel-content-height) + var(--safe-bottom));
 }
+.token-panel-container p {
+    line-height: 1.2;
+}
 
 /* Chat container and layout */
 .chat-container {
@@ -107,7 +110,7 @@
 .panel-content {
     background: inherit;
     backdrop-filter: inherit;
-    margin-top: 0.25rem;
+    margin-top: 0;
 }
 
 /* Chat input container positioning */

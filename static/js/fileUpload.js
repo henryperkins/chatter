@@ -87,12 +87,11 @@
                         e.target.value = '';
                     });
 
-                    // Upload button click (desktop)
-                    this.uploadButton?.addEventListener('click', () => {
-                        // Only show file dialog on non-mobile view
-                        if (window.innerWidth > 640) {
-                            this.fileInput.click();
-                        }
+                    // Upload button click (desktop) and touch (mobile)
+                    this.uploadButton?.addEventListener('click', () => this.fileInput.click());
+                    this.uploadButton?.addEventListener('touchend', (e) => {
+                        e.preventDefault();
+                        this.fileInput.click();
                     });
 
                     // Adjust mobile menu on window resize
