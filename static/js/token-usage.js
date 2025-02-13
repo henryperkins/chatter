@@ -1,9 +1,9 @@
 (() => {
-    // Only define the class if it doesn't exist
-    if (!window.TokenUsageManager) {
+    (() => {
         class TokenUsageManager {
             constructor(config) {
                 // Prevent multiple instances
+                console.debug('TokenUsageManager: Constructor called');
                 if (window.TokenUsageManager?.instance) {
                     console.log('TokenUsageManager: Returning existing instance');
                     return window.TokenUsageManager.instance;
@@ -45,27 +45,22 @@
             initializeElements() {
                 return {
                     container: document.getElementById('token-usage'),
-                    progress: document.getElementById('token-progress'),
                     tokensUsed: document.getElementById('tokens-used'),
                     tokensLimit: document.getElementById('tokens-limit'),
+                    tokensLeft: document.getElementById('tokens-left'),
                     userTokens: document.getElementById('user-tokens'),
                     assistantTokens: document.getElementById('assistant-tokens'),
-                    systemTokens: document.getElementById('system-tokens'),
-                    toggleBtn: document.getElementById('toggle-stats-btn'),
-                    refreshBtn: document.getElementById('refresh-stats'),
-                    breakdown: document.getElementById('token-breakdown')
+                    systemTokens: document.getElementById('system-tokens')
                 };
             }
 
             async initialize() {
                 try {
-                    console.log('TokenUsageManager: Starting initialization');
-                    let attempts = 0;
-                    while ((!window.utils || !window.CHAT_CONFIG) && attempts < 50) {
-                        console.log('TokenUsageManager: Waiting for dependencies...');
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                        attempts++;
-                    }
+                    console.debug('TokenUsageManager: Starting initialization', { config: this.config });
+                    
+                    // Check dependencies immediately instead of polling
+                    if (!window.utils) throw new Error('Utils dependency not available');
+                    if (!window.CHAT_CONFIG) throw new Error('CHAT_CONFIG dependency not available');
 
                     if (!window.utils || !window.CHAT_CONFIG) {
                         console.error('TokenUsageManager: Required dependencies not available after waiting');
@@ -83,18 +78,11 @@
                         this.elements.container.classList.remove('hidden');
                     }
 
-                    if (this.elements.toggleBtn) {
-                        this.elements.toggleBtn.addEventListener('click', () => {
-                            if (this.elements.breakdown) {
-                                this.elements.breakdown.classList.toggle('hidden');
-                            }
-                        });
-                    }
 
                     await this.updateStats();
                     this.startPeriodicUpdates();
 
-                    console.log('TokenUsageManager: Initialization complete');
+                    console.debug('TokenUsageManager: Initialization completed successfully');
                     return true;
                 } catch (error) {
                     console.error('TokenUsageManager: Initialization failed:', error);
@@ -119,10 +107,10 @@
                 }
 
                 try {
-                    console.log('TokenUsageManager: Starting stats update for chat', this.chatId);
+                    console.debug('TokenUsageManager: Starting stats update for chat', this.chatId);
 
                     const url = `/chat/stats/${this.chatId}`;
-                    console.log('TokenUsageManager: Fetching stats from:', url);
+                    console.debug('TokenUsageManager: Fetching stats from:', url);
 
                     const response = await fetch(url, {
                         method: 'GET',
@@ -138,7 +126,7 @@
                     }
 
                     const data = await response.json();
-                    console.log('TokenUsageManager: Received data:', data);
+                    console.debug('TokenUsageManager: Received data:', data);
 
                     if (!data || !data.success || !data.stats) {
                         throw new Error(data?.error || 'Invalid response format');
@@ -180,7 +168,7 @@
                         this.elements.systemTokens.textContent = (breakdown.system || 0).toLocaleString();
                     }
 
-                    console.log('TokenUsageManager: Stats updated successfully');
+                    console.debug('TokenUsageManager: Stats updated successfully');
                 } catch (error) {
                     console.error('TokenUsageManager: Error updating stats:', error);
                     this.showError('Failed to update token usage');
@@ -243,7 +231,8 @@
             }
         }
 
+        console.debug('TokenUsageManager: Module loaded, exposing to window');
         // Expose to window
         window.TokenUsageManager = TokenUsageManager;
-    }
+    })();
 })();

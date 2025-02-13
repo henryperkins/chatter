@@ -10,38 +10,48 @@ class MessageRenderer {
     };
 
     static async initialize() {
-        console.log('Initializing MessageRenderer with dependencies:', {
-            md: !!window.md,
-            DOMPurify: !!window.DOMPurify,
-            Prism: !!window.Prism,
-            CHAT_CONFIG: !!window.CHAT_CONFIG
-        });
+        try {
+            console.debug('MessageRenderer: Starting initialization');
 
-        // Cache templates from the DOM
-        this.templates.assistant = document.getElementById('assistant-message-template');
-        this.templates.user = document.getElementById('user-message-template');
-        this.templates.attachment = document.getElementById('attachment-template');
-        this.templates.attachmentItem = document.getElementById('attachment-item-template');
-        this.templates.typingIndicator = document.getElementById('typing-indicator-template');
+            // Check dependencies immediately instead of assuming they exist
+            if (!window.md) throw new Error('markdown-it not available');
+            if (!window.DOMPurify) throw new Error('DOMPurify not available');
+            if (!window.Prism) throw new Error('Prism not available');
+            if (!window.CHAT_CONFIG) throw new Error('CHAT_CONFIG not available');
+            
+            console.debug('MessageRenderer: Dependencies verified');
 
-        if (!this.templates.assistant || !this.templates.user) {
-            throw new Error('Message templates not found');
-        }
+            // Cache templates from the DOM
+            console.debug('MessageRenderer: Loading templates');
+            this.templates.assistant = document.getElementById('assistant-message-template');
+            this.templates.user = document.getElementById('user-message-template');
+            this.templates.attachment = document.getElementById('attachment-template');
+            this.templates.attachmentItem = document.getElementById('attachment-item-template');
+            this.templates.typingIndicator = document.getElementById('typing-indicator-template');
 
-        // Process existing messages
-        const chatBox = document.getElementById('chat-box');
-        if (chatBox) {
-            const assistantMessages = chatBox.querySelectorAll('.assistant-message .prose');
-            for (const messageDiv of assistantMessages) {
-                const content = messageDiv.getAttribute('data-content');
-                if (content) {
-                    await this.finalizeAssistantMessage(messageDiv.closest('.assistant-message'), content);
+            if (!this.templates.assistant || !this.templates.user) {
+                throw new Error('Message templates not found');
+            }
+
+            // Process existing messages
+            const chatBox = document.getElementById('chat-box');
+            console.debug('MessageRenderer: Processing existing messages');
+            if (chatBox) {
+                const assistantMessages = chatBox.querySelectorAll('.assistant-message .prose');
+                for (const messageDiv of assistantMessages) {
+                    const content = messageDiv.getAttribute('data-content');
+                    if (content) {
+                        await this.finalizeAssistantMessage(messageDiv.closest('.assistant-message'), content);
+                    }
                 }
             }
-        }
 
-        // Dispatch event to signal MessageRenderer is ready
-        document.dispatchEvent(new Event('messagerenderer:ready'));
+            console.debug('MessageRenderer: Initialization completed successfully');
+            return true;
+        } catch (error) {
+            console.error('MessageRenderer initialization failed:', error);
+            throw error;
+        }
     }
 
     static renderAssistantMessage(message, isStreaming = false) {
@@ -210,6 +220,7 @@ class MessageRenderer {
     }
 
     static async finalizeAssistantMessage(messageDiv, content) {
+        console.debug('MessageRenderer: Finalizing assistant message');
         if (!messageDiv) return;
 
         const container = messageDiv.querySelector('.prose');
@@ -280,6 +291,7 @@ class MessageRenderer {
 
         // Make content collapsible if needed
         this.makeContentCollapsible(container, content);
+        console.debug('MessageRenderer: Message finalized');
     }
 
     static preprocessOSeriesMarkdown(content) {
@@ -432,19 +444,4 @@ class MessageRenderer {
 // Export the MessageRenderer class
 export { MessageRenderer };
 
-// Also make globally accessible
 window.MessageRenderer = MessageRenderer;
-
-// Initialize after ChatConfig is ready
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        // Wait for ChatConfig to initialize first
-        const config = ChatConfig.getInstance();
-        await config.init();
-
-        // Now initialize MessageRenderer
-        await MessageRenderer.initialize();
-    } catch (error) {
-        console.error('Failed to initialize MessageRenderer:', error);
-    }
-});

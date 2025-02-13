@@ -1,9 +1,10 @@
 import logging
 import json
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Union, Any
 from dataclasses import dataclass
 
-from sqlalchemy import text, Column, String, Integer, Boolean, ForeignKey
+from sqlalchemy import text, Column, String, Integer, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 
 from database import db_session
@@ -27,6 +28,7 @@ class Chat(Base):
     title = Column(String, default="New Chat")
     model_id = Column(Integer, ForeignKey("models.id"), nullable=True)
     is_deleted = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=text('NOW()'))
 
     # Relationship to UploadedFile if any
     files = relationship("UploadedFile", back_populates="chat")

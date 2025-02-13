@@ -76,7 +76,44 @@ class User(UserMixin):
     def from_dict(cls, data: Dict[str, Any]) -> "User":
         """Create User instance from dictionary. Expects certain keys."""
         if not all(k in data for k in ["id", "username", "email"]):
+            logger.error(f"Missing required fields in user data: {data.keys()}")
             raise ValueError("Missing required fields in user data")
+
+        # Parse created_at with better error handling
+        created_at = None
+        if "created_at" in data:
+            try:
+                if isinstance(data["created_at"], datetime):
+                    created_at = data["created_at"]
+                elif isinstance(data["created_at"], str):
+                    # Handle PostgreSQL timestamp string
+                    timestamp_str = str(data["created_at"])
+                    if "+" in timestamp_str:  # Has timezone
+                        created_at = datetime.fromisoformat(timestamp_str)
+                    else:  # No timezone
+                        created_at = datetime.fromisoformat(timestamp_str.replace(" ", "T"))
+                    logger.debug(f"Parsed created_at from string: {created_at}")
+                else:
+                    logger.warning(f"Unexpected created_at type: {type(data['created_at'])}")
+                    created_at = datetime.now()
+            except Exception as e:
+                logger.error(f"Error parsing created_at '{data.get('created_at')}': {e}")
+                created_at = datetime.now()
+        else:
+            logger.warning("No created_at provided, using current time")
+            created_at = datetime.now()
+
+        # Parse reset_token_expiry if present
+        reset_token_expiry = None
+        if data.get("reset_token_expiry"):
+            try:
+                if isinstance(data["reset_token_expiry"], datetime):
+                    reset_token_expiry = data["reset_token_expiry"]
+                else:
+                    reset_token_expiry = datetime.fromisoformat(str(data["reset_token_expiry"]))
+            except Exception as e:
+                logger.error(f"Error parsing reset_token_expiry: {e}")
+                reset_token_expiry = None
 
         return cls(
             id=int(data["id"]),
@@ -84,9 +121,9 @@ class User(UserMixin):
             email=data["email"],
             password_hash=data.get("password_hash"),
             role=data.get("role", "user"),
-            created_at=data["created_at"] if isinstance(data["created_at"], datetime) else datetime.fromisoformat(str(data["created_at"])) if data.get("created_at") else datetime.now(),
+            created_at=created_at,
             reset_token_hash=data.get("reset_token_hash"),
-            reset_token_expiry=data["reset_token_expiry"] if isinstance(data.get("reset_token_expiry"), datetime) else datetime.fromisoformat(str(data["reset_token_expiry"])) if data.get("reset_token_expiry") else None,
+            reset_token_expiry=reset_token_expiry,
             _active=data.get("is_active", True),
         )
 
@@ -214,7 +251,7 @@ class User(UserMixin):
                             :username, :email, :password_hash, :role,
                             NULL, NULL, NOW(), TRUE
                         )
-                        RETURNING id
+                        RETURNING id, created_at
                         """
                     ),
                     {
@@ -223,14 +260,22 @@ class User(UserMixin):
                         "password_hash": password_hash,
                         "role": "admin" if is_first_user else "user"
                     },
-                )
-                user_id = result.scalar_one()
+                ).mappings().first()
+
+                if not result:
+                    logger.error("User creation failed - no result returned")
+                    raise ValueError("Failed to create user")
+                    
+                user_id = result["id"]
+                logger.debug(f"User created with ID {user_id} and created_at {result.get('created_at')}")
                 db.commit()
                 
                 created_user = User.get_by_id(user_id)
                 if not created_user:
+                    logger.error(f"Failed to retrieve created user with ID {user_id}")
                     raise ValueError("Failed to create user")
-                    
+                
+                logger.debug(f"Successfully created and retrieved user: {created_user.to_dict()}")
                 return created_user
 
         except IntegrityError as e:

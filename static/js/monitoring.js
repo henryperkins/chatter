@@ -1,11 +1,11 @@
 (() => {
-    'use strict';
 
     class Monitoring {
         constructor(options = {}) {
             this.options = {
                 enabled: true,
                 debugMode: window.CHAT_CONFIG?.debug || false,
+                debugLog: true,
                 errorReporting: true,
                 performanceMonitoring: true,
                 interactionTracking: true,
@@ -27,14 +27,15 @@
                 measures: []
             };
 
-            this.init();
         }
 
         init() {
             if (!this.options.enabled) return;
+            console.debug('Monitoring: Starting initialization');
 
             // Global error handling
             window.addEventListener('error', (event) => {
+                console.debug('Monitoring: Caught global error', event);
                 this.logError('Uncaught error', {
                     message: event.message,
                     filename: event.filename,
@@ -196,6 +197,7 @@
         log(level, message, data = {}) {
             if (!this.options.enabled) return;
 
+            if (this.options.debugLog) console.debug(`Monitoring [${level}]:`, message, data);
             const logEntry = {
                 timestamp: new Date().toISOString(),
                 level,
@@ -275,8 +277,8 @@
         }
     }
 
-    // Initialize monitoring
-    window.monitoring = new Monitoring();
+    // Export monitoring class
+    window.Monitoring = Monitoring;
 
     // Expose debug functions when debug mode is enabled
     if (window.CHAT_CONFIG?.debug) {
@@ -290,4 +292,11 @@
             }
         };
     }
+
+    // Create instance but let core.js initialize it
+    console.debug('Monitoring: Creating initial instance (disabled)');
+    window.monitoring = new Monitoring({
+        enabled: false, // Start disabled until core.js initializes
+        debugLog: true  // Enable debug logging
+    });
 })();

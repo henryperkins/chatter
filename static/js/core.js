@@ -1,34 +1,106 @@
 window.App = {
     initialized: false,
-    dependencies: {
+    components: {
+        monitoring: false,
         utils: false,
         markdown: false,
         prism: false,
-        darkMode: false
+        darkMode: false,
+        chatConfig: false,
+        messageRenderer: false,
+        tokenUsage: false,
+        chat: false
     },
 
     async init() {
         if (this.initialized) return;
+        
+        console.debug('App: Starting initialization sequence');
 
         try {
-            const timeout = 15000; // Increased timeout to 15 seconds
+            // 1. Initialize monitoring first for error tracking
+            await this.initMonitoring();
+            
+            // 2. Initialize utils
+            await this.initUtils();
 
-            // Initialize core dependencies in parallel with timeout
+            // 3. Initialize core dependencies in parallel
+            const timeout = 15000;
             await Promise.all([
                 this.initializeWithTimeout(this.initializeMarkdown(), 'Markdown', timeout),
                 this.initializeWithTimeout(this.initializePrism(), 'Prism', timeout),
-                this.initializeWithTimeout(this.initializeUtils(), 'Utils', timeout),
                 this.initializeWithTimeout(this.initializeDarkMode(), 'Dark Mode', timeout)
             ]);
 
-            // Set up global error handling
-            this.setupErrorHandling();
+            // 4. Initialize chat-specific components if on chat page
+            if (document.getElementById('chat-container')) {
+                await this.initializeChatComponents();
+            }
 
             this.initialized = true;
             document.dispatchEvent(new Event('app:ready'));
+            
+            if (this.components.monitoring) {
+                console.debug('App: Component states:', this.components);
+                window.monitoring.log('info', 'App initialization complete', this.components);
+            }
         } catch (error) {
             console.error('App initialization failed:', error);
+            if (this.components.monitoring) {
+                window.monitoring.logError('App initialization failed', error);
+            }
             this.handleInitializationError(error);
+        }
+    },
+
+    async initMonitoring() {
+        if (this.components.monitoring) return;
+        if (window.monitoring) {
+            console.debug('App: Initializing monitoring');
+            this.components.monitoring = true;
+            console.debug('App: Monitoring initialized');
+        }
+    },
+
+    async initUtils() {
+        if (this.components.utils) return;
+        if (!window.utils) {
+            console.debug('App: Utils not found');
+            console.trace('Utils dependency missing');
+            throw new Error('Utils not loaded');
+        }
+        this.components.utils = true;
+        console.log('Utils initialized');
+    },
+
+    async initializeChatComponents() {
+        try {
+            console.debug('App: Initializing chat components');
+            // Initialize ChatConfig first
+            const config = window.ChatConfig.getInstance();
+            await config.init();
+            this.components.chatConfig = true;
+
+            // Initialize MessageRenderer after ChatConfig
+            if (window.MessageRenderer) {
+                await window.MessageRenderer.initialize();
+                this.components.messageRenderer = true;
+            }
+
+            // TokenUsageManager depends on ChatConfig
+            if (window.TokenUsageManager && window.CHAT_CONFIG?.chatId) {
+                window.tokenUsageManager = new TokenUsageManager(window.CHAT_CONFIG);
+                await window.tokenUsageManager.initialize();
+                this.components.tokenUsage = true;
+            }
+            
+            console.debug('App: Chat components initialized successfully');
+        } catch (error) {
+            console.error('Chat components initialization failed:', error);
+            if (this.components.monitoring) {
+                window.monitoring.logError('Chat components initialization failed', error);
+            }
+            throw error;
         }
     },
 
@@ -56,7 +128,7 @@ window.App = {
                 }
             });
 
-            this.dependencies.markdown = true;
+            this.components.markdown = true;
             return true;
         } catch (error) {
             console.error('Markdown initialization failed:', error);
@@ -72,7 +144,7 @@ window.App = {
         try {
             // Configure Prism options if needed
             window.Prism.manual = true; // Prevent automatic highlighting
-            this.dependencies.prism = true;
+            this.components.prism = true;
             return true;
         } catch (error) {
             console.error('Prism initialization failed:', error);
@@ -80,55 +152,13 @@ window.App = {
         }
     },
 
-    async initializeUtils() {
-        if (!window.utils) {
-            throw new Error('Utils not loaded');
-        }
-
-        try {
-            // Verify essential utils methods exist
-            const requiredMethods = ['fetchWithCSRF', 'showFeedback', 'sanitizeHTML'];
-            for (const method of requiredMethods) {
-                if (typeof window.utils[method] !== 'function') {
-                    throw new Error(`Missing required utils method: ${method}`);
-                }
-            }
-
-            this.dependencies.utils = true;
-            return true;
-        } catch (error) {
-            console.error('Utils initialization failed:', error);
-            throw error;
-        }
-    },
-
-    setupErrorHandling() {
-        window.addEventListener('error', (event) => {
-            console.error('Global error:', event.error);
-            if (window.utils?.showFeedback) {
-                window.utils.showFeedback('An error occurred. Please refresh the page.', 'error');
-            } else {
-                // Fallback error display
-                this.showFallbackError('An error occurred. Please refresh the page.');
-            }
-        });
-
-        window.addEventListener('unhandledrejection', (event) => {
-            console.error('Unhandled promise rejection:', event.reason);
-            if (window.utils?.showFeedback) {
-                window.utils.showFeedback('An error occurred. Please refresh the page.', 'error');
-            } else {
-                this.showFallbackError('An error occurred. Please refresh the page.');
-            }
-        });
-    },
-
     async waitForDependencies(timeout = 10000) {
         return new Promise((resolve, reject) => {
             const start = Date.now();
 
             const check = () => {
-                if (Object.values(this.dependencies).every(dep => dep)) {
+                const requiredDeps = ['markdown', 'prism', 'darkMode'];
+                if (requiredDeps.every(dep => this.components[dep])) {
                     resolve();
                     return;
                 }
@@ -147,14 +177,21 @@ window.App = {
 
     handleInitializationError(error) {
         console.error('Initialization error:', error);
+        if (this.components.monitoring) {
+            window.monitoring.logError('Initialization error', error);
+        }
         this.showFallbackError('Failed to initialize application. Please refresh the page.');
     },
 
     showFallbackError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-[2000]';
-        errorDiv.textContent = message;
-        document.body.appendChild(errorDiv);
+        if (window.utils?.showFeedback) {
+            window.utils.showFeedback(message, 'error');
+        } else {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-[2000]';
+            errorDiv.textContent = message;
+            document.body.appendChild(errorDiv);
+        }
     },
 
     async initializeWithTimeout(promise, name, timeout) {
@@ -172,7 +209,7 @@ window.App = {
         }
         try {
             await window.DarkMode.init();
-            this.dependencies.darkMode = true;
+            this.components.darkMode = true;
             return true;
         } catch (error) {
             console.error('Dark mode initialization failed:', error);
@@ -181,5 +218,11 @@ window.App = {
     }
 };
 
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', () => window.App.init());
+// Initialize when DOM is ready, with error handling
+document.addEventListener('DOMContentLoaded', () => {
+    console.debug('App: DOMContentLoaded triggered, starting initialization');
+    window.App.init().catch(error => {
+        console.error('Failed to initialize App:', error);
+        window.App.handleInitializationError(error);
+    });
+});

@@ -298,9 +298,12 @@ function setupUIEventListeners() {
         });
     }
 
-    // Model selection
-    if (modelSelect) {
-        modelSelect.addEventListener('change', handleModelChange);
+    // Model selection with custom dropdown
+    const modelDropdown = document.getElementById('model-dropdown');
+    if (modelDropdown) {
+        modelDropdown.querySelectorAll('button[data-model-id]').forEach((btn) => {
+            btn.addEventListener('click', handleModelChange);
+        });
     }
 
     // Edit title button

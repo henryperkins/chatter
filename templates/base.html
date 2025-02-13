@@ -204,33 +204,43 @@
 
     <!-- Core Libraries -->
     <!-- External Dependencies -->
+    <script src="{{ url_for('static', filename='js/lib/axios.min.js') }}"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
     
-    <!-- Local Libraries -->
-    <script src="{{ url_for('static', filename='js/lib/axios.min.js') }}"></script>
+    <!-- Core Library Fallbacks -->
     <script src="{{ url_for('static', filename='js/lib/dompurify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/lib/markdown-it.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/lib/prism.js') }}"></script>
     <script src="{{ url_for('static', filename='js/lib/markdown-it-bundle.js') }}"></script>
 
-    <!-- Core Utilities -->
+    <!-- Initialize Axios CSRF -->
+    <script>
+        window.axios.defaults.headers.common['X-CSRFToken'] = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    </script>
+
+    <!-- Core Foundation -->
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
-<script>
-// Configure Axios to include CSRF token in all requests
-window.axios.defaults.headers.common['X-CSRFToken'] = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-</script>
     <script src="{{ url_for('static', filename='js/monitoring.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/base.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/core.js') }}"></script>
+
+    <!-- UI Components -->
     <script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dark-mode.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>
+
+    <!-- Form Handling -->
     <script src="{{ url_for('static', filename='js/shared-validation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>
+
+    <!-- Feature Modules -->
+    <script src="{{ url_for('static', filename='js/base.js') }}"></script>
     <script src="{{ url_for('static', filename='js/fileUpload.js') }}"></script>
     <script src="{{ url_for('static', filename='js/token-usage.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/core.js') }}"></script>
+
+    <!-- ES Modules (loaded in chat.html) -->
+    {% block modules %}{% endblock %}
 
     {% block scripts %}{% endblock %}
 </body>

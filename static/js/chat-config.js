@@ -1,71 +1,82 @@
-class ChatConfig {
-        constructor() {
-            this.initialized = false;
-            this.config = null;
-            this.initPromise = null;
-        }
+export class ChatConfig {
+    constructor() {
+        this.initialized = false;
+        this.config = null;
+    }
 
-        async init() {
-            if (this.initialized) return this.config;
+    async init(options = {}) {
+        if (this.initialized) return this.config;
+        console.debug('ChatConfig: Starting initialization');
 
-            if (this.initPromise) {
-                return this.initPromise;
+        try {
+            const configEl = document.getElementById('chat-config');
+
+            console.debug('ChatConfig: Checking for chat container');
+            // If we're not on a chat page, resolve with empty config
+            if (!configEl || !document.getElementById('chat-container')) {
+                this.config = {};
+                this.initialized = true;
+                window.CHAT_CONFIG = this.config;
+                return this.config;
             }
 
-            this.initPromise = new Promise((resolve) => {
-                try {
-                    const configEl = document.getElementById('chat-config');
+            console.debug('ChatConfig: Loading configuration from DOM');
+            // Initialize config from data attributes
+            this.config = {
+                chatId: configEl.dataset.chatId,
+                csrfToken: configEl.dataset.csrfToken,
+                models: JSON.parse(configEl.dataset.models || '[]'),
+                currentModel: JSON.parse(configEl.dataset.currentModel || 'null'),
+                userId: configEl.dataset.userId,
+                debug: configEl.dataset.debug === 'true',
+                azureToken: configEl.dataset.azureToken
+            };
 
-                    // If we're not on a chat page, resolve with empty config
-                    if (!configEl || !document.getElementById('chat-container')) {
-                        this.config = {};
-                        this.initialized = true;
-                        window.CHAT_CONFIG = this.config;
-                        return resolve(this.config);
-                    }
-
-                    this.config = {
-                        chatId: configEl.dataset.chatId,
-                        csrfToken: configEl.dataset.csrfToken,
-                        models: JSON.parse(configEl.dataset.models || '[]'),
-                        currentModel: JSON.parse(configEl.dataset.currentModel || 'null'),
-                        userId: configEl.dataset.userId,
-                        debug: configEl.dataset.debug === 'true',
-                        azureToken: configEl.dataset.azureToken
-                    };
-
-                    this.initialized = true;
-                    window.CHAT_CONFIG = this.config;
-                    resolve(this.config);
-                } catch (error) {
-                    console.error('Failed to initialize chat config:', error);
-                    // Resolve with empty config on error rather than rejecting
-                    this.config = {};
-                    this.initialized = true;
-                    window.CHAT_CONFIG = this.config;
-                    resolve(this.config);
-                }
-            });
-
-            return this.initPromise;
-        }
-
-        static getInstance() {
-            if (!ChatConfig.instance) {
-                ChatConfig.instance = new ChatConfig();
+            // Merge any provided options
+            if (options.headers) {
+                this.config.headers = {
+                    ...this.config.headers,
+                    ...options.headers
+                };
             }
-            return ChatConfig.instance;
+
+            console.debug('ChatConfig: Configuration loaded:', this.config);
+
+            // Log initialization if in debug mode
+            if (this.config.debug) {
+                console.log('ChatConfig initialized:', this.config);
+            }
+
+            this.initialized = true;
+            window.CHAT_CONFIG = this.config;
+
+            // Initialize token usage manager if needed
+            if (window.TokenUsageManager && this.config.chatId) {
+                console.debug('ChatConfig: Initializing TokenUsageManager');
+                window.tokenUsageManager = new TokenUsageManager(this.config);
+                await window.tokenUsageManager.initialize();
+            }
+
+            return this.config;
+
+        } catch (error) {
+            console.error('Failed to initialize chat config:', error);
+            // Create empty config on error rather than throwing
+            this.config = {};
+            this.initialized = true;
+            window.CHAT_CONFIG = this.config;
+            return this.config;
         }
     }
 
-// Export for use in other modules
-export { ChatConfig };
+    static getInstance() {
+        console.debug('ChatConfig: Getting instance');
+        if (!ChatConfig.instance) {
+            ChatConfig.instance = new ChatConfig();
+        }
+        return ChatConfig.instance;
+    }
+}
 
-// Initialize when DOM is ready and make globally available
-document.addEventListener('DOMContentLoaded', () => {
-    const config = ChatConfig.getInstance();
-    window.ChatConfig = ChatConfig;
-    config.init().catch(error => {
-        console.error('Failed to initialize chat config:', error);
-    });
-});
+// Export singleton instance
+window.ChatConfig = ChatConfig;

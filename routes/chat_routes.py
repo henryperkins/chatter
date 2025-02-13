@@ -616,7 +616,8 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             message = request.form.get("message", "").strip()
             # Process file uploads if any
             files_data = []
-            files_list = request.files.getlist("files[]")
+            # Check for uploaded_files first, fall back to files[] for compatibility
+            files_list = request.files.getlist("uploaded_files") or request.files.getlist("files[]")
             if files_list and any(f.filename for f in files_list):
                 included_files, excluded_files, total_tokens, file_contents = process_uploaded_files(files_list)
                 if excluded_files:

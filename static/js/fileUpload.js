@@ -33,8 +33,7 @@
                     ];
 
                     // DOM references
-                    this.uploadButton = uploadButton || document.getElementById('file-upload');
-                    this.dropZone = document.getElementById('drop-zone');
+                    this.uploadButton = uploadButton || document.getElementById('upload-trigger');
                     this.fileInput = this.createFileInput();
                     this.mobileUploadMenu = document.getElementById('mobile-upload-controls');
                     this.uploadedFilesDiv = document.getElementById('uploaded-files');
@@ -69,16 +68,15 @@
                 }
 
                 /**
-                 * Main entry point to set up event listeners and drag-and-drop.
+                 * Main entry point to set up event listeners.
                  */
                 async initializeFileUpload() {
                     if (this.initialized) return true;
                     try {
                         if (this.isMobile) {
                             await this.setupMobileSpecificHandling();
-                        } else {
-                            this.setupDragAndDrop();
                         }
+                        // Removed drop-zone handling to match the template which has no drop zone
                         this.setupEventListeners();
                         this.setupMobileUpload();
                         this.initialized = true;
@@ -88,44 +86,6 @@
                         this.showError('File upload initialization failed');
                         return false;
                     }
-                }
-
-                /**
-                 * Wires up drag-and-drop functionality if a drop zone is present.
-                 */
-                setupDragAndDrop() {
-                    if (!this.dropZone) return;
-
-                    // Configure drop zone positioning
-                    this.dropZone.style.zIndex = '9999';
-                    this.dropZone.style.pointerEvents = 'none';
-                    
-                    // Update input height CSS variable
-                    document.documentElement.style.setProperty(
-                        '--chat-input-height',
-                        `${this.chatInput?.offsetHeight || 120}px`
-                    );
-
-                    const highlight = () => this.dropZone.classList.add('drag-active');
-                    const unhighlight = () => this.dropZone.classList.remove('drag-active');
-
-                    const handleDrag = (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        highlight();
-                    };
-
-                    const handleDrop = (e) => {
-                        e.preventDefault();
-                        unhighlight();
-                        const files = Array.from(e.dataTransfer.files);
-                        this.handleNewFiles(files);
-                    };
-
-                    this.dropZone.addEventListener('dragenter', handleDrag);
-                    this.dropZone.addEventListener('dragover', handleDrag);
-                    this.dropZone.addEventListener('dragleave', unhighlight);
-                    this.dropZone.addEventListener('drop', handleDrop);
                 }
 
                 /**

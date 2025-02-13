@@ -1,6 +1,5 @@
-// Dark mode utility singleton
-const DarkMode = {
-    init() {
+window.DarkMode = {
+    async init() {
         if (this.initialized) return;
 
         this.html = document.documentElement;
@@ -10,6 +9,8 @@ const DarkMode = {
         this.initialize();
         this.setupEventListeners();
         this.initialized = true;
+
+        return true;
     },
 
     initialize() {
@@ -35,12 +36,6 @@ const DarkMode = {
             document.documentElement.style.visibility = '';
         }, 50);
 
-        // Make theme controls visible after initialization
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => this.showToggle());
-        } else {
-            this.showToggle();
-        }
 
         // Update ARIA labels
         this.updateARIALabels();
@@ -169,12 +164,3 @@ const DarkMode = {
     }
 };
 
-// Initialize dark mode
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => DarkMode.init());
-} else {
-    DarkMode.init();
-}
-
-// Expose DarkMode globally
-window.DarkMode = DarkMode;

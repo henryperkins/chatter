@@ -31,13 +31,16 @@
                     </button>
                     
                     <!-- Chat List Dropdown -->
-                    <div id="chat-list-dropdown" class="hidden absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 max-h-64 overflow-y-auto w-[20rem]">
+                    <div id="chat-list-dropdown" class="hidden absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 max-h-64 overflow-y-auto w-[20rem] z-[2000]">
                         {% for chat in conversations %}
                         <button class="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-left {% if chat.id == chat_id %}bg-gray-50 dark:bg-gray-700{% endif %}"
-                                data-chat-id="{{ chat.id }}">
+                                data-chat-id="{{ chat.id }}"
+                                data-chat-title="{{ chat.title }}"
+                                data-chat-date="">
                             <span class="flex-1 truncate">{{ chat.title }}</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">{{ chat.created_at.strftime('%b %d') }}</span>
                             {% if chat.id == chat_id %}
-                            <i class="fas fa-check text-blue-500"></i>
+                            <i class="fas fa-check text-blue-500 ml-2"></i>
                             {% endif %}
                         </button>
                         {% endfor %}
@@ -194,37 +197,11 @@
 </div>
 {% endblock content %}
 
-{% block scripts %}
-{{ super() }}
-<!-- Chat Feature Modules -->
+{% block modules %}
+<!-- Chat Feature ES Modules -->
 <script src="{{ url_for('static', filename='js/message-renderer.js') }}" type="module"></script>
 <script src="{{ url_for('static', filename='js/chat-config.js') }}" type="module"></script>
 <script src="{{ url_for('static', filename='js/chat.js') }}" type="module"></script>
+{% endblock modules %}
 
-<!-- Add CSRF token to all AJAX requests -->
-<script type="module">
-import { ChatConfig } from "{{ url_for('static', filename='js/chat-config.js') }}";
-const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-
-document.addEventListener('DOMContentLoaded', async () => {
-    // Initialize chat config with CSRF token
-    const config = ChatConfig.getInstance();
-    await config.init({
-        headers: {
-            'X-CSRFToken': csrfToken
-        }
-    });
-    
-    if (!window.CHAT_CONFIG?.chatId) {
-        console.warn('No valid chatId found, skipping TokenUsageManager initialization.');
-        return;
-    }
-
-    // Initialize token usage manager
-    if (window.TokenUsageManager) {
-        window.tokenUsageManager = new TokenUsageManager(window.CHAT_CONFIG);
-        await window.tokenUsageManager.initialize();
-    }
-});
-</script>
-{% endblock scripts %}
+{% block scripts %}{{ super() }}{% endblock scripts %}
