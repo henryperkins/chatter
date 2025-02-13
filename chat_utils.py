@@ -33,18 +33,43 @@ def extract_text_from_file(file, mime_type: str) -> str:
     """
     try:
         file.seek(0)
-        content = file.read()
         
         if mime_type == 'application/pdf':
-            from pypdf import PdfReader
-            reader = PdfReader(file)
-            return "\n".join(page.extract_text() for page in reader.pages)
+            try:
+                from pypdf import PdfReader
+                reader = PdfReader(file)
+                text = []
+                for page in reader.pages:
+                    extracted = page.extract_text()
+                    if extracted:
+                        text.append(extracted)
+                return "\n\n".join(text)
+            except ImportError:
+                raise ValueError("PDF processing requires pypdf package")
             
         elif mime_type in ['application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                           'application/msword']:
-            from docx import Document
-            doc = Document(file)
-            return "\n".join(para.text for para in doc.paragraphs)
+            try:
+                from docx import Document
+                doc = Document(file)
+                text = []
+                
+                # Extract headers
+                for para in doc.paragraphs:
+                    if para.style.name.startswith('Heading'):
+                        text.append(f"\n# {para.text}\n")
+                    elif para.text.strip():
+                        text.append(para.text)
+                
+                # Extract tables
+                for table in doc.tables:
+                    text.append("\nTable contents:")
+                    for row in table.rows:
+                        text.append(" | ".join(cell.text for cell in row.cells))
+                
+                return "\n".join(text)
+            except ImportError:
+                raise ValueError("DOCX processing requires python-docx package")
             
         else:
             raise ValueError(f"Unsupported file type for text extraction: {mime_type}")
@@ -53,6 +78,8 @@ def extract_text_from_file(file, mime_type: str) -> str:
         raise ValueError(f"Required library not installed for {mime_type} processing: {e}")
     except Exception as e:
         raise ValueError(f"Failed to extract text from {file.filename}: {e}")
+    finally:
+        file.seek(0)
 
 # Constants
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4")  # Default model name
@@ -149,10 +176,20 @@ def allowed_file(filename: str) -> bool:
     return os.path.splitext(filename)[1].lower() in allowed_extensions
 
 def count_file_tokens(content: str) -> int:
-    """Count tokens for file content with additional overhead."""
-    base_tokens = count_tokens(content)
-    # Add overhead for file metadata and structure
-    return base_tokens + 10
+    """
+    Count tokens for file content using tiktoken consistently.
+    Adds small overhead for metadata/structure.
+    """
+    from token_utils import count_tokens
+    try:
+        # Use tiktoken for accurate counting
+        base_tokens = count_tokens(content)
+        # Add small overhead for metadata
+        return base_tokens + 10
+    except Exception as e:
+        logger.error(f"Token counting failed: {e}")
+        # Fallback only if tiktoken fails
+        return len(content.split()) + 10
 
 
 # Initialize context management
@@ -210,46 +247,56 @@ def process_file(file) -> Tuple[str, str, int]:
     if file_length > max_file_size:
         raise ValueError(f"File too large: {filename} exceeds the {max_file_size} byte limit.")
 
-    # Special handling for text-based files that might be detected as octet-stream
-    if mime_type == 'application/octet-stream':
-        try:
-            file.seek(0)
-            # Try to read and decode a sample to verify it's text
-            file.read(1024).decode('utf-8')
-            file.seek(0)
-            if ext in ['md', 'txt', 'json', 'py', 'js', 'css', 'html', 'csv']:
-                mime_type = f'text/{ext}' if ext != 'md' else 'text/markdown'
-        except (UnicodeDecodeError, Exception):
-            raise ValueError(f"Unable to process file as text: {filename}")
-
-    # Process text-based files with context management
+    # Handle different file types based on MIME type
     if mime_type.startswith('text/') or mime_type in ['application/json']:
+        # Text files - decode directly
+        file.seek(0)
         try:
             file_content = file.read().decode('utf-8')
-
-            # Use context monitor for intelligent file content compression
-            truncated_content = context_monitor.compress_file_content(
-                file_content,
-                MAX_FILE_CONTENT_LENGTH
-            )
-
-            # Track token usage
-            token_count = count_file_tokens(truncated_content)
-            context_monitor.track_token_usage(token_count)
-
-            # Cache the processed content
-            cache_key = hash((filename, len(file_content)))
-            context_manager.context_cache[cache_key] = [{"content": truncated_content}]
-
-            # Check if content was truncated
-            if len(truncated_content) < len(file_content):
-                logger.info(f"File {filename} was truncated from {len(file_content)} to {len(truncated_content)} characters")
-            
-            return filename, truncated_content, token_count
-        except UnicodeDecodeError as e:
-            raise ValueError(f"Failed to decode file {filename}: {e}")
+        except UnicodeDecodeError:
+            raise ValueError(f"Failed to decode text file {filename}")
+    elif mime_type in ['application/pdf', 'application/msword', 
+                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
+        # PDF/DOC/DOCX - use extract_text_from_file
+        try:
+            from chat_utils import extract_text_from_file
+            file_content = extract_text_from_file(file, mime_type)
+        except Exception as e:
+            raise ValueError(f"Failed to extract text from {filename}: {e}")
+    elif mime_type == 'application/octet-stream':
+        # Try to detect text files with wrong MIME type
+        try:
+            file.seek(0)
+            sample = file.read(1024).decode('utf-8')
+            file.seek(0)
+            if ext in ['md', 'txt', 'json', 'py', 'js', 'css', 'html', 'csv']:
+                file_content = file.read().decode('utf-8')
+            else:
+                raise ValueError(f"Unsupported binary file type: {filename}")
+        except UnicodeDecodeError:
+            raise ValueError(f"Unable to process file as text: {filename}")
     else:
         raise ValueError(f"Unsupported file type ({mime_type}): {filename}")
+
+    # Use context monitor for intelligent file content compression
+    truncated_content = context_monitor.compress_file_content(
+        file_content,
+        MAX_FILE_CONTENT_LENGTH
+    )
+
+    # Use tiktoken for consistent token counting
+    token_count = count_file_tokens(truncated_content)
+    context_monitor.track_token_usage(token_count)
+
+    # Cache the processed content
+    cache_key = hash((filename, len(file_content)))
+    context_manager.context_cache[cache_key] = [{"content": truncated_content}]
+
+    # Check if content was truncated
+    if len(truncated_content) < len(file_content):
+        logger.info(f"File {filename} was truncated from {len(file_content)} to {len(truncated_content)} characters")
+            
+    return filename, truncated_content, token_count
 
 def generate_chat_title(conversation_text: str) -> str:
     """
