@@ -218,7 +218,7 @@ class ConversationManager:
         truncated = encoding.decode(tokens)
         return f"{truncated}\n\n[Note: Content truncated to fit token limit]"
 
-    def _manage_context_window(self, chat_id: str, max_tokens: Optional[int]) -> None:
+    async def _manage_context_window(self, chat_id: str, max_tokens: Optional[int]) -> None:
         """
         Manage advanced context with partial retrieval if needed.
         """
@@ -244,8 +244,8 @@ class ConversationManager:
                             "timestamp": msg.get("metadata", {}).get("timestamp")
                         })
                         
-                        # Generate embeddings
-                        embeddings = await self.embedder.get_embeddings(text=content)
+                        # Generate embeddings synchronously
+                        embeddings = self.embedder.get_embeddings_sync(text=content)
                         
                         # Store analysis in message metadata
                         if "metadata" not in msg:

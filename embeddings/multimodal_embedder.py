@@ -77,6 +77,49 @@ class MultiModalEmbedder:
         else:
             raise ValueError("At least one embedding type required")
 
+    def get_embeddings_sync(
+        self,
+        text: Optional[str] = None,
+        image: Optional[Union[str, bytes]] = None
+    ) -> Dict[str, Any]:
+        """Synchronous version of get_embeddings."""
+        embeddings = {}
+        
+        if text:
+            cache_key = f"text:{hash(text)}"
+            if cache_key in self.embedding_cache:
+                embeddings["text"] = self.embedding_cache[cache_key]
+            else:
+                response = self.client.embeddings.create(
+                    model="text-embedding-ada-002",
+                    input=text
+                )
+                embeddings["text"] = np.array(response.data[0].embedding)
+                self.embedding_cache[cache_key] = embeddings["text"]
+                
+        if image:
+            cache_key = f"image:{hash(str(image))}"
+            if cache_key in self.embedding_cache:
+                embeddings["image"] = self.embedding_cache[cache_key]
+            else:
+                response = self.client.embeddings.create(
+                    model="vision-embedding-model",
+                    input=[{
+                        "type": "image",
+                        "image": image if isinstance(image, str) else base64.b64encode(image).decode('utf-8')
+                    }]
+                )
+                embeddings["image"] = np.array(response.data[0].embedding)
+                self.embedding_cache[cache_key] = embeddings["image"]
+                
+        if "text" in embeddings or "image" in embeddings:
+            embeddings["combined"] = self.combine_embeddings(
+                embeddings.get("text"),
+                embeddings.get("image")
+            )
+            
+        return embeddings
+
     async def get_embeddings(
         self,
         text: Optional[str] = None,
