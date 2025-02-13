@@ -17,15 +17,6 @@
     position: relative;
 }
 
-.chat-messages-scroll {
-    flex: 1;
-    overflow-y: auto;
-    scroll-padding-top: 4rem;
-    padding-bottom: var(--total-bottom-height);
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-    margin-bottom: env(safe-area-inset-bottom, 0px);
-}
 
 /* Usage Panel Core Styles */
 #usage-panel {
