@@ -55,7 +55,8 @@ from database import (
 )
 from models import User, Model, Provider
 from routes.auth_routes import bp as auth_bp
-from routes.chat_routes import chat_routes
+from chat import chat_routes  # Import from new modular chat package
+
 from routes.model_routes import bp as model_bp
 from routes.provider_routes import bp as provider_bp
 from routes.file_routes import init_file_routes
@@ -141,8 +142,8 @@ def configure_app(app: Optional[Flask] = None) -> None:
             "SESSION_REFRESH_EACH_REQUEST": True,
             "SESSION_COOKIE_HTTPONLY": True,
             # Only force secure cookies in production; allow HTTP in dev
-            "SESSION_COOKIE_SECURE": False if app.config.get("ENV") != "production" else True,
-            "SESSION_COOKIE_SAMESITE": None,
+            "SESSION_COOKIE_SECURE": True,
+            "SESSION_COOKIE_SAMESITE": "None",
             "SESSION_COOKIE_NAME": (
                 "__Secure-session"
                 if app.config.get("ENV") == "production"
@@ -185,8 +186,9 @@ def init_app_components(app: Flask) -> None:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
     app.wsgi_app = SecurityMiddleware(app.wsgi_app)
 
-    # Initialize CSRF protection first
+    # Initialize CSRF protection with enhanced settings
     csrf.init_app(app)
+    csrf.exempt(lambda _: False)  # Clear any existing exemptions using public API
     
     # Then initialize login manager
     login_manager.init_app(app)

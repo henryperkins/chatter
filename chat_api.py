@@ -297,9 +297,10 @@ def handle_normal_response(response: ChatCompletion) -> ChatCompletion:
         raise ChatAPIError(f"Error processing response: {str(e)}", 500)
 
 
-def scrape_data(query: str) -> str:
+async def scrape_data(query: str) -> str:
     """
     Scrape data from external resources based on the provided query.
+    Returns the content as a string.
     """
     if not query or not isinstance(query, str):
         raise ChatAPIError("Invalid query provided", 400)
@@ -309,7 +310,8 @@ def scrape_data(query: str) -> str:
         if not scraper.validate_access(query):
             raise ChatAPIError("Scraping not allowed by policy", 403)
             
-        return scraper.scrape(query)
+        result = await scraper.scrape(query)
+        return result["content"]  # Extract content from the result dict
 
     except requests.Timeout:
         raise ChatAPIError("Request timed out", 504)

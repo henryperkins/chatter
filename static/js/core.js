@@ -16,6 +16,10 @@ window.App = {
         if (this.initialized) return;
         
         console.debug('App: Starting initialization sequence');
+        
+        // Configure Axios defaults
+        window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
+        window.axios.defaults.withCredentials = true;
 
         try {
             // 1. Initialize monitoring first for error tracking

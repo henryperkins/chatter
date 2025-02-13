@@ -471,3 +471,24 @@ def process_uploaded_files(files_list):
         except ValueError as e:
             excluded_files.append({f.filename: str(e)})
     return (included_files, excluded_files, total_tokens, file_contents)
+
+def validate_chat_access(chat_id: str, user_id: str) -> bool:
+    """
+    Validate if a user has access to a specific chat.
+    
+    Args:
+        chat_id: ID of the chat to validate
+        user_id: ID of the user requesting access
+        
+    Returns:
+        bool: True if user has access, False otherwise
+    """
+    try:
+        from models.chat import Chat
+        chat = Chat.query.get(chat_id)
+        if not chat:
+            return False
+        return chat.user_id == user_id
+    except Exception as e:
+        logger.error(f"Error validating chat access: {str(e)}")
+        return False

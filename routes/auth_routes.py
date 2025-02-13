@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
 
 from typing import Optional
-from flask_wtf.csrf import CSRFError
+from flask_wtf.csrf import CSRFError, generate_csrf
 from email_validator import EmailNotValidError, validate_email
 from flask import (
     Blueprint,
@@ -16,6 +16,7 @@ from flask import (
     flash,
     g,
     jsonify,
+    make_response,
     redirect,
     render_template,
     request,
@@ -221,16 +222,31 @@ def handle_csrf_error(e):
         extra={
             "ip_address": request.remote_addr,
             "route": request.path,
-            "error": str(e),
+            "error_type": type(e).__name__,
+            "user_agent": request.headers.get("User-Agent"),
+            "referrer": request.headers.get("Referer"),
             "headers": dict(request.headers),
             "form_data": request.form.to_dict(),
+            "cookies": request.cookies
         }
     )
     
-    response_data = {
+    # Generate new CSRF token for the response
+    csrf_token = generate_csrf()
+    
+    response = make_response({
         "success": False,
         "error": "CSRF validation failed. Please refresh the page.",
-    }
+        "csrf_token": csrf_token
+    })
+    response.set_cookie(
+        "X-CSRF-TOKEN",
+        value=csrf_token,
+        secure=True,
+        httponly=False,
+        samesite='Strict'
+    )
+    return response
 
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
         return jsonify(response_data), 400  # Return JSON for AJAX requests
