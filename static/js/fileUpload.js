@@ -613,15 +613,26 @@
                 }
 
                 async fixImageOrientation(blob) {
-                    const image = await createImageBitmap(blob);
-                    const canvas = document.createElement('canvas');
-                    canvas.width = image.width;
-                    canvas.height = image.height;
-                    
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(image, 0, 0);
-                    
-                    return new Promise(resolve => {
+                    let canvas;
+                    try {
+                        const imageBitmap = await createImageBitmap(blob);
+                        canvas = document.createElement('canvas');
+                        canvas.width = imageBitmap.width;
+                        canvas.height = imageBitmap.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(imageBitmap, 0, 0);
+                    } catch (e) {
+                        // Fallback para iOS que não suporta createImageBitmap
+                        const fallbackImg = document.createElement('img');
+                        fallbackImg.src = URL.createObjectURL(blob);
+                        await new Promise((res) => (fallbackImg.onload = res));
+                        canvas = document.createElement('canvas');
+                        canvas.width = fallbackImg.width;
+                        canvas.height = fallbackImg.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(fallbackImg, 0, 0);
+                    }
+                    return new Promise((resolve) => {
                         canvas.toBlob(resolve, 'image/jpeg', 0.8);
                     });
                 }
