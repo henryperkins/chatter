@@ -7,10 +7,10 @@
         <div class="flex-1 min-w-0">
             <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                 <p class="prose dark:prose-invert max-w-none"></p>
-                <div class="mt-2 flex items-center justify-between">
+                <div class="mt-3 flex items-center justify-between">
                     <span class="text-xs text-gray-500 dark:text-gray-400"></span>
-                    <button class="copy-button text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" aria-label="Copy message">
-                        <i class="fas fa-copy"></i>
+                    <button class="copy-button p-2 -m-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors" aria-label="Copy message">
+                        <i class="fas fa-copy text-lg"></i>
                     </button>
                 </div>
             </div>
@@ -27,18 +27,18 @@
         <div class="message-content flex-1 min-w-0">
             <div data-role="assistant-message" class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                 <div class="prose dark:prose-invert max-w-none"></div>
-                <div class="mt-2 flex items-center justify-between">
+                <div class="mt-3 flex items-center justify-between">
                     <span class="text-xs text-gray-500 dark:text-gray-400"></span>
-                    <div class="flex items-center gap-2">
-                        <button class="regenerate-button text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" aria-label="Regenerate response">
-                            <i class="fas fa-redo"></i>
+                    <div class="flex items-center">
+                        <button class="regenerate-button p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors" aria-label="Regenerate response">
+                            <i class="fas fa-redo text-lg"></i>
                         </button>
-                        <button class="copy-button text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" aria-label="Copy message">
-                            <i class="fas fa-copy"></i>
+                        <button class="copy-button p-2 ml-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors" aria-label="Copy message">
+                            <i class="fas fa-copy text-lg"></i>
                         </button>
                     </div>
                 </div>
-                <button class="toggle-more hidden mt-4 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+                <button class="toggle-more hidden mt-4 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px] w-full sm:w-auto">
                     Show more
                 </button>
             </div>
@@ -72,12 +72,40 @@
 </template>
 
 <template id="attachment-item-template">
-    <div class="flex items-center gap-2 text-sm">
-        <i class="fas fa-paperclip text-gray-500 dark:text-gray-400"></i>
-        <a class="attachment-link text-blue-600 dark:text-blue-400 hover:underline" target="_blank">
-            <span class="attachment-name"></span>
-        </a>
-        <span class="file-size text-gray-500 dark:text-gray-400"></span>
+    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+        <div class="flex items-start gap-3">
+            <!-- File Icon/Preview -->
+            <div class="file-preview w-10 h-10 flex-shrink-0 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
+                <i class="fas fa-file text-gray-400 dark:text-gray-500 text-xl file-icon"></i>
+                <img class="w-full h-full object-cover rounded-lg hidden preview-image" alt="">
+            </div>
+            
+            <!-- File Info -->
+            <div class="flex-1 min-w-0">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="flex-1 min-w-0">
+                        <a class="attachment-link block text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline truncate" target="_blank">
+                            <span class="attachment-name"></span>
+                        </a>
+                        <div class="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            <span class="file-size"></span>
+                            <span class="file-type"></span>
+                            <span class="file-date"></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Actions -->
+                    <div class="flex items-center gap-1">
+                        <button class="preview-button p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors" aria-label="Preview file">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="remove-button p-2 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors" aria-label="Remove file">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -109,8 +137,8 @@
 <template id="code-block-template">
     <div class="code-block-wrapper relative">
         <pre><code></code></pre>
-        <button class="copy-code absolute top-2 right-2 p-2 bg-gray-800/10 dark:bg-gray-200/10 rounded-lg hover:bg-gray-800/20 dark:hover:bg-gray-200/20 transition-colors" aria-label="Copy code">
-            <i class="fas fa-copy"></i>
+        <button class="copy-code absolute top-2 right-2 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center bg-gray-800/10 dark:bg-gray-200/10 rounded-lg hover:bg-gray-800/20 dark:hover:bg-gray-200/20 transition-colors" aria-label="Copy code">
+            <i class="fas fa-copy text-lg"></i>
         </button>
     </div>
 </template>

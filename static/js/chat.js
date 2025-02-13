@@ -1,4 +1,4 @@
-xz // Enhanced chat interface with mobile optimizations
+// Enhanced chat interface with mobile optimizations
 
 "use strict";
 
@@ -9,7 +9,7 @@ const CONFIG = {
     STREAM_UPDATE_INTERVAL: 100,
     MAX_DEPENDENCY_ATTEMPTS: 50,
     O_SERIES_MODELS: ['o3-mini', 'o1', 'o1-mini', 'o1-preview'],
-    DEBUG: true
+    DEBUG: true,
 };
 
 // -----------------------------------------------------------------------------
@@ -694,26 +694,108 @@ async function handlePotentialFetchResponse(response) {
 
 // Normal response handler
 async function handleNormalResponse(formData) {
-    const message = formData.get('message') || '';
+    // Prepare request data
+    const message = formData.get('message')?.trim() || '';
     const jsonData = {
         message,
-        chat_id: window.CHAT_CONFIG.chatId
+        chat_id: window.CHAT_CONFIG.chatId,
+        file_ids: []
     };
 
+    // Handle file uploads if present
     if (window.fileUploadManager?.uploadedFiles?.length > 0) {
-        const uploadResponse = await fetch(`/api/files/upload/${window.CHAT_CONFIG.chatId}`, {
-            method: 'POST',
-            body: new FormData(document.getElementById('chat-form')),
-            headers: {
-                'X-Chat-ID': window.CHAT_CONFIG.chatId,
-                'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+        try {
+            // Use fileUploadManager's uploadFiles method which handles validation
+            const uploadedFiles = await window.fileUploadManager.uploadFiles();
+            
+            // Validate uploaded files response
+            if (!Array.isArray(uploadedFiles)) {
+                throw new Error('Invalid response from file upload manager');
             }
-        });
-        if (!uploadResponse.ok) {
-            throw new Error(`File upload failed: ${uploadResponse.status}`);
+
+            // Validate each file has required metadata
+            const validFiles = uploadedFiles.filter(file => {
+                if (!file || typeof file !== 'object') return false;
+                if (!file.id || !file.name || !file.mime_type) return false;
+                return true;
+            });
+
+            if (validFiles.length !== uploadedFiles.length) {
+                throw new Error('Some files have invalid metadata');
+            }
+
+            // Add file IDs and metadata to request
+            jsonData.file_ids = validFiles.map(file => file.id);
+            
+            // Add file metadata with processing status
+            jsonData.files = validFiles.map(file => ({
+                id: file.id,
+                name: file.name,
+                type: file.mime_type,
+                size: file.size,
+                url: file.url,
+                status: 'uploaded',
+                processing_complete: false
+            }));
+
+            // Monitor file processing status
+            const processingPromises = validFiles.map(async file => {
+                try {
+                    const statusResp = await fetch(`/api/files/status/${file.id}`, {
+                        headers: {
+                            'X-CSRFToken': window.CHAT_CONFIG.csrfToken,
+                            'X-Chat-ID': window.CHAT_CONFIG.chatId
+                        }
+                    });
+                    
+                    if (!statusResp.ok) {
+                        throw new Error('Failed to get file processing status');
+                    }
+
+                    const status = await statusResp.json();
+                    if (!status.success) {
+                        throw new Error(status.error || 'File processing failed');
+                    }
+
+                    // Update file status
+                    const fileIndex = jsonData.files.findIndex(f => f.id === file.id);
+                    if (fileIndex !== -1) {
+                        jsonData.files[fileIndex] = {
+                            ...jsonData.files[fileIndex],
+                            status: status.status,
+                            processing_complete: status.processing_complete,
+                            content_available: status.content_available,
+                            error: status.error
+                        };
+                    }
+
+                    // Log processing status
+                    console.log(`File ${file.name} processing status:`, status);
+
+                } catch (error) {
+                    console.error(`Error monitoring file ${file.name}:`, error);
+                    window.MessageRenderer.showError(`File processing error: ${error.message}`);
+                }
+            });
+
+            // Wait for all processing status checks
+            await Promise.all(processingPromises);
+
+            // Verify all files processed successfully
+            const failedFiles = jsonData.files.filter(file => 
+                !file.processing_complete || !file.content_available
+            );
+
+            if (failedFiles.length > 0) {
+                const errors = failedFiles.map(file => 
+                    `${file.name}: ${file.error || 'Processing failed'}`
+                ).join('\n');
+                throw new Error(`Some files failed processing:\n${errors}`);
+            }
+        } catch (uploadError) {
+            window.MessageRenderer.showError(`File upload failed: ${uploadError.message}`);
+            throw uploadError;
         }
-        const { file_ids: fileIds } = await uploadResponse.json();
-        jsonData.file_ids = fileIds;
     }
 
     let fetchResponse;
@@ -936,7 +1018,34 @@ async function sendMessage(event) {
         const message = messageInput.value.trim();
         let uploadedFiles = [];
 
+        // Validate message content
+        if (!message && (!window.fileUploadManager?.uploadedFiles?.length)) {
+            window.MessageRenderer.showError('Please provide a message or upload files');
+            return;
+        }
+
+        // Validate files if present
         if (window.fileUploadManager?.uploadedFiles?.length > 0) {
+            // Validate file types and sizes
+            const validFileTypes = ['text/plain', 'application/pdf', 'image/jpeg', 'image/png'];
+            const maxFileSize = 10 * 1024 * 1024; // 10MB
+            
+            const invalidFiles = window.fileUploadManager.uploadedFiles.filter(file => {
+                if (!validFileTypes.includes(file.type)) {
+                    window.MessageRenderer.showError(`Invalid file type: ${file.name}. Supported types: txt, pdf, jpg, png`);
+                    return true;
+                }
+                if (file.size > maxFileSize) {
+                    window.MessageRenderer.showError(`File too large: ${file.name}. Maximum size: 10MB`);
+                    return true;
+                }
+                return false;
+            });
+
+            if (invalidFiles.length > 0) {
+                return;
+            }
+
             try {
                 uploadedFiles = await window.fileUploadManager.uploadFiles();
                 if (!Array.isArray(uploadedFiles)) {

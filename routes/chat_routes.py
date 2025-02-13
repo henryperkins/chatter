@@ -1,4 +1,4 @@
-""" 
+"""
 Module for handling chat routes.
 
 This module provides routes for managing chat interactions, including:
@@ -84,7 +84,7 @@ limiter = Limiter(key_func=get_remote_address)
 # ----------------------------------------------------------------------------
 # Token Encoding Initialization with Fallback
 # ----------------------------------------------------------------------------
-def get_token_encoder(model_name: str = DEFAULT_MODEL):
+def get_token_encoder(model_name: str = DEFAULT_MODEL) -> tiktoken.Encoding:
     try:
         return tiktoken.encoding_for_model(model_name)
     except KeyError:
@@ -93,6 +93,7 @@ def get_token_encoder(model_name: str = DEFAULT_MODEL):
 
 
 encoding = get_token_encoder()
+
 
 # ----------------------------------------------------------------------------
 # Upload Folder Initialization
@@ -103,7 +104,9 @@ def init_upload_folder() -> None:
     if not os.path.exists(upload_folder):
         os.makedirs(upload_folder, exist_ok=True)
 
+
 init_upload_folder()
+
 
 # ----------------------------------------------------------------------------
 # Server-side Markdown Rendering
@@ -113,7 +116,8 @@ def server_side_format_markdown(raw_text: str) -> str:
     Convert raw text to HTML using Mistune server-side rendering.
     """
     markdown_processor = mistune.create_markdown(plugins=["url", "table"], escape=False)
-    return markdown_processor(raw_text)
+    return str(markdown_processor(raw_text))  # Explicit string conversion
+
 
 ##############################################################################
 # Validation / Helper Functions
@@ -222,6 +226,7 @@ def validate_chat_request(request_data) -> Dict[str, Any]:
         logger.error("Request validation error: %s", str(e), exc_info=True)
         return {"valid": False, "error": "Request validation failed"}
 
+
 ##############################################################################
 # 1) Chat Interface Pages
 ##############################################################################
@@ -236,8 +241,8 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     try:
         with db_session() as db:
             try:
-                model_count = db.execute(text("SELECT COUNT(*) FROM models")).scalar()
-                if model_count == 0:
+                model_count: Optional[int] = db.scalar(text("SELECT COUNT(*) FROM models"))  # type: ignore[assignment]
+                if not model_count:
                     logger.warning("No models found - showing error message")
                     rendered = render_template(
                         "error.html",
@@ -549,6 +554,7 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     response.status_code = 200
     return response
 
+
 ##############################################################################
 # 2) Create a New Chat
 ##############################################################################
@@ -580,6 +586,7 @@ def add_cors_headers(response: FlaskResponse) -> FlaskResponse:
     response.headers["X-Accel-Buffering"] = "no"  # Disable buffering for nginx
     return response
 
+
 ##############################################################################
 # 3) Send a Chat Message
 ##############################################################################
@@ -607,26 +614,26 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     try:
         logger.info("handle_chat: Content-Type = %s", request.headers.get('Content-Type', ''))
 
+        # Initialize files_data and included_files
+        files_data = []
+        included_files = []
+        
         # Handle both JSON and form data
         if request.is_json:
             data = request.get_json()
             message = data.get("message", "").strip()
-            files_data = []  # JSON requests don't support file uploads currently
         else:
             message = request.form.get("message", "").strip()
             # Process file uploads if any
-            files_data = []
-            # Check for uploaded_files first, fall back to files[] for compatibility
             files_list = request.files.getlist("uploaded_files") or request.files.getlist("files[]")
             if files_list and any(f.filename for f in files_list):
-                included_files, excluded_files, total_tokens, file_contents = process_uploaded_files(files_list)
+                processed_files = process_uploaded_files(files_list)
+                included_files, excluded_files, total_tokens, file_contents = processed_files
                 if excluded_files:
-                    error_json = jsonify({
+                    return jsonify({
                         "error": "Some files could not be processed",
                         "details": excluded_files,
-                    })
-                    error_json.status_code = 400
-                    return error_json
+                    }), 400
                 files_data = file_contents
 
         temp_chat_id = request.headers.get("X-Chat-ID") or session.get("chat_id", "")
@@ -656,17 +663,19 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             error_json.status_code = 400
             return error_json
 
-        # Get file content from uploaded files
+        # If file_ids were passed in JSON, fetch from DB
         file_contents = []
-        if 'file_ids' in data:
-            from models.uploaded_file import UploadedFile
-            for file_id in data['file_ids']:
-                file_record = UploadedFile.get_by_id(file_id)
-                if file_record and file_record.text_content:
-                    file_contents.append({
-                        'filename': file_record.filename,
-                        'content': file_record.text_content
-                    })
+        if request.is_json:
+            data = request.get_json() or {}
+            if 'file_ids' in data:
+                from models.uploaded_file import UploadedFile
+                for file_id in data['file_ids']:
+                    file_record = UploadedFile.get_by_id(file_id)
+                    if file_record and file_record.text_content:
+                        file_contents.append({
+                            'filename': file_record.filename,
+                            'content': file_record.text_content
+                        })
 
         # Combine message + file contents
         combined_message = message
@@ -702,7 +711,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         if use_streaming:
             return stream_response(chat_id, history, model_obj)
         else:
-            return normal_response(chat_id, history, model_obj)
+            return normal_response(chat_id, history, model_obj, included_files)
 
     except Exception as e:
         logger.error("Chat handling error: %s", str(e), exc_info=True)
@@ -783,17 +792,15 @@ def stream_response(chat_id: str, history: List[Dict[str, Any]], model_obj: Mode
             logger.debug("Streaming response initiated, returning SSE chunks")
 
             for chunk in response:
-                # If the chunk is already a string, yield it directly.
+                # Yield strings directly without processing
                 if isinstance(chunk, str):
                     yield chunk
                     continue
-
-                # Try to extract choices from chunk
-                choices = None
-                if isinstance(chunk, dict):
-                    choices = chunk.get("choices")
-                elif hasattr(chunk, "choices"):
-                    choices = chunk.choices
+                
+                # Only process proper response chunks
+                # Type-safe handling of Azure response chunks
+                chunk: Any  # Explicit type hint for dynamic response
+                choices = getattr(chunk, "choices", []) if hasattr(chunk, "choices") else []
 
                 if choices:
                     choice = choices[0]
@@ -829,7 +836,8 @@ def stream_response(chat_id: str, history: List[Dict[str, Any]], model_obj: Mode
 def normal_response(
     chat_id: str,
     history: List[Dict[str, Any]],
-    model_obj: Model
+    model_obj: Model,
+    included_files: List[Any]
 ) -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Handle normal (non-stream) response while honoring o-series constraints."""
     try:
@@ -922,14 +930,24 @@ def normal_response(
             requires_o1_handling=model_obj.requires_o1_handling,
         )
 
+        # Return file metadata along with chat response
+        saved_files = [{
+            "id": str(uuid.uuid4()),
+            "filename": f.filename,
+            "size": f.size,
+            "mime_type": f.mime_type,
+            "uploaded_at": datetime.utcnow().isoformat()
+        } for f in included_files] if included_files else []
+
         return jsonify({
             "success": True,
+            "saved_files": saved_files,
             "message": {
                 "role": "assistant",
-                "content": content,        # raw text
-                "content_html": content_html,  # preformatted HTML
+                "content": content,
+                "content_html": content_html,
                 "id": str(uuid.uuid4()),
-            },
+            }
         })
 
     except Exception as e:
@@ -937,6 +955,7 @@ def normal_response(
         error_json = jsonify({"error": str(e)})
         error_json.status_code = 500
         return error_json
+
 
 ##############################################################################
 # 4) Stats & Utility Routes

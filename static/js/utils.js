@@ -52,13 +52,27 @@ window.utils = {
                 defaultHeaders['X-Azure-Token'] = window.CHAT_CONFIG.azureToken;
             }
 
-            // Properly handle request body and content type
+            // Validate and handle request body
             let finalBody = options.body;
-            if (finalBody && !(finalBody instanceof FormData)) {
-                if (typeof finalBody === 'object') {
+            if (finalBody) {
+                if (finalBody instanceof FormData) {
+                    // FormData validation not needed - handled by chat.js
+                    // Just ensure the data exists
+                    if (!finalBody.has('message') && !finalBody.has('files[]')) {
+                        throw new Error('Message or files required');
+                    }
+                } else if (typeof finalBody === 'object') {
+                    // For JSON requests, validate content
+                    const hasMessage = finalBody.message && finalBody.message.trim().length > 0;
+                    const hasFiles = finalBody.file_ids?.length > 0 || finalBody.files?.length > 0;
+                    
+                    if (!hasMessage && !hasFiles) {
+                        throw new Error('Message or files required');
+                    }
+                    
                     finalBody = JSON.stringify({
                         ...finalBody,
-                        csrf_token: csrfToken // Include token in request body
+                        csrf_token: csrfToken
                     });
                     defaultHeaders['Content-Type'] = 'application/json';
                 }

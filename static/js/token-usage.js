@@ -22,7 +22,13 @@
                 this.updateInterval = null;
                 this.retryCount = 0;
                 this.initialized = false;
-                this.tokenCount = 0; // Initialize token count
+                this.tokenCount = 0;
+                this.lastUpdateTime = 0;
+                this.minUpdateInterval = 5000; // Minimum time between updates in ms
+                this.maxRetries = 3;
+                this.backoffDelay = 1000; // Initial backoff delay in ms
+                this.isRateLimited = false;
+                this.rateLimitEndTime = 0;
 
                 // Set up element references
                 this.elements = this.initializeElements();
@@ -90,27 +96,34 @@
                 }
             }
 
-            async updateStats() {
-                if (!window.utils) {
-                    console.error('TokenUsageManager: Utils not available');
-                    return;
-                }
-
-                if (!this.elements.container) {
-                    console.error('TokenUsageManager: Container element not found');
-                    return;
-                }
-
-                if (!this.chatId || typeof this.chatId !== 'string') {
-                    console.error('TokenUsageManager: Invalid chat ID for stats update:', this.chatId);
-                    return;
-                }
-
+            async updateStats(forceUpdate = false) {
                 try {
-                    console.debug('TokenUsageManager: Starting stats update for chat', this.chatId);
+                    // Check dependencies and elements
+                    if (!window.utils || !this.elements.container || !this.chatId) {
+                        console.error('TokenUsageManager: Missing required dependencies or elements');
+                        return;
+                    }
 
+                    // Check if we're rate limited
+                    if (this.isRateLimited) {
+                        const now = Date.now();
+                        if (now < this.rateLimitEndTime) {
+                            console.debug('TokenUsageManager: Still rate limited, skipping update');
+                            return;
+                        }
+                        this.isRateLimited = false;
+                    }
+
+                    // Enforce minimum update interval unless forced
+                    const now = Date.now();
+                    const timeSinceLastUpdate = now - this.lastUpdateTime;
+                    if (!forceUpdate && timeSinceLastUpdate < this.minUpdateInterval) {
+                        console.debug('TokenUsageManager: Update throttled, too soon since last update');
+                        return;
+                    }
+
+                    console.debug('TokenUsageManager: Starting stats update for chat', this.chatId);
                     const url = `/chat/stats/${this.chatId}`;
-                    console.debug('TokenUsageManager: Fetching stats from:', url);
 
                     const response = await fetch(url, {
                         method: 'GET',
@@ -121,16 +134,23 @@
                         credentials: 'same-origin'
                     });
 
+                    if (response.status === 429) {
+                        const retryAfter = parseInt(response.headers.get('Retry-After')) || 30;
+                        this.handleRateLimit(retryAfter);
+                        return;
+                    }
+
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
 
                     const data = await response.json();
-                    console.debug('TokenUsageManager: Received data:', data);
-
                     if (!data || !data.success || !data.stats) {
                         throw new Error(data?.error || 'Invalid response format');
                     }
+
+                    this.lastUpdateTime = now;
+                    this.retryCount = 0;
 
                     const stats = data.stats;
                     const breakdown = stats.token_breakdown || {};
@@ -207,9 +227,32 @@
                 });
             }
 
+            handleRateLimit(retryAfter) {
+                this.isRateLimited = true;
+                this.rateLimitEndTime = Date.now() + (retryAfter * 1000);
+                
+                // Update UI to show rate limit status
+                if (this.elements.tokensUsed) {
+                    this.elements.tokensUsed.innerHTML = `<span class="text-yellow-500">Rate limited</span>`;
+                }
+                
+                console.debug(`TokenUsageManager: Rate limited, retry after ${retryAfter}s`);
+                
+                // Schedule a retry
+                setTimeout(() => {
+                    this.isRateLimited = false;
+                    this.updateStats(true);
+                }, retryAfter * 1000);
+            }
+
             startPeriodicUpdates() {
+                // Clear any existing interval
+                this.stopPeriodicUpdates();
+                
                 this.updateInterval = setInterval(() => {
-                    if (this.elements.container && !this.elements.container.classList.contains('hidden')) {
+                    if (this.elements.container && 
+                        !this.elements.container.classList.contains('hidden') &&
+                        !this.isRateLimited) {
                         this.updateStats();
                     }
                 }, 30000);
@@ -224,9 +267,16 @@
 
             async handleNewMessage() {
                 try {
-                    await this.updateStats();
+                    if (this.isRateLimited) {
+                        console.debug('TokenUsageManager: Skipping update due to rate limit');
+                        return;
+                    }
+                    await this.updateStats(true);
                 } catch (error) {
                     console.error('TokenUsageManager: Error updating stats after new message:', error);
+                    if (error.message.includes('429')) {
+                        this.handleRateLimit(30); // Default 30s backoff if no Retry-After header
+                    }
                 }
             }
         }

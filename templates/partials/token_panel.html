@@ -1,7 +1,7 @@
-<div class="token-panel-container p-3">
-    <div id="token-usage" class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+<div class="token-panel-container p-4">
+    <div id="token-usage" class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <!-- Usage Stats -->
-        <div class="flex items-center gap-2 text-sm">
+        <div class="flex items-center gap-3 text-sm min-h-[44px]">
             <span id="tokens-used" 
                   class="font-medium tabular-nums text-gray-900 dark:text-gray-100" 
                   role="status" 
@@ -16,17 +16,17 @@
         </div>
         
         <!-- Distribution -->
-        <div class="flex items-center gap-4 text-sm tabular-nums">
-            <div class="flex items-center gap-1.5">
-                <i class="fas fa-user text-blue-600 dark:text-blue-500 text-xs"></i>
+        <div class="flex flex-wrap items-center gap-4 text-sm tabular-nums min-h-[44px]">
+            <div class="flex items-center gap-2 min-w-[60px] px-2 py-1 rounded-md bg-blue-50/50 dark:bg-blue-900/20">
+                <i class="fas fa-user text-blue-600 dark:text-blue-400"></i>
                 <span id="user-tokens" class="text-gray-700 dark:text-gray-300">0</span>
             </div>
-            <div class="flex items-center gap-1.5">
-                <i class="fas fa-robot text-green-600 dark:text-green-500 text-xs"></i>
+            <div class="flex items-center gap-2 min-w-[60px] px-2 py-1 rounded-md bg-green-50/50 dark:bg-green-900/20">
+                <i class="fas fa-robot text-green-600 dark:text-green-400"></i>
                 <span id="assistant-tokens" class="text-gray-700 dark:text-gray-300">0</span>
             </div>
-            <div class="flex items-center gap-1.5">
-                <i class="fas fa-cog text-purple-600 dark:text-purple-500 text-xs"></i>
+            <div class="flex items-center gap-2 min-w-[60px] px-2 py-1 rounded-md bg-purple-50/50 dark:bg-purple-900/20">
+                <i class="fas fa-cog text-purple-600 dark:text-purple-400"></i>
                 <span id="system-tokens" class="text-gray-700 dark:text-gray-300">0</span>
             </div>
         </div>

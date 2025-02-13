@@ -87,15 +87,17 @@
 </div>
 
 <!-- Token/File Usage Panel -->
-<div id="usage-panel" class="fixed bottom-0 left-0 right-0 z-[1100] bg-white/95 dark:bg-gray-800/95 border-t border-gray-200/50 dark:border-gray-700/50 backdrop-blur-md transition-transform duration-200">
-    <div class="max-w-4xl mx-auto w-full usage-tabs">
+<div id="usage-panel" class="fixed bottom-0 left-0 right-0 z-[1100] bg-white/98 dark:bg-gray-800/98 border-t border-gray-200/80 dark:border-gray-700/80 backdrop-blur-md transition-transform duration-200 shadow-lg">
+    <div class="max-w-4xl mx-auto w-full">
         <!-- Tab Buttons -->
-        <div class="usage-tabs flex items-center space-x-2 p-2">
-            <button class="tab tab-active" data-panel="token-usage-panel">
-              <i class="fas fa-chart-pie"></i> Tokens
+        <div class="usage-tabs flex items-center gap-2 p-3 border-b border-gray-200/50 dark:border-gray-700/50">
+            <button class="tab tab-active flex-1 sm:flex-none justify-center" data-panel="token-usage-panel">
+                <i class="fas fa-chart-pie"></i>
+                <span>Tokens</span>
             </button>
-            <button class="tab" data-panel="file-usage-panel">
-              <i class="fas fa-file-upload"></i> Files
+            <button class="tab flex-1 sm:flex-none justify-center" data-panel="file-usage-panel">
+                <i class="fas fa-file-upload"></i>
+                <span>Files</span>
             </button>
         </div>
 
@@ -105,17 +107,31 @@
                 {% include 'partials/token_panel.html' %}
             </div>
             
-            <div id="file-usage-panel" class="panel-content hidden p-3">
-                <div id="file-list" class="space-y-2 max-h-32 overflow-y-auto mb-3">
-                    <p class="text-gray-500 dark:text-gray-400 text-sm">
-                        No files attached yet.
-                    </p>
+            <div id="file-usage-panel" class="panel-content hidden">
+                <div class="p-4">
+                    <div class="flex flex-col gap-4">
+                        <!-- File List -->
+                        <div id="file-list" class="space-y-3 max-h-48 overflow-y-auto">
+                            <div class="file-list-empty text-gray-500 dark:text-gray-400 text-sm text-center py-4">
+                                <i class="fas fa-file-upload text-2xl mb-2 opacity-50"></i>
+                                <p>No files attached yet</p>
+                            </div>
+                        </div>
+
+                        <!-- Upload Controls -->
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <button id="upload-trigger" 
+                                    class="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2 min-h-[44px] px-4">
+                                <i class="fas fa-upload"></i>
+                                <span>Upload File</span>
+                            </button>
+                            <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                                <i class="fas fa-info-circle"></i>
+                                <span>Supported: PDF, TXT, DOC, DOCX (Max: 10MB)</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <button id="upload-trigger" 
-                        class="btn-primary">
-                    <i class="fas fa-upload"></i>
-                    <span>Upload File</span>
-                </button>
             </div>
         </div>
     </div>
@@ -165,9 +181,9 @@
 
     <!-- Chat Input Area -->
     <div id="chat-input" class="chat-input-container">
-        <div class="max-w-4xl mx-auto">
+        <div class="max-w-4xl mx-auto w-full">
             <form id="chat-form"
-                  class="h-full px-4 py-3 flex flex-col justify-between"
+                  class="flex flex-col justify-between gap-3 px-4"
                   enctype="multipart/form-data">
                 <!-- Hidden CSRF input if needed -->
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

@@ -1,11 +1,12 @@
 /* CSS Variables */
 :root {
     --nav-height: 4rem;
-    --tabs-height: 2.5rem;
-    --panel-content-height: 3.5rem;
+    --tabs-height: 3rem;
+    --panel-content-height: 4rem;
     --safe-bottom: env(safe-area-inset-bottom, 0px);
-    --chat-input-height: 5rem;
+    --chat-input-height: 6rem;
     --panel-spacing: 1rem;
+    --total-bottom-height: calc(var(--chat-input-height) + var(--tabs-height) + var(--panel-content-height) + var(--safe-bottom));
 }
 
 /* Chat container and layout */
@@ -20,20 +21,25 @@
     flex: 1;
     overflow-y: auto;
     scroll-padding-top: 4rem;
-    padding-bottom: calc(var(--chat-input-height) + var(--tabs-height) + var(--panel-content-height) + var(--safe-bottom));
+    padding-bottom: var(--total-bottom-height);
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    margin-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Usage Panel Core Styles */
 #usage-panel {
     position: fixed;
-    bottom: calc(var(--chat-input-height) + var(--safe-bottom));
-    background-color: rgba(255, 255, 255, 0.95);
-    border-top: 1px solid rgba(229, 231, 235, 0.5);
-    backdrop-filter: blur(8px);
+    bottom: var(--chat-input-height);
+    background-color: rgba(255, 255, 255, 0.98);
+    border-top: 1px solid rgba(229, 231, 235, 0.8);
+    backdrop-filter: blur(12px);
     color: rgb(31, 41, 55);
     z-index: 1100;
     touch-action: none;
+    width: 100%;
+    box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
+    min-height: calc(var(--tabs-height) + var(--panel-content-height));
 }
 
 .dark #usage-panel {
@@ -105,14 +111,17 @@
     bottom: 0;
     left: 0;
     right: 0;
-    background-color: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(8px);
-    border-top: 1px solid rgba(229, 231, 235, 0.5);
-    padding-bottom: var(--safe-bottom);
-    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.05);
+    background-color: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(229, 231, 235, 0.8);
+    padding: 1rem;
+    padding-bottom: max(1rem, var(--safe-bottom));
+    box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.05);
     transform: translateZ(0);
     z-index: 1200;
-    height: calc(var(--chat-input-height) + var(--safe-bottom));
+    height: var(--chat-input-height);
+    display: flex;
+    align-items: center;
 }
 
 .dark .chat-input-container {
@@ -132,27 +141,47 @@
 
 .tab {
     position: relative;
-    padding: 0.375rem 0.75rem;
+    padding: 0.75rem 1rem;
     font-size: 0.875rem;
     font-weight: 500;
-    color: rgb(55, 65, 81);
+    color: rgb(107, 114, 128);
     user-select: none;
-    min-height: 44px; /* Better touch target */
-    border-radius: 0.375rem;
+    min-height: 44px;
+    border-radius: 0.5rem;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 0.5rem;
+    transition: all 0.2s ease;
 }
- 
+
 .tab:hover {
     background-color: rgba(243, 244, 246, 0.9);
-    transition: background-color 0.2s;
+    color: rgb(55, 65, 81);
 }
 
 .tab.tab-active {
-    background-color: rgb(229, 231, 235);
-    color: rgb(17, 24, 39);
-    border-bottom: 2px solid rgb(37, 99, 235);
+    background-color: rgb(37, 99, 235);
+    color: white;
+    font-weight: 600;
+}
+
+.tab i {
+    font-size: 1rem;
+}
+
+.dark .tab {
+    color: rgb(156, 163, 175);
+}
+
+.dark .tab:hover {
+    background-color: rgba(55, 65, 81, 0.9);
+    color: rgb(209, 213, 219);
+}
+
+.dark .tab.tab-active {
+    background-color: rgb(59, 130, 246);
+    color: white;
 }
 
 .btn-tab {
@@ -162,19 +191,6 @@
     transition: background-color 0.2s;
 }
 
-.dark .tab {
-    color: rgb(209, 213, 219);
-}
-
-.dark .tab:hover {
-    background-color: rgba(55, 65, 81, 0.9);
-}
-
-.dark .tab.tab-active {
-    background-color: rgb(55, 65, 81);
-    color: rgb(243, 244, 246);
-    border-bottom-color: rgb(59, 130, 246);
-}
 
 .dark .btn-tab {
     background-color: rgb(55, 65, 81);
@@ -335,23 +351,24 @@
 }
 
 @media (max-width: 640px) {
+    :root {
+        --chat-input-height: 5rem;
+        --tabs-height: 3.5rem;
+        --panel-content-height: 4.5rem;
+    }
+
     .chat-messages-scroll {
-        padding-bottom: calc(var(--chat-input-height) + var(--safe-bottom) + 56px); /* Account for token panel */
+        padding-bottom: var(--total-bottom-height);
     }
 
     .chat-input-container {
         padding: 0.75rem;
-        padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
-        height: auto;
-        min-height: calc(var(--chat-input-height) + var(--safe-bottom));
+        padding-bottom: max(0.75rem, var(--safe-bottom));
     }
 
     #usage-panel {
-        position: fixed;
-        bottom: calc(var(--chat-input-height));
-        left: 0;
-        right: 0;
-        z-index: 1100;
+        box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
 
     .model-selector {
         max-width: calc(100vw - 2rem);
@@ -364,12 +381,12 @@
     }
 
     .message-container {
-        margin: 0 -1rem;
+        margin: 0 -0.5rem;
         padding: 1rem;
     }
 
     .btn-icon {
-        padding: 0.5rem;
+        padding: 0.75rem;
         min-height: 44px;
         min-width: 44px;
     }
@@ -377,90 +394,122 @@
     .usage-tabs {
         display: flex;
         gap: 0.5rem;
-        padding: 0.5rem;
-        z-index: 2000;
-    }
-
-    .usage-tabs .tab {
-        position: relative;
-        transition: all 0.2s ease;
-        border-radius: 0.5rem;
-        padding: 0.5rem 1rem;
-    }
-
-    .usage-tabs .tab.tab-active {
-        background-color: rgb(229, 231, 235);
-        color: rgb(17, 24, 39);
-    }
-
-    .usage-tabs .tab:not(.tab-active):hover {
-        background-color: rgba(209, 213, 219, 0.2);
-    }
-
-    #chat-list-dropdown button {
-        transition: background-color 0.2s ease;
+        padding: 0.75rem;
         border-bottom: 1px solid rgba(229, 231, 235, 0.5);
     }
 
-    #chat-list-dropdown button:last-child {
-        border-bottom: none;
-    }
-
-    #chat-list-dropdown button:hover {
-        background-color: rgba(243, 244, 246, 0.5);
-    }
-
-    .dark #chat-list-dropdown button {
-        border-color: rgba(55, 65, 81, 0.5);
-    }
-
-    .dark #chat-list-dropdown button:hover {
-        background-color: rgba(31, 41, 55, 0.5);
-    }
-
-    #usage-panel {
-        box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-
-    .dark #usage-panel {
-        box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.5);
-    }
-
     .tab {
+        flex: 1;
         display: flex;
         align-items: center;
-        gap: 0.375rem;
-        padding: 0.5rem 0.75rem;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem;
         font-size: 0.875rem;
         font-weight: 500;
-        border-radius: 0.5rem 0.5rem 0 0;
-        transition: all 0.2s;
+        border-radius: 0.5rem;
+        transition: all 0.2s ease;
+        min-height: 44px;
+    }
+
+    .tab.tab-active {
+        background-color: rgb(37, 99, 235);
+        color: white;
+        font-weight: 600;
+    }
+
+    .dark .tab.tab-active {
+        background-color: rgb(59, 130, 246);
+        color: white;
+    }
+
+    .tab i {
+        font-size: 1.125rem;
+    }
+
+    .tab span {
+        font-size: 0.875rem;
+    }
+
+    .panel-content {
+        padding: 1rem;
+        min-height: var(--panel-content-height);
     }
 }
 
-/* Panel content styling */
+/* Panel Content Styles */
 .panel-content {
     min-height: var(--panel-content-height);
     overflow: hidden;
-    transition: height 0.2s ease-in-out;
+    transition: all 0.2s ease-in-out;
 }
 
-/* Token panel container */
+.panel-content.expanded {
+    height: auto;
+    max-height: calc(40vh - var(--tabs-height));
+}
+
+/* Token Panel Container */
 .token-panel-container {
     max-width: 4xl;
     margin: 0 auto;
 }
 
-.panel-content.expanded {
-    height: auto;
-    max-height: calc(30vh - var(--tabs-height));
+/* File List Styling */
+.file-list-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 2rem 1rem;
+    background-color: rgba(243, 244, 246, 0.5);
+    border-radius: 0.5rem;
+    border: 2px dashed rgba(156, 163, 175, 0.3);
 }
 
+.dark .file-list-empty {
+    background-color: rgba(31, 41, 55, 0.5);
+    border-color: rgba(75, 85, 99, 0.3);
+}
+
+.file-list-empty i {
+    font-size: 2rem;
+    color: rgb(156, 163, 175);
+}
+
+.dark .file-list-empty i {
+    color: rgb(75, 85, 99);
+}
+
+/* Upload Controls */
 #upload-trigger {
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    min-height: 44px;
+    padding: 0.75rem 1.25rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    background-color: rgb(37, 99, 235);
+    color: white;
+    border-radius: 0.5rem;
 }
+
+#upload-trigger:hover {
+    background-color: rgb(29, 78, 216);
 }
+
+#upload-trigger i {
+    font-size: 1.125rem;
+}
+
+#upload-trigger:active {
+    transform: scale(0.98);
+}
+
+/* File Preview Icons */
+.file-icon.pdf { color: #dc2626; }
+.file-icon.doc, .file-icon.docx { color: #2563eb; }
+.file-icon.txt { color: #4b5563; }
