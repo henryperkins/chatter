@@ -231,6 +231,16 @@ class ConversationManager:
                 if isinstance(msg, dict) and msg.get("role") == "user":
                     content = msg.get("content", "")
                     if content and isinstance(content, str):
+                        # Try to get search expansions
+                        expansions = self.search_expander.expand(content)
+                        if expansions:
+                            logger.debug("Got expansions: %s", expansions[:200])
+                            expansion_msg = {
+                                "role": "system",
+                                "content": f"[Search Expansions]\n{expansions}"
+                            }
+                            Chat.add_message(chat_id, "system", expansion_msg["content"])
+
                         # Semantic analysis
                         analysis = self.analyzer.process_text(content)
                         logger.debug("Semantic analysis for message: entities=%d, edges=%d",
