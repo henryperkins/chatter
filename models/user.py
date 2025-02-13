@@ -30,6 +30,7 @@ class User(UserMixin):
     _active: bool = field(default=True)
     otp_secret: Optional[str] = field(default=None)
     otp_required: bool = field(default=False)
+    account_locked_until: Optional[datetime] = field(default=None)
 
     def __post_init__(self):
         """Dataclass hook for post-initialization."""
@@ -125,6 +126,7 @@ class User(UserMixin):
             reset_token_hash=data.get("reset_token_hash"),
             reset_token_expiry=reset_token_expiry,
             _active=data.get("is_active", True),
+            account_locked_until=data.get("account_locked_until"),
         )
 
     @classmethod
@@ -145,7 +147,8 @@ class User(UserMixin):
                     text(
                         """
                         SELECT id, username, email, password_hash, role,
-                               created_at, reset_token_hash, reset_token_expiry, is_active
+                               created_at, reset_token_hash, reset_token_expiry, is_active,
+                               account_locked_until
                         FROM users
                         WHERE id = :user_id
                         """
