@@ -565,6 +565,23 @@ class FileUploadHandler:
                     )
                 )
 
+                # Store extracted text and tokenized version
+                tokenized_content = context_monitor.compress_file_content(
+                    extracted_text,
+                    context_monitor.calculate_optimal_window_size(len(extracted_text))
+                )
+                
+                UploadedFile.store_tokenized_content(file_id, tokenized_content)
+                
+                # Store full extracted text
+                with db_session() as db:
+                    db.execute(text("""
+                        UPDATE uploaded_files
+                           SET text_content = :text
+                         WHERE id = :fid
+                    """), {"text": extracted_text, "fid": file_id})
+                    db.commit()
+
                 file_record = UploadedFile.get_by_id(file_id)
                 if not file_record:
                     raise Exception(f"Failed to retrieve file record for ID: {file_id}")
