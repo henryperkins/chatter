@@ -47,7 +47,8 @@ CREATE TABLE users (
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     otp_secret TEXT DEFAULT NULL,
     otp_required BOOLEAN DEFAULT FALSE,
-    locked_until TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    account_locked_until TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    failed_login_attempts INT NOT NULL DEFAULT 0,
     version INT NOT NULL DEFAULT 0
 );
 

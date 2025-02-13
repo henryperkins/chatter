@@ -31,6 +31,7 @@ class User(UserMixin):
     otp_secret: Optional[str] = field(default=None)
     otp_required: bool = field(default=False)
     account_locked_until: Optional[datetime] = field(default=None)
+    failed_login_attempts: int = field(default=0)
 
     def __post_init__(self):
         """Dataclass hook for post-initialization."""
