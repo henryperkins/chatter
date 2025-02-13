@@ -1,4 +1,4 @@
-xz // Enhanced chat interface with mobile optimizations
+xz; // Enhanced chat interface with mobile optimizations
 
 "use strict";
 
