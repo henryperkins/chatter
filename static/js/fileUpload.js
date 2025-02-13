@@ -81,7 +81,14 @@
                 setupEventListeners() {
                     // File input change
                     this.fileInput.addEventListener('change', async (e) => {
-                        const files = Array.from(e.target.files);
+                        // Ensure iOS triggers the "change" event
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const inputFiles = e.target.files;
+                        if (!inputFiles || !inputFiles.length) {
+                            return; // Bail out if no files selected
+                        }
+                        const files = Array.from(inputFiles);
                         await this.handleNewFiles(files);
                         // Reset file input to allow selecting the same file again
                         e.target.value = '';
@@ -90,7 +97,14 @@
                     // Upload button click (desktop) and touch (mobile)
                     this.uploadButton?.addEventListener('click', () => this.fileInput.click());
                     this.uploadButton?.addEventListener('touchstart', (e) => {
-                        this.fileInput.click();
+                        // Prevent default so iOS doesn't ignore the tap
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Some versions of iOS Safari need a small delay
+                        // before calling .click() on the file input
+                        setTimeout(() => {
+                            this.fileInput.click();
+                        }, 50);
                     });
 
                     // Adjust mobile menu on window resize
