@@ -1,10 +1,13 @@
 import os
+import tiktoken
 from werkzeug.utils import secure_filename
 from flask import current_app, request, jsonify
 from typing import List, Dict, Tuple, Any, Optional
 from models.uploaded_file import UploadedFile
 from config import config_instance
 from azure_search_config import AzureSearchConfig
+from database import db_session
+from sqlalchemy import text
 import hashlib
 import time
 
@@ -565,10 +568,18 @@ class FileUploadHandler:
                     )
                 )
 
+                # Get file content
+                file.seek(0)
+                try:
+                    file_content = file.read().decode('utf-8')
+                except UnicodeDecodeError:
+                    file_content = file.read().decode('latin-1', errors='ignore')
+                file.seek(0)
+
                 # Store extracted text and tokenized version
                 tokenized_content = context_monitor.compress_file_content(
-                    extracted_text,
-                    context_monitor.calculate_optimal_window_size(len(extracted_text))
+                    file_content,
+                    context_monitor.calculate_optimal_window_size(len(file_content))
                 )
                 
                 UploadedFile.store_tokenized_content(file_id, tokenized_content)
@@ -579,7 +590,7 @@ class FileUploadHandler:
                         UPDATE uploaded_files
                            SET text_content = :text
                          WHERE id = :fid
-                    """), {"text": extracted_text, "fid": file_id})
+                    """), {"text": file_content, "fid": file_id})
                     db.commit()
 
                 file_record = UploadedFile.get_by_id(file_id)
