@@ -545,16 +545,34 @@ class FileUploadHandler:
                             content,
                             context_monitor.calculate_optimal_window_size(len(content))
                         )
-                        file_tokens = len(compressed_content.split())
+                        file_tokens = len(tiktoken.get_encoding("cl100k_base").encode(compressed_content))
                     except UnicodeDecodeError:
                         current_app.logger.warning(
                             f"Could not read {original_filename} as text, skipping content processing"
                         )
+                        file_tokens = 0
+                elif mime_type in [
+                    'application/pdf',
+                    'application/msword',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                ]:
+                    with open(filepath, 'rb') as bin_file:
+                        try:
+                            extracted_text = extract_text_from_file(bin_file, mime_type)
+                            compressed_content = context_monitor.compress_file_content(
+                                extracted_text,
+                                context_monitor.calculate_optimal_window_size(len(extracted_text))
+                            )
+                            file_tokens = len(tiktoken.get_encoding("cl100k_base").encode(compressed_content))
+                            context_monitor.track_token_usage(file_tokens)
+                        except ValueError as e:
+                            current_app.logger.warning(f"Extracting text failed: {e}")
+                            file_tokens = 0
                 else:
                     current_app.logger.debug(
-                        f"Skipping content processing for binary file: {original_filename}"
+                        f"Skipping content processing for unsupported file type: {original_filename}"
                     )
-                    file_tokens = os.path.getsize(filepath) // 4  # Rough estimate for binary
+                    file_tokens = 0
 
                 total_tokens += file_tokens
                 context_monitor.track_token_usage(file_tokens)
