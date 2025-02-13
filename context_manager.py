@@ -32,6 +32,12 @@ class ContextManager:
         self.model_type = model_type
         self.analyzer = SemanticAnalyzer()
         
+        # Initialize knowledge graph and embedder
+        from analysis.knowledge_graph import KnowledgeGraph
+        from embeddings.multimodal_embedder import MultiModalEmbedder
+        self.knowledge_graph = KnowledgeGraph()
+        self.embedder = MultiModalEmbedder()
+        
         # Adjust max tokens for o-series models
         if model_type and model_type.lower() in ["o3-mini", "o1", "o1-mini", "o1-preview"]:
             self.model_max_tokens = min(model_max_tokens, self._get_o_series_token_limit(model_type))

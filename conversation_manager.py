@@ -226,18 +226,35 @@ class ConversationManager:
             messages = Chat.get_messages(chat_id)
             logger.debug("Retrieved %d messages for chat %s", len(messages), chat_id)
 
-            # Process user messages for semantic analysis
+            # Process user messages for semantic analysis and knowledge graph
             for msg in messages:
                 if isinstance(msg, dict) and msg.get("role") == "user":
                     content = msg.get("content", "")
                     if content and isinstance(content, str):
+                        # Semantic analysis
                         analysis = self.analyzer.process_text(content)
                         logger.debug("Semantic analysis for message: entities=%d, edges=%d",
                                    len(analysis["entities"]), len(analysis["graph_edges"]))
-                        # Store analysis in message metadata for future use
+                        
+                        # Add to knowledge graph
+                        graph_data = self.knowledge_graph.process_text(content)
+                        self.knowledge_graph.add_to_context(content, {
+                            "chat_id": chat_id,
+                            "message_id": msg.get("id"),
+                            "timestamp": msg.get("metadata", {}).get("timestamp")
+                        })
+                        
+                        # Generate embeddings
+                        embeddings = await self.embedder.get_embeddings(text=content)
+                        
+                        # Store analysis in message metadata
                         if "metadata" not in msg:
                             msg["metadata"] = {}
-                        msg["metadata"]["semantic_analysis"] = analysis
+                        msg["metadata"].update({
+                            "semantic_analysis": analysis,
+                            "graph_data": graph_data,
+                            "embeddings": embeddings
+                        })
 
             if hasattr(self.context_manager, "get_context"):
                 optimized_context = self.context_manager.get_context(messages)
