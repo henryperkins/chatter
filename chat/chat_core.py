@@ -15,6 +15,7 @@ from flask import (
 from flask.wrappers import Response as FlaskResponse
 from flask_login import login_required, current_user
 from flask_wtf.csrf import generate_csrf
+from database import db_session
 from sqlalchemy import text
 
 from models.chat import Chat
