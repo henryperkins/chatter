@@ -15,6 +15,7 @@ from flask import (
     request, jsonify, Response,
     session
 )
+from extensions import csrf
 from flask.wrappers import Response as FlaskResponse
 from flask_login import login_required, current_user
 from flask_limiter import Limiter
@@ -401,7 +402,7 @@ def normal_response(
 @chat_routes.route("/send_stream", methods=["POST"])
 @login_required
 @limiter.limit("60 per minute")
-@csrf.protect()
+@csrf.protect
 def handle_chat_stream() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Dedicated endpoint for handling streaming chat messages."""
     try:
