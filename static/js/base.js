@@ -119,8 +119,31 @@ class MobileMenuManager {
         });
     }
 
-    toggleMenu() {
-        this.isOpen ? this.closeMenu() : this.openMenu();
+    async toggleMenu() {
+        const csrfToken = window.utils.getCSRFToken();
+        if (!csrfToken) {
+            console.error('CSRF token not found');
+            return;
+        }
+        
+        try {
+            await fetch('/api/menu/state', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    isOpen: !this.isOpen
+                })
+            });
+            this.isOpen ? this.closeMenu() : this.openMenu();
+        } catch (error) {
+            console.error('Failed to save menu state:', error);
+            // Still toggle menu even if save fails
+            this.isOpen ? this.closeMenu() : this.openMenu();
+        }
     }
 
     openMenu() {

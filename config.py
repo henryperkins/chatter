@@ -300,9 +300,12 @@ class Config:
                 if len(key_bytes) != 32:
                     key_bytes = key_bytes[:32].ljust(32, b'\0')  # Ensure exactly 32 bytes
                 # Convert to Fernet key format (URL-safe base64)
-                fernet_key = base64.urlsafe_b64encode(key_bytes)
+                # Use standard base64 encoding to match session cookie encoding
+                fernet_key = base64.b64encode(key_bytes)
                 logger.debug("Successfully processed encryption key")
-                return fernet_key.decode()
+                # Ensure padding is correct
+                padded_key = fernet_key.decode().rstrip('=') + '=' * (-len(fernet_key) % 4)
+                return padded_key
             except Exception as e:
                 raise ValueError(f"Invalid encryption key format: {str(e)}")
 

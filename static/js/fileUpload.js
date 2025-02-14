@@ -596,8 +596,9 @@
                                         method: 'POST',
                                         body: formData,
                                         headers: {
-                                            'X-CSRFToken': window.CHAT_CONFIG.csrfToken,
-                                            'X-Chat-ID': this.chatId
+                                            'X-CSRF-Token': window.utils.getCSRFToken(),
+                                            'X-Chat-ID': this.chatId,
+                                            'X-Requested-With': 'XMLHttpRequest'
                                         }
                                     });
 
