@@ -1,6 +1,6 @@
 """Knowledge graph management for semantic relationship tracking."""
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 import spacy
 from spacy.tokens import Doc
 from logging_config import get_logger
