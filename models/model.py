@@ -94,6 +94,20 @@ class Model:
         },
     )
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a dictionary of Model fields, excluding sensitive data."""
+        return {
+            "id": self.id,
+            "provider_id": self.provider_id,
+            "name": self.name,
+            "deployment_name": self.deployment_name,
+            "description": self.description,
+            "model_type": self.model_type,
+            "max_tokens": self.max_tokens,
+            "max_completion_tokens": self.max_completion_tokens,
+            "requires_o1_handling": self.requires_o1_handling,
+        }
+
     # Class-level provider capabilities – may be superseded by centralized configuration
     PROVIDER_CAPABILITIES: ClassVar[Dict[str, Dict[str, Any]]] = {
         "gpt-4": {"fixed_temperature": True, "streaming": True, "max_tokens": 8192},
