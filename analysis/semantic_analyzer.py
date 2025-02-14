@@ -14,12 +14,8 @@ class SemanticAnalyzer:
             self.nlp = spacy.load("en_core_web_sm")
             self.spacy_available = True
             logger.info("spaCy initialized successfully")
-        except ImportError:
-            logger.warning("spaCy not installed - running with basic analysis only")
-        except OSError:
-            logger.warning("spaCy model not found - running with basic analysis only")
         except Exception as e:
-            logger.warning(f"Error initializing spaCy: {str(e)} - running with basic analysis only")
+            raise RuntimeError("Cannot proceed without spaCy model: en_core_web_sm") from e
 
     def process_text(self, text: str) -> Dict[str, Any]:
         """

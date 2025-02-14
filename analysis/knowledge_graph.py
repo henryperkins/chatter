@@ -14,9 +14,8 @@ class KnowledgeGraph:
         """Initialize the knowledge graph with spaCy model."""
         try:
             self.nlp = spacy.load("en_core_web_sm")
-        except OSError:
-            logger.warning("spaCy model 'en_core_web_sm' not found - skipping advanced knowledge graph features.")
-            self.nlp = None
+        except OSError as e:
+            raise RuntimeError("Cannot proceed without spaCy model: en_core_web_sm") from e
             
         self.entities: Dict[str, Set[str]] = {}
         self.relationships: List[Tuple[str, str, str]] = []
