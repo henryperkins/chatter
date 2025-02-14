@@ -3,7 +3,6 @@ Message handling and streaming functionality for chat system.
 Handles processing of chat messages, file uploads, and response generation.
 """
 
-import os
 import json
 import uuid
 import bleach
@@ -14,7 +13,7 @@ from typing import Dict, List, Any, Generator, Optional, Union, Tuple
 from . import chat_routes
 from flask import (
     request, jsonify, Response,
-    session, make_response
+    session
 )
 from flask.wrappers import Response as FlaskResponse
 from flask_login import login_required, current_user

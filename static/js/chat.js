@@ -284,10 +284,7 @@ async function startChat() {
 // UI Event Listeners
 // -----------------------------------------------------------------------------
 function setupUIEventListeners() {
-    const uploadTrigger = document.getElementById('upload-trigger');
-    const fileInput = document.getElementById('file-upload');
     const messageInput = document.getElementById('message-input');
-    const sendButton = document.getElementById('send-button');
     const chatForm = document.getElementById('chat-form');
     const newChatBtn = document.getElementById('new-chat-btn');
     const modelSelectorBtn = document.getElementById('model-selector-btn');
@@ -345,7 +342,7 @@ function setupUIEventListeners() {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+                            'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content
                         },
                         body: JSON.stringify({
                             chat_id: window.CHAT_CONFIG.chatId,

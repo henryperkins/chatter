@@ -38,8 +38,6 @@ from models.model import Model
 
 # Azure libraries for deployment validation (optional)
 try:
-    from azure.identity import DefaultAzureCredential
-    from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
     AZURE_IMPORTS_AVAILABLE = True
 except ImportError:
     AZURE_IMPORTS_AVAILABLE = False
@@ -542,6 +540,7 @@ class ProviderForm(FlaskForm):
 # ------------------------------------------------------------------------
 
 class ModelForm(FlaskForm):
+    csrf_token = HiddenField('CSRF Token')
     name = StringField('Model Name', validators=[DataRequired(), Length(max=255)])
     deployment_name = StringField(
         'Deployment Name',
@@ -912,4 +911,3 @@ class DefaultModelForm(FlaskForm):
         ],
     )
     submit = SubmitField("Save Default Model")
- 

@@ -247,28 +247,27 @@ def handle_csrf_error(e):
         }
     )
     
-    # Generate new CSRF token for the response
-    csrf_token = generate_csrf()
+    # Generate and rotate CSRF token
+    new_csrf_token = generate_csrf()
+    session['csrf_token'] = new_csrf_token
+    g.csrf_token = new_csrf_token
     
-    response = make_response({
+    response = make_response(jsonify({
         "success": False,
-        "error": "CSRF validation failed. Please refresh the page.",
-        "csrf_token": csrf_token
-    })
+        "error": "Security validation failed. Please refresh the page and try again.",
+        "csrf_token": new_csrf_token
+    }), 403)
+
+    # Set secure cookie with SameSite and HttpOnly flags
     response.set_cookie(
-        "X-CSRF-TOKEN",
-        value=csrf_token,
+        'X-CSRF-TOKEN',
+        value=new_csrf_token,
         secure=True,
-        httponly=False,
-        samesite='Strict'
+        httponly=True,
+        samesite='Strict',
+        max_age=3600
     )
     return response
-
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-        return jsonify(response_data), 400  # Return JSON for AJAX requests
-
-    flash("Form validation failed. Please try again.", "error")
-    return redirect(url_for("auth.login"))
 
 
 @bp.route("/register", methods=["GET", "POST"]) 

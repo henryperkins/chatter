@@ -11,7 +11,7 @@
 
 {% block main_classes %}relative flex-1{% endblock %}
 
-{% block chat_tabs %}
+{% block chat_tabs %}   
 <!-- Chat Header -->
 <div class="fixed w-full top-16 z-[1100] bg-white/95 dark:bg-gray-800/95 border-b border-gray-200/50 dark:border-gray-700/50 backdrop-blur-md">
     <div class="max-w-7xl mx-auto px-4 py-2">
@@ -122,12 +122,15 @@
 
                         <!-- Upload Controls -->
                         <div class="flex flex-col sm:flex-row gap-3">
-                            <button id="upload-trigger" 
-                                    class="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2 min-h-[44px] px-4">
+                            <button id="upload-trigger"
+                                    class="btn-primary flex-1 sm:flex-none flex items-center justify-center gap-2 min-h-[44px] px-4"
+                                    title="Upload a file you want to include.">
                                 <i class="fas fa-upload"></i>
                                 <span>Upload File</span>
                             </button>
-            <input type="file" id="file-upload" class="hidden" multiple accept=".pdf,.txt,.doc,.docx" />
+                            <label for="file-upload" class="sr-only">Select file(s)</label>
+                            <input type="file" id="file-upload" class="hidden" multiple accept=".pdf,.txt,.doc,.docx"
+                                   aria-label="Select file(s) to upload" />
                             <div class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
                                 <i class="fas fa-info-circle"></i>
                                 <span>Supported: PDF, TXT, DOC, DOCX (Max: 10MB)</span>
@@ -224,8 +227,9 @@
         Save
       </button>
     </div>
-    <button id="dev-msg-modal-close" class="absolute top-2 right-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-      <i class="fas fa-times"></i>
+    <button id="dev-msg-modal-close" class="absolute top-2 right-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" title="Close developer message window">
+        <i class="fas fa-times"></i>
+        <span class="sr-only">Close</span>
     </button>
   </div>
 </div>
