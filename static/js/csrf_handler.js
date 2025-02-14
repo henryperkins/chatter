@@ -3,7 +3,7 @@ import axios from './lib/axios.min.js';
 
 // Initialize axios defaults
 axios.defaults.xsrfCookieName = 'X-CSRF-TOKEN';
-axios.defaults.xsrfHeaderName = 'X-CSRFToken';
+axios.defaults.xsrfHeaderName = 'X-CSRF-TOKEN';
 axios.defaults.withCredentials = true;
 
 export class CSRFHandler {
@@ -16,7 +16,7 @@ export class CSRFHandler {
         if (metaTag) {
             metaTag.content = newToken;
         }
-        document.cookie = `X-CSRF-TOKEN=${newToken}; Path=/; Secure; SameSite=Strict`;
+        document.cookie = `X-CSRF-TOKEN=${newToken}; Path=/; Secure; SameSite=Lax`;
     }
 
     static async handleCSRFError(error) {
