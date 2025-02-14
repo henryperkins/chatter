@@ -16,11 +16,12 @@ class SemanticAnalyzer:
         try:
             self.nlp = spacy.load("en_core_web_sm")
         except OSError as e:
-            logger.error("spaCy model 'en_core_web_sm' not found. To install in virtual environment:")
-            logger.error("1. venv/bin/python -m spacy download en_core_web_sm")
-            logger.error("2. Verify with: venv/bin/python -c 'import spacy; spacy.load(\"en_core_web_sm\")'")
-            logger.error("3. Then run with: venv/bin/python -m flask run")
-            raise RuntimeError("Missing spaCy model - use venv Python explicitly") from e
+            logger.error("spaCy not installed in virtual environment. First install dependencies:")
+            logger.error("1. venv/bin/python -m pip install -r requirements.txt")
+            logger.error("2. venv/bin/python -m spacy download en_core_web_sm")
+            logger.error("3. Verify with: venv/bin/python -c 'import spacy; spacy.load(\"en_core_web_sm\")'")
+            logger.error("4. Then run with: venv/bin/python -m flask run")
+            raise RuntimeError("Missing dependencies - install with venv Python") from e
 
     def process_text(self, text: str) -> Dict[str, Any]:
         """
