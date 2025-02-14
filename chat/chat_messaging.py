@@ -199,6 +199,7 @@ def stream_response(
     def generate() -> Generator[str, None, None]:
         """Generate streaming response chunks."""
         try:
+            # No CSRF protection here - it belongs at route level only
             client = AzureOpenAI(
                 azure_endpoint=model_obj.api_endpoint,
                 api_key=model_obj.api_key,
@@ -402,7 +403,7 @@ def normal_response(
 @chat_routes.route("/send_stream", methods=["POST"])
 @login_required
 @limiter.limit("60 per minute")
-@csrf.protect()
+@csrf.protect()  # CSRF protection at route level only
 def handle_chat_stream() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """Dedicated endpoint for handling streaming chat messages."""
     try:
