@@ -59,7 +59,7 @@ window.utils = {
                     // FormData validation not needed - handled by chat.js
                     // Just ensure the data exists
                     if (!finalBody.has('message') && !finalBody.has('files[]')) {
-                        throw new Error('Message or files required');
+                        console.warn('No message or files in FormData. Request may fail');
                     }
                 } else if (typeof finalBody === 'object') {
                     // For JSON requests, validate content
@@ -67,7 +67,7 @@ window.utils = {
                     const hasFiles = finalBody.file_ids?.length > 0 || finalBody.files?.length > 0;
                     
                     if (!hasMessage && !hasFiles) {
-                        throw new Error('Message or files required');
+                        console.warn('No message or files in JSON data. Request may fail');
                     }
                     
                     finalBody = JSON.stringify({

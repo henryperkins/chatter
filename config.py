@@ -278,6 +278,19 @@ class Config:
 
         # Validate configuration
         validate_config(self.__dict__)
+        
+        # Test encryption/decryption cycle
+        test_text = "encryption_test_string"
+        try:
+            from utils.encryption import encrypt_api_key, decrypt_api_key
+            encrypted = encrypt_api_key(test_text, self.ENCRYPTION_KEY)
+            decrypted = decrypt_api_key(encrypted, self.ENCRYPTION_KEY)
+            if decrypted != test_text:
+                raise ValueError("Encryption/decryption test failed")
+            logger.info("Encryption key validation successful")
+        except Exception as e:
+            logger.error("Encryption key validation failed: %s", str(e))
+            raise
 
         # Log environment values only during first initialization
         if not hasattr(Config, '_logged'):
@@ -291,13 +304,26 @@ class Config:
         if not key:
             raise ValueError("ENCRYPTION_KEY is missing. Check your .env setup.")
             
-        key = key.strip()  # Remove any whitespace
+        # Normalize key length and encoding
+        key = key.strip().ljust(43, '-')[:43]  # Fernet key is 44 bytes when encoded
+        key = key.replace('_', '/').replace('-', '+')  # Handle URL-safe encoding
         
         try:
-            # First try to use the key directly with Fernet to validate it
-            Fernet(key.encode())
-            logger.debug("Using valid Fernet key")
-            return key
+            # Add proper base64 padding
+            missing_padding = len(key) % 4
+            if missing_padding:
+                key += '=' * (4 - missing_padding)
+                
+            # Decode and validate key
+            key_bytes = base64.b64decode(key, validate=True)
+            if len(key_bytes) != 32:
+                raise ValueError("Key must be 32 bytes after decoding")
+                
+            # Re-encode with proper URL-safe encoding
+            fernet_key = base64.urlsafe_b64encode(key_bytes).decode()
+            Fernet(fernet_key)  # Validate key format
+            logger.debug("Using validated Fernet key")
+            return fernet_key
         except Exception:
             # If that fails, try to process it into a valid Fernet key
             try:

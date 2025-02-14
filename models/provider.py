@@ -219,7 +219,8 @@ class Provider:
 
                 api_key = data.get("api_key")
                 if api_key:
-                    api_key = encrypt_api_key(api_key)
+                    from config import config_instance
+                    api_key = encrypt_api_key(api_key, config_instance.ENCRYPTION_KEY)
 
                 is_azure = data.get(
                     "is_azure", False
