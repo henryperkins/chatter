@@ -32,11 +32,20 @@ class ContextManager:
         self.model_type = model_type
         self.analyzer = SemanticAnalyzer()
         
-        # Initialize knowledge graph and embedder
-        from analysis.knowledge_graph import KnowledgeGraph
-        from embeddings.multimodal_embedder import MultiModalEmbedder
-        self.knowledge_graph = KnowledgeGraph()
-        self.embedder = MultiModalEmbedder()
+        # Initialize optional components
+        try:
+            from analysis.knowledge_graph import KnowledgeGraph
+            self.knowledge_graph = KnowledgeGraph()
+        except ImportError:
+            logger.warning("KnowledgeGraph not available - advanced analysis disabled")
+            self.knowledge_graph = None
+            
+        try:
+            from embeddings.multimodal_embedder import MultiModalEmbedder
+            self.embedder = MultiModalEmbedder()
+        except ImportError:
+            logger.warning("MultiModalEmbedder not available - embeddings disabled") 
+            self.embedder = None
         
         # Adjust max tokens for o-series models
         if model_type and model_type.lower() in ["o3-mini", "o1", "o1-mini", "o1-preview"]:
