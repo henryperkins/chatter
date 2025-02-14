@@ -255,11 +255,10 @@ class Config:
 
         # Session settings
         self.PERMANENT_SESSION_LIFETIME = int(os.getenv("PERMANENT_SESSION_LIFETIME", "3600"))
-        self.SESSION_COOKIE_SECURE = bool(os.getenv("SESSION_COOKIE_SECURE", False))
+        self.SESSION_COOKIE_SECURE = True  # Always use secure cookies
         self.SESSION_COOKIE_HTTPONLY = True
-        # Session security settings
-        self.SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", self.ENV == "production")
-        self.SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")  # Ensures SameSite=Lax for CSRF compatibility
+        self.SESSION_COOKIE_SAMESITE = "Lax"  # Required for cross-origin safety
+        self.PREFERRED_URL_SCHEME = "https"  # Force HTTPS as preferred scheme
 
         # Email settings
         self.EMAIL_SENDER = os.getenv("EMAIL_SENDER", "no-reply@example.com")

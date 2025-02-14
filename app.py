@@ -83,6 +83,8 @@ class SecurityMiddleware:
                 ("X-Content-Type-Options", "nosniff"),
                 ("X-Frame-Options", "SAMEORIGIN"),
                 ("X-XSS-Protection", "1; mode=block"),
+                ("Strict-Transport-Security", "max-age=31536000; includeSubDomains"),
+                ("Content-Security-Policy", "default-src 'self' https://liveonshuffle.com; script-src 'self' 'unsafe-inline' https://*.googletagmanager.com;"),
                 ("Connection", "keep-alive"),
                 ("Cache-Control", "no-cache, no-store, must-revalidate"),
                 ("Pragma", "no-cache"),
@@ -188,7 +190,13 @@ def configure_app(app: Optional[Flask] = None) -> None:
 
 
 def init_app_components(app: Flask) -> None:
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=2,     # Trust two X-Forwarded-For headers
+        x_proto=2,   # Trust two X-Forwarded-Proto headers
+        x_host=1,    # Trust one X-Forwarded-Host header
+        x_prefix=1   # Trust X-Forwarded-Prefix if needed
+    )
     app.wsgi_app = SecurityMiddleware(app.wsgi_app)
 
     # Initialize CSRF protection with enhanced settings
@@ -591,6 +599,16 @@ def log_error():
     except Exception as e:
         logger.error("Error logging client error: %s", str(e))
         return create_error_response("Failed to log error", 500)
+
+@app.route("/debug")
+def debug():
+    """Debug endpoint to verify header handling."""
+    return jsonify({
+        "x-forwarded-proto": request.headers.get("X-Forwarded-Proto"),
+        "scheme": request.scheme,
+        "is_secure": request.is_secure,
+        "cookies_secure": current_app.config.get("SESSION_COOKIE_SECURE")
+    })
 
 @app.route("/health")
 def health_check():
