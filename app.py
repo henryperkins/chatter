@@ -18,8 +18,9 @@ import uuid
 import io
 import mistune
 import logging
+import mimetypes
 from datetime import timedelta, datetime
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, Dict
 
 from flask import (
     Flask,
@@ -66,19 +67,45 @@ from logging_config import get_logger
 logger = get_logger(__name__)
 
 
+def configure_mime_types(app: Flask) -> None:
+    """Configure MIME type mappings for static files."""
+    app.config['MIME_TYPES'] = {
+        '.css': 'text/css',
+        '.js': 'application/javascript',
+        '.json': 'application/json',
+        '.html': 'text/html',
+        '.txt': 'text/plain',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.ico': 'image/x-icon',
+        '.woff': 'font/woff',
+        '.woff2': 'font/woff2',
+        '.ttf': 'font/ttf',
+        '.eot': 'application/vnd.ms-fontobject'
+    }
+
+
 class SecurityMiddleware:
     """Unified security and connection header middleware."""
 
     def __init__(self, app):
+        import base64
+        import os
         self.app = app
-
     def __call__(self, environ, start_response):
+        logger.debug("SecurityMiddleware: Applying security headers")
         environ["HTTP_X_FORWARDED_PROTO"] = "https"
         environ["HTTP_X_FORWARDED_FOR"] = environ.get("REMOTE_ADDR", "")
         request_id = environ.get("HTTP_X_REQUEST_ID", str(uuid.uuid4()))
         environ["HTTP_X_REQUEST_ID"] = request_id
 
         def custom_start_response(status, headers, exc_info=None):
+            # Convert headers to a dict for easier manipulation
+            headers_dict = dict(headers)
+            
             security_headers = [
                 ("X-Content-Type-Options", "nosniff"),
                 ("X-Frame-Options", "SAMEORIGIN"),
@@ -87,26 +114,23 @@ class SecurityMiddleware:
                 ("Content-Security-Policy", (
                     "default-src 'self' https://liveonshuffle.com; "
                     "script-src 'self' 'unsafe-inline' https://liveonshuffle.com *.googletagmanager.com; "
-                    "style-src 'self' 'unsafe-inline' https://liveonshuffle.com fonts.googleapis.com; "
-                    "img-src 'self' data: https://liveonshuffle.com *.google-analytics.com; "
-                    "font-src 'self' data: fonts.gstatic.com; "
-                    "connect-src 'self' https://liveonshuffle.com *.google-analytics.com "
-                    "wss://*.servicebus.windows.net ws://localhost:*/; "
-                    "frame-src 'self' https://challenges.cloudflare.com; "
-                    "media-src 'self' https://liveonshuffle.com; "
-                    "object-src 'none'; "
+                    "style-src 'self' https://liveonshuffle.com fonts.googleapis.com; "
+                    "img-src 'self' data: blob: https://liveonshuffle.com *.google-analytics.com; "
+                    "font-src 'self' data: https://liveonshuffle.com fonts.gstatic.com; "
+                    "connect-src 'self' wss: https://liveonshuffle.com *.google-analytics.com; "
                     "base-uri 'self'; "
                     "form-action 'self'; "
-                    "frame-ancestors 'none'; "
-                    "block-all-mixed-content;"
+                    "frame-src 'self'; "
+                    "media-src 'self' blob: data:; "
+                    "object-src 'none'; "
+                    "child-src 'self' blob:; "
+                    "worker-src 'self' blob:"
                 )),
                 ("Connection", "keep-alive"),
-                ("Cache-Control", "no-cache, no-store, must-revalidate"),
-                ("Pragma", "no-cache"),
                 ("Expires", "0"),
             ]
             headers.extend(security_headers)
-            return start_response(status, headers, exc_info)
+            return start_response(status, [(str(k), str(v)) for k, v in headers], exc_info)
 
         return self.app(environ, custom_start_response)
 
@@ -204,12 +228,13 @@ def configure_app(app: Optional[Flask] = None) -> None:
 def init_app_components(app: Flask) -> None:
     app.wsgi_app = ProxyFix(
         app.wsgi_app,
-        x_for=2,     # Trust two X-Forwarded-For headers
-        x_proto=2,   # Trust two X-Forwarded-Proto headers
-        x_host=1,    # Trust one X-Forwarded-Host header
-        x_prefix=1   # Trust X-Forwarded-Prefix if needed
+        x_for=2,
+        x_proto=2,
+        x_host=1,
+        x_prefix=1
     )
     app.wsgi_app = SecurityMiddleware(app.wsgi_app)
+
 
     # Initialize CSRF protection with enhanced settings
     csrf.init_app(app)
@@ -402,6 +427,7 @@ def create_app() -> Flask:
         return Flask._app_instance  # type: ignore
 
     app = Flask(__name__)
+    configure_mime_types(app)
     Flask._already_configured = True  # type: ignore
     Flask._app_instance = app  # type: ignore
 
@@ -625,6 +651,24 @@ def debug():
         "is_secure": request.is_secure,
         "cookies_secure": current_app.config.get("SESSION_COOKIE_SECURE")
     })
+
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """Serve static files with proper MIME types."""
+    response = send_from_directory(app.static_folder, filename)
+    
+    # Determine content type
+    file_ext = os.path.splitext(filename)[1].lower()
+    content_type = app.config.get('MIME_TYPES', {}).get(file_ext)
+    
+    if not content_type:
+        content_type, _ = mimetypes.guess_type(filename)
+    
+    if content_type:
+        response.headers['Content-Type'] = content_type
+    
+    return response
+
 
 @app.route("/health")
 def health_check():

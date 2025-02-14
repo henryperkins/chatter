@@ -1,7 +1,3 @@
-"""
-Refined Flask Authentication Blueprint with improved password reset logic.
-"""
-
 import logging
 import os
 from datetime import datetime, timezone
@@ -13,6 +9,7 @@ from email_validator import EmailNotValidError, validate_email
 from flask import (
     Blueprint,
     current_app,
+    make_response,
     flash,
     g,
     jsonify,

@@ -1,0 +1,63 @@
+/* Typing indicator animation */
+.typing-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 3px;
+    border-radius: 50%;
+    background-color: #90949c;
+    animation: typing 1.5s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.typing-dot:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing {
+    0%, 60%, 100% {
+        transform: translateY(0);
+    }
+    30% {
+        transform: translateY(-10px);
+    }
+}
+
+/* Message container animation */
+.message-container {
+    animation: messageSlideIn 0.3s ease-out forwards;
+    opacity: 0;
+    transform: translateY(20px);
+}
+
+@keyframes messageSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Copy button hover effects */
+.copy-button {
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+.copy-button:hover {
+    opacity: 1;
+}
+
+pre:hover .copy-button {
+    opacity: 0.8;
+}

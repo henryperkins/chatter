@@ -2,6 +2,7 @@
 {% block extra_head %}
 <!-- Chat-specific styles -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/message_templates.css') }}">
 <meta name="csrf-token" content="{{ csrf_token() }}">
 {% endblock %}
 
