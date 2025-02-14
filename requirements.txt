@@ -128,3 +128,4 @@ html2text==2024.2.26
 validators==0.22.0
 mistune>=3.0.2
 playwright==1.37.0
+greenlet>=3.2.3
