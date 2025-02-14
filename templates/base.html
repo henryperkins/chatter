@@ -16,19 +16,18 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
 
-    <!-- Fonts -->
+    <!-- Local Fonts -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jetbrains-mono@1.0.6/css/jetbrains-mono.min.css">
-
+    
     <!-- Tailwind CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/output.css') }}">
 
-    <!-- Syntax Highlighting -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    <!-- Local Syntax Highlighting -->
+    <link rel="stylesheet" href="/static/css/local/prism.css">
+    <link rel="stylesheet" href="/static/css/local/prism-tomorrow.css">
 
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <!-- Local Icons -->
+    <link rel="stylesheet" href="/static/css/local/fontawesome.css">
 
     <!-- Safe Area CSS Variables -->
     <style>
@@ -203,18 +202,10 @@
     </main>
 
     <!-- Core Libraries -->
-    <!-- External Dependencies -->
     <script src="{{ url_for('static', filename='js/lib/axios.min.js') }}"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
-    
-    <!-- Core Library Fallbacks -->
-    <script src="{{ url_for('static', filename='js/lib/dompurify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/lib/markdown-it.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lib/dompurify.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/lib/prism.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/lib/markdown-it-bundle.js') }}"></script>
 
     <!-- Initialize Axios CSRF -->
     <script>
@@ -224,7 +215,7 @@
     <!-- Core Foundation -->
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/monitoring.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/core.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/core.js') }}" defer></script>
 
     <!-- UI Components -->
     <script src="{{ url_for('static', filename='js/alerts.js') }}"></script>

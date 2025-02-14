@@ -31,7 +31,7 @@ class UsagePanelManager {
         
         // Set initial active tab
         const firstTab = document.querySelector('.usage-tabs .tab');
-        const firstPanelId = firstTab?.getAttribute('data-panel');
+        const firstPanelId = firstTab?.getAttribute('data-panel'); 
         if (firstTab && firstPanelId) {
             this.switchTab(firstTab, firstPanelId);
         }
@@ -669,9 +669,11 @@ function debounce(func, wait) {
 // -----------------------------------------------------------------------------
 // Initialize on DOMContentLoaded
 // -----------------------------------------------------------------------------
-document.addEventListener('DOMContentLoaded', () => {
-    startChat();
-    updateMobileLayout();
+document.addEventListener('app:ready', () => {
+    startChat().catch(error => {
+        console.error('Chat initialization failed:', error);
+        window.MessageRenderer?.showError('Failed to initialize chat');
+    });
 
     function updateMobileLayout() {
         handleViewportChanges();
@@ -772,9 +774,10 @@ async function handleNormalResponse(formData) {
             method: 'POST',
             headers: {
                 'X-Chat-ID': window.CHAT_CONFIG.chatId,
-                'api-key': window.CHAT_CONFIG.azureToken,
+                'api-key': window.CHAT_CONFIG?.azureToken,
                 'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': window.CHAT_CONFIG?.csrfToken
             },
             body: jsonData
         });
@@ -834,7 +837,8 @@ async function handleStreamingResponse(formData) {
             message: message || '',
             files: uploadedFiles.map(file => file.id),
             chat_id: window.CHAT_CONFIG.chatId,
-            stream: true
+            stream: true,
+            model_type: window.CHAT_CONFIG.modelType
         };
 
         let response;

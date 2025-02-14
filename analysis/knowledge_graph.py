@@ -20,9 +20,9 @@ class KnowledgeGraph:
             
         self.entities: Dict[str, Set[str]] = {}
         self.relationships: List[Tuple[str, str, str]] = []
-        self.context_cache: Dict[str, List[Dict[str, str]]] = {}
+        self.context_cache: Dict[str, List[Dict[str, Any]]] = {}
 
-    def process_text(self, text: str) -> Dict[str, List[str]]:
+    def process_text(self, text: str) -> Dict[str, List[Dict[str, str]] | List[Tuple[str, str, str]]]:
         """Extract entities and relationships from text."""
         if not self.nlp:
             return {

@@ -132,9 +132,7 @@ def login():
             flash("Account locked for 15 minutes due to multiple failed attempts", "error")
             return render_template("login.html", form=form)
 
-        # Validate CSRF token using Flask-WTF's built-in validation
-        if not form.validate_csrf_token():
-            raise CSRFError("Invalid CSRF token")
+        # Removed explicit call to form.validate_csrf_token() because FlaskForm already handles CSRF validation in validate_on_submit()
         try:
             username = form.username.data
             if not username or not isinstance(username, str):
@@ -355,7 +353,11 @@ def forgot_password():
                 # If user exists, generate the reset token.
                 serializer = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
                 reset_token = serializer.dumps(email, salt="password-reset")
-                hashed_token = generate_password_hash(reset_token)
+                reset_token_str = (
+                    reset_token.decode("utf-8") if isinstance(reset_token, bytes)
+                    else str(reset_token)
+                )
+                hashed_token = generate_password_hash(reset_token_str)
 
                 # Update DB with hashed token and expiry
                 db.execute(

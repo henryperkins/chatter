@@ -84,7 +84,22 @@ class SecurityMiddleware:
                 ("X-Frame-Options", "SAMEORIGIN"),
                 ("X-XSS-Protection", "1; mode=block"),
                 ("Strict-Transport-Security", "max-age=31536000; includeSubDomains"),
-                ("Content-Security-Policy", "default-src 'self' https://liveonshuffle.com; script-src 'self' 'unsafe-inline' https://*.googletagmanager.com;"),
+                ("Content-Security-Policy", (
+                    "default-src 'self' https://liveonshuffle.com; "
+                    "script-src 'self' 'unsafe-inline' https://liveonshuffle.com *.googletagmanager.com; "
+                    "style-src 'self' 'unsafe-inline' https://liveonshuffle.com fonts.googleapis.com; "
+                    "img-src 'self' data: https://liveonshuffle.com *.google-analytics.com; "
+                    "font-src 'self' data: fonts.gstatic.com; "
+                    "connect-src 'self' https://liveonshuffle.com *.google-analytics.com "
+                    "wss://*.servicebus.windows.net ws://localhost:*/; "
+                    "frame-src 'self' https://challenges.cloudflare.com; "
+                    "media-src 'self' https://liveonshuffle.com; "
+                    "object-src 'none'; "
+                    "base-uri 'self'; "
+                    "form-action 'self'; "
+                    "frame-ancestors 'none'; "
+                    "block-all-mixed-content;"
+                )),
                 ("Connection", "keep-alive"),
                 ("Cache-Control", "no-cache, no-store, must-revalidate"),
                 ("Pragma", "no-cache"),
@@ -223,11 +238,15 @@ def init_app_components(app: Flask) -> None:
     app.static_folder = static_folder
     app.static_url_path = "/static"
 
-    # Configure static file serving
+    # Configure static file serving with security headers
     app.config.update({
-        'SEND_FILE_MAX_AGE_DEFAULT': 0,  # Disable caching in development
+        'SEND_FILE_MAX_AGE_DEFAULT': 0,
         'STATIC_FOLDER': static_folder,
         'STATIC_URL_PATH': '/static',
+        'STATIC_HEADERS': {
+            'Cache-Control': 'no-store, max-age=0',
+            'X-Content-Type-Options': 'nosniff'
+        }
     })
 
     # Exempt static files from CSRF protection
