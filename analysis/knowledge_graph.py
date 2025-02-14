@@ -15,10 +15,8 @@ class KnowledgeGraph:
         try:
             self.nlp = spacy.load("en_core_web_sm")
         except OSError:
-            logger.warning("Downloading spacy model 'en_core_web_sm'...")
-            import subprocess
-            subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"])
-            self.nlp = spacy.load("en_core_web_sm")
+            logger.warning("spaCy model 'en_core_web_sm' not found - skipping advanced knowledge graph features.")
+            self.nlp = None
             
         self.entities: Dict[str, Set[str]] = {}
         self.relationships: List[Tuple[str, str, str]] = []
@@ -26,6 +24,12 @@ class KnowledgeGraph:
 
     def process_text(self, text: str) -> Dict[str, List[str]]:
         """Extract entities and relationships from text."""
+        if not self.nlp:
+            return {
+                "entities": [],
+                "relationships": []
+            }
+            
         doc = self.nlp(text)
         
         # Extract named entities
@@ -54,6 +58,9 @@ class KnowledgeGraph:
 
     def get_related_context(self, text: str, max_items: int = 5) -> List[Dict[str, str]]:
         """Get semantically related context items."""
+        if not self.nlp:
+            return []
+            
         doc = self.nlp(text)
         related_context = []
         
@@ -79,12 +86,19 @@ class KnowledgeGraph:
         if not metadata:
             metadata = {}
             
-        doc = self.nlp(text)
-        context_item = {
-            "text": text,
-            "entities": [ent.text for ent in doc.ents],
-            **metadata
-        }
+        if self.nlp:
+            doc = self.nlp(text)
+            context_item = {
+                "text": text,
+                "entities": [ent.text for ent in doc.ents],
+                **metadata
+            }
+        else:
+            context_item = {
+                "text": text,
+                "entities": [],
+                **metadata
+            }
         
         # Use text as cache key
         if text not in self.context_cache:
