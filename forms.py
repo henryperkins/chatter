@@ -151,7 +151,6 @@ class LoginForm(FlaskForm):
     """
     Form for user login.
     """
-    csrf_token = HiddenField('CSRF Token')
     username = StringField(
         "Username",
         validators=[DataRequired(message="Username is required.")],
@@ -237,11 +236,6 @@ class RegistrationForm(FlaskForm):
     Form for user registration.
     Inherits CSRF protection from FlaskForm.
     """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if not hasattr(self, "csrf_token"):
-            self.csrf_token = HiddenField('CSRF Token')
-
     username = StringField(
         "Username",
         validators=[
@@ -540,7 +534,6 @@ class ProviderForm(FlaskForm):
 # ------------------------------------------------------------------------
 
 class ModelForm(FlaskForm):
-    csrf_token = HiddenField('CSRF Token')
     name = StringField('Model Name', validators=[DataRequired(), Length(max=255)])
     deployment_name = StringField(
         'Deployment Name',
