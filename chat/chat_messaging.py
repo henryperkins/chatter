@@ -435,7 +435,7 @@ def add_cors_headers(response: FlaskResponse) -> FlaskResponse:
     """Add required CORS headers for streaming support."""
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = (
-        "Content-Type, Authorization, X-Chat-ID, api-key, X-CSRFToken"
+        "Content-Type, Authorization, X-Chat-ID, api-key, X-CSRFToken, X-Requested-With"
     )
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
     response.headers["X-Accel-Buffering"] = "no"  # Disable buffering for nginx

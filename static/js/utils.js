@@ -44,7 +44,7 @@ window.utils = {
             const csrfToken = this.ensureCSRFToken();
             const defaultHeaders = {
                 'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-Token': csrfToken  // Standardized header name
+                'X-CSRFToken': csrfToken  // Standardized header name
             };
 
             // Only add Azure token if it exists

@@ -241,12 +241,13 @@ def handle_csrf_error(e):
 
     # Set cookie for double-submit pattern
     response.set_cookie(
-        'X-CSRF-Token',  # Standardized naming
+        'X-CSRFToken',  # Standardized naming
         value=csrf_token,
         secure=True,
         httponly=False,  # Allow JS to read for double-submit
         samesite='Lax',  # More permissive for external links
-        max_age=3600
+        max_age=3600,
+        path='/'  # Ensure cookie is available site-wide
     )
     return response
 

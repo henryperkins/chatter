@@ -166,14 +166,15 @@ def configure_app(app: Optional[Flask] = None) -> None:
             'WTF_CSRF_SECRET_KEY': app.config['SECRET_KEY'],
             'WTF_CSRF_TIME_LIMIT': 3600,
             'WTF_CSRF_SSL_STRICT': False,
-            'WTF_CSRF_HEADERS': ['X-CSRF-Token'],  # Standardized header name
+            'WTF_CSRF_HEADERS': ['X-CSRFToken'],  # Standardized header name
             'WTF_CSRF_METHODS': ['POST', 'PUT', 'PATCH', 'DELETE'],
             'WTF_CSRF_FIELD_NAME': 'csrf_token',
             'WTF_CSRF_CHECK_DEFAULT': True,
-            'WTF_CSRF_COOKIE_NAME': 'X-CSRF-Token',  # Match header name
+            'WTF_CSRF_COOKIE_NAME': 'X-CSRFToken',  # Match header name
             'WTF_CSRF_COOKIE_HTTPONLY': False,  # Allow JS to read for double-submit
             'WTF_CSRF_COOKIE_SAMESITE': 'Lax',  # More permissive
-            'WTF_CSRF_COOKIE_SECURE': True
+            'WTF_CSRF_COOKIE_SECURE': True,
+            'WTF_CSRF_COOKIE_PATH': '/'  # Ensure cookie is available site-wide
         }
     )
 
