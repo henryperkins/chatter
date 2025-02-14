@@ -14,7 +14,7 @@ from flask_login import login_required, current_user
 from models.chat import Chat
 from models.model import Model
 from conversation_manager import conversation_manager
-from chat_utils import validate_chat_access, generate_new_chat_id
+from chat.chat_utilities import validate_chat_access, generate_new_chat_id
 
 # Logging setup
 from logging_config import get_logger
