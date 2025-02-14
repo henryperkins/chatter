@@ -168,3 +168,83 @@ CREATE UNIQUE INDEX unique_lower_email ON users ((LOWER(email)));
 CREATE INDEX idx_uploaded_files_version ON uploaded_files (version);
 CREATE INDEX idx_uploaded_files_uuid ON uploaded_files (uuid);
 COMMIT;
+
+-- =============================================================
+-- INITIAL DATA - Insert default configuration
+-- =============================================================
+
+BEGIN;
+-- Insert Azure OpenAI Provider
+INSERT INTO providers (
+    name, slug, api_base_url, api_version_format, auth_type, 
+    endpoint_pattern, is_azure, validation_rules, capabilities, 
+    requires_authentication, is_active
+) VALUES (
+    'Azure OpenAI', 
+    'azure-openai',
+    'https://o1models.openai.azure.com',
+    '2025-01-01-preview',
+    'api-key',
+    '/openai/deployments/{deployment_name}/chat/completions',
+    true,
+    '{}',
+    '{"max_tokens": 200000, "max_completion_tokens": 100000}',
+    true,
+    true
+);
+
+-- Insert O1 Model
+INSERT INTO models (
+    provider_id,
+    name,
+    deployment_name,
+    description,
+    model_type,
+    api_endpoint,
+    api_key,
+    temperature,
+    max_tokens,
+    max_completion_tokens,
+    is_default,
+    requires_o1_handling,
+    supports_streaming,
+    api_version,
+    reasoning_effort,
+    store_completion
+) VALUES (
+    (SELECT id FROM providers WHERE slug = 'azure-openai'),
+    'O1 Model',
+    'o1-east2',
+    'Azure OpenAI O1 Model',
+    'o1',
+    'https://o1models.openai.azure.com',
+    'vOJIQH9dOVWO83YTXnu312o5rhgJ1a9yzrQ5goUKTZ7KPhmSX6dpJQQJ99BBACHYHv6XJ3w3AAABACOGSR1q',
+    1.0,
+    200000,
+    100000,
+    true,
+    true,
+    false,
+    '2025-01-01-preview',
+    'medium',
+    false
+);
+
+-- Insert Admin User
+INSERT INTO users (
+    username,
+    email,
+    password_hash,
+    role,
+    is_verified,
+    is_active
+) VALUES (
+    'admin',
+    'admin@example.com',
+    '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKyBAHLNn0FQrYi',
+    'admin',
+    true,
+    true
+);
+
+COMMIT;

@@ -95,14 +95,23 @@ class ConversationManager:
             context.append(markdown_request)
 
         for msg in messages:
-            role = msg.get("role")
-            content = msg.get("content")
-            if isinstance(role, str) and isinstance(content, str):
-                context.append({"role": role, "content": content})
+            if isinstance(msg, dict):
+                metadata = msg.get("metadata", {})
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                    
+                role = msg.get("role")
+                content = msg.get("content")
+                if isinstance(role, str) and isinstance(content, str):
+                    context.append({
+                        "role": role,
+                        "content": content,
+                        "timestamp": str(metadata.get("timestamp", ""))
+                    })
 
         return context
 
-    def add_message(
+    async def add_message(
         self,
         chat_id: str,
         role: str,
@@ -115,11 +124,6 @@ class ConversationManager:
     ) -> None:
         """
         Add a message to the conversation context with metadata and token management.
-
-        from models.token_usage import TokenUsage
-        user_id = 123  # or retrieve from your logic
-        if not TokenUsage.within_rate_limit(user_id, 30, 20000):
-            raise ValueError("Rate limit exceeded for chat messages.")
 
         Args:
             chat_id: The ID of the chat.
@@ -150,7 +154,7 @@ class ConversationManager:
         logger.debug("Calculated %d tokens for message: %s", tokens, message_obj)
 
         metadata: Dict[str, Any] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(timezone.utc),
             "token_count": tokens,
             "requires_o1": requires_o1_handling,
             "model_max_tokens": model_max_tokens,
@@ -184,7 +188,7 @@ class ConversationManager:
             self.lint_message(chat_id, message_id)
 
         # Manage context window
-        self._manage_context_window(chat_id, model_max_tokens)
+        await self._manage_context_window(chat_id, model_max_tokens)
 
     def _extract_file_attachments(self, content: str) -> List[Dict[str, str]]:
         """
@@ -243,30 +247,9 @@ class ConversationManager:
                             }
                             Chat.add_message(chat_id, "system", expansion_msg["content"])
 
-                        # Semantic analysis
-                        analysis = self.analyzer.process_text(content)
-                        logger.debug("Semantic analysis for message: entities=%d, edges=%d",
-                                   len(analysis["entities"]), len(analysis["graph_edges"]))
-                        
-                        # Add to knowledge graph
-                        graph_data = self.knowledge_graph.process_text(content)
-                        self.knowledge_graph.add_to_context(content, {
-                            "chat_id": chat_id,
-                            "message_id": msg.get("id"),
-                            "timestamp": msg.get("metadata", {}).get("timestamp")
-                        })
-                        
-                        # Generate embeddings synchronously
-                        embeddings = self.embedder.get_embeddings_sync(text=content)
-                        
-                        # Store analysis in message metadata
-                        if "metadata" not in msg:
-                            msg["metadata"] = {}
-                        msg["metadata"].update({
-                            "semantic_analysis": analysis,
-                            "graph_data": graph_data,
-                            "embeddings": embeddings
-                        })
+                        # Note: Semantic analysis, knowledge graph, and embeddings functionality
+                        # is currently disabled as the required components are not initialized
+                        logger.debug("Skipping semantic analysis for message content: %s...", content[:100])
 
             if hasattr(self.context_manager, "get_context"):
                 optimized_context = self.context_manager.get_context(messages)
@@ -316,9 +299,6 @@ class ConversationManager:
                     self._remove_old_messages(chat_id, keep_ids)
 
             self.context_cache[chat_id] = optimized_context
-
-            # Track usage
-            # Removed references to track_token_usage and optimize_compression
 
         except Exception as e:
             logger.error("Error in _manage_context_window for chat %s: %s", chat_id, e)

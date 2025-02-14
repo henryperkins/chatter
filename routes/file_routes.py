@@ -45,10 +45,10 @@ def init_file_routes(app):
             Dict: Response from Azure OpenAI API
         """
         try:
-            base_url = config_instance.AZURE_API_ENDPOINT
+            base_url = config_instance.AZURE_OPENAI_ENDPOINT
             if not base_url.endswith('/'):
                 base_url += '/'
-            url = f"{base_url}files?api-version={config_instance.AZURE_API_VERSION}"
+            url = f"{base_url}files?api-version={config_instance.AZURE_OPENAI_API_VERSION}"
 
             headers = {
                 "api-key": config_instance.AZURE_OPENAI_KEY
@@ -100,8 +100,8 @@ def init_file_routes(app):
 
             # Validate Azure configuration
             if not all([
-                hasattr(config_instance, 'AZURE_API_ENDPOINT'),
-                config_instance.AZURE_API_ENDPOINT,
+                hasattr(config_instance, 'AZURE_OPENAI_ENDPOINT'),
+                config_instance.AZURE_OPENAI_ENDPOINT,
                 hasattr(config_instance, 'AZURE_OPENAI_KEY'),
                 config_instance.AZURE_OPENAI_KEY
             ]):
@@ -115,8 +115,8 @@ def init_file_routes(app):
             try:
                 # Only attempt Azure operations if configuration is valid
                 if all([
-                    hasattr(config_instance, 'AZURE_API_ENDPOINT'),
-                    config_instance.AZURE_API_ENDPOINT,
+                    hasattr(config_instance, 'AZURE_OPENAI_ENDPOINT'),
+                    config_instance.AZURE_OPENAI_ENDPOINT,
                     hasattr(config_instance, 'AZURE_OPENAI_KEY'),
                     config_instance.AZURE_OPENAI_KEY
                 ]):
@@ -243,7 +243,7 @@ def init_file_routes(app):
         List all files uploaded to Azure OpenAI.
         """
         try:
-            url = f"{config_instance.AZURE_API_ENDPOINT}/files?api-version={config_instance.AZURE_API_VERSION}"
+            url = f"{config_instance.AZURE_OPENAI_ENDPOINT}/files?api-version={config_instance.AZURE_OPENAI_API_VERSION}"
             headers = {"api-key": config_instance.AZURE_OPENAI_KEY}
 
             response = requests.get(url, headers=headers)
@@ -275,7 +275,7 @@ def init_file_routes(app):
             Response: A Flask JSON response indicating success or failure.
         """
         try:
-            url = f"{config_instance.AZURE_API_ENDPOINT}/files/{file_id}?api-version={config_instance.AZURE_API_VERSION}"
+            url = f"{config_instance.AZURE_OPENAI_ENDPOINT}/files/{file_id}?api-version={config_instance.AZURE_OPENAI_API_VERSION}"
             headers = {"api-key": config_instance.AZURE_OPENAI_KEY}
 
             response = requests.delete(url, headers=headers)

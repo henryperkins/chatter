@@ -105,7 +105,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             if 'file_ids' in data:
                 for file_id in data['file_ids']:
                     file_record = UploadedFile.get_by_id(file_id)
-                    if file_record and file_record.text_content:
+                    if isinstance(file_record, UploadedFile) and getattr(file_record, "text_content", None):
                         files_data.append({
                             'filename': file_record.filename,
                             'content': file_record.text_content
@@ -187,12 +187,13 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         # -------------------------------------
         # Add User Message to Conversation
         # -------------------------------------
-        conversation_manager.add_message(
+        _ = conversation_manager.add_message(
             chat_id=chat_id,
             role="user",
             content=combined_message,
             model_max_tokens=model_obj.max_tokens,
-            requires_o1_handling=model_obj.requires_o1_handling
+            requires_o1_handling=model_obj.requires_o1_handling,
+            timestamp=datetime.utcnow()
         )
 
         # Fetch updated conversation context
@@ -264,33 +265,33 @@ def stream_response(
             # Stream the response chunks
             response = client.chat.completions.create(**completion_params)
             for chunk in response:
-                # Skip invalid chunks
-                if not hasattr(chunk, "choices"):
+                # If chunk is just a string or not a valid chunk object, skip
+                if isinstance(chunk, str) or not hasattr(chunk, "choices"):
                     continue
 
-                # Process content from first choice
                 choices = getattr(chunk, "choices", [])
-                if choices:
-                    choice = choices[0]
-                    delta = None
+                if not choices:
+                    continue
 
-                    # The chunk could be a dict or an object
-                    if isinstance(choice, dict):
-                        delta = choice.get("delta")
-                    elif hasattr(choice, "delta"):
-                        delta = choice.delta
+                choice = choices[0]
+                # The chunk could be a dict or an object
+                if isinstance(choice, dict):
+                    delta = choice.get("delta")
+                else:
+                    delta = getattr(choice, "delta", None)
 
-                    if delta:
-                        # Extract content
-                        content = None
-                        if isinstance(delta, dict):
-                            content = delta.get("content")
-                        elif hasattr(delta, "content"):
-                            content = delta.content
+                if not delta:
+                    continue
 
-                        # Yield SSE event
-                        if content:
-                            yield f"data: {json.dumps({'content': content})}\n\n"
+                # Extract content
+                if isinstance(delta, dict):
+                    content = delta.get("content")
+                else:
+                    content = getattr(delta, "content", None)
+
+                # Yield SSE event if content is found
+                if content:
+                    yield f"data: {json.dumps({'content': content})}\n\n"
 
             # Signal completion
             yield "data: [DONE]\n\n"
@@ -376,7 +377,7 @@ def normal_response(
                 message_obj = choice.get("message", {})
                 if isinstance(message_obj, dict):
                     content = message_obj.get("content")
-        elif hasattr(response, "choices") and response.choices:
+        elif not isinstance(response, (str, Generator)) and hasattr(response, "choices") and response.choices:
             # Object style
             choice = response.choices[0]
             if hasattr(choice, "message") and choice.message is not None:
@@ -402,7 +403,8 @@ def normal_response(
             content=content,
             model_max_tokens=model_obj.max_tokens,
             requires_o1_handling=model_obj.requires_o1_handling,
-        )
+            timestamp=datetime.utcnow()
+        )  # type: ignore
 
         # Prepare file metadata for the response
         saved_files = []

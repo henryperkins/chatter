@@ -12,15 +12,15 @@ class SemanticAnalyzer:
         # Try to initialize spaCy if available
         try:
             import spacy
-            self.nlp = spacy.load("en_core_web_sm")
+            # Use system-installed model path
+            self.nlp = spacy.load("/usr/lib/python3/dist-packages/en_core_web_sm")
             self.spacy_available = True
             logger.info("spaCy initialized successfully")
         except OSError as e:
-            logger.warning("Downloading spaCy model: en_core_web_sm")
-            spacy.cli.download("en_core_web_sm")
-            self.nlp = spacy.load("en_core_web_sm")
-            self.spacy_available = True
-            logger.info("spaCy model downloaded and initialized successfully")
+            logger.error("Could not load spaCy model from system path: %s", str(e))
+            self.nlp = None
+            self.spacy_available = False
+            logger.warning("Falling back to basic analysis")
         except Exception as e:
             raise RuntimeError("Cannot proceed without spaCy model: en_core_web_sm") from e
 
@@ -35,7 +35,7 @@ class SemanticAnalyzer:
         Returns:
             Dict containing entities and graph edges
         """
-        if not self.spacy_available:
+        if not self.spacy_available or self.nlp is None:
             return self._basic_analysis(text)
             
         try:

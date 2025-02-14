@@ -307,7 +307,7 @@ def create_default_model(db: Session) -> Optional[int]:
                     TRUE
                 ) RETURNING id
             """), {
-                "api_base_url": config_instance.AZURE_API_ENDPOINT.rstrip("/"),
+                "api_base_url": config_instance.AZURE_OPENAI_ENDPOINT.rstrip("/"),
                 "validation_rules": json.dumps({
                     "model_id": "^[a-zA-Z0-9-]{3,64}$",
                     "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$",
@@ -336,11 +336,11 @@ def create_default_model(db: Session) -> Optional[int]:
         model_data = {
             "provider_id": provider_id,
             "name": config_instance.DEFAULT_MODEL_NAME,
-            "deployment_name": config_instance.AZURE_DEPLOYMENT_NAME,
+            "deployment_name": config_instance.AZURE_OPENAI_DEPLOYMENT_NAME,
             "description": "Azure OpenAI o1 model",
             "api_endpoint": config_instance.DEFAULT_API_ENDPOINT.rstrip("/"),
             "api_key": api_key,
-            "api_version": config_instance.AZURE_API_VERSION,
+            "api_version": config_instance.AZURE_OPENAI_API_VERSION,
             "temperature": config_instance.DEFAULT_TEMPERATURE,
             "max_tokens": int(config_instance.DEFAULT_MAX_TOKENS),
             "max_completion_tokens": config_instance.DEFAULT_MAX_COMPLETION_TOKENS,

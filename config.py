@@ -218,18 +218,24 @@ class Config:
             logger.info(f"Converted database URI from postgres:// to postgresql://: {self.DATABASE_URI}")
 
         # Azure OpenAI settings
-        self.AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY")
-        self.AZURE_API_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT", "https://o1models.openai.azure.com").strip()
-        self.AZURE_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2025-01-01-preview")
-        self.AZURE_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "o1-east2")
+        self.AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY") or os.getenv("AZURE_API_KEY")
+        self.AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT") or os.getenv("AZURE_API_BASE", "https://o1models.openai.azure.com").strip()
+        self.AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION") or os.getenv("AZURE_API_VERSION", "2025-01-01-preview")
+        self.AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "o1-east2")
+        
+        # Ensure we have consistent values for backward compatibility
+        os.environ["AZURE_OPENAI_KEY"] = self.AZURE_OPENAI_KEY
+        os.environ["AZURE_OPENAI_ENDPOINT"] = self.AZURE_OPENAI_ENDPOINT
+        os.environ["AZURE_OPENAI_API_VERSION"] = self.AZURE_OPENAI_API_VERSION
+        os.environ["AZURE_OPENAI_DEPLOYMENT_NAME"] = self.AZURE_OPENAI_DEPLOYMENT_NAME
 
         # Model settings
         self.MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "Azure o1")
         self.DEFAULT_MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "Azure o1")
-        self.DEFAULT_DEPLOYMENT_NAME = os.getenv("DEFAULT_DEPLOYMENT_NAME", self.AZURE_DEPLOYMENT_NAME)
+        self.DEFAULT_DEPLOYMENT_NAME = os.getenv("DEFAULT_DEPLOYMENT_NAME", self.AZURE_OPENAI_DEPLOYMENT_NAME)
         self.DEFAULT_MODEL_TYPE = os.getenv("DEFAULT_MODEL_TYPE", "o1-preview")
-        self.DEFAULT_API_ENDPOINT = os.getenv("DEFAULT_API_ENDPOINT", self.AZURE_API_ENDPOINT)
-        self.DEFAULT_API_VERSION = os.getenv("DEFAULT_API_VERSION", self.AZURE_API_VERSION)
+        self.DEFAULT_API_ENDPOINT = os.getenv("DEFAULT_API_ENDPOINT", self.AZURE_OPENAI_ENDPOINT)
+        self.DEFAULT_API_VERSION = os.getenv("DEFAULT_API_VERSION", self.AZURE_OPENAI_API_VERSION)
         self.DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", "1.0"))
         self.DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", "200000"))
         self.DEFAULT_MAX_COMPLETION_TOKENS = int(os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "100000"))
