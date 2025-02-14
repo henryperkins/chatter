@@ -1,6 +1,5 @@
 python-json-logger>=2.0.7
 aiohappyeyeballs==2.4.4
-spacy>=3.0.0
 en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.6.0/en_core_web_sm-3.6.0-py3-none-any.whl
 azure-search-documents>=11.4.0
 azure-core>=1.29.5
@@ -66,7 +65,7 @@ mixpanel==4.10.1
 monotonic==1.6
 multidict==6.1.0
 networkx==3.2.1
-numpy==1.26.4
+numpy
 openai
 ordered-set==4.1.0
 packaging==24.2

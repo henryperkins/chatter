@@ -136,8 +136,24 @@ def login():
         logger.debug(f"CSRF data in form object: {form.csrf_token.data}")
         logger.debug(f"Raw form data for csrf_token: {request.form.get('csrf_token')}")
         logger.debug(f"Cookies sent by client: {request.cookies}")
-        if not form.csrf_token.data:
-            raise CSRFError("Missing CSRF token")
+        # Session-based CSRF validation with token rotation
+        session_token = session.get('csrf_token')
+        form_token = form.csrf_token.data
+        cookie_token = request.cookies.get('X-CSRF-TOKEN')
+        header_token = request.headers.get('X-CSRFToken')
+        
+        # Validate all tokens exist
+        if not all([session_token, form_token, cookie_token, header_token]):
+            raise CSRFError("Missing CSRF tokens")
+        
+        # Validate all tokens match
+        if len({session_token, form_token, cookie_token, header_token}) != 1:
+            raise CSRFError("CSRF token mismatch")
+        
+        # Rotate CSRF token after validation
+        new_token = generate_csrf()
+        session['csrf_token'] = new_token
+        g.csrf_token = new_token
         try:
             username = form.username.data
             if not username or not isinstance(username, str):
