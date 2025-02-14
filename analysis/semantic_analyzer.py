@@ -1,5 +1,6 @@
 from typing import List, Dict, Tuple, Any, Optional
 from logging_config import get_logger
+import spacy.cli
 
 logger = get_logger(__name__)
 
@@ -14,6 +15,12 @@ class SemanticAnalyzer:
             self.nlp = spacy.load("en_core_web_sm")
             self.spacy_available = True
             logger.info("spaCy initialized successfully")
+        except OSError as e:
+            logger.warning("Downloading spaCy model: en_core_web_sm")
+            spacy.cli.download("en_core_web_sm")
+            self.nlp = spacy.load("en_core_web_sm")
+            self.spacy_available = True
+            logger.info("spaCy model downloaded and initialized successfully")
         except Exception as e:
             raise RuntimeError("Cannot proceed without spaCy model: en_core_web_sm") from e
 
