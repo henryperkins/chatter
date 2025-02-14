@@ -132,28 +132,9 @@ def login():
             flash("Account locked for 15 minutes due to multiple failed attempts", "error")
             return render_template("login.html", form=form)
 
-        # Add CSRF debugging
-        logger.debug(f"CSRF data in form object: {form.csrf_token.data}")
-        logger.debug(f"Raw form data for csrf_token: {request.form.get('csrf_token')}")
-        logger.debug(f"Cookies sent by client: {request.cookies}")
-        # Session-based CSRF validation with token rotation
-        session_token = session.get('csrf_token')
-        form_token = form.csrf_token.data
-        cookie_token = request.cookies.get('X-CSRF-TOKEN')
-        header_token = request.headers.get('X-CSRFToken')
-        
-        # Validate all tokens exist
-        if not all([session_token, form_token, cookie_token, header_token]):
-            raise CSRFError("Missing CSRF tokens")
-        
-        # Validate all tokens match
-        if len({session_token, form_token, cookie_token, header_token}) != 1:
-            raise CSRFError("CSRF token mismatch")
-        
-        # Rotate CSRF token after validation
-        new_token = generate_csrf()
-        session['csrf_token'] = new_token
-        g.csrf_token = new_token
+        # Validate CSRF token using Flask-WTF's built-in validation
+        if not form.validate_csrf_token():
+            raise CSRFError("Invalid CSRF token")
         try:
             username = form.username.data
             if not username or not isinstance(username, str):
@@ -247,24 +228,24 @@ def handle_csrf_error(e):
         }
     )
     
-    # Generate and rotate CSRF token
-    new_csrf_token = generate_csrf()
-    session['csrf_token'] = new_csrf_token
-    g.csrf_token = new_csrf_token
+    # Use existing CSRF token or generate new one
+    csrf_token = session.get('csrf_token') or generate_csrf()
+    session['csrf_token'] = csrf_token
+    g.csrf_token = csrf_token
     
     response = make_response(jsonify({
         "success": False,
         "error": "Security validation failed. Please refresh the page and try again.",
-        "csrf_token": new_csrf_token
+        "csrf_token": csrf_token
     }), 403)
 
-    # Set secure cookie with SameSite and HttpOnly flags
+    # Set cookie for double-submit pattern
     response.set_cookie(
-        'X-CSRF-TOKEN',
-        value=new_csrf_token,
+        'X-CSRF-Token',  # Standardized naming
+        value=csrf_token,
         secure=True,
-        httponly=True,
-        samesite='Strict',
+        httponly=False,  # Allow JS to read for double-submit
+        samesite='Lax',  # More permissive for external links
         max_age=3600
     )
     return response
