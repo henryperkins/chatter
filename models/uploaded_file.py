@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 
 from werkzeug.utils import secure_filename
 
-from sqlalchemy import ForeignKey, Integer, String, Text, DateTime, func
+from sqlalchemy import ForeignKey, Integer, String, Text, DateTime, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import db_session
 from models.base import Base
