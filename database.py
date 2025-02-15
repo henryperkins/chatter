@@ -125,8 +125,7 @@ def create_db_engine(db_uri: str) -> Engine:
             "application_name": "chatter-app",
             "options": "-c statement_timeout=120000 "
                        "-c idle_in_transaction_session_timeout=240000",
-            "sslmode": "verify-full",
-            "sslrootcert": "DigiCertGlobalRootG2.crt.pem"
+            "sslmode": "require"
         },
         json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
     )

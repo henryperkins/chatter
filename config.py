@@ -219,7 +219,7 @@ class Config:
             logger.info(f"Converted database URI from postgres:// to postgresql://: {self.DATABASE_URI}")
 
         # Azure OpenAI settings
-        self.AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY", "REPLACE_WITH_YOUR_KEY_VALUE_HERE")
+        self.AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY", "").strip()
 """Configuration module for the application."""
 
 import os

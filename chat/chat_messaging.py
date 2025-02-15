@@ -184,7 +184,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         # ---------------------------------
         # Add User Message to Conversation
         # ---------------------------------
-        conversation_manager.add_message(
+        await conversation_manager.add_message(
             chat_id=chat_id,
             role="user",
             content=combined_message,

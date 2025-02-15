@@ -12,7 +12,7 @@ from logging_config import get_logger
 logger = get_logger(__name__)
 
 # Constants
-DEFAULT_API_VERSION = "2024-12-01-preview"  # Default for client creation
+DEFAULT_API_VERSION = "2024-02-01"  # Default for client creation
 DEFAULT_TIMEOUT = 30
 API_URL_PATTERN = "{endpoint}/openai/deployments/{deployment}/chat/completions"
 VALID_REASONING_EFFORTS = ["low", "medium", "high"]
