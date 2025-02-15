@@ -12,6 +12,7 @@ from typing import Optional, Dict, Any, List
 from sqlalchemy import text
 from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
+from utils.encryption import encrypt_api_key
 
 # (Remove the import line entirely)
 from logging_config import get_logger
