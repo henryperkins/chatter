@@ -201,7 +201,8 @@ INSERT INTO providers (
     validation_rules = EXCLUDED.validation_rules,
     capabilities = EXCLUDED.capabilities,
     requires_authentication = EXCLUDED.requires_authentication,
-    is_active = EXCLUDED.is_active;
+    is_active = EXCLUDED.is_active,
+    created_at = EXCLUDED.created_at;
 
 -- Insert O1 Model with proper provider reference
 INSERT INTO models (
@@ -249,7 +250,10 @@ INSERT INTO models (
     requires_o1_handling = EXCLUDED.requires_o1_handling,
     supports_streaming = EXCLUDED.supports_streaming,
     api_version = EXCLUDED.api_version,
-    reasoning_effort = EXCLUDED.reasoning_effort;
+    reasoning_effort = EXCLUDED.reasoning_effort,
+    store_completion = EXCLUDED.store_completion,
+    created_at = EXCLUDED.created_at,
+    version = models.version + 1;
 
 -- Insert Admin User
 INSERT INTO users (
