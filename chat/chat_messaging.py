@@ -63,7 +63,7 @@ def server_side_format_markdown(raw_text: str) -> str:
 @chat_routes.route("/send", methods=["POST"])
 @limiter.limit(CHAT_RATE_LIMIT)
 @login_required
-def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
+async def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """
     Main endpoint to handle incoming chat messages with optional file uploads.
     Determines whether to stream or return a normal (non-streaming) response.
@@ -184,7 +184,7 @@ def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         # ---------------------------------
         # Add User Message to Conversation
         # ---------------------------------
-        await conversation_manager.add_message(
+        conversation_manager.add_message(
             chat_id=chat_id,
             role="user",
             content=combined_message,

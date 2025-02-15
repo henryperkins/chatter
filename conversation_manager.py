@@ -111,7 +111,7 @@ class ConversationManager:
 
         return context
 
-    async def add_message(
+    def add_message(
         self,
         chat_id: str,
         role: str,
