@@ -216,7 +216,7 @@ async def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             return stream_response(chat_id, history, model_obj)
         else:
             logger.debug(f"Normal (non-streaming) response for chat_id={chat_id}")
-            return normal_response(chat_id, history, model_obj, included_files)
+            return await normal_response(chat_id, history, model_obj, included_files)
 
     except Exception as e:
         logger.error("Chat handling error: %s", str(e), exc_info=True)
@@ -311,7 +311,7 @@ def stream_response(
     )
 
 
-def normal_response(
+async def normal_response(
     chat_id: str,
     history: List[Dict[str, Any]],
     model_obj: Model,
