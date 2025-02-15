@@ -197,7 +197,7 @@ class Provider:
                 {"name": data["name"], "slug": data["slug"]},
             ).fetchone()
 
-                if existing:
+            if existing:
                     field = (
                         "name"
                         if existing[0].lower() == data["name"].lower()
