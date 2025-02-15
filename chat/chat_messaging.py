@@ -344,7 +344,15 @@ async def normal_response(
         }
 
         limit = token_limits.get((model_obj.model_type or "").lower(), 32000)
-        max_completion_tokens = min(model_obj.max_completion_tokens, limit) if is_o_series else model_obj.max_completion_tokens
+        # Ensure we have valid integer values for token calculation
+        safe_max_tokens = int(model_obj.max_completion_tokens) if model_obj.max_completion_tokens is not None else 32000
+        safe_limit = int(limit) if limit is not None else 32000
+        
+        max_completion_tokens = (
+            min(safe_max_tokens, safe_limit)
+            if is_o_series
+            else safe_max_tokens
+        )
 
         api_params = {
             "messages": history,
@@ -399,11 +407,11 @@ async def normal_response(
                 content = getattr(choice.message, "content", None)
 
         if not content:
-            if model_obj.requires_o1_handling:
-                content = (
-                    "[No response generated. The O-series model may need more context "
-                    "or a different prompt format.]"
-                )
+        if model_obj.requires_o1_handling and model_obj.max_completion_tokens is not None:
+            api_params["max_completion_tokens"] = min(
+                int(model_obj.max_completion_tokens),
+                75000  # Default safe limit
+            )
             else:
                 content = "[No response from model. Please try again or contact support.]"
 
