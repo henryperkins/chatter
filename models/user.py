@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from database import db_session
+from sqlalchemy.orm import Session
 from models.base import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -109,15 +109,14 @@ class User(UserMixin):
         """Get user by ID for Flask-Login."""
         return cls.get_by_id(user_id)
 
-    @staticmethod
-    def get_by_id(user_id: int) -> Optional["User"]:
+    @classmethod
+    def get_by_id(cls, session: Session, user_id: int) -> Optional["User"]:
         """Retrieve a user by their ID with proper transaction isolation."""
         if not user_id:
             logger.debug("get_by_id called with null/zero user_id")
             return None
 
         try:
-            with db_session() as db:
                 result = db.execute(
                     text(
                         """
