@@ -144,7 +144,8 @@ class Model:
             "required_headers": {
                 "api-key": "{api_key}",
                 "Content-Type": "application/json"
-            },
+            }
+        },
         "o1-mini": {
             "fixed_temperature": True,
             "streaming": False,
