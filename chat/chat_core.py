@@ -4,10 +4,6 @@ Refactored chat blueprint code for handling:
 - Secondary interface route
 - Shared logic for retrieving or creating chats, loading model configs, etc.
 """
-
-import os
-import json
-import bleach
 from datetime import datetime, timedelta
 from typing import Union, Tuple, Dict, Any, Optional
 
@@ -19,10 +15,13 @@ from flask.wrappers import Response as FlaskResponse
 from flask_login import login_required, current_user
 from flask_wtf.csrf import generate_csrf
 from sqlalchemy import text
+import json
+import bleach
 
 from database import db_session
 from models.provider import Provider
 from models.model import Model
+from models.chat import Chat
 from utils.encryption import decrypt_api_key, EncryptionError
 from conversation_manager import conversation_manager
 from chat.chat_utilities import generate_new_chat_id, init_upload_folder
@@ -46,12 +45,17 @@ def _get_or_create_chat(chat_id: Optional[str], user_id: int) -> Chat:
     """
     if chat_id:
         existing_chat = Chat.get_by_id(chat_id)
-        if existing_chat:
+        if existing_chat and existing_chat.user_id == user_id:
             return existing_chat
+        elif existing_chat:
+            logger.warning(f"User {user_id} attempted to access chat {chat_id} belonging to user {existing_chat.user_id}")
 
     new_id = generate_new_chat_id()
     Chat.create(id=new_id, user_id=user_id, title="New Chat")
-    return Chat.get_by_id(new_id)
+    new_chat = Chat.get_by_id(new_id)
+    if not new_chat:
+        raise RuntimeError(f"Failed to create new chat with ID {new_id}")
+    return new_chat
 
 
 def _load_chat_context(chat_id: Optional[str], user_id: int) -> Dict[str, Any]:
@@ -68,9 +72,11 @@ def _load_chat_context(chat_id: Optional[str], user_id: int) -> Dict[str, Any]:
     chat = _get_or_create_chat(chat_id, user_id)
 
     # 2. Retrieve the associated model or the default model
-    model_obj = Model.get_by_id(chat.model_id) if chat.model_id else Model.get_default()
-    if not model_obj:
-        raise ValueError("No model configured and no default model available")
+    model_obj = None
+    if chat.model_id:
+        model_obj = Model.get_by_id(chat.model_id)
+        if not model_obj:
+            logger.warning(f"Model {chat.model_id} not found for chat {chat.chat_id}")
 
     # 3. Decrypt the stored API key if available
     azure_token = ""
@@ -83,27 +89,35 @@ def _load_chat_context(chat_id: Optional[str], user_id: int) -> Dict[str, Any]:
         except EncryptionError as exc:
             raise RuntimeError(f"Error decrypting API key: {str(exc)}")
 
-    # 4. Load conversation messages; create welcome if none exist
-    messages = conversation_manager.get_context(chat.id)
-    if not messages:
-        # If you have a method that initializes the conversation, call it
-        conversation_manager.add_message(
-            chat_id=chat.id,
-            role="system",
-            content="Welcome to Azure OpenAI Chat!"
-        )
-        conversation_manager.add_message(
-            chat_id=chat.id,
-            role="assistant",
-            content=(
-                "Hello! I'm ready to help. You can:\n"
-                "- Type a message to chat\n"
-                "- Upload files for analysis\n"
-                "- Change models using the dropdown\n"
-                "- Start a new chat with the + button"
-            )
-        )
+    # 4. Load conversation messages; create welcome messages if none exist
+    try:
         messages = conversation_manager.get_context(chat.id)
+        logger.debug(f"Loaded {len(messages)} messages for chat {chat.id}")
+        
+        if not messages:
+            # Initialize conversation with welcome messages
+            conversation_manager.add_message(
+                chat_id=chat.id,
+                role="system",
+                content="Welcome to Azure OpenAI Chat!"
+            )
+            conversation_manager.add_message(
+                chat_id=chat.id,
+                role="assistant",
+                content=(
+                    "Hello! I'm ready to help. You can:\n"
+                    "- Type a message to chat\n"
+                    "- Upload files for analysis\n"
+                    "- Change models using the dropdown\n"
+                    "- Start a new chat with the + button"
+                )
+            )
+            messages = conversation_manager.get_context(chat.id)
+            logger.debug(f"Initialized new chat {chat.id} with welcome messages")
+        
+    except Exception as e:
+        logger.error(f"Error loading messages for chat {chat.id}: {str(e)}", exc_info=True)
+        messages = []
 
     # 5. Sanitize user messages to prevent XSS
     for msg in messages:
@@ -142,9 +156,8 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                     )
                 ), 200
 
-        # Retrieve chat_id from session
+        # Retrieve chat_id from session and ensure it's a string
         chat_id = session.get("chat_id", "")
-        # Convert to str just to be safe
         if not isinstance(chat_id, str):
             chat_id = str(chat_id)
 
@@ -152,7 +165,8 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         context_data = _load_chat_context(chat_id, current_user.id)
 
         # Save updated chat_id to session (in case a new one was created)
-        session["chat_id"] = context_data["chat"].id  # Use 'id' field as chat_id
+        session["chat_id"] = str(context_data["chat"].id)  # Ensure chat_id is stored as string
+        session.modified = True  # Ensure session is saved
 
         # Prepare front-end config
         chat_config = {
@@ -188,11 +202,9 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         )
 
     except ValueError as ve:
-        # Example for model or config errors
         logger.error("Value error in chat interface: %s", str(ve))
         return render_template("error.html", error=str(ve)), 500
     except RuntimeError as re:
-        # Example for encryption errors
         logger.error("Runtime error in chat interface: %s", str(re))
         return render_template("error.html", error=str(re)), 500
     except Exception as e:
@@ -209,21 +221,19 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     - Renders chat.html with relevant context.
     """
     try:
-        logger.debug("Current user: id=%s, role=%s", current_user.id, current_user.role)
+        session.modified = True  # Ensure session is saved
+        chat_id_param = request.args.get("chat_id")
+        chat = _get_or_create_chat(chat_id_param, current_user.id)
+        context_data = {
+            "chat": chat,
+            "azure_token": None,
+            "model_obj": None,
+            "messages": []
+        }
 
-        # Retrieve chat ID from query param or session
-        chat_id = request.args.get("chat_id") or session.get("chat_id", "")
-        if not isinstance(chat_id, str):
-            chat_id = str(chat_id)
-
-        # If an explicit chat_id is provided, store it in the session
-        if request.args.get("chat_id"):
-            session["chat_id"] = chat_id
-
-        # Load the chat context
-        context_data = _load_chat_context(chat_id, current_user.id)
-        # In case a new one was created
-        session["chat_id"] = context_data["chat"].chat_id
+        # Save updated chat_id to session (in case a new one was created)
+        session["chat_id"] = str(context_data["chat"].id)  # Ensure chat_id is stored as string
+        session.modified = True  # Ensure session is saved
 
         # Prepare front-end config
         chat_config = {
@@ -259,14 +269,11 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         )
 
     except ValueError as ve:
-        logger.error("Value error in /chat_interface: %s", str(ve))
+        logger.error("Value error in chat_interface: %s", str(ve))
         return render_template("error.html", error=str(ve)), 500
     except RuntimeError as re:
-        logger.error("Runtime error in /chat_interface: %s", str(re))
+        logger.error("Runtime error in chat_interface: %s", str(re))
         return render_template("error.html", error=str(re)), 500
     except Exception as e:
-        logger.error("Error in /chat_interface for chat_id=%s: %s", chat_id, str(e), exc_info=True)
-        return render_template(
-            "error.html",
-            error="An error occurred while loading the chat interface."
-        ), 500
+        logger.error("Error initializing chat_interface: %s", str(e), exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
