@@ -6,7 +6,7 @@ from typing import Optional, Dict, Any, List, ClassVar, TYPE_CHECKING
 from sqlalchemy import String, Integer, Float, Boolean, DateTime, ForeignKey, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from database import db_session
+# (Remove this line entirely)
 from config import Config
 from logging_config import get_logger
 from .provider import Provider
@@ -186,13 +186,12 @@ class Model(Base):
         }
 
     @staticmethod
-    def get_all() -> List["Model"]:
+    def get_all(session: Session) -> List["Model"]:
         """Retrieve all models from the database."""
         try:
             config = Config()
-            with db_session() as db:
                 query = text("SELECT * FROM models ORDER BY name")
-                results = db.execute(query).mappings().all()
+                results = session.execute(query).mappings().all()
                 models = []
                 for row in results:
                     model_dict = dict(row)
@@ -246,11 +245,10 @@ class Model(Base):
             return ["provider_id"]
 
     @staticmethod
-    def get_by_id(model_id: int) -> Optional["Model"]:
+    def get_by_id(session: Session, model_id: int) -> Optional["Model"]:
         """Retrieve a model by its ID."""
         try:
             config = Config()
-            with db_session() as session:
                 query = text("SELECT * FROM models WHERE id = :id")
                 row = session.execute(query, {"id": model_id}).mappings().first()
                 if not row:
@@ -296,10 +294,9 @@ class Model(Base):
             return None
 
     @staticmethod
-    def create(data: ModelDict) -> Optional[int]:
+    def create(session: Session, data: ModelDict) -> Optional[int]:
         """Create a new model record."""
         try:
-            with db_session() as session:
                 logger.debug(
                     "Creating model with data: %s",
                     {k: v if k != "api_key" else "****" for k, v in data.items()},
@@ -403,7 +400,7 @@ class Model(Base):
         try:
             if not model_id:
                 raise ValueError("Model ID is required")
-            with db_session() as db:
+            
                 allowed_fields = {
                     "name",
                     "deployment_name",
@@ -437,7 +434,7 @@ class Model(Base):
                         logger.error("Failed to encrypt API key: %s", str(e))
                         raise ValueError(f"Failed to encrypt API key: {str(e)}")
 
-                existing_model = Model.get_by_id(model_id)
+                existing_model = Model.get_by_id(session, model_id)
                 if not existing_model:
                     raise ValueError(f"Model with ID {model_id} not found")
 
@@ -507,7 +504,7 @@ class Model(Base):
                     RETURNING version
                     """
                 ).bindparams(**params)
-                result = db.execute(query)
+                result = session.execute(query)
                 if result.rowcount == 0:
                     raise ValueError(
                         "Model was modified by another user. Please refresh and try again."
@@ -528,7 +525,7 @@ class Model(Base):
                             "model_id": model_id,
                         },
                     )
-                db.commit()
+                session.commit()
                 logger.info("Model updated (ID %d)", model_id)
 
         except Exception as e:
@@ -536,9 +533,8 @@ class Model(Base):
             raise ValueError(f"Failed to update model: {str(e)}")
 
     @staticmethod
-    def delete(model_id: int) -> None:
+    def delete(session: Session, model_id: int) -> None:
         """Delete a model from the database."""
-        with db_session() as db:
             try:
                 is_default_query = text(
                     "SELECT is_default FROM models WHERE id = :model_id"
@@ -550,7 +546,7 @@ class Model(Base):
                     default_count_query = text(
                         "SELECT COUNT(*) FROM models WHERE is_default = TRUE"
                     )
-                    default_count = db.execute(default_count_query).scalar()
+                    default_count = session.execute(default_count_query).scalar()
                     if default_count == 1:
                         raise ValueError("Cannot delete the last default model")
                 check_query = text(
@@ -574,20 +570,19 @@ class Model(Base):
                 db.execute(delete_versions_query, {"model_id": model_id})
                 query = text("DELETE FROM models WHERE id = :model_id")
                 db.execute(query, {"model_id": model_id})
-                db.commit()
+                session.commit()
                 logger.info("Model deleted (ID %d)", model_id)
             except Exception as e:
-                db.rollback()
+                session.rollback()
                 logger.error("Failed to delete model %d: %s", model_id, e)
                 raise
 
     @staticmethod
-    def get_default() -> Optional["Model"]:
+    def get_default(session: Session) -> Optional["Model"]:
         """Retrieve the default model."""
-        with db_session() as db:
             try:
                 query = text("SELECT * FROM models WHERE is_default = TRUE")
-                result = db.execute(query).mappings().first()
+                result = session.execute(query).mappings().first()
                 if result:
                     model_dict = dict(result)
                     model_dict["id"] = (
