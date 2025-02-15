@@ -10,9 +10,10 @@ import re
 import json
 from typing import Optional, Dict, Any, List
 from sqlalchemy import text
+from dataclasses import dataclass, field
+from sqlalchemy.orm import Session
 
 # (Remove the import line entirely)
-from utils.encryption import encrypt_api_key
 from logging_config import get_logger
 
 logger = get_logger(__name__)
