@@ -50,7 +50,7 @@ MODEL_CONFIG = {
         },
         "capabilities": {
             "max_tokens": 100000,
-            "max_completion_tokens": 50000,
+            "max_completion_tokens": 65536,
             "supports_function_calling": True,
             "supports_vision": False,
             "requires_reasoning_effort": True,

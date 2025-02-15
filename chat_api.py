@@ -92,7 +92,7 @@ class ChatClient:
         limits = {
             "o3-mini": 75000,
             "o1": 100000,
-            "o1-mini": 50000,
+            "o1-mini": 65536,
             "o1-preview": 32768,
         }
         return limits.get(model_type.lower(), 32000)
