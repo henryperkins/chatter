@@ -313,9 +313,9 @@ class Provider:
         try:
             query = text("SELECT * FROM providers WHERE slug = :slug")
             row = session.execute(query, {"slug": slug}).mappings().first()
-                if not row:
-                    logger.warning("No provider found with slug %s", slug)
-                    return None
+            if not row:
+                logger.warning("No provider found with slug %s", slug)
+                return None
                 return Provider(**dict(row))
         except Exception as e:
             logger.error("Error retrieving provider by slug %s: %s", slug, e)
