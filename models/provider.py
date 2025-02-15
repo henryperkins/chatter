@@ -8,7 +8,6 @@ This module provides a Provider class for managing AI provider configurations, i
 
 import re
 import json
-from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
 from sqlalchemy import text
 
@@ -98,7 +97,6 @@ class ProviderCapabilities:
         return errors
 
 
-@dataclass
 class Provider:
     """
     Represents an AI provider configuration.

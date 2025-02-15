@@ -1,5 +1,4 @@
 from typing import Dict, Any, Optional, TypeVar, List
-from dataclasses import dataclass, field
 from datetime import datetime
 from sqlalchemy import text
 import logging
@@ -15,16 +14,15 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound="User")
 
 
-@dataclass
 class User(Base, UserMixin):
     """Represents a user in the system using raw SQL queries."""
 
-    id: int
-    username: str
-    email: str
-    password_hash: Optional[str] = None
-    role: str = "user"
-    created_at: datetime = field(default_factory=datetime.now)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String(150), nullable=False)
+    email: Mapped[str] = mapped_column(String(150), nullable=False)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    role: Mapped[str] = mapped_column(String(50), nullable=False, default="user")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Renamed to clarify we store hashed tokens:
     reset_token_hash: Optional[str] = None
     reset_token_expiry: Optional[datetime] = None
