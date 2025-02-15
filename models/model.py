@@ -234,7 +234,7 @@ class Model(Base):
         try:
             with db_session() as session:
                 query = text("SELECT model_type FROM models WHERE id = :id")
-                model_type = db.execute(query, {"id": model_id}).scalar()
+                model_type = session.execute(query, {"id": model_id}).scalar()
                 immutable_fields = ["provider_id"]
                 if model_type == "o1-preview":
                     immutable_fields.extend(["temperature", "supports_streaming"])
@@ -397,7 +397,7 @@ class Model(Base):
             raise
 
     @staticmethod
-    def update(model_id: int, data: Dict[str, Any]) -> None:
+    def update(session: Session, model_id: int, data: Dict[str, Any]) -> None:
         """Update model with validated data."""
         try:
             if not model_id:
