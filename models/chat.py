@@ -244,14 +244,10 @@ class Chat(Base):
                     model_id=model_id
                 )
                 db.add(new_chat)
-                result = db.execute(stmt, {"id": id, "user_id": user_id, "title": cleaned_title, "model_id": model_id}).mappings().first()
                 db.commit()
-                if not result:
-                    raise ValueError("Failed to create chat - no result returned")
-                created_at = result["created_at"]
-                logger.info(f"Chat created: {chat_id} for user {user_id} with model {model_id or 'default'} at {created_at or 'unknown time'}")
+                logger.info(f"Chat created: {id} for user {user_id} with model {model_id or 'default'}")
         except Exception as e:
-            logger.error(f"Failed to create chat {chat_id}: {e}")
+            logger.error(f"Failed to create chat {id}: {e}")
             raise
 
     @classmethod
