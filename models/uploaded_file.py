@@ -22,32 +22,25 @@ class UploadedFile(Base):
     """
     __tablename__ = 'uploaded_files'
 
-    id = Column(Integer, primary_key=True)
-    chat_id = Column(String, ForeignKey('chats.id'), nullable=False)
-    filename = Column(String, nullable=False)
-    filepath = Column(String, nullable=False)
-    uuid = Column(String, nullable=False)
-    size = Column(Integer, nullable=False)
-    mime_type = Column(String)
-    description = Column(Text)
-    version = Column(Integer, default=1)
-    azure_file_id = Column(String)
-    azure_search_id = Column(String)
-    indexing_status = Column(String, default='pending')
-    last_indexed_at = Column(DateTime)
-    tokenized_text = Column(Text)
-    text_content = Column(Text)  # Stores extracted text for AI context
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, onupdate=func.now())
+    id: Mapped[int] = mapped_column(primary_key=True)
+    chat_id: Mapped[str] = mapped_column(ForeignKey('chats.id'))
+    filename: Mapped[str] = mapped_column(String)
+    filepath: Mapped[str] = mapped_column(String)
+    uuid: Mapped[str] = mapped_column(String)
+    size: Mapped[int] = mapped_column(Integer)
+    mime_type: Mapped[Optional[str]] = mapped_column(String)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    azure_file_id: Mapped[Optional[str]] = mapped_column(String)
+    azure_search_id: Mapped[Optional[str]] = mapped_column(String)
+    indexing_status: Mapped[str] = mapped_column(String, default='pending')
+    last_indexed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    tokenized_text: Mapped[Optional[str]] = mapped_column(Text)
+    text_content: Mapped[Optional[str]] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, onupdate=func.now())
 
-    # Relationship with Chat model
-    chat = relationship("Chat", back_populates="files")
-
-    def __init__(self, **kwargs):
-        """Initialize an UploadedFile instance."""
-        super().__init__()
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+    chat: Mapped["Chat"] = relationship(back_populates="files")
 
     @staticmethod
     def create(
