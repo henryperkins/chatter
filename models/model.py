@@ -462,14 +462,14 @@ class Model(Base):
 
                 if "is_default" in update_data:
                     if update_data["is_default"]:
-                        db.execute(
+                        session.execute(
                             text(
                                 "UPDATE models SET is_default = :new_default WHERE id != :model_id"
                             ),
                             {"new_default": False, "model_id": model_id},
                         )
                     else:
-                        default_count = db.execute(
+                        default_count = session.execute(
                             text(
                                 "SELECT COUNT(*) FROM models WHERE is_default = :current_default AND id != :model_id"
                             ),
@@ -539,7 +539,7 @@ class Model(Base):
                 is_default_query = text(
                     "SELECT is_default FROM models WHERE id = :model_id"
                 )
-                is_default_result = db.execute(
+                is_default_result = session.execute(
                     is_default_query, {"model_id": model_id}
                 ).scalar()
                 if is_default_result:
@@ -557,7 +557,7 @@ class Model(Base):
                     """
                 )
                 result = (
-                    db.execute(check_query, {"model_id": model_id}).mappings().first()
+                    session.execute(check_query, {"model_id": model_id}).mappings().first()
                 )
                 if result and result["count"] > 0:
                     raise ValueError("Cannot delete model that is in use by chats")
@@ -567,9 +567,9 @@ class Model(Base):
                 delete_versions_query = text(
                     "DELETE FROM model_versions WHERE model_id = :model_id"
                 )
-                db.execute(delete_versions_query, {"model_id": model_id})
+                session.execute(delete_versions_query, {"model_id": model_id})
                 query = text("DELETE FROM models WHERE id = :model_id")
-                db.execute(query, {"model_id": model_id})
+                session.execute(query, {"model_id": model_id})
                 session.commit()
                 logger.info("Model deleted (ID %d)", model_id)
             except Exception as e:
