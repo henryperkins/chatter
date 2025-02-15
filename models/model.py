@@ -5,8 +5,6 @@ from typing import Optional, Dict, Any, List, ClassVar, TYPE_CHECKING
 
 from sqlalchemy import String, Integer, Float, Boolean, DateTime, ForeignKey, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
-from database import db_session
-
 from config import Config
 from logging_config import get_logger
 from .provider import Provider
@@ -231,6 +229,7 @@ class Model(Base):
     @staticmethod
     def get_immutable_fields(model_id: int) -> List[str]:
         """Retrieve a list of fields that cannot be modified for an existing model."""
+        from database import db_session
         try:
             with db_session() as session:
                 query = text("SELECT model_type FROM models WHERE id = :id")

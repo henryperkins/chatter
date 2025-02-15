@@ -451,9 +451,9 @@ def create_app() -> Flask:
     print(f"DEBUG: DEBUG: {app.config['DEBUG']}", file=sys.stderr)
 
     # Initialize database first
-    db = init_db_app(app)
+    init_db_app(app)
     
-    # Initialize migrate with both app and db
+    # Initialize migrate with app
     migrate.init_app(app, db, render_as_batch=True)
 
     # Verify database connection

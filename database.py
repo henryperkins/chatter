@@ -37,7 +37,6 @@ db = SQLAlchemy()
 from sqlalchemy.engine import Engine, CursorResult, Row
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, InterfaceError
 from sqlalchemy.orm import scoped_session, sessionmaker, Session
-from models.base import Base
 from sqlalchemy.pool import QueuePool
 from tenacity import (
     retry,
@@ -495,6 +494,7 @@ def check_db_health() -> Dict[str, Any]:
 
 def init_db() -> None:
     """(Re)Initialize the database using SQLAlchemy metadata"""
+    from models.base import Base
     try:
         db_state = get_db_state()
         engine = db_state["engine"]
