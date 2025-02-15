@@ -47,7 +47,7 @@ class TokenUsage(Base):
         Defaults to 10,000 tokens per 60 minutes.
         """
         from datetime import datetime, timedelta
-        from database import db_session
+        # (Remove the import line entirely)
         from sqlalchemy import text
 
         cutoff = datetime.utcnow() - timedelta(minutes=minutes_window)

@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 
 from sqlalchemy import ForeignKey, Integer, String, Text, DateTime, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from database import db_session
+# (Remove this import line entirely)
 from models.base import Base
 # Import the Chat model so that SQLAlchemy can properly map the relationship
 from models.chat import Chat

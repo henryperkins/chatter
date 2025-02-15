@@ -11,7 +11,7 @@ import json
 from typing import Optional, Dict, Any, List
 from sqlalchemy import text
 
-from database import db_session
+# (Remove the import line entirely)
 from utils.encryption import encrypt_api_key
 from logging_config import get_logger
 
