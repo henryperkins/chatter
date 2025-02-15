@@ -23,6 +23,7 @@ from sqlalchemy import text
 from database import db_session
 from models.provider import Provider
 from models.chat import Chat
+from models.model import Model
 from utils.encryption import decrypt_api_key, EncryptionError
 from conversation_manager import conversation_manager
 from chat.chat_utilities import generate_new_chat_id, init_upload_folder
