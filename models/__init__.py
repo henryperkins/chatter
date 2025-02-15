@@ -21,5 +21,5 @@ __all__ = [
 def init_models(engine):
     """Initialize all models and configure their mappers."""
     from sqlalchemy import orm
-    BaseModel.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
     orm.configure_mappers()
