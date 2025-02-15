@@ -206,11 +206,11 @@ class Provider:
                     raise ValueError(f"A provider with this {field} already exists")
 
             data = data.copy()
-                # Convert dict to JSON if needed
-                if isinstance(data.get("capabilities"), dict):
-                    data["capabilities"] = json.dumps(data["capabilities"])
+            # Convert dict to JSON if needed
+            if isinstance(data.get("capabilities"), dict):
+                data["capabilities"] = json.dumps(data["capabilities"])
 
-                api_key = data.get("api_key")
+            api_key = data.get("api_key")
                 if api_key:
                     from config import config_instance
                     api_key = encrypt_api_key(api_key, config_instance.ENCRYPTION_KEY)
@@ -301,11 +301,11 @@ class Provider:
         """Retrieve all providers using the provided session."""
         try:
             query = text("SELECT * FROM providers ORDER BY name")
-                rows = session.execute(query).mappings().all()
-                return [Provider(**dict(row)) for row in rows]
-            except Exception as e:
-                logger.error("Error retrieving providers: %s", e)
-                raise
+            rows = session.execute(query).mappings().all()
+            return [Provider(**dict(row)) for row in rows]
+        except Exception as e:
+            logger.error("Error retrieving providers: %s", e)
+            raise
 
     @staticmethod
     def get_by_slug(session: Session, slug: str) -> Optional["Provider"]:
