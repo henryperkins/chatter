@@ -46,6 +46,7 @@ from werkzeug.serving import WSGIRequestHandler
 from sqlalchemy.orm import Session, scoped_session
 from sqlalchemy import text, Engine
 from flask_migrate import Migrate
+migrate = Migrate()
 from extensions import limiter, login_manager, csrf
 from config import Config, ApiError
 from database import (
@@ -450,6 +451,7 @@ def create_app() -> Flask:
     print(f"DEBUG: DEBUG: {app.config['DEBUG']}", file=sys.stderr)
 
     init_db_app(app)
+    migrate.init_app(app)
 
     # Verify database connection
     max_retries = 3
