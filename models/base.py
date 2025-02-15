@@ -1,9 +1,8 @@
 """Base model configuration for SQLAlchemy."""
-from database import Base
-from sqlalchemy.orm import MappedAsDataclass, declared_attr
+from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass, declared_attr
 
-class BaseModel(MappedAsDataclass, Base):
-    """Base class for all models."""
+class Base(MappedAsDataclass, DeclarativeBase):
+    """Base class for all models with dataclass support."""
     __abstract__ = True
     
     @declared_attr.directive

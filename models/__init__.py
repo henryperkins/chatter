@@ -1,5 +1,5 @@
 # models/__init__.py
-from .base import BaseModel
+from .base import Base
 
 # First import models that don't have dependencies
 from .user import User
@@ -11,7 +11,7 @@ from .chat import Chat
 
 # Expose all models
 __all__ = [
-    "BaseModel",
+    "Base",
     "User",
     "Provider",
     "Model",
