@@ -190,8 +190,8 @@ class Model(Base):
         """Retrieve all models from the database."""
         try:
             config = Config()
-                query = text("SELECT * FROM models ORDER BY name")
-                results = session.execute(query).mappings().all()
+            query = text("SELECT * FROM models ORDER BY name")
+            results = session.execute(query).mappings().all()
                 models = []
                 for row in results:
                     model_dict = dict(row)
