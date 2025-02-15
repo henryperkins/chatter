@@ -9,6 +9,7 @@ from sqlalchemy.orm import relationship
 
 from database import db_session
 from .base import Base
+from .model import Model
 
 logger = logging.getLogger(__name__)
 
