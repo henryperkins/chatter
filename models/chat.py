@@ -59,11 +59,9 @@ class Chat(Base):
             lazy="joined"
         )
         files: Mapped[List["UploadedFile"]] = relationship(
-            "UploadedFile",  # Changed to string reference
+            "UploadedFile",
             back_populates="chat",
-            lazy="select",
-            init=False,
-            default_factory=list
+            lazy="select"
         )
 
         def __init__(self, **kwargs) -> None:
