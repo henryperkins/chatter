@@ -15,7 +15,7 @@ flask-login==0.6.3
 flask-limiter==3.5.0
 bleach==6.1.0
 mistune==3.0.2
-gunicorn==21.2.0
+gunicorn==22.0.0
 python-json-logger==2.0.7
 tenacity==8.2.3
 Werkzeug==3.0.1
