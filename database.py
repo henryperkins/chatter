@@ -505,9 +505,8 @@ def init_db() -> None:
         # Drop all tables first
         Base.metadata.drop_all(bind=engine)
         
-        # Initialize models with the engine
-        from models import init_models
-        init_models(engine)  # Pass engine to models initialization
+        # Create all tables
+        Base.metadata.create_all(bind=engine)
 
         # Create a default model if needed
         with db_session(transactional=True) as db:

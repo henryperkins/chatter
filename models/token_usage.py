@@ -3,7 +3,6 @@ from typing import Optional, Dict, Any
 from sqlalchemy import ForeignKey, JSON, DateTime, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column, Session
 from models.base import Base
-from database import db_session
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,52 +20,20 @@ class TokenUsage(Base):
     metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
     @staticmethod
-    def create(user_id: int, chat_id: str, tokens_used: int) -> "TokenUsage":
+    def create(session: Session, user_id: int, chat_id: str, tokens_used: int) -> "TokenUsage":
         """Create a new token usage record."""
-        with db_session() as db:
-            try:
-                # Get user's token limit from their role/settings
-                limit_query = text("""
-                    SELECT COALESCE(
-                        (SELECT token_limit FROM user_settings WHERE user_id = :user_id),
-                        100000  -- Default limit
-                    ) as token_limit
-                """)
-                token_limit = int(db.execute(limit_query, {"user_id": user_id}).scalar() or 100000)
-
-                query = text("""
-                    INSERT INTO token_usage (
-                        user_id, chat_id, tokens_used, tokens_limit,
-                        last_updated, metadata
-                    ) VALUES (
-                        :user_id, :chat_id, :tokens_used, :token_limit,
-                        CURRENT_TIMESTAMP, :metadata
-                    ) RETURNING id, last_updated
-                """)
-                
-                result = db.execute(query, {
-                    "user_id": user_id,
-                    "chat_id": chat_id,
-                    "tokens_used": tokens_used,
-                    "token_limit": token_limit,
-                    "metadata": {"source": "file_upload"}
-                })
-                
-                result = result.mappings().first()
-                if not result:
-                    raise ValueError("Failed to create token usage record")
-                
-                db.commit()
-                
-                return TokenUsage(
-                    id=result["id"],
-                    user_id=user_id,
-                    chat_id=chat_id,
-                    tokens_used=tokens_used,
-                    tokens_limit=token_limit,
-                    last_updated=result["last_updated"],
-                    metadata={"source": "file_upload"}
-                )
+        try:
+            new_usage = TokenUsage(
+                user_id=user_id,
+                chat_id=chat_id,
+                tokens_used=tokens_used,
+                last_updated=func.now(),
+                metadata={"source": "file_upload"}
+            )
+            session.add(new_usage)
+            session.commit()
+            session.refresh(new_usage)
+            return new_usage
 
             except Exception as e:
                 db.rollback()
