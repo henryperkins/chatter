@@ -60,13 +60,9 @@ class ChatClient:
                     api_version
                 )
                 self._azure_client = AzureOpenAI(
+                    api_key=api_key,
                     azure_endpoint=api_endpoint,
                     api_version=api_version,
-                    api_key=api_key,
-                    default_headers={
-                        "x-ms-user-id": "user_id_placeholder",
-                        "x-ms-client-request-id": str(uuid.uuid4())
-                    }
                 )
 
             return self._azure_client

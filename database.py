@@ -29,7 +29,11 @@ from contextlib import contextmanager
 from flask import current_app, Flask
 import click
 
+from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import create_engine, text
+
+# Initialize Flask-SQLAlchemy
+db = SQLAlchemy()
 from sqlalchemy.engine import Engine, CursorResult, Row
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, InterfaceError
 from sqlalchemy.orm import scoped_session, sessionmaker, Session

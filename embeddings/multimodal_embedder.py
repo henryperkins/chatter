@@ -11,25 +11,32 @@ from logging_config import get_logger
 
 logger = get_logger(__name__)
 
+# Retrieve your Azure deployment names from environment variables,
+# or provide defaults as needed.
+TEXT_EMBEDDING_DEPLOYMENT = os.getenv("TEXT_EMBEDDING_DEPLOYMENT", "text-embedding-deployment")
+VISION_EMBEDDING_DEPLOYMENT = os.getenv("VISION_EMBEDDING_DEPLOYMENT", "vision-embedding-deployment")
+
 class MultiModalEmbedder:
     """Generates and manages embeddings for text and media content."""
-    
+
     def __init__(self):
         """Initialize the embedder with Azure OpenAI client."""
         self.client = AzureOpenAI(
             api_key=os.getenv("AZURE_OPENAI_KEY"),
-            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview"),
+            # Use a valid Azure OpenAI API version that supports embeddings:
+            api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview"),
             azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
         )
         
         # Cache for embeddings
         self.embedding_cache: Dict[str, np.ndarray] = {}
-        
+
     async def generate_text_embedding(self, text: str) -> np.ndarray:
         """Generate embeddings for text content."""
         try:
+            # Use your Azure deployment name instead of the base model name:
             response = await self.client.embeddings.create(
-                model="text-embedding-ada-002",  # or your Azure deployment name
+                model=TEXT_EMBEDDING_DEPLOYMENT,  
                 input=text
             )
             return np.array(response.data[0].embedding)
@@ -45,10 +52,11 @@ class MultiModalEmbedder:
                 image_b64 = base64.b64encode(image_data).decode('utf-8')
             else:
                 image_b64 = image_data
-                
-            # Use CLIP-like model for image embeddings
+
+            # This assumes your vision-embedding-deployment can accept image data in the format shown
+            # If you have a different approach, adjust accordingly
             response = await self.client.embeddings.create(
-                model="vision-embedding-model",  # your Azure deployment name
+                model=VISION_EMBEDDING_DEPLOYMENT,
                 input=[{
                     "type": "image",
                     "image": image_b64
@@ -64,9 +72,9 @@ class MultiModalEmbedder:
         text_embedding: Optional[np.ndarray] = None,
         image_embedding: Optional[np.ndarray] = None
     ) -> np.ndarray:
-        """Combine text and image embeddings if both present."""
+        """Combine text and image embeddings if both are present."""
         if text_embedding is not None and image_embedding is not None:
-            # Normalize and concatenate
+            # Normalize and then concatenate
             text_norm = text_embedding / np.linalg.norm(text_embedding)
             image_norm = image_embedding / np.linalg.norm(image_embedding)
             return np.concatenate([text_norm, image_norm])
@@ -75,49 +83,53 @@ class MultiModalEmbedder:
         elif image_embedding is not None:
             return image_embedding
         else:
-            raise ValueError("At least one embedding type required")
+            raise ValueError("At least one embedding type (text or image) is required")
 
     def get_embeddings_sync(
         self,
         text: Optional[str] = None,
         image: Optional[Union[str, bytes]] = None
     ) -> Dict[str, Any]:
-        """Synchronous version of get_embeddings."""
+        """Synchronous version of get_embeddings for text/image content."""
         embeddings = {}
-        
+
         if text:
             cache_key = f"text:{hash(text)}"
             if cache_key in self.embedding_cache:
                 embeddings["text"] = self.embedding_cache[cache_key]
             else:
-                response = self.client.embeddings.create(
-                    model="text-embedding-ada-002",
+                resp = self.client.embeddings.create(
+                    model=TEXT_EMBEDDING_DEPLOYMENT,
                     input=text
                 )
-                embeddings["text"] = np.array(response.data[0].embedding)
+                embeddings["text"] = np.array(resp.data[0].embedding)
                 self.embedding_cache[cache_key] = embeddings["text"]
-                
+
         if image:
             cache_key = f"image:{hash(str(image))}"
             if cache_key in self.embedding_cache:
                 embeddings["image"] = self.embedding_cache[cache_key]
             else:
-                response = self.client.embeddings.create(
-                    model="vision-embedding-model",
+                if isinstance(image, bytes):
+                    image_b64 = base64.b64encode(image).decode('utf-8')
+                else:
+                    image_b64 = image
+                resp = self.client.embeddings.create(
+                    model=VISION_EMBEDDING_DEPLOYMENT,
                     input=[{
                         "type": "image",
-                        "image": image if isinstance(image, str) else base64.b64encode(image).decode('utf-8')
+                        "image": image_b64
                     }]
                 )
-                embeddings["image"] = np.array(response.data[0].embedding)
+                embeddings["image"] = np.array(resp.data[0].embedding)
                 self.embedding_cache[cache_key] = embeddings["image"]
-                
+
         if "text" in embeddings or "image" in embeddings:
             embeddings["combined"] = self.combine_embeddings(
                 embeddings.get("text"),
                 embeddings.get("image")
             )
-            
+
         return embeddings
 
     async def get_embeddings(
@@ -125,9 +137,9 @@ class MultiModalEmbedder:
         text: Optional[str] = None,
         image: Optional[Union[str, bytes]] = None
     ) -> Dict[str, Any]:
-        """Get embeddings for text and/or image content."""
+        """Get embeddings for text and/or image content (async version)."""
         embeddings = {}
-        
+
         if text:
             cache_key = f"text:{hash(text)}"
             if cache_key in self.embedding_cache:
@@ -135,7 +147,7 @@ class MultiModalEmbedder:
             else:
                 embeddings["text"] = await self.generate_text_embedding(text)
                 self.embedding_cache[cache_key] = embeddings["text"]
-                
+
         if image:
             cache_key = f"image:{hash(str(image))}"
             if cache_key in self.embedding_cache:
@@ -143,11 +155,11 @@ class MultiModalEmbedder:
             else:
                 embeddings["image"] = await self.generate_image_embedding(image)
                 self.embedding_cache[cache_key] = embeddings["image"]
-                
+
         if "text" in embeddings or "image" in embeddings:
             embeddings["combined"] = self.combine_embeddings(
                 embeddings.get("text"),
                 embeddings.get("image")
             )
-            
+
         return embeddings

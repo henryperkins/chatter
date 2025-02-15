@@ -1,3 +1,8 @@
+psycopg2
+playwright
+bs4
+spacy
+tiktoken
 flask==3.0.2
 python-dotenv==1.0.1
 azure-identity==1.15.0
@@ -21,3 +26,4 @@ jinja2==3.1.2
 psutil==5.9.8
 flask-wtf==1.2.1
 email-validator==2.0.0.post2
+flask-migrate==4.0.7

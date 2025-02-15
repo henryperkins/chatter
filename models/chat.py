@@ -77,7 +77,7 @@ class Chat(Base):
         chat_obj = cls.get_by_id(chat_id)
         if not chat_obj:
             return False
-        return chat_obj.title == "New Chat"
+        return bool(chat_obj and chat_obj.title == "New Chat")
 
     @classmethod
     def update_model(cls, chat_id: str, model_id: int) -> None:
@@ -161,8 +161,11 @@ class Chat(Base):
             for row in rows:
                 try:
                     created_at = row["created_at"].isoformat() if row["created_at"] else None
-                    last_activity = (row["last_activity"].isoformat() if row["last_activity"] 
-                                   else created_at)
+                    # Handle last_activity datetime conversion
+                    if isinstance(row["last_activity"], datetime):
+                        last_activity = row["last_activity"].isoformat()
+                    else:
+                        last_activity = str(row["last_activity"]) if row["last_activity"] else created_at
                 except Exception as e:
                     logger.error(f"Error formatting timestamps: {e}")
                     created_at = None
@@ -274,14 +277,36 @@ class Chat(Base):
         Retrieve the associated Model for a given chat, using the Chat's model_id via text query or ORM.
         """
         chat_obj = cls.get_by_id(chat_id)
-        if not chat_obj or not chat_obj.model_id:
+        if not chat_obj:
             return None
-        model = Model.get_by_id(chat_obj.model_id)
-        if model and model.model_type == 'o1':
+            
+        # Convert SQLAlchemy Column to scalar value
+        try:
+            from sqlalchemy import inspect
+            if chat_obj.model_id is not None:
+                model_id = inspect(chat_obj).attrs.model_id.value
+                if model_id is not None:
+                    model = Model.get_by_id(int(model_id))
+                    if model and model.model_type == 'o1':
+                        # Force Azure-specific settings
+                        model.api_version = '2025-01-01-preview'
+                        model.temperature = 1.0
+                        model.max_completion_tokens = 100000
+                    return model
+            return None
+        except Exception as e:
+            logger.error(f"Error getting model for chat: {e}")
+            return None
+        if not model:
+            return None
+            
+        # Handle o1 model type configuration
+        if model.model_type == 'o1':
             # Force Azure-specific settings
             model.api_version = '2025-01-01-preview'
             model.temperature = 1.0
             model.max_completion_tokens = 100000
+            
         return model
 
     @classmethod
@@ -294,8 +319,8 @@ class Chat(Base):
         try:
             with db_session() as db:
                 stmt = text("""
-                    INSERT INTO messages (chat_id, role, content, metadata)
-                    VALUES (:chat_id, :role, :content, :metadata)
+                    INSERT INTO messages (chat_id, role, content, metadata, timestamp)
+                    VALUES (:chat_id, :role, :content, :metadata, NOW())
                     RETURNING id
                 """)
                 result = db.execute(stmt, {
@@ -326,8 +351,7 @@ class Chat(Base):
                     conditions.append("role != 'system'")
 
                 stmt = text(f"""
-                    SELECT id, role, content, metadata,
-                           TO_CHAR(timestamp, 'YYYY-MM-DD HH24:MI:SS') as timestamp
+                    SELECT id, role, content, metadata, timestamp
                     FROM messages
                     WHERE {' AND '.join(conditions)}
                     ORDER BY timestamp ASC

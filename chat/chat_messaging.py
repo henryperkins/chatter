@@ -11,6 +11,8 @@ import bleach
 import mistune
 from datetime import datetime
 from typing import Dict, List, Any, Generator, Optional, Union, Tuple
+from openai.types.chat.chat_completion import ChatCompletion, Choice
+from openai.types.chat.chat_completion_chunk import ChatCompletionChunk
 
 from flask import (
     request, jsonify, Response, session
@@ -369,25 +371,23 @@ async def normal_response(
             "requires_o1_handling": model_obj.requires_o1_handling,
             "stream": False,
         }
+        # Safely handle and enforce int max_completion_tokens
+        safe_mct = int(model_obj.max_completion_tokens) if isinstance(model_obj.max_completion_tokens, int) else 32000
 
+        # If the model requires O1 handling, enforce a limit
         if model_obj.requires_o1_handling:
-            api_params["temperature"] = 1.0  # Force required value
-            api_params["max_completion_tokens"] = min(
-                model_obj.max_completion_tokens,
-                75000  # Default safe limit
-            )
-
-        if is_o_series:
-            # Reasoning docs say no temperature for o-series
-            api_params["max_completion_tokens"] = max_completion_tokens
-        if is_o_series:
-            # O-series models require temperature=1.0
             api_params["temperature"] = 1.0
-            # Reasoning docs say no temperature for o-series
-            api_params["max_completion_tokens"] = max_completion_tokens
+            api_params["max_completion_tokens"] = min(safe_mct, 75000)
+
+        # If it's an O-series model, apply O-series constraints
+        if is_o_series:
+            # O-series must have temperature=1.0
+            api_params["temperature"] = 1.0
+            # Enforce the min(...) limit
+            api_params["max_completion_tokens"] = min(safe_mct, max_completion_tokens)
         else:
             # Legacy model usage
-            api_params["max_tokens"] = model_obj.max_completion_tokens
+            api_params["max_tokens"] = safe_mct
             if model_obj.temperature is not None:
                 api_params["temperature"] = model_obj.temperature
 
@@ -397,7 +397,8 @@ async def normal_response(
 
         # Extract content from the final response
         content: Optional[str] = None
-        # If get_azure_response returns a dict:
+
+        # If get_azure_response returns a dict
         if isinstance(response, dict):
             choices = response.get("choices", [])
             if choices:
@@ -405,28 +406,28 @@ async def normal_response(
                 msg_obj = choice.get("message", {})
                 if isinstance(msg_obj, dict):
                     content = msg_obj.get("content")
-        # Or if it's an actual ChatCompletion object:
-        elif hasattr(response, "choices") and response.choices:
-            choice = response.choices[0]
-            if hasattr(choice, "message") and choice.message is not None:
-                content = getattr(choice.message, "content", None)
+        elif isinstance(response, ChatCompletion):
+            # This is a ChatCompletion object
+            if response.choices:
+                choice = response.choices[0]
+                if hasattr(choice, "message") and choice.message is not None:
+                    content = getattr(choice.message, "content", None)
+        else:
+            # Possibly a str or streaming generator
+            logger.warning("Response is neither dict nor ChatCompletion. Type: %s", type(response))
 
-        if not content:
-            if model_obj.requires_o1_handling and model_obj.max_completion_tokens is not None:
-                api_params["max_completion_tokens"] = min(
-                    int(model_obj.max_completion_tokens),
-                    75000  # Default safe limit
-                )
-            else:
-                content = "[No response from model. Please try again or contact support.]"
+        # Ensure "content" is a string for further processing
+        if not isinstance(content, str):
+            content = str(content or "[No response from model. Please try again or contact support.]")
 
         content_html = server_side_format_markdown(content)
 
         # Save the assistant message into conversation history
+        safe_content = content if isinstance(content, str) else str(content or "")
         await conversation_manager.add_message(
             chat_id=chat_id,
             role="assistant",
-            content=content,
+            content=safe_content,
             model_max_tokens=model_obj.max_tokens,
             requires_o1_handling=model_obj.requires_o1_handling,
             timestamp=datetime.utcnow()

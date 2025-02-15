@@ -21,11 +21,11 @@ logger = get_logger(__name__)
 # Type alias for clarity
 ProviderDict = Dict[str, Any]
 
-# Default Azure settings – preserves current behavior
+# Default Azure settings – updated to use a newer API version
 DEFAULT_SETTINGS = {
     "supports_streaming": True,
     "max_tokens": 16384,
-    "api_version": "2023-07-01-preview",
+    "api_version": "2025-01-01-preview",  # updated default
     "endpoint_pattern": "https://{deployment}.openai.azure.com/openai/deployments/{model}",
 }
 
@@ -49,6 +49,7 @@ class ProviderCapabilities:
     """Helper class for managing provider capabilities."""
 
     def __init__(self, capabilities: Dict[str, Any]):
+        # Merge the incoming dict with the global defaults
         self.capabilities: Dict[str, Any] = {**DEFAULT_CAPABILITIES, **capabilities}
 
     def supports_feature(self, feature: str) -> bool:
@@ -141,15 +142,20 @@ class Provider:
         """Set appropriate defaults based on provider type."""
         if isinstance(self.capabilities, str):
             self.capabilities = json.loads(self.capabilities)
+
+        # Heuristic check for Azure usage
         if self.is_azure or "openai.azure.com" in self.api_base_url:
+            # If is_azure, set typical Azure endpoint pattern and validation rules
             self.endpoint_pattern = (
                 "https://{endpoint}/openai/deployments/{deployment}/chat/completions"
             )
+            # updated to match typical Azure preview pattern
             self.validation_rules = {
                 "model_id": "^[a-zA-Z0-9-]{3,64}$",
-                "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$",
+                "api_version": r"^\d{4}-\d{2}-\d{2}(-preview)?$",
             }
         else:
+            # Otherwise, assume standard OpenAI
             self.endpoint_pattern = "https://api.openai.com/v1/chat/completions"
             self.validation_rules = {
                 "model_id": "^(gpt-4|gpt-3.5-turbo).*$",
@@ -214,6 +220,7 @@ class Provider:
                     raise ValueError(f"A provider with this {field} already exists")
 
                 data = data.copy()
+                # Convert dict to JSON if needed
                 if isinstance(data.get("capabilities"), dict):
                     data["capabilities"] = json.dumps(data["capabilities"])
 
@@ -222,21 +229,25 @@ class Provider:
                     from config import config_instance
                     api_key = encrypt_api_key(api_key, config_instance.ENCRYPTION_KEY)
 
-                is_azure = data.get(
-                    "is_azure", False
-                ) or "openai.azure.com" in data.get("api_base_url", "")
+                # Check if it's an Azure-based provider
+                is_azure = data.get("is_azure", False) or "openai.azure.com" in data.get("api_base_url", "")
                 if is_azure:
+                    # Updated default endpoint pattern and validation for Azure
                     endpoint_pattern = "https://{endpoint}/openai/deployments/{deployment}/chat/completions"
                     validation_rules = {
                         "model_id": "^[a-zA-Z0-9-]{3,64}$",
-                        "api_version": "^\\d{4}-\\d{2}-\\d{2}(-preview)?$",
+                        "api_version": r"^\d{4}-\d{2}-\d{2}(-preview)?$",
                     }
+                    # Also update to a newer API version if not provided
+                    if not data.get("api_version_format"):
+                        data["api_version_format"] = "2025-01-01-preview"
                 else:
                     endpoint_pattern = "https://api.openai.com/v1/chat/completions"
                     validation_rules = {
                         "model_id": "^(gpt-4|gpt-3.5-turbo).*$",
                         "api_version": "^v[0-9]+.*$",
                     }
+
                 query = text(
                     """
                     INSERT INTO providers (
@@ -253,6 +264,7 @@ class Provider:
                     RETURNING id
                     """
                 )
+
                 result = session.execute(
                     query,
                     {
@@ -260,22 +272,16 @@ class Provider:
                         "slug": data["slug"],
                         "api_base_url": data["api_base_url"],
                         "capabilities": data.get("capabilities", "{}"),
-                        "requires_authentication": data.get(
-                            "requires_authentication", True
-                        ),
+                        "requires_authentication": data.get("requires_authentication", True),
                         "api_version_format": data.get("api_version_format"),
-                        "endpoint_pattern": data.get(
-                            "endpoint_pattern", endpoint_pattern
-                        ),
+                        "endpoint_pattern": data.get("endpoint_pattern", endpoint_pattern),
                         "auth_type": data.get("auth_type", "api-key"),
                         "validation_rules": json.dumps(
                             data.get("validation_rules", validation_rules)
                         ),
                         "api_key": api_key,
                         "model_name": data.get("model_name"),
-                        "deployment_name": (
-                            data.get("deployment_name") if is_azure else None
-                        ),
+                        "deployment_name": (data.get("deployment_name") if is_azure else None),
                         "is_azure": is_azure,
                     },
                 )

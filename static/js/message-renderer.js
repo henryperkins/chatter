@@ -485,7 +485,6 @@ class MessageRenderer {
     }
 }
 
-// Export the MessageRenderer class
 export { MessageRenderer };
 
 window.MessageRenderer = MessageRenderer;
