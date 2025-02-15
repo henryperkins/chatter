@@ -493,32 +493,20 @@ def check_db_health() -> Dict[str, Any]:
     return health_status
 
 def init_db() -> None:
-    """
-    (Re)Initialize the database by dropping all tables, recreating them from schema.sql,
-    and optionally creating a default model.
-    """
+    """(Re)Initialize the database using SQLAlchemy metadata"""
     try:
-        schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
-        with open(schema_path) as f:
-            schema = f.read()
+        db_state = get_db_state()
+        engine = db_state["engine"]
+        
+        if not engine:
+            raise RuntimeError("Database engine not initialized")
 
-        # Drop & recreate schema
-        with db_session(transactional=True) as db:
-            # Drop known tables (you can adjust as needed)
-            db.execute(text("""
-                DROP TABLE IF EXISTS uploaded_files CASCADE;
-                DROP TABLE IF EXISTS messages CASCADE;
-                DROP TABLE IF EXISTS chats CASCADE;
-                DROP TABLE IF EXISTS model_versions CASCADE;
-                DROP TABLE IF EXISTS login_attempts CASCADE;
-                DROP TABLE IF EXISTS models CASCADE;
-                DROP TABLE IF EXISTS providers CASCADE;
-                DROP TABLE IF EXISTS users CASCADE;
-                -- Removed system views/tables that shouldn't be managed by the app
-            """))
-
-            # Create fresh schema
-            db.execute(text(schema))
+        # Drop all tables first
+        Base.metadata.drop_all(bind=engine)
+        
+        # Initialize models with the engine
+        from models import init_models
+        init_models(engine)  # Pass engine to models initialization
 
         # Create a default model if needed
         with db_session(transactional=True) as db:
