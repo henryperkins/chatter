@@ -192,7 +192,7 @@ class Provider:
                     OR LOWER(slug) = LOWER(:slug)
                     """
                 )
-                existing = session.execute(
+        existing = session.execute(
                     check_query,
                     {"name": data["name"], "slug": data["slug"]},
                 ).fetchone()
