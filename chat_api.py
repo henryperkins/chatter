@@ -3,6 +3,7 @@
 import os
 import requests
 import uuid
+import httpx
 from typing import Optional, List, Dict, Union, Generator, Any
 from openai import AzureOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
@@ -59,10 +60,21 @@ class ChatClient:
                     api_endpoint,
                     api_version
                 )
+                # Add HTTP client with proxy configuration
+                http_client = None
+                if os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY"):
+                    http_client = httpx.Client(
+                        proxies={
+                            "http://": os.environ.get("HTTP_PROXY"),
+                            "https://": os.environ.get("HTTPS_PROXY")
+                        }
+                    )
+
                 self._azure_client = AzureOpenAI(
                     api_key=api_key,
                     azure_endpoint=api_endpoint,
                     api_version=api_version,
+                    http_client=http_client  # Pass configured client here
                 )
 
             return self._azure_client
