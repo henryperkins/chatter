@@ -368,10 +368,9 @@ class User(Base, UserMixin):
             raise ValueError(f"Failed to update user: {str(e)}")
 
     @staticmethod
-    def deactivate(user_id: int) -> bool:
-        """Deactivate a user account."""
+    def deactivate(session: Session, user_id: int) -> bool:
+        """Deactivate a user account using provided session."""
         try:
-            with db_session() as db:
                 result = db.execute(
                     text(
                         """
@@ -392,10 +391,9 @@ class User(Base, UserMixin):
             return False
 
     @staticmethod
-    def validate_reset_token(token: str) -> Optional["User"]:
-        """Validate a password reset token by comparing hashes."""
+    def validate_reset_token(session: Session, token: str) -> Optional["User"]:
+        """Validate a password reset token by comparing hashes using provided session."""
         try:
-            with db_session() as db:
                 # Get all users with unexpired reset tokens
                 results = db.execute(
                     text(
@@ -419,10 +417,9 @@ class User(Base, UserMixin):
             return None
 
     @staticmethod
-    def set_role(user_id: int, role: str) -> bool:
-        """Change a user's role."""
+    def set_role(session: Session, user_id: int, role: str) -> bool:
+        """Change a user's role using provided session."""
         try:
-            with db_session() as db:
                 result = db.execute(
                     text(
                         """
@@ -442,10 +439,9 @@ class User(Base, UserMixin):
             logger.error(f"Error updating role for user {user_id}: {e}")
             return False
 
-    def save(self) -> bool:
-        """Save current user state to database."""
+    def save(self, session: Session) -> bool:
+        """Save current user state to database using provided session."""
         try:
-            with db_session() as db:
                 result = db.execute(
                     text("""
                         UPDATE users 
@@ -468,14 +464,12 @@ class User(Base, UserMixin):
             logger.error(f"Error saving user {self.id} state: {e}")
             return False
 
-    def change_password(self, new_password: str) -> bool:
-        """Change user's password and clear any reset token data."""
+    def change_password(self, session: Session, new_password: str) -> bool:
+        """Change user's password and clear any reset token data using provided session."""
         try:
             password_hash = generate_password_hash(new_password)
             if isinstance(password_hash, bytes):
                 password_hash = password_hash.decode("utf-8")
-
-            with db_session() as db:
                 result = db.execute(
                     text(
                         """
@@ -516,10 +510,9 @@ class User(Base, UserMixin):
         }
 
     @classmethod
-    def list_active_users(cls) -> List["User"]:
-        """Get all active users."""
+    def list_active_users(cls, session: Session) -> List["User"]:
+        """Get all active users using provided session."""
         try:
-            with db_session() as db:
                 results = db.execute(
                     text(
                         """
@@ -538,10 +531,9 @@ class User(Base, UserMixin):
             return []
 
     @staticmethod
-    def bulk_deactivate(user_ids: List[int]) -> bool:
-        """Deactivate multiple users at once."""
+    def bulk_deactivate(session: Session, user_ids: List[int]) -> bool:
+        """Deactivate multiple users at once using provided session."""
         try:
-            with db_session() as db:
                 result = db.execute(
                     text(
                         """
