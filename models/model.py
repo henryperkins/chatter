@@ -1,12 +1,11 @@
-"""Model definition with proper SQLAlchemy integration."""
 import json
 import re
 from datetime import datetime
 from typing import Optional, Dict, Any, List, ClassVar, TYPE_CHECKING
-from sqlalchemy import String, Integer, Float, Boolean, DateTime, ForeignKey, text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-# (Remove this line entirely)
+from sqlalchemy import String, Integer, Float, Boolean, DateTime, ForeignKey, text
+from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
+
 from config import Config
 from logging_config import get_logger
 from .provider import Provider
@@ -21,6 +20,7 @@ logger = get_logger(__name__)
 
 # Type alias for clarity
 ModelDict = Dict[str, Any]
+
 
 class Model(Base):
     """
@@ -46,7 +46,7 @@ class Model(Base):
         created_at: Creation timestamp
         version: Record version for optimistic locking
     """
-    
+
     # Required fields without Python defaults (including server defaults)
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     provider_id: Mapped[int] = mapped_column(Integer, ForeignKey("providers.id", ondelete="CASCADE"), nullable=False)
@@ -57,7 +57,7 @@ class Model(Base):
     api_key: Mapped[str] = mapped_column(String(200), nullable=False)
     temperature: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     max_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    
+
     # Server-default fields (no Python-side defaults)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
@@ -150,7 +150,7 @@ class Model(Base):
             elif key == 'provider_id' and value is not None:
                 value = int(value)
             setattr(self, key, value)
-        
+
         # Apply provider constraints after initialization
         self.apply_provider_constraints()
 
@@ -192,37 +192,39 @@ class Model(Base):
             config = Config()
             query = text("SELECT * FROM models ORDER BY name")
             results = session.execute(query).mappings().all()
-                models = []
-                for row in results:
-                    model_dict = dict(row)
-                    model_dict.pop("store_completion", None)
-                    model_dict["id"] = int(model_dict["id"]) if model_dict.get("id") is not None else 0
-                    model_dict["provider_id"] = int(model_dict["provider_id"]) if model_dict.get("provider_id") is not None else 0
-                    model_dict["temperature"] = float(model_dict["temperature"]) if model_dict.get("temperature") is not None else None
-                    model_dict["max_tokens"] = int(model_dict["max_tokens"]) if model_dict.get("max_tokens") is not None else None
-                    model_dict["max_completion_tokens"] = int(model_dict["max_completion_tokens"]) if model_dict.get("max_completion_tokens") is not None else 8300
 
-                    for bool_field in ["requires_o1_handling", "supports_streaming", "is_default"]:
-                        value = model_dict.get(bool_field)
-                        if isinstance(value, str):
-                            model_dict[bool_field] = value.lower() in ("true", "t", "1")
-                        elif isinstance(value, int):
-                            model_dict[bool_field] = bool(value)
+            models = []
+            for row in results:
+                model_dict = dict(row)
+                model_dict.pop("store_completion", None)
+                model_dict["id"] = int(model_dict["id"]) if model_dict.get("id") is not None else 0
+                model_dict["provider_id"] = int(model_dict["provider_id"]) if model_dict.get("provider_id") is not None else 0
+                model_dict["temperature"] = float(model_dict["temperature"]) if model_dict.get("temperature") is not None else None
+                model_dict["max_tokens"] = int(model_dict["max_tokens"]) if model_dict.get("max_tokens") is not None else None
+                model_dict["max_completion_tokens"] = int(model_dict["max_completion_tokens"]) if model_dict.get("max_completion_tokens") is not None else 8300
 
-                    from utils.encryption import decrypt_api_key, EncryptionError
-                    encrypted_key = model_dict.get("api_key", "")
-                    if encrypted_key and config.ENCRYPTION_KEY:
-                        try:
-                            model_dict["api_key"] = decrypt_api_key(encrypted_key, config.ENCRYPTION_KEY)
-                        except EncryptionError as e:
-                            logger.error("Failed to decrypt API key for model %d: %s", model_dict["id"], str(e))
-                            model_dict["api_key"] = ""
-                    else:
+                for bool_field in ["requires_o1_handling", "supports_streaming", "is_default"]:
+                    value = model_dict.get(bool_field)
+                    if isinstance(value, str):
+                        model_dict[bool_field] = value.lower() in ("true", "t", "1")
+                    elif isinstance(value, int):
+                        model_dict[bool_field] = bool(value)
+
+                from utils.encryption import decrypt_api_key, EncryptionError
+                encrypted_key = model_dict.get("api_key", "")
+                if encrypted_key and config.ENCRYPTION_KEY:
+                    try:
+                        model_dict["api_key"] = decrypt_api_key(encrypted_key, config.ENCRYPTION_KEY)
+                    except EncryptionError as e:
+                        logger.error("Failed to decrypt API key for model %d: %s", model_dict["id"], str(e))
                         model_dict["api_key"] = ""
-                        logger.warning("API key not decrypted because ENCRYPTION_KEY or api_key is empty.")
+                else:
+                    model_dict["api_key"] = ""
+                    logger.warning("API key not decrypted because ENCRYPTION_KEY or api_key is empty.")
 
-                    models.append(Model(**model_dict))
-                return models
+                models.append(Model(**model_dict))
+
+            return models
         except Exception as e:
             logger.error("Error retrieving all models: %s", e, exc_info=True)
             return []
@@ -249,43 +251,44 @@ class Model(Base):
         """Retrieve a model by its ID."""
         try:
             config = Config()
-                query = text("SELECT * FROM models WHERE id = :id")
-                row = session.execute(query, {"id": model_id}).mappings().first()
-                if not row:
-                    logger.warning("No model found with ID %d", model_id)
-                    return None
-                model_dict = dict(row)
-                model_dict.pop("store_completion", None)
+            query = text("SELECT * FROM models WHERE id = :id")
+            row = session.execute(query, {"id": model_id}).mappings().first()
+            if not row:
+                logger.warning("No model found with ID %d", model_id)
+                return None
 
-                from utils.encryption import decrypt_api_key, EncryptionError
+            model_dict = dict(row)
+            model_dict.pop("store_completion", None)
 
-                encrypted_key = model_dict.get("api_key", "")
-                if encrypted_key:
-                    try:
-                        model_dict["api_key"] = decrypt_api_key(
-                            encrypted_key, config.ENCRYPTION_KEY
-                        )
-                    except EncryptionError as e:
-                        logger.error(
-                            "Failed to decrypt API key for model %d: %s",
-                            model_id,
-                            str(e),
-                        )
-                        model_dict["api_key"] = ""
-                else:
+            from utils.encryption import decrypt_api_key, EncryptionError
+            encrypted_key = model_dict.get("api_key", "")
+            if encrypted_key:
+                try:
+                    model_dict["api_key"] = decrypt_api_key(
+                        encrypted_key, config.ENCRYPTION_KEY
+                    )
+                except EncryptionError as e:
+                    logger.error(
+                        "Failed to decrypt API key for model %d: %s",
+                        model_id,
+                        str(e),
+                    )
                     model_dict["api_key"] = ""
+            else:
+                model_dict["api_key"] = ""
 
-                for bool_field in [
-                    "requires_o1_handling",
-                    "supports_streaming",
-                    "is_default"
-                ]:
-                    value = model_dict.get(bool_field)
-                    if isinstance(value, str):
-                        model_dict[bool_field] = value.lower() in ("true", "t", "1")
-                    elif isinstance(value, int):
-                        model_dict[bool_field] = bool(value)
-                return Model(**model_dict)
+            for bool_field in [
+                "requires_o1_handling",
+                "supports_streaming",
+                "is_default"
+            ]:
+                value = model_dict.get(bool_field)
+                if isinstance(value, str):
+                    model_dict[bool_field] = value.lower() in ("true", "t", "1")
+                elif isinstance(value, int):
+                    model_dict[bool_field] = bool(value)
+
+            return Model(**model_dict)
 
         except Exception as e:
             logger.error(
@@ -297,98 +300,98 @@ class Model(Base):
     def create(session: Session, data: ModelDict) -> Optional[int]:
         """Create a new model record."""
         try:
-                logger.debug(
-                    "Creating model with data: %s",
-                    {k: v if k != "api_key" else "****" for k, v in data.items()},
+            logger.debug(
+                "Creating model with data: %s",
+                {k: v if k != "api_key" else "****" for k, v in data.items()},
+            )
+
+            from utils.encryption import encrypt_api_key
+            config = Config()
+            if "api_key" in data:
+                try:
+                    data["api_key"] = encrypt_api_key(data["api_key"], config.ENCRYPTION_KEY)
+                except Exception as e:
+                    logger.error("Failed to encrypt API key: %s", str(e))
+                    raise ValueError(f"Failed to encrypt API key: {str(e)}")
+
+            provider = Provider.get_by_id(data["provider_id"])
+            if not provider:
+                raise ValueError("Invalid provider_id")
+
+            if provider.validation_rules.get("fixed_temperature"):
+                data["temperature"] = 1.0
+
+            if "max_tokens" in provider.validation_rules:
+                data["max_completion_tokens"] = min(
+                    data.get("max_completion_tokens", 16384),
+                    int(provider.validation_rules["max_tokens"]),
                 )
 
-                from utils.encryption import encrypt_api_key
-                config = Config()
-                if "api_key" in data:
-                    try:
-                        data["api_key"] = encrypt_api_key(data["api_key"], config.ENCRYPTION_KEY)
-                    except Exception as e:
-                        logger.error("Failed to encrypt API key: %s", str(e))
-                        raise ValueError(f"Failed to encrypt API key: {str(e)}")
+            check_query = text(
+                """
+                SELECT name, deployment_name
+                FROM models
+                WHERE (LOWER(name) = LOWER(:name)
+                OR LOWER(deployment_name) = LOWER(:deployment_name))
+                AND provider_id = :provider_id
+                AND (NOT is_default OR :is_default = TRUE)
+                """
+            )
+            existing = session.execute(
+                check_query,
+                {
+                    "name": data["name"],
+                    "deployment_name": data["deployment_name"],
+                    "provider_id": data["provider_id"],
+                    "is_default": data.get("is_default", False),
+                },
+            ).fetchone()
 
-                provider = Provider.get_by_id(data["provider_id"])
-                if not provider:
-                    raise ValueError("Invalid provider_id")
-
-                if provider.validation_rules.get("fixed_temperature"):
-                    data["temperature"] = 1.0
-
-                if "max_tokens" in provider.validation_rules:
-                    data["max_completion_tokens"] = min(
-                        data.get("max_completion_tokens", 16384),
-                        int(provider.validation_rules["max_tokens"]),
-                    )
-
-                check_query = text(
-                    """
-                    SELECT name, deployment_name
-                    FROM models
-                    WHERE (LOWER(name) = LOWER(:name)
-                    OR LOWER(deployment_name) = LOWER(:deployment_name))
-                    AND provider_id = :provider_id
-                    AND (NOT is_default OR :is_default = TRUE)
-                    """
+            if existing:
+                field = (
+                    "name"
+                    if existing[0].lower() == data["name"].lower()
+                    else "deployment_name"
                 )
-                existing = session.execute(
-                    check_query,
-                    {
-                        "name": data["name"],
-                        "deployment_name": data["deployment_name"],
-                        "provider_id": data["provider_id"],
-                        "is_default": data.get("is_default", False),
-                    },
-                ).fetchone()
-
-                if existing:
-                    field = (
-                        "name"
-                        if existing[0].lower() == data["name"].lower()
-                        else "deployment_name"
-                    )
-                    raise ValueError(
-                        f"A model with this {field} already exists for this provider"
-                    )
-
-                Model.validate_model_config(data)
-
-                if data.get("is_default", False):
-                    session.execute(
-                        text(
-                            "UPDATE models SET is_default = FALSE WHERE is_default = TRUE"
-                        )
-                    )
-
-                query = text(
-                    """
-                    INSERT INTO models (
-                        provider_id, name, deployment_name, description, api_endpoint, api_key,
-                        api_version, temperature, max_tokens, max_completion_tokens,
-                        model_type, requires_o1_handling, supports_streaming, is_default,
-                        created_at
-                    ) VALUES (
-                        :provider_id, :name, :deployment_name, :description, :api_endpoint, :api_key,
-                        :api_version, :temperature, :max_tokens, :max_completion_tokens,
-                        :model_type, :requires_o1_handling, :supports_streaming, :is_default,
-                        NOW()
-                    )
-                    RETURNING id
-                    """
+                raise ValueError(
+                    f"A model with this {field} already exists for this provider"
                 )
-                result = session.execute(query, data)
-                model_id = result.scalar()
 
-                if model_id is None:
-                    logger.error("Failed to create model - no ID returned")
-                    return None
+            Model.validate_model_config(data)
 
-                session.commit()
-                logger.info("Model created with ID: %d", model_id)
-                return model_id
+            if data.get("is_default", False):
+                session.execute(
+                    text(
+                        "UPDATE models SET is_default = FALSE WHERE is_default = TRUE"
+                    )
+                )
+
+            query = text(
+                """
+                INSERT INTO models (
+                    provider_id, name, deployment_name, description, api_endpoint, api_key,
+                    api_version, temperature, max_tokens, max_completion_tokens,
+                    model_type, requires_o1_handling, supports_streaming, is_default,
+                    created_at
+                ) VALUES (
+                    :provider_id, :name, :deployment_name, :description, :api_endpoint, :api_key,
+                    :api_version, :temperature, :max_tokens, :max_completion_tokens,
+                    :model_type, :requires_o1_handling, :supports_streaming, :is_default,
+                    NOW()
+                )
+                RETURNING id
+                """
+            )
+            result = session.execute(query, data)
+            model_id = result.scalar()
+
+            if model_id is None:
+                logger.error("Failed to create model - no ID returned")
+                return None
+
+            session.commit()
+            logger.info("Model created with ID: %d", model_id)
+            return model_id
 
         except Exception as e:
             logger.error("Failed to create model: %s", e)
@@ -400,133 +403,136 @@ class Model(Base):
         try:
             if not model_id:
                 raise ValueError("Model ID is required")
-            
-                allowed_fields = {
-                    "name",
-                    "deployment_name",
-                    "description",
-                    "api_endpoint",
-                    "api_key",
-                    "api_version",
-                    "temperature",
-                    "max_tokens",
-                    "max_completion_tokens",
-                    "model_type",
-                    "requires_o1_handling",
-                    "supports_streaming",
-                    "is_default",
-                    "provider_id",
-                    "reasoning_effort",
-                }
-                update_data = {
-                    key: value for key, value in data.items() if key in allowed_fields
-                }
-                if not update_data:
-                    logger.info("No valid fields to update for model ID %d", model_id)
-                    return
-                
-                if "api_key" in update_data:
-                    from utils.encryption import encrypt_api_key
-                    config = Config()
-                    try:
-                        update_data["api_key"] = encrypt_api_key(update_data["api_key"], config.ENCRYPTION_KEY)
-                    except Exception as e:
-                        logger.error("Failed to encrypt API key: %s", str(e))
-                        raise ValueError(f"Failed to encrypt API key: {str(e)}")
 
-                existing_model = Model.get_by_id(session, model_id)
-                if not existing_model:
-                    raise ValueError(f"Model with ID {model_id} not found")
+            allowed_fields = {
+                "name",
+                "deployment_name",
+                "description",
+                "api_endpoint",
+                "api_key",
+                "api_version",
+                "temperature",
+                "max_tokens",
+                "max_completion_tokens",
+                "model_type",
+                "requires_o1_handling",
+                "supports_streaming",
+                "is_default",
+                "provider_id",
+                "reasoning_effort",
+            }
+            update_data = {
+                key: value for key, value in data.items() if key in allowed_fields
+            }
+            if not update_data:
+                logger.info("No valid fields to update for model ID %d", model_id)
+                return
 
-                provider_caps = Model.PROVIDER_CAPABILITIES.get(
-                    data.get("model_type", ""), {}
+            if "api_key" in update_data:
+                from utils.encryption import encrypt_api_key
+                config = Config()
+                try:
+                    update_data["api_key"] = encrypt_api_key(update_data["api_key"], config.ENCRYPTION_KEY)
+                except Exception as e:
+                    logger.error("Failed to encrypt API key: %s", str(e))
+                    raise ValueError(f"Failed to encrypt API key: {str(e)}")
+
+            existing_model = Model.get_by_id(session, model_id)
+            if not existing_model:
+                raise ValueError(f"Model with ID {model_id} not found")
+
+            provider_caps = Model.PROVIDER_CAPABILITIES.get(
+                data.get("model_type", ""), {}
+            )
+            if provider_caps.get("fixed_temperature"):
+                update_data["temperature"] = 1.0
+            update_data["supports_streaming"] = bool(
+                provider_caps.get("streaming", True)
+            )
+
+            if "max_completion_tokens" in update_data:
+                max_tokens = provider_caps.get("max_tokens", 16384)
+                update_data["max_completion_tokens"] = min(
+                    update_data["max_completion_tokens"] or 0, max_tokens
                 )
-                if provider_caps.get("fixed_temperature"):
-                    update_data["temperature"] = 1.0
-                update_data["supports_streaming"] = bool(
-                    provider_caps.get("streaming", True)
+
+            if update_data.get(
+                "requires_o1_handling", existing_model.requires_o1_handling
+            ):
+                update_data["supports_streaming"] = False
+                update_data["temperature"] = 1.0
+                logger.debug(
+                    "Enforcing o1-preview constraints for model %d", model_id
                 )
-                if "max_completion_tokens" in update_data:
-                    max_tokens = provider_caps.get("max_tokens", 16384)
-                    update_data["max_completion_tokens"] = min(
-                        update_data["max_completion_tokens"] or 0, max_tokens
-                    )
-                if update_data.get(
-                    "requires_o1_handling", existing_model.requires_o1_handling
-                ):
-                    update_data["supports_streaming"] = False
-                    update_data["temperature"] = 1.0
-                    logger.debug(
-                        "Enforcing o1-preview constraints for model %d", model_id
-                    )
 
-                if "is_default" in update_data:
-                    if update_data["is_default"]:
-                        session.execute(
-                            text(
-                                "UPDATE models SET is_default = :new_default WHERE id != :model_id"
-                            ),
-                            {"new_default": False, "model_id": model_id},
-                        )
-                    else:
-                        default_count = session.execute(
-                            text(
-                                "SELECT COUNT(*) FROM models WHERE is_default = :current_default AND id != :model_id"
-                            ),
-                            {"current_default": True, "model_id": model_id},
-                        ).scalar()
-                        if default_count == 0:
-                            raise ValueError(
-                                "Cannot unset default model without setting another as default"
-                            )
-
-                Model.validate_model_config(update_data, model_id)
-
-                current_version = db.execute(
-                    text("SELECT version FROM models WHERE id = :model_id"),
-                    {"model_id": model_id},
-                ).scalar()
-                if current_version is None:
-                    raise ValueError(f"Model with ID {model_id} not found")
-                update_data["version"] = current_version + 1
-
-                set_clause = ", ".join(f"{key} = :{key}" for key in update_data)
-                params = {
-                    **update_data,
-                    "model_id": model_id,
-                    "current_version": current_version,
-                }
-                query = text(
-                    f"""
-                    UPDATE models
-                    SET {set_clause}
-                    WHERE id = :model_id AND version = :current_version
-                    RETURNING version
-                    """
-                ).bindparams(**params)
-                result = session.execute(query)
-                if result.rowcount == 0:
-                    raise ValueError(
-                        "Model was modified by another user. Please refresh and try again."
-                    )
-
-                if update_data.get("is_default", False):
-                    db.execute(
+            if "is_default" in update_data:
+                if update_data["is_default"]:
+                    session.execute(
                         text(
-                            """
-                            UPDATE models
-                            SET is_default = :new_default
-                            WHERE id != :model_id AND is_default = :current_default
-                            """
+                            "UPDATE models SET is_default = :new_default WHERE id != :model_id"
                         ),
-                        {
-                            "new_default": False,
-                            "current_default": True,
-                            "model_id": model_id,
-                        },
+                        {"new_default": False, "model_id": model_id},
                     )
-                session.commit()
-                logger.info("Model updated (ID %d)", model_id)
+                else:
+                    default_count = session.execute(
+                        text(
+                            "SELECT COUNT(*) FROM models WHERE is_default = :current_default AND id != :model_id"
+                        ),
+                        {"current_default": True, "model_id": model_id},
+                    ).scalar()
+                    if default_count == 0:
+                        raise ValueError(
+                            "Cannot unset default model without setting another as default"
+                        )
+
+            Model.validate_model_config(update_data, model_id)
+
+            current_version = db.execute(
+                text("SELECT version FROM models WHERE id = :model_id"),
+                {"model_id": model_id},
+            ).scalar()
+            if current_version is None:
+                raise ValueError(f"Model with ID {model_id} not found")
+            update_data["version"] = current_version + 1
+
+            set_clause = ", ".join(f"{key} = :{key}" for key in update_data)
+            params = {
+                **update_data,
+                "model_id": model_id,
+                "current_version": current_version,
+            }
+            query = text(
+                f"""
+                UPDATE models
+                SET {set_clause}
+                WHERE id = :model_id AND version = :current_version
+                RETURNING version
+                """
+            ).bindparams(**params)
+            result = session.execute(query)
+            if result.rowcount == 0:
+                raise ValueError(
+                    "Model was modified by another user. Please refresh and try again."
+                )
+
+            if update_data.get("is_default", False):
+                db.execute(
+                    text(
+                        """
+                        UPDATE models
+                        SET is_default = :new_default
+                        WHERE id != :model_id AND is_default = :current_default
+                        """
+                    ),
+                    {
+                        "new_default": False,
+                        "current_default": True,
+                        "model_id": model_id,
+                    },
+                )
+
+            session.commit()
+            logger.info("Model updated (ID %d)", model_id)
 
         except Exception as e:
             logger.error("Failed to update model %d: %s", model_id, e, exc_info=True)
@@ -535,84 +541,88 @@ class Model(Base):
     @staticmethod
     def delete(session: Session, model_id: int) -> None:
         """Delete a model from the database."""
-            try:
-                is_default_query = text(
-                    "SELECT is_default FROM models WHERE id = :model_id"
+        try:
+            is_default_query = text(
+                "SELECT is_default FROM models WHERE id = :model_id"
+            )
+            is_default_result = session.execute(
+                is_default_query, {"model_id": model_id}
+            ).scalar()
+            if is_default_result:
+                default_count_query = text(
+                    "SELECT COUNT(*) FROM models WHERE is_default = TRUE"
                 )
-                is_default_result = session.execute(
-                    is_default_query, {"model_id": model_id}
-                ).scalar()
-                if is_default_result:
-                    default_count_query = text(
-                        "SELECT COUNT(*) FROM models WHERE is_default = TRUE"
-                    )
-                    default_count = session.execute(default_count_query).scalar()
-                    if default_count == 1:
-                        raise ValueError("Cannot delete the last default model")
-                check_query = text(
-                    """
-                    SELECT COUNT(*) as count
-                    FROM chats
-                    WHERE model_id = :model_id
-                    """
-                )
-                result = (
-                    session.execute(check_query, {"model_id": model_id}).mappings().first()
-                )
-                if result and result["count"] > 0:
-                    raise ValueError("Cannot delete model that is in use by chats")
-                model = Model.get_by_id(model_id)
-                if model:
-                    logger.info("Deleting model with provider: %s", model.model_type)
-                delete_versions_query = text(
-                    "DELETE FROM model_versions WHERE model_id = :model_id"
-                )
-                session.execute(delete_versions_query, {"model_id": model_id})
-                query = text("DELETE FROM models WHERE id = :model_id")
-                session.execute(query, {"model_id": model_id})
-                session.commit()
-                logger.info("Model deleted (ID %d)", model_id)
-            except Exception as e:
-                session.rollback()
-                logger.error("Failed to delete model %d: %s", model_id, e)
-                raise
+                default_count = session.execute(default_count_query).scalar()
+                if default_count == 1:
+                    raise ValueError("Cannot delete the last default model")
+
+            check_query = text(
+                """
+                SELECT COUNT(*) as count
+                FROM chats
+                WHERE model_id = :model_id
+                """
+            )
+            result = (
+                session.execute(check_query, {"model_id": model_id}).mappings().first()
+            )
+            if result and result["count"] > 0:
+                raise ValueError("Cannot delete model that is in use by chats")
+
+            model = Model.get_by_id(session, model_id)
+            if model:
+                logger.info("Deleting model with provider: %s", model.model_type)
+
+            delete_versions_query = text(
+                "DELETE FROM model_versions WHERE model_id = :model_id"
+            )
+            session.execute(delete_versions_query, {"model_id": model_id})
+
+            query = text("DELETE FROM models WHERE id = :model_id")
+            session.execute(query, {"model_id": model_id})
+            session.commit()
+            logger.info("Model deleted (ID %d)", model_id)
+        except Exception as e:
+            session.rollback()
+            logger.error("Failed to delete model %d: %s", model_id, e)
+            raise
 
     @staticmethod
     def get_default(session: Session) -> Optional["Model"]:
         """Retrieve the default model."""
-            try:
-                query = text("SELECT * FROM models WHERE is_default = TRUE")
-                result = session.execute(query).mappings().first()
-                if result:
-                    model_dict = dict(result)
-                    model_dict["id"] = (
-                        int(model_dict["id"]) if model_dict.get("id") is not None else 0
-                    )
-                    model_dict["provider_id"] = (
-                        int(model_dict["provider_id"])
-                        if model_dict.get("provider_id") is not None
-                        else 0
-                    )
-                    model_dict["temperature"] = (
-                        float(model_dict["temperature"])
-                        if model_dict.get("temperature") is not None
-                        else None
-                    )
-                    model_dict["max_tokens"] = (
-                        int(model_dict["max_tokens"])
-                        if model_dict.get("max_tokens") is not None
-                        else None
-                    )
-                    model_dict["max_completion_tokens"] = (
-                        int(model_dict["max_completion_tokens"])
-                        if model_dict.get("max_completion_tokens") is not None
-                        else 8300
-                    )
-                    return Model(**model_dict)
-                return None
-            except Exception as e:
-                logger.error("Failed to retrieve default model: %s", e)
-                return None
+        try:
+            query = text("SELECT * FROM models WHERE is_default = TRUE")
+            result = session.execute(query).mappings().first()
+            if result:
+                model_dict = dict(result)
+                model_dict["id"] = (
+                    int(model_dict["id"]) if model_dict.get("id") is not None else 0
+                )
+                model_dict["provider_id"] = (
+                    int(model_dict["provider_id"])
+                    if model_dict.get("provider_id") is not None
+                    else 0
+                )
+                model_dict["temperature"] = (
+                    float(model_dict["temperature"])
+                    if model_dict.get("temperature") is not None
+                    else None
+                )
+                model_dict["max_tokens"] = (
+                    int(model_dict["max_tokens"])
+                    if model_dict.get("max_tokens") is not None
+                    else None
+                )
+                model_dict["max_completion_tokens"] = (
+                    int(model_dict["max_completion_tokens"])
+                    if model_dict.get("max_completion_tokens") is not None
+                    else 8300
+                )
+                return Model(**model_dict)
+            return None
+        except Exception as e:
+            logger.error("Failed to retrieve default model: %s", e)
+            return None
 
     @staticmethod
     def validate_model_config(
@@ -624,14 +634,14 @@ class Model(Base):
         provider = Provider.get_by_id(config["provider_id"])
         if not provider:
             raise ValueError("Invalid provider_id")
-            
+
         # Azure o1 model validation
         if config.get("model_type") == "o1":
             if not (config.get("api_key", "").startswith("sk-") or config.get("api_key", "").startswith("vOJI")):
                 raise ValueError("Azure API keys must start with 'sk-' or 'vOJI'")
             if not config.get("api_endpoint", "").startswith("https://o1models."):
                 raise ValueError("o1 models require specific Azure endpoint format")
-            
+
             # Ensure requires_o1_handling is set so normal_response uses temperature=1.0, max_completion_tokens
             config["requires_o1_handling"] = True
 
@@ -668,6 +678,7 @@ class Model(Base):
             if reasoning_effort not in ["low", "medium", "high"]:
                 raise ValueError("reasoning_effort must be one of: low, medium, high")
             config["reasoning_effort"] = reasoning_effort
+
             # Validate max completion tokens
             max_completion_tokens = config.get("max_completion_tokens")
             model_caps = Model.PROVIDER_CAPABILITIES.get(model_type, {})
