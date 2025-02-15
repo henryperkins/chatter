@@ -9,6 +9,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from sqlalchemy.orm import Session
 from models.base import BaseModel
+from database import db_session
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +118,7 @@ class User(UserMixin):
             return None
 
         try:
-                result = db.execute(
+                result = session.execute(
                     text(
                         """
                         SELECT id, username, email, password_hash, role,
