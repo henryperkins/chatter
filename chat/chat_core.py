@@ -158,7 +158,7 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         context_data = _load_chat_context(chat_id, current_user.id)
 
         # Save updated chat_id to session (in case a new one was created)
-        session["chat_id"] = context_data["chat"].chat_id
+        session["chat_id"] = context_data["chat"].id  # Use 'id' field as chat_id
 
         # Prepare front-end config
         chat_config = {

@@ -23,7 +23,7 @@ class Chat(Base):
 
     __tablename__ = "chats"
 
-    chat_id = Column(String, primary_key=True)
+    id = Column(String, primary_key=True)  # Keep database column name as 'id'
     user_id = Column(Integer, nullable=False)
     title = Column(String, default="New Chat")
     model_id = Column(Integer, ForeignKey("models.id"), nullable=True)
@@ -45,7 +45,7 @@ class Chat(Base):
         Retrieve a Chat instance by primary key using ORM.
         """
         with db_session() as db:
-            return db.query(cls).filter(cls.chat_id == chat_id, cls.is_deleted == False).first()
+            return db.query(cls).filter(cls.id == chat_id, cls.is_deleted == False).first()
 
     @classmethod
     def is_chat_owned_by_user(cls, chat_id: str, user_id: int) -> bool:
