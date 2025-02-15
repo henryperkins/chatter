@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any, List, ClassVar, TYPE_CHECKING
 from sqlalchemy import String, Integer, Float, Boolean, DateTime, ForeignKey, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
 from config import Config
+from database import db_session
 from logging_config import get_logger
 from .provider import Provider
 from .base import Base
