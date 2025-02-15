@@ -34,11 +34,10 @@ class TokenUsage(Base):
             session.commit()
             session.refresh(new_usage)
             return new_usage
-
-            except Exception as e:
-                session.rollback()
-                logger.error(f"Failed to create token usage record: {e}")
-                raise
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to create token usage record: {e}")
+            raise
 
     @staticmethod
     def within_rate_limit(session: Session, user_id: int, minutes_window: int = 60, token_limit: int = 10000) -> bool:
