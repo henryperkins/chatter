@@ -64,7 +64,7 @@ class ChatClient:
                     api_version=api_version,
                     api_key=api_key,
                     default_headers={
-                        "x-ms-user-id": "user_id_placeholder",  # Will be set from request context
+                        "x-ms-user-id": "user_id_placeholder",
                         "x-ms-client-request-id": str(uuid.uuid4())
                     }
                 )
@@ -237,7 +237,6 @@ def get_azure_response(
                         400
                     )
 
-            # o1-specific parameters
             completion_params["max_completion_tokens"] = min(max_completion_tokens, token_limit)
             if model_type_lower == "o1":
                 completion_params["reasoning_effort"] = reasoning_effort or "medium"
