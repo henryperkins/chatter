@@ -801,6 +801,11 @@ async function handleNormalResponse(formData) {
                 modelType === 'o1-preview' ? 32768 :
                 32000; // fallback
 
+            // Add required parameters for o1 model
+            jsonData.api_version = '2025-01-01-preview';
+            jsonData.response_format = 'text';
+            jsonData.stop = null;
+
             // reasoning_effort only for o3-mini and o1
             if (modelType === 'o3-mini' || modelType === 'o1') {
                 jsonData.reasoning_effort = 'medium';

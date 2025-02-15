@@ -145,23 +145,6 @@ class Model:
                 "api-key": "{api_key}",
                 "Content-Type": "application/json"
             },
-            "required_params": ["max_tokens", "response_format", "stop"]
-            "required_headers": {
-                "api-key": "{api_key}",
-                "Content-Type": "application/json"
-            }
-        },
-        "o1": {
-            "fixed_temperature": True,
-            "streaming": False,
-            "max_tokens": 200000,
-            "max_completion_tokens": 100000,
-            "supports_json_mode": True,
-            "requires_reasoning_effort": True,
-            "supports_vision": True,
-            "api_version": "2025-01-01-preview",
-            "default_reasoning_effort": "medium",
-        },
         "o1-mini": {
             "fixed_temperature": True,
             "streaming": False,
