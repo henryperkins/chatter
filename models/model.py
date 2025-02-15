@@ -47,7 +47,7 @@ class Model(Base):
         version: Record version for optimistic locking
     """
     
-    # Required fields without defaults
+    # Required fields without Python defaults (including server defaults)
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     provider_id: Mapped[int] = mapped_column(Integer, ForeignKey("providers.id", ondelete="CASCADE"), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -55,10 +55,14 @@ class Model(Base):
     model_type: Mapped[str] = mapped_column(String(50), nullable=False)
     api_endpoint: Mapped[str] = mapped_column(String(200), nullable=False)
     api_key: Mapped[str] = mapped_column(String(200), nullable=False)
-
-    # Optional fields (nullable=True or with defaults)
     temperature: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     max_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    
+    # Server-default fields (no Python-side defaults)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+
+    # Fields with Python defaults (must come last)
     description: Mapped[str] = mapped_column(String(500), nullable=False, default="")
     max_completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=8300)
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -66,10 +70,6 @@ class Model(Base):
     supports_streaming: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     api_version: Mapped[str] = mapped_column(String(50), nullable=False, default="2024-12-01-preview")
     reasoning_effort: Mapped[str] = mapped_column(String(10), nullable=False, default="medium")
-    
-    # Fields with server defaults
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
-    version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
 
     # Relationship fields (defined last since they don't affect table schema)
     provider: Mapped["Provider"] = relationship(
