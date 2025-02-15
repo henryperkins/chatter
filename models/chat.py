@@ -90,7 +90,7 @@ class Chat(Base):
                 stmt = text("""
                     UPDATE chats
                     SET model_id = :model_id
-                    WHERE id = :chat_id
+                    WHERE id = :id
                 """)
                 db.execute(stmt, {"chat_id": chat_id, "model_id": model_id})
                 db.commit()
@@ -121,7 +121,7 @@ class Chat(Base):
                 stmt = text("""
                     UPDATE chats
                     SET title = :title
-                    WHERE id = :chat_id
+                    WHERE id = :id
                 """)
                 db.execute(stmt, {"title": cleaned_title, "chat_id": chat_id})
                 db.commit()
@@ -238,11 +238,11 @@ class Chat(Base):
         try:
             with db_session() as db:
                 stmt = text("""
-                    INSERT INTO chats (chat_id, user_id, title, model_id, created_at)
-                    VALUES (:chat_id, :user_id, :title, :model_id, NOW())
+                    INSERT INTO chats (id, user_id, title, model_id, created_at)
+                    VALUES (:id, :user_id, :title, :model_id, NOW())
                     RETURNING id, TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MSZ') as created_at
                 """)
-                result = db.execute(stmt, {"chat_id": chat_id, "user_id": user_id, "title": cleaned_title, "model_id": model_id}).mappings().first()
+                result = db.execute(stmt, {"id": chat_id, "user_id": user_id, "title": cleaned_title, "model_id": model_id}).mappings().first()
                 db.commit()
                 if not result:
                     raise ValueError("Failed to create chat - no result returned")
@@ -262,7 +262,7 @@ class Chat(Base):
                 stmt = text("""
                     UPDATE chats
                     SET is_deleted = TRUE
-                    WHERE id = :chat_id
+                    WHERE id = :id
                 """)
                 db.execute(stmt, {"chat_id": chat_id})
                 db.commit()
