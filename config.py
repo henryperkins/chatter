@@ -500,19 +500,6 @@ class Config:
         # Validate configuration
         validate_config(self.__dict__)
         
-        # Test encryption/decryption cycle
-        test_text = "encryption_test_string"
-        try:
-            from utils.encryption import encrypt_api_key, decrypt_api_key
-            encrypted = encrypt_api_key(test_text, self.ENCRYPTION_KEY)
-            decrypted = decrypt_api_key(encrypted, self.ENCRYPTION_KEY)
-            if decrypted != test_text:
-                raise ValueError("Encryption/decryption test failed")
-            logger.info("Encryption key validation successful")
-        except Exception as e:
-            logger.error("Encryption key validation failed: %s", str(e))
-            raise
-
         # Log environment values only during first initialization
         if not hasattr(Config, '_logged'):
             self.log_env_values()

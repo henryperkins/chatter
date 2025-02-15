@@ -172,14 +172,6 @@ def get_azure_response(
                     f"Model {model_type} does not support system messages", 400
                 )
 
-        # Decrypt the API key if it's encrypted
-        try:
-            if api_key:
-                encryption_key = os.getenv("ENCRYPTION_KEY", "")
-                api_key = decrypt_api_key(api_key, encryption_key)
-        except Exception as e:
-            raise ChatAPIError(f"API key decryption failed: {str(e)}", 500)
-
         # Create/reuse the AzureOpenAI client
         chat_client = ChatClient()
         client = chat_client.get_azure_client(
