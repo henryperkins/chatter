@@ -1,5 +1,3 @@
-// Enhanced chat interface with mobile optimizations
-
 'use strict';
 
 let scrollFrame = null;
@@ -91,7 +89,7 @@ class UsagePanelManager {
         // Remove active class from all tabs
         this.tabs.forEach(t => t.classList.remove('tab-active'));
         
-        // Add active class to selected tab
+        // Add active class to selectedTab
         selectedTab.classList.add('tab-active');
         
         // Hide all panels
@@ -703,51 +701,6 @@ document.addEventListener('app:ready', () => {
     }
 });
 
-// Azure AD token handling
-let oSeriesTokenCache = null;
-
-async function getOSeriesToken() {
-    if (oSeriesTokenCache && tokenIsValid(oSeriesTokenCache)) {
-        return oSeriesTokenCache.access_token;
-    }
-    
-    try {
-        const response = await fetch('/auth/azure-ad-token', {
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': window.CHAT_CONFIG.csrfToken
-            }
-        });
-        
-        if (!response.ok) throw new Error('Failed to get Azure AD token');
-        
-        const tokenData = await response.json();
-        validateTokenResponse(tokenData);
-        
-        // Cache token with expiration buffer
-        oSeriesTokenCache = {
-            ...tokenData,
-            expires_at: Date.now() + (tokenData.expires_in - 300) * 1000
-        };
-        
-        return tokenData.access_token;
-    } catch (error) {
-        console.error('Azure AD token acquisition failed:', error);
-        window.MessageRenderer.showError('Authentication failed - please refresh the page');
-        throw error;
-    }
-}
-
-function tokenIsValid(token) {
-    return token?.expires_at > Date.now();
-}
-
-function validateTokenResponse(tokenData) {
-    if (!tokenData?.access_token || !tokenData?.expires_in) {
-        throw new Error('Invalid token response from server');
-    }
-}
-
 // -----------------------------------------------------------------------------
 // Existing Chat Functions
 // -----------------------------------------------------------------------------
@@ -800,10 +753,9 @@ async function handlePotentialFetchResponse(response) {
     }
 }
 
-// Normal response handler
+// Normal response handler (non-streaming)
 async function handleNormalResponse(formData) {
     try {
-        // Get model type and check if it's o-series
         const modelSelect = document.getElementById('model-select');
         const selectedOption = modelSelect?.selectedOptions[0];
         const modelType = selectedOption?.dataset?.modelType || 'azure';
@@ -819,33 +771,36 @@ async function handleNormalResponse(formData) {
             stream: false
         };
 
-        // Add o-series specific parameters
+        // O-series config
         if (isOSeries) {
+            // All o-series must have temperature=1.0
             jsonData.temperature = 1.0;
+
+            // Use max_completion_tokens
             jsonData.max_completion_tokens =
                 modelType === 'o3-mini' ? 75000 :
                 modelType === 'o1' ? 100000 :
                 modelType === 'o1-mini' ? 50000 :
-                modelType === 'o1-preview' ? 32768 : 32000;
-            
-            // Add reasoning effort for o3-mini and o1
+                modelType === 'o1-preview' ? 32768 :
+                32000; // fallback
+
+            // reasoning_effort only for o3-mini and o1
             if (modelType === 'o3-mini' || modelType === 'o1') {
                 jsonData.reasoning_effort = 'medium';
             }
         }
 
-            // Prepare request parameters
-            const requestParams = {
-                method: 'POST',
-                headers: {
-                    'X-Chat-ID': window.CHAT_CONFIG.chatId,
-                    'api-key': window.CHAT_CONFIG?.azureToken,
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRFToken': window.CHAT_CONFIG?.csrfToken
-                },
-                body: JSON.stringify(jsonData)
-            };
+        const requestParams = {
+            method: 'POST',
+            headers: {
+                'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                'Authorization': 'Bearer ' + window.CHAT_CONFIG?.azureToken,
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': window.CHAT_CONFIG?.csrfToken
+            },
+            body: JSON.stringify(jsonData)
+        };
 
         console.log('API Request Data:', JSON.stringify({
             endpoint: '/chat/send',
@@ -895,7 +850,7 @@ async function handleNormalResponse(formData) {
     }
 }
 
-// Streaming response handler
+// Streaming response handler (for o3-mini only)
 async function handleStreamingResponse(formData) {
     let accumulatedContent = '';
     let messageDiv = null;
@@ -921,17 +876,22 @@ async function handleStreamingResponse(formData) {
             message: message || '',
             files: uploadedFiles.map(file => file.id),
             chat_id: window.CHAT_CONFIG.chatId,
-            stream: modelType === 'o3-mini', // Only enable streaming for o3-mini
-            model_type: modelType,
-            // O-series specific parameters
-            ...(isOSeries && {
-                temperature: 1.0,
-                max_completion_tokens: modelType === 'o3-mini' ? 75000 :
-                                     modelType === 'o1' ? 100000 :
-                                     modelType === 'o1-mini' ? 50000 :
-                                     modelType === 'o1-preview' ? 32768 : 32000
-            })
+            stream: modelType === 'o3-mini', // streaming only for o3-mini
+            model_type: modelType
         };
+
+        if (isOSeries) {
+            jsonData.temperature = 1.0;
+            jsonData.max_completion_tokens =
+                modelType === 'o3-mini' ? 75000 :
+                modelType === 'o1' ? 100000 :
+                modelType === 'o1-mini' ? 50000 :
+                modelType === 'o1-preview' ? 32768 : 32000;
+
+            if (modelType === 'o3-mini' || modelType === 'o1') {
+                jsonData.reasoning_effort = 'medium';
+            }
+        }
 
         let response;
         try {
@@ -952,6 +912,7 @@ async function handleStreamingResponse(formData) {
             throw err;
         }
 
+        // If the server did not return a real stream (maybe fallback case)
         if (!(response instanceof Response)) {
             if (!response.success) {
                 throw new Error('Request was not successful (non-streaming server response).');
