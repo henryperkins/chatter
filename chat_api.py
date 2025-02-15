@@ -162,6 +162,15 @@ def get_azure_response(
         if stream and model_type and not ChatClient.supports_streaming(model_type):
             raise ChatAPIError(f"Model {model_type} does not support streaming", 400)
 
+        # Block system messages for o1-mini or o1-preview
+        if model_type and model_type.lower() in ["o1-mini", "o1-preview"]:
+            for msg in messages:
+                if msg.get("role") == "system":
+                    raise ChatAPIError(
+                        f"Model {model_type} does not allow system messages. Use developer role instead.",
+                        400
+                    )
+
         # Determine the limit for max_completion_tokens
         token_limit = (
             ChatClient.get_max_completion_tokens_limit(model_type)
