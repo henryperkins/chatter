@@ -231,7 +231,7 @@ def get_azure_response(
             # o1-specific parameters
             completion_params["max_completion_tokens"] = min(max_completion_tokens, token_limit)
             if model_type_lower == "o1":
-                completion_params["reasoning_effort"] = "medium"  # Required for o1
+                completion_params["reasoning_effort"] = reasoning_effort or "medium"
 
             # Reasoning effort is optional, but must be one of ['low','medium','high']
             valid_efforts = ["low", "medium", "high"]
