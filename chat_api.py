@@ -2,6 +2,7 @@
 
 import os
 import requests
+import uuid
 from typing import Optional, List, Dict, Union, Generator, Any
 from openai import AzureOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
