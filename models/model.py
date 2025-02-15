@@ -66,16 +66,14 @@ class Model(Base):
     provider: Mapped["Provider"] = relationship(
         "Provider",
         back_populates="models",
-        lazy="joined",
-        init=False
+        lazy="joined"
     )
     chats: Mapped[List["Chat"]] = relationship(
         "Chat",
         back_populates="model",
         cascade="all, delete-orphan",
         lazy="select",
-        init=False,
-        default_factory=list
+        default=None
     )
 
     # Fields with Python defaults (must come last)
