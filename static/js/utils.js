@@ -412,7 +412,11 @@ window.utils = {
     handleError(error) {
         console.error('Error:', error);
 
-        let message = 'An unexpected error occurred';
+        const errorMessage = data?.error?.message || 
+                           data?.detail?.message || 
+                           data?.message || 
+                           'Unknown error occurred';
+        let message = errorMessage;
         let type = 'error';
 
         if (error instanceof FetchError) {

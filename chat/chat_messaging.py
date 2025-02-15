@@ -357,6 +357,13 @@ async def normal_response(
             "stream": False,
         }
 
+        if model_obj.requires_o1_handling:
+            api_params["temperature"] = 1.0  # Force required value
+            api_params["max_completion_tokens"] = min(
+                model_obj.max_completion_tokens,
+                75000  # Default safe limit
+            )
+
         if is_o_series:
             # Reasoning docs say no temperature for o-series
             api_params["max_completion_tokens"] = max_completion_tokens

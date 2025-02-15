@@ -293,7 +293,7 @@ class Chat(Base):
                     "chat_id": chat_id,
                     "role": role,
                     "content": content,
-                    "metadata": json.dumps(metadata) if metadata is not None else '{}'
+                    "metadata": json.dumps(metadata, default=str) if metadata is not None else '{}'
                 })
                 inserted_id = result.scalar()
                 if inserted_id is None:

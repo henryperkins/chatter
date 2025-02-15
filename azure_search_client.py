@@ -186,7 +186,8 @@ class AzureOpenAI:
         else:
             # For Azure AD authentication
             self.credential = DefaultAzureCredential(
-                credential_scopes=["https://cognitiveservices.azure.com/.default"]
+                credential_scopes=["https://cognitiveservices.azure.com/.default"],
+                additionally_allowed_tenants=["*"]
             )
 
         self.client = openai.AzureOpenAI(

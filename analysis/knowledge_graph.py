@@ -17,15 +17,23 @@ class KnowledgeGraph:
         
         try:
             import spacy
-            # Use system-installed model path
-            self.nlp = spacy.load("/usr/lib/python3/dist-packages/en_core_web_sm")
+            # First try standard package name
+            self.nlp = spacy.load("en_core_web_sm")
             self.spacy_available = True
             logger.info("spaCy initialized successfully for knowledge graph")
-        except OSError as e:
-            logger.error("Could not load spaCy model from system path: %s", str(e))
-            self.nlp = None
-            self.spacy_available = False
-            logger.warning("Knowledge graph will operate in basic mode")
+        except (OSError, ImportError):
+            try:
+                # Auto-download if missing
+                from spacy.cli import download
+                download("en_core_web_sm")
+                self.nlp = spacy.load("en_core_web_sm")
+                self.spacy_available = True
+                logger.info("spaCy model downloaded and loaded successfully for knowledge graph")
+            except Exception as e:
+                logger.error("Failed to download spaCy model: %s", str(e))
+                self.nlp = None
+                self.spacy_available = False
+                logger.warning("Knowledge graph will operate in basic mode")
             
         self.entities: Dict[str, Set[str]] = {}
         self.relationships: List[Tuple[str, str, str]] = []
