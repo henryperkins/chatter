@@ -144,6 +144,11 @@ class Model:
             "required_headers": {
                 "api-key": "{api_key}",
                 "Content-Type": "application/json"
+            },
+            "required_params": ["max_tokens", "response_format", "stop"]
+            "required_headers": {
+                "api-key": "{api_key}",
+                "Content-Type": "application/json"
             }
         },
         "o1": {
@@ -693,8 +698,8 @@ class Model:
             
         # Azure o1 model validation
         if config.get("model_type") == "o1":
-            if not config.get("api_key", "").startswith("vOJI"):
-                raise ValueError("Invalid Azure API key format for o1 models")
+            if not (config.get("api_key", "").startswith("sk-") or config.get("api_key", "").startswith("vOJI")):
+                raise ValueError("Azure API keys must start with 'sk-' or 'vOJI'")
             if not config.get("api_endpoint", "").startswith("https://o1models."):
                 raise ValueError("o1 models require specific Azure endpoint format")
         provider_caps = provider.capabilities

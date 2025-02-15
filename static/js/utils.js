@@ -49,7 +49,7 @@ window.utils = {
 
             // Only add Azure token if it exists
             if (window.CHAT_CONFIG?.azureToken) {
-                defaultHeaders['X-Azure-Token'] = window.CHAT_CONFIG.azureToken;
+                defaultHeaders['api-key'] = window.CHAT_CONFIG.azureToken;
             }
 
             // Validate and handle request body

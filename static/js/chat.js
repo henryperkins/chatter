@@ -811,7 +811,7 @@ async function handleNormalResponse(formData) {
             method: 'POST',
             headers: {
                 'X-Chat-ID': window.CHAT_CONFIG.chatId,
-                'Authorization': 'Bearer ' + window.CHAT_CONFIG?.azureToken,
+                'api-key': window.CHAT_CONFIG?.azureToken,
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest',
                 'X-CSRFToken': window.CHAT_CONFIG?.csrfToken
