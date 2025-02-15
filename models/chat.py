@@ -54,10 +54,9 @@ class Chat(Base):
 
         # Relationships
         model: Mapped[Optional["Model"]] = relationship(
-            "Model",  # Changed to string reference
+            "Model",
             back_populates="chats",
-            lazy="joined",
-            init=False
+            lazy="joined"
         )
         files: Mapped[List["UploadedFile"]] = relationship(
             "UploadedFile",  # Changed to string reference
