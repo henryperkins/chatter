@@ -282,6 +282,8 @@ async function startChat() {
 // UI Event Listeners
 // -----------------------------------------------------------------------------
 function setupUIEventListeners() {
+    console.debug('[Chat] Setting up UI event listeners');
+    
     const messageInput = document.getElementById('message-input');
     const chatForm = document.getElementById('chat-form');
     const newChatBtn = document.getElementById('new-chat-btn');
@@ -290,6 +292,12 @@ function setupUIEventListeners() {
     const chatSelectorBtn = document.getElementById('chat-selector-btn');
     const chatListDropdown = document.getElementById('chat-list-dropdown');
     const editTitleBtn = document.getElementById('edit-title-btn');
+
+    if (!chatForm) {
+        window.monitoring?.logError('Chat form element not found!');
+        return;
+    }
+    console.debug('[Chat] Found chat form:', chatForm);
 
     // Chat list item navigation
     if (chatListDropdown) {
@@ -366,7 +374,14 @@ function setupUIEventListeners() {
 
     // Chat form submission
     if (chatForm) {
-        chatForm.addEventListener('submit', handleSubmit);
+        // Remove existing submit handler
+        chatForm.removeEventListener('submit', handleSubmit);
+        
+        // Add new listener with proper prevention
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            handleSubmit(e);
+        });
     }
 
     // Message input handling with debounce
@@ -455,7 +470,9 @@ function setupUIEventListeners() {
 // -----------------------------------------------------------------------------
 function handleSubmit(e) {
     e.preventDefault();
-    sendMessage(e);
+    sendMessage(e).catch(error => {
+        window.monitoring?.logError('Submit handler error:', error);
+    });
 }
 
 function handleKeydown(e) {
@@ -1026,19 +1043,26 @@ async function handleStreamingResponse(formData) {
 }
 
 async function sendMessage(event) {
-    if (event) {
-        event.preventDefault();
-    }
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
-
+    
+    // Add null checks with proper error handling
     if (!messageInput || !sendButton) {
+        const errorMsg = 'Critical UI elements missing! Input:' + 
+                        `${!!messageInput}, Button: ${!!sendButton}`;
+        window.monitoring?.logError(errorMsg);
         window.MessageRenderer.showError('Chat interface not properly initialized');
         return;
     }
-    if (sendButton.disabled) return;
-
-    sendButton.disabled = true;
+    
+    // Prevent double-submission
+    if (sendButton.disabled) {
+        window.monitoring?.log('debug', 'Send button already disabled');
+        return;
+    }
+    
+    try {
+        sendButton.disabled = true;
     try {
         const message = messageInput.value.trim();
         let uploadedFiles = [];

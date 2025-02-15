@@ -191,6 +191,8 @@
         <div class="max-w-4xl mx-auto w-full">
             <form id="chat-form"
                   class="flex flex-col justify-between gap-3 px-4"
+                  role="form"
+                  aria-label="Chat input form"
                   enctype="multipart/form-data">
                 <!-- Hidden CSRF input if needed -->
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
