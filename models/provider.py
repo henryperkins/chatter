@@ -180,23 +180,11 @@ class Provider:
         )
 
     @staticmethod
-    def create(data: ProviderDict) -> Optional[int]:
-        """
-        Create a new provider record.
-
-        Args:
-            data: Dictionary containing provider configuration
-
-        Returns:
-            Optional[int]: ID of created provider or None if creation failed
-
-        Raises:
-            ValueError: If provider configuration is invalid
-        """
+    def create(session: Session, data: ProviderDict) -> Optional[int]:
+        """Create a new provider record using the provided session."""
         try:
-            with db_session() as session:
-                logger.debug("Creating provider with data: %s", data)
-                check_query = text(
+            logger.debug("Creating provider with data: %s", data)
+            check_query = text(
                     """
                     SELECT name, slug
                     FROM providers
@@ -295,20 +283,11 @@ class Provider:
             raise
 
     @staticmethod
-    def get_by_id(provider_id: int) -> Optional["Provider"]:
-        """
-        Retrieve a provider by its ID.
-
-        Args:
-            provider_id: ID of the provider to retrieve
-
-        Returns:
-            Optional[Provider]: Provider instance if found, None otherwise
-        """
+    def get_by_id(session: Session, provider_id: int) -> Optional["Provider"]:
+        """Retrieve a provider by its ID using the provided session."""
         try:
-            with db_session() as session:
-                query = text("SELECT * FROM providers WHERE id = :id")
-                row = session.execute(query, {"id": provider_id}).mappings().first()
+            query = text("SELECT * FROM providers WHERE id = :id")
+            row = session.execute(query, {"id": provider_id}).mappings().first()
                 if not row:
                     logger.warning("No provider found with ID %s", provider_id)
                     return None
@@ -318,16 +297,10 @@ class Provider:
             return None
 
     @staticmethod
-    def get_all() -> List["Provider"]:
-        """
-        Retrieve all providers.
-
-        Returns:
-            List[Provider]: List of provider instances
-        """
-        with db_session() as session:
-            try:
-                query = text("SELECT * FROM providers ORDER BY name")
+    def get_all(session: Session) -> List["Provider"]:
+        """Retrieve all providers using the provided session."""
+        try:
+            query = text("SELECT * FROM providers ORDER BY name")
                 rows = session.execute(query).mappings().all()
                 return [Provider(**dict(row)) for row in rows]
             except Exception as e:
@@ -335,20 +308,11 @@ class Provider:
                 raise
 
     @staticmethod
-    def get_by_slug(slug: str) -> Optional["Provider"]:
-        """
-        Retrieve a provider by its slug.
-
-        Args:
-            slug: URL-friendly identifier of the provider
-
-        Returns:
-            Optional[Provider]: Provider instance if found, None otherwise
-        """
+    def get_by_slug(session: Session, slug: str) -> Optional["Provider"]:
+        """Retrieve a provider by its slug using the provided session."""
         try:
-            with db_session() as session:
-                query = text("SELECT * FROM providers WHERE slug = :slug")
-                row = session.execute(query, {"slug": slug}).mappings().first()
+            query = text("SELECT * FROM providers WHERE slug = :slug")
+            row = session.execute(query, {"slug": slug}).mappings().first()
                 if not row:
                     logger.warning("No provider found with slug %s", slug)
                     return None

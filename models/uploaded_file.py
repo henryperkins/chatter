@@ -44,20 +44,17 @@ class UploadedFile(Base):
 
     @staticmethod
     def create(
+        session: Session,
         chat_id: str,
         filename: str,
         filepath: str,
         mime_type: Optional[str] = None,
         description: Optional[str] = None,
         azure_file_id: Optional[str] = None
-    ) -> str:
-        """
-        Insert a new uploaded file record into the database.
-        Returns the unique file ID for reference.
-        """
-        with db_session() as db:
-            unique_filepath = None
-            try:
+    ) -> int:
+        """Create a new record with provided session."""
+        unique_filepath = None
+        try:
                 # Check for existing versions
                 version_query = text("""
                     SELECT MAX(version) FROM uploaded_files
@@ -121,16 +118,13 @@ class UploadedFile(Base):
                 raise
 
     @staticmethod
-    def get_by_id(file_id: int) -> Optional["UploadedFile"]:
-        """
-        Retrieve an uploaded file by its ID.
-        """
-        with db_session() as db:
-            try:
-                query = text("""
-                    SELECT * FROM uploaded_files
-                    WHERE id = :file_id
-                """)
+    def get_by_id(session: Session, file_id: int) -> Optional["UploadedFile"]:
+        """Retrieve an uploaded file by ID with provided session."""
+        try:
+            query = text("""
+                SELECT * FROM uploaded_files
+                WHERE id = :file_id
+            """)
                 row = db.execute(query, {"file_id": file_id}).mappings().first()
                 if row:
                     return UploadedFile(**dict(row))
@@ -162,16 +156,12 @@ class UploadedFile(Base):
                 raise
 
     @staticmethod
-    def delete_by_chat_ids(chat_ids: List[str]) -> Dict[str, int]:
-        """
-        Delete all uploaded files associated with specific chat IDs.
-        Returns a dict with deletion stats.
-        """
+    def delete_by_chat_ids(session: Session, chat_ids: List[str]) -> Dict[str, int]:
+        """Delete all uploaded files for the given chat IDs."""
         if not chat_ids:
             return {"deleted_files": 0, "deleted_bytes": 0}
 
-        with db_session() as db:
-            try:
+        try:
                 # First get file info for cleanup
                 query = text("""
                     SELECT filepath, size FROM uploaded_files
@@ -203,12 +193,9 @@ class UploadedFile(Base):
                 raise
 
     @staticmethod
-    def update_azure_file_id(file_id: int, azure_file_id: str) -> bool:
-        """
-        Update the Azure file ID for an uploaded file.
-        """
-        with db_session() as db:
-            try:
+    def update_azure_file_id(session: Session, file_id: int, azure_file_id: str) -> bool:
+        """Update the Azure file ID using the provided session."""
+        try:
                 query = text("""
                     UPDATE uploaded_files
                     SET azure_file_id = :azure_file_id,
