@@ -288,10 +288,10 @@ class Provider:
         try:
             query = text("SELECT * FROM providers WHERE id = :id")
             row = session.execute(query, {"id": provider_id}).mappings().first()
-                if not row:
-                    logger.warning("No provider found with ID %s", provider_id)
-                    return None
-                return Provider(**dict(row))
+            if not row:
+                logger.warning("No provider found with ID %s", provider_id)
+                return None
+            return Provider(**dict(row))
         except Exception as e:
             logger.error("Error retrieving provider by ID %d: %s", provider_id, e)
             return None
