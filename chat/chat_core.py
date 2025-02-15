@@ -1,6 +1,8 @@
 """
-Core chat functionality and basic routes.
-Handles the main chat interface, initialization, and session logic.
+Refactored chat blueprint code for handling:
+- Main chat interface
+- Secondary interface route
+- Shared logic for retrieving or creating chats, loading model configs, etc.
 """
 
 import os
@@ -16,9 +18,9 @@ from flask import (
 from flask.wrappers import Response as FlaskResponse
 from flask_login import login_required, current_user
 from flask_wtf.csrf import generate_csrf
-from database import db_session
 from sqlalchemy import text
 
+from database import db_session
 from models.chat import Chat
 from models.model import Model
 from models.provider import Provider
@@ -38,101 +40,167 @@ chat_routes = Blueprint("chat", __name__, url_prefix="/chat")
 init_upload_folder()
 
 
+def _get_or_create_chat(chat_id: Optional[str], user_id: int) -> Chat:
+    """
+    Retrieve an existing chat by chat_id or create a new one if not found.
+    Returns the Chat object.
+    """
+    if chat_id:
+        existing_chat = Chat.get_by_id(chat_id)
+        if existing_chat:
+            return existing_chat
+
+    new_id = generate_new_chat_id()
+    Chat.create(chat_id=new_id, user_id=user_id, title="New Chat")
+    return Chat.get_by_id(new_id)
+
+
+def _load_chat_context(chat_id: Optional[str], user_id: int) -> Dict[str, Any]:
+    """
+    Loads or creates the necessary data to render a chat interface:
+      - Chat record
+      - Model configuration (and default if missing)
+      - Decrypted API key (e.g., azure_token)
+      - Chat messages (creates initial welcome messages if none exist)
+      - Sanitizes user messages with bleach.
+    Raises exceptions for serious issues like encryption errors or invalid models.
+    """
+    # 1. Retrieve or create the Chat
+    chat = _get_or_create_chat(chat_id, user_id)
+
+    # 2. Retrieve the associated model or the default model
+    model_obj = None
+    if chat.model_id:
+        model_obj = Chat.get_model(chat.chat_id)
+        if not model_obj:
+            raise ValueError("Invalid or missing model configuration for this chat.")
+    else:
+        # No model assigned to this chat, use a global default if it exists
+        model_obj = Model.get_default()
+
+    # 3. Decrypt the stored API key if available
+    azure_token = ""
+    if model_obj and model_obj.api_key:
+        try:
+            azure_token = decrypt_api_key(
+                model_obj.api_key,
+                config_instance.ENCRYPTION_KEY
+            )
+        except EncryptionError as exc:
+            raise RuntimeError(f"Error decrypting API key: {str(exc)}")
+
+    # 4. Load conversation messages; create welcome if none exist
+    messages = conversation_manager.get_context(chat.chat_id)
+    if not messages:
+        # If you have a method that initializes the conversation, call it
+        conversation_manager.add_message(
+            chat_id=chat.chat_id,
+            role="system",
+            content="Welcome to Azure OpenAI Chat!"
+        )
+        conversation_manager.add_message(
+            chat_id=chat.chat_id,
+            role="assistant",
+            content=(
+                "Hello! I'm ready to help. You can:\n"
+                "- Type a message to chat\n"
+                "- Upload files for analysis\n"
+                "- Change models using the dropdown\n"
+                "- Start a new chat with the + button"
+            )
+        )
+        messages = conversation_manager.get_context(chat.chat_id)
+
+    # 5. Sanitize user messages to prevent XSS
+    for msg in messages:
+        if msg["role"] == "user":
+            msg["content"] = bleach.clean(msg["content"])
+
+    return {
+        "chat": chat,
+        "model_obj": model_obj,
+        "azure_token": azure_token,
+        "messages": messages
+    }
+
+
 @chat_routes.route("/interface")
 @login_required
 def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """
-    Main chat interface route that either:
-      - Creates a new chat session if none exists.
-      - Loads an existing chat session (and model configuration if available).
-      - Renders the chat.html template with conversation data.
+    Main chat interface route:
+      - Checks for model availability
+      - Gets or creates chat (by session['chat_id'])
+      - Loads messages, model config, etc.
+      - Renders the chat interface
     """
     try:
+        # Ensure at least one model is defined (optional check)
         with db_session() as db:
-            # Ensure at least one model is defined in the system
             model_count = db.scalar(text("SELECT COUNT(*) FROM models"))
             if not model_count:
                 logger.warning("No models found - showing error message")
-                return render_template(
-                    "error.html",
-                    error="No AI models are configured. Please contact your administrator.",
-                    show_models_link=True
+                return make_response(
+                    render_template(
+                        "error.html",
+                        error="No AI models are configured. Please contact your administrator.",
+                        show_models_link=True
+                    )
                 ), 200
 
-            # Retrieve chat ID from session
-            chat_id = session.get("chat_id", "")
-            if not isinstance(chat_id, str):
-                chat_id = str(chat_id)
+        # Retrieve chat_id from session
+        chat_id = session.get("chat_id", "")
+        # Convert to str just to be safe
+        if not isinstance(chat_id, str):
+            chat_id = str(chat_id)
 
-            # Look up the existing chat record
-            existing_chat = Chat.get_by_id(chat_id) if chat_id else None
-            if not existing_chat:
-                new_id = generate_new_chat_id()
-                Chat.create(chat_id=new_id, user_id=current_user.id, title="New Chat")
-                session["chat_id"] = new_id
-                chat_id = new_id
+        # Load the chat context (chat, model, token, messages)
+        context_data = _load_chat_context(chat_id, current_user.id)
 
-            chat = Chat.get_by_id(chat_id)
-            if not chat:
-                # Edge case: If chat creation or retrieval fails
-                return redirect(url_for("chat.index"))
+        # Save updated chat_id to session (in case a new one was created)
+        session["chat_id"] = context_data["chat"].chat_id
 
-            # Get model configuration for this chat (or default)
-            model_obj = Chat.get_model(chat_id) if chat.model_id else Model.get_default()
-            if not model_obj and chat.model_id:
-                logger.error("Invalid or missing model configuration for chat_id=%s", chat_id)
-                return render_template(
-                    "error.html",
-                    error="The model configuration is invalid."
-                ), 500
-
-            # Decrypt the stored API key (if any)
-            azure_token = None
-            if model_obj and model_obj.api_key:
-                try:
-                    azure_token = decrypt_api_key(
-                        model_obj.api_key,
-                        config_instance.ENCRYPTION_KEY
-                    )
-                except EncryptionError as e:
-                    logger.error("Error decrypting API key for chat_id=%s: %s", chat_id, str(e))
-                    return render_template(
-                        "error.html",
-                        error="Configuration error: Unable to decrypt API key."
-                    ), 500
-
-            # Load the conversation messages
-            messages = conversation_manager.get_context(chat_id)
-            # Sanitize user messages (especially if you store raw HTML)
-            for message in messages:
-                if message["role"] == "user":
-                    message["content"] = bleach.clean(message["content"])
-
-            # Prepare data for the front end
-            chat_config = {
-                "chatId": chat_id,
-                "csrfToken": generate_csrf(),
-                "azureToken": azure_token or "",
-                "userId": str(current_user.id),
-                "modelSettings": model_obj.to_dict() if model_obj else {}
-            }
-
-            return render_template(
-                "chat.html",
-                chat_id=chat_id,
-                chat_title=chat.title,
-                model_name=model_obj.name if model_obj else "Default Model",
-                current_model=model_obj,
-                messages=messages,
-                models=Model.get_all(),
-                conversations=Chat.get_user_chats(current_user.id),
-                now=datetime.now,
-                today=datetime.now().strftime("%Y-%m-%d"),
-                yesterday=(datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
-                azure_token=azure_token,
-                CHAT_CONFIG=json.dumps(chat_config)
+        # Prepare front-end config
+        chat_config = {
+            "chatId": context_data["chat"].chat_id,
+            "csrfToken": generate_csrf(),
+            "azureToken": context_data["azure_token"],
+            "userId": str(current_user.id),
+            "modelSettings": (
+                context_data["model_obj"].to_dict()
+                if context_data["model_obj"]
+                else {}
             )
+        }
 
+        return render_template(
+            "chat.html",
+            chat_id=context_data["chat"].chat_id,
+            chat_title=context_data["chat"].title,
+            model_name=(
+                context_data["model_obj"].name
+                if context_data["model_obj"]
+                else "Default Model"
+            ),
+            current_model=context_data["model_obj"],
+            messages=context_data["messages"],
+            models=Model.get_all(),
+            conversations=Chat.get_user_chats(current_user.id),
+            now=datetime.now,
+            today=datetime.now().strftime("%Y-%m-%d"),
+            yesterday=(datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
+            azure_token=context_data["azure_token"],
+            CHAT_CONFIG=json.dumps(chat_config)
+        )
+
+    except ValueError as ve:
+        # Example for model or config errors
+        logger.error("Value error in chat interface: %s", str(ve))
+        return render_template("error.html", error=str(ve)), 500
+    except RuntimeError as re:
+        # Example for encryption errors
+        logger.error("Runtime error in chat interface: %s", str(re))
+        return render_template("error.html", error=str(re)), 500
     except Exception as e:
         logger.error("Error initializing chat interface: %s", str(e), exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
@@ -143,107 +211,67 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
     """
     Secondary route for loading the existing chat interface with a given chat_id.
-    - If chat_id is missing or invalid, a new chat session is created.
+    - If 'chat_id' is missing or invalid, a new chat session is created.
     - Renders chat.html with relevant context.
     """
-    logger.debug("Current user: id=%s, role=%s", current_user.id, current_user.role)
-
-    # Retrieve chat ID from request or session
-    chat_id = request.args.get("chat_id") or session.get("chat_id", "")
-    if not isinstance(chat_id, str):
-        chat_id = str(chat_id)
-
-    # Update session if chat_id is explicitly provided
-    if request.args.get("chat_id"):
-        session["chat_id"] = chat_id
-
-    # Create a new chat if none found
-    if not chat_id or not Chat.get_by_id(chat_id):
-        chat_id = generate_new_chat_id()
-        Chat.create(chat_id=chat_id, user_id=current_user.id, title="New Chat")
-        session["chat_id"] = chat_id
-        return redirect(url_for("chat.index"))
-
-    chat = Chat.get_by_id(chat_id)
-    if not chat:
-        return redirect(url_for("chat.chat_interface"))
-
     try:
-        # Retrieve model configuration
-        model_obj = Chat.get_model(chat_id) if chat.model_id else None
-        if not model_obj and chat.model_id:
-            return render_template(
-                "error.html",
-                error="The model configuration is invalid."
-            ), 500
+        logger.debug("Current user: id=%s, role=%s", current_user.id, current_user.role)
 
-        # Decrypt any stored API key
-        azure_token = None
-        if model_obj and model_obj.api_key:
-            try:
-                azure_token = decrypt_api_key(
-                    model_obj.api_key,
-                    config_instance.ENCRYPTION_KEY
-                )
-            except EncryptionError as e:
-                logger.error("Error decrypting API key: %s", str(e))
-                return render_template(
-                    "error.html",
-                    error="Configuration error: Unable to decrypt API key."
-                ), 500
+        # Retrieve chat ID from query param or session
+        chat_id = request.args.get("chat_id") or session.get("chat_id", "")
+        if not isinstance(chat_id, str):
+            chat_id = str(chat_id)
 
-        # Retrieve messages
-        messages = conversation_manager.get_context(chat_id)
-        if not messages:
-            # If no messages, initialize with welcome prompts
-            conversation_manager.add_message(
-                chat_id=chat_id,
-                role="system",
-                content="Welcome to Azure OpenAI Chat!"
-            )
-            conversation_manager.add_message(
-                chat_id=chat_id,
-                role="assistant",
-                content="Hello! I'm ready to help. You can:\n"
-                        "- Type a message to chat\n"
-                        "- Upload files for analysis\n"
-                        "- Change models using the dropdown\n"
-                        "- Start a new chat with the + button"
-            )
-            messages = conversation_manager.get_context(chat_id)
+        # If an explicit chat_id is provided, store it in the session
+        if request.args.get("chat_id"):
+            session["chat_id"] = chat_id
 
-        # Sanitize user messages
-        for message in messages:
-            if message["role"] == "user":
-                message["content"] = bleach.clean(message["content"])
+        # Load the chat context
+        context_data = _load_chat_context(chat_id, current_user.id)
+        # In case a new one was created
+        session["chat_id"] = context_data["chat"].chat_id
 
-        # Prepare client-side configuration
+        # Prepare front-end config
         chat_config = {
-            "chatId": chat_id,
+            "chatId": context_data["chat"].chat_id,
             "csrfToken": generate_csrf(),
-            "azureToken": azure_token or "",
+            "azureToken": context_data["azure_token"],
             "userId": str(current_user.id),
-            "modelSettings": model_obj.to_dict() if model_obj else {}
+            "modelSettings": (
+                context_data["model_obj"].to_dict()
+                if context_data["model_obj"]
+                else {}
+            )
         }
 
         return render_template(
             "chat.html",
-            chat_id=chat_id,
-            chat_title=chat.title,
-            model_name=model_obj.name if model_obj else "Default Model",
-            current_model=model_obj,
-            messages=messages,
+            chat_id=context_data["chat"].chat_id,
+            chat_title=context_data["chat"].title,
+            model_name=(
+                context_data["model_obj"].name
+                if context_data["model_obj"]
+                else "Default Model"
+            ),
+            current_model=context_data["model_obj"],
+            messages=context_data["messages"],
             models=Model.get_all(),
             conversations=Chat.get_user_chats(current_user.id),
             now=datetime.now,
             today=datetime.now().strftime("%Y-%m-%d"),
             yesterday=(datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
-            azure_token=azure_token,
+            azure_token=context_data["azure_token"],
             CHAT_CONFIG=json.dumps(chat_config)
         )
 
+    except ValueError as ve:
+        logger.error("Value error in /chat_interface: %s", str(ve))
+        return render_template("error.html", error=str(ve)), 500
+    except RuntimeError as re:
+        logger.error("Runtime error in /chat_interface: %s", str(re))
+        return render_template("error.html", error=str(re)), 500
     except Exception as e:
-        logger.error("Error in chat interface for chat_id=%s: %s", chat_id, str(e), exc_info=True)
+        logger.error("Error in /chat_interface for chat_id=%s: %s", chat_id, str(e), exc_info=True)
         return render_template(
             "error.html",
             error="An error occurred while loading the chat interface."

@@ -1,4 +1,4 @@
-                                                     <div class="message-group user-message flex items-start gap-4 p-4" data-sender="user">
+<div class="message-group user-message flex items-start gap-4 p-4" data-sender="user">
   <div class="avatar-container rounded-full bg-secondary-600 dark:bg-secondary-500 flex items-center justify-center">
     <i class="fas fa-user text-white text-sm"></i>
   </div>
@@ -6,8 +6,7 @@
     <div class="message-bubble shadow-sm">
       <p class="prose dark:prose-invert max-w-none">{{ message.content }}</p>
       <div class="flex items-center justify-between">
-        <span class="timestamp">{{ message.timestamp.isoformat() if message.timestamp else "" }}</span>
-        <div class="flex items-center gap-2">
+        <span class="timestamp">{{ message.timestamp if message.timestamp else "" }}</span>
           <span class="message-status"></span>
           <button class="copy-button p-2 text-gray-400 hover:text-gray-300 transition-colors" data-raw-content="{{ message.content }}">
             <i class="fas fa-copy text-lg"></i>
@@ -16,4 +15,3 @@
       </div>
     </div>
   </div>
-</div>

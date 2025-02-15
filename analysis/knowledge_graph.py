@@ -1,6 +1,6 @@
 """Knowledge graph management for semantic relationship tracking."""
 
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import spacy
 from spacy.tokens import Doc
 from logging_config import get_logger
@@ -16,7 +16,6 @@ class KnowledgeGraph:
         self.spacy_available = False
         
         try:
-            import spacy
             # First try standard package name
             self.nlp = spacy.load("en_core_web_sm")
             self.spacy_available = True
@@ -24,7 +23,7 @@ class KnowledgeGraph:
         except (OSError, ImportError):
             try:
                 # Auto-download if missing
-                from spacy.cli import download
+                from spacy.cli.download import download
                 download("en_core_web_sm")
                 self.nlp = spacy.load("en_core_web_sm")
                 self.spacy_available = True
@@ -39,8 +38,14 @@ class KnowledgeGraph:
         self.relationships: List[Tuple[str, str, str]] = []
         self.context_cache: Dict[str, List[Dict[str, Any]]] = {}
 
-    def process_text(self, text: str) -> Dict[str, List[Dict[str, str]] | List[Tuple[str, str, str]]]:
+    def process_text(self, text: str) -> Dict[str, Union[List[Dict[str, str]], List[Tuple[str, str, str]]]]:
         """Extract entities and relationships from text."""
+        if not text or text.isspace():
+            return {
+                "entities": [],
+                "relationships": []
+            }
+            
         if not self.spacy_available or self.nlp is None:
             # Basic processing when spaCy is not available
             words = text.split()
@@ -140,7 +145,7 @@ class KnowledgeGraph:
             basic_entities = [
                 word for word in words
                 if word[0].isupper() and len(word) > 1
-            ]
+                ]
             context_item = {
                 "text": text,
                 "entities": basic_entities,
