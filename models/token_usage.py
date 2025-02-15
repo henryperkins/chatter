@@ -1,23 +1,23 @@
-from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Dict, Any, Union
-from sqlalchemy import text
-from database import db_session
+from typing import Optional, Dict, Any
+from sqlalchemy import ForeignKey, JSON, DateTime, Integer, String, text
+from sqlalchemy.orm import Mapped, mapped_column, Session
+from models.base import Base
 import logging
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class TokenUsage:
+class TokenUsage(Base):
     """Tracks token usage per user/chat."""
+    __tablename__ = "token_usage"
     
-    id: int
-    user_id: int
-    chat_id: str
-    tokens_used: int
-    tokens_limit: int
-    last_updated: datetime
-    metadata: Optional[Dict[str, Any]] = None
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    chat_id: Mapped[str] = mapped_column(String)
+    tokens_used: Mapped[int] = mapped_column(Integer)
+    tokens_limit: Mapped[int] = mapped_column(Integer)
+    last_updated: Mapped[datetime] = mapped_column(DateTime)
+    metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
     @staticmethod
     def create(user_id: int, chat_id: str, tokens_used: int) -> "TokenUsage":
