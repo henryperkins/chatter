@@ -1061,8 +1061,8 @@ async function sendMessage(event) {
         return;
     }
     
-    try {
-        sendButton.disabled = true;
+    sendButton.disabled = true;
+    
     try {
         const message = messageInput.value.trim();
         let uploadedFiles = [];
