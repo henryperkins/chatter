@@ -217,7 +217,7 @@ class User(Base, UserMixin):
                     raise ValueError("Username or email already exists")
 
                 # Insert new user - first user gets admin role
-                result = db.execute(
+                result = session.execute(
                     text(
                         """
                         INSERT INTO users (
@@ -345,7 +345,7 @@ class User(Base, UserMixin):
                 set_clause = ", ".join(f"{key} = :{key}" for key in update_data)
                 params = {**update_data, "user_id": user_id}
 
-                result = db.execute(
+                result = session.execute(
                     text(
                         f"""
                         UPDATE users
@@ -370,7 +370,7 @@ class User(Base, UserMixin):
     def deactivate(session: Session, user_id: int) -> bool:
         """Deactivate a user account using provided session."""
         try:
-                result = db.execute(
+                result = session.execute(
                     text(
                         """
                         UPDATE users
@@ -394,7 +394,7 @@ class User(Base, UserMixin):
         """Validate a password reset token by comparing hashes using provided session."""
         try:
                 # Get all users with unexpired reset tokens
-                results = db.execute(
+                results = session.execute(
                     text(
                         """
                         SELECT id, username, email, password_hash, role,
@@ -419,7 +419,7 @@ class User(Base, UserMixin):
     def set_role(session: Session, user_id: int, role: str) -> bool:
         """Change a user's role using provided session."""
         try:
-                result = db.execute(
+                result = session.execute(
                     text(
                         """
                         UPDATE users
@@ -441,7 +441,7 @@ class User(Base, UserMixin):
     def save(self, session: Session) -> bool:
         """Save current user state to database using provided session."""
         try:
-                result = db.execute(
+                result = session.execute(
                     text("""
                         UPDATE users 
                         SET failed_login_attempts = :attempts,
@@ -469,7 +469,7 @@ class User(Base, UserMixin):
             password_hash = generate_password_hash(new_password)
             if isinstance(password_hash, bytes):
                 password_hash = password_hash.decode("utf-8")
-                result = db.execute(
+                result = session.execute(
                     text(
                         """
                         UPDATE users
@@ -484,7 +484,7 @@ class User(Base, UserMixin):
                 )
                 success = result.scalar() is not None
                 if success:
-                    db.commit()
+                    session.commit()
                     self.password_hash = password_hash
                     logger.info(f"Password changed for user {self.id}")
                 return success
@@ -512,7 +512,7 @@ class User(Base, UserMixin):
     def list_active_users(cls, session: Session) -> List["User"]:
         """Get all active users using provided session."""
         try:
-                results = db.execute(
+                results = session.execute(
                     text(
                         """
                         SELECT id, username, email, password_hash, role,
