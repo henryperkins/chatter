@@ -1,19 +1,20 @@
+"""Base model configuration for SQLAlchemy."""
+from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass, declared_attr
+from datetime import datetime
+from typing import Optional, Dict, Any
 import logging
-# Removed unused imports
-from sqlalchemy.ext.declarative import declarative_base
-
 
 logger = logging.getLogger(__name__)
 
+class Base(MappedAsDataclass, DeclarativeBase):
+    """Base class for all models."""
+    
+    @declared_attr.directive
+    def __tablename__(cls) -> str:
+        """Default tablename is lowercase class name."""
+        return cls.__name__.lower() + 's'
 
-# Removed redundant db_session function; using db_session from database.py instead
-
-
-# Import Base from SQLAlchemy
-Base = declarative_base()
-Base.__allow_unmapped__ = True  # Temporary development safety
-
-def row_to_dict(row, fields=None):
+def row_to_dict(row: Any, fields: Optional[list[str]] = None) -> Dict[str, Any]:
     """Convert a SQLAlchemy row object to a dictionary.
     
     Args:
