@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, Any
 from urllib.parse import urlparse, urlunparse
 from dotenv import load_dotenv
+from utils.encryption import encrypt_api_key, decrypt_api_key
 
 logger = logging.getLogger(__name__)
 
