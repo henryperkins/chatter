@@ -450,8 +450,11 @@ def create_app() -> Flask:
     print(f"DEBUG: ENV: {app.config['ENV']}", file=sys.stderr)
     print(f"DEBUG: DEBUG: {app.config['DEBUG']}", file=sys.stderr)
 
-    init_db_app(app)
-    migrate.init_app(app, render_as_batch=True)
+    # Initialize database first
+    db = init_db_app(app)
+    
+    # Initialize migrate with both app and db
+    migrate.init_app(app, db, render_as_batch=True)
 
     # Verify database connection
     max_retries = 3
