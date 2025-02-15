@@ -100,9 +100,23 @@ def validate_immutable_fields(model_id: int, data: dict) -> None:
 def validate_model_data(data: Dict[str, Any]) -> List[str]:
     """Enhanced validation for model configuration."""
     errors = []
+    
+    # API version validation matrix
+    valid_versions = {
+        "o3-mini": ["2024-12-01-preview", "2025-01-01-preview"],
+        "o1": ["2024-12-01-preview", "2025-01-01-preview"],
+        "o1-preview": ["2024-09-01-preview", "2024-10-01-preview", "2024-12-01-preview"],
+        "o1-mini": ["2024-09-01-preview", "2024-10-01-preview", "2024-12-01-preview"]
+    }
+
+    model_type = data.get("model_type", "").lower()
+    if model_type in valid_versions:
+        api_version = data.get("api_version")
+        if api_version not in valid_versions[model_type]:
+            errors.append(f"Invalid API version for {model_type}. Valid versions: {', '.join(valid_versions[model_type])}")
 
     # If the model type is explicitly "azure", perform simplified Azure-specific validations.
-    if data.get("model_type") == "azure":
+    if model_type == "azure":
         required_azure_fields = [
             "api_endpoint",
             "deployment_name",
@@ -837,3 +851,24 @@ def get_immutable_fields(model_id: int):
         return jsonify(immutable_fields)
     except Exception as e:
         return handle_error(e, "Error retrieving immutable fields")
+
+@bp.route("/debug/config")
+@login_required
+@admin_required
+def debug_config():
+    """Debug endpoint to verify model configuration."""
+    try:
+        default_model = Model.get_default()
+        return jsonify({
+            "api_version": config_instance.AZURE_OPENAI_API_VERSION,
+            "deployment": config_instance.AZURE_OPENAI_DEPLOYMENT_NAME,
+            "model_type": default_model.model_type if default_model else None,
+            "valid_versions": {
+                "o3-mini": ["2024-12-01-preview", "2025-01-01-preview"],
+                "o1": ["2024-12-01-preview", "2025-01-01-preview"],
+                "o1-preview": ["2024-09-01-preview", "2024-10-01-preview", "2024-12-01-preview"],
+                "o1-mini": ["2024-09-01-preview", "2024-10-01-preview", "2024-12-01-preview"]
+            }
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

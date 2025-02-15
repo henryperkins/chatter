@@ -441,7 +441,7 @@ class Config:
         # Azure OpenAI settings
         self.AZURE_OPENAI_KEY = os.getenv("AZURE_OPENAI_KEY") or os.getenv("AZURE_API_KEY", "REPLACE_WITH_YOUR_KEY_VALUE_HERE")
         self.AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT") or os.getenv("AZURE_API_BASE", "https://o1models.openai.azure.com").strip()
-        self.AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION") or os.getenv("AZURE_API_VERSION", "2025-01-01-preview")
+        self.AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION") or os.getenv("AZURE_API_VERSION", "2024-12-01-preview")
         self.AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "o1-east2")
         
         # Ensure we have consistent values for backward compatibility
@@ -499,6 +499,18 @@ class Config:
 
         # Validate configuration
         validate_config(self.__dict__)
+        
+        # Validate encryption if not explicitly skipped
+        if not os.getenv("SKIP_KEY_VALIDATION"):
+            try:
+                test_text = "validation_key"
+                encrypted = encrypt_api_key(test_text, self.ENCRYPTION_KEY)
+                decrypted = decrypt_api_key(encrypted, self.ENCRYPTION_KEY)
+                if test_text != decrypted:
+                    raise ValueError("Encryption validation failed")
+            except Exception as e:
+                logger.error("Encryption validation failed: %s", str(e))
+                raise
         
         # Log environment values only during first initialization
         if not hasattr(Config, '_logged'):

@@ -18,6 +18,25 @@ API_URL_PATTERN = "{endpoint}/openai/deployments/{deployment}/chat/completions"
 VALID_REASONING_EFFORTS = ["low", "medium", "high"]
 
 
+def validate_api_version(model_type: str, api_version: str) -> bool:
+    """
+    Validate API version compatibility for different model types.
+    
+    Args:
+        model_type: The type of model (e.g., 'o3-mini', 'o1', 'o1-preview')
+        api_version: The API version to validate
+        
+    Returns:
+        bool: True if version is valid for model type, False otherwise
+    """
+    version_matrix = {
+        "o3-mini": ["2024-12-01-preview", "2025-01-01-preview"],
+        "o1": ["2024-12-01-preview", "2025-01-01-preview"],
+        "o1-preview": ["2024-09-01-preview", "2024-10-01-preview", "2024-12-01-preview"],
+        "o1-mini": ["2024-09-01-preview", "2024-10-01-preview", "2024-12-01-preview"]
+    }
+    return api_version in version_matrix.get(model_type.lower(), [])
+
 def validate_model_config(model_config: Dict[str, Any]) -> None:
     """
     Validate model configuration and enforce model-specific requirements.
@@ -25,6 +44,13 @@ def validate_model_config(model_config: Dict[str, Any]) -> None:
     """
     if not isinstance(model_config, dict):
         raise ValueError("model_config must be a dictionary")
+        
+    # Validate API version compatibility
+    model_type = model_config.get("model_type")
+    api_version = model_config.get("api_version")
+    if model_type and api_version:
+        if not validate_api_version(model_type, api_version):
+            raise ValueError(f"Invalid API version {api_version} for model type {model_type}")
 
     # Required fields validation with proper type checking
     required_fields = {"api_endpoint", "api_key", "deployment_name", "api_version"}
