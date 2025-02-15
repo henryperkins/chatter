@@ -9,7 +9,6 @@ from sqlalchemy.orm import relationship
 
 from database import db_session
 from .base import Base
-from .model import Model  # For get_by_id and future references
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +33,9 @@ class Chat(Base):
                        default=datetime.utcnow)
 
     # Relationships
-    model = relationship("Model", back_populates="chats")
+    model = relationship("Model", back_populates="chats", lazy="joined")
     files = relationship("UploadedFile", back_populates="chat")
+    chats = relationship("Chat", back_populates="model", lazy="dynamic")
 
     def __repr__(self):
         return f"<Chat(id={self.id}, user_id={self.user_id}, title='{self.title}', model_id={self.model_id})>"
@@ -272,7 +272,8 @@ class Chat(Base):
             raise
 
     @classmethod
-    def get_model(cls, chat_id: str) -> Optional[Model]:
+    def get_model(cls, chat_id: str) -> Optional["Model"]:
+        from .model import Model  # Local import
         """
         Retrieve the associated Model for a given chat, using the Chat's model_id via ORM.
         """
