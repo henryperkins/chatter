@@ -33,7 +33,8 @@ class Chat(Base):
                        server_default=text('CURRENT_TIMESTAMP'),
                        default=datetime.utcnow)
 
-    # Relationship to UploadedFile if any
+    # Relationships
+    model = relationship("Model", back_populates="chats")
     files = relationship("UploadedFile", back_populates="chat")
 
     def __repr__(self):
@@ -273,40 +274,20 @@ class Chat(Base):
     @classmethod
     def get_model(cls, chat_id: str) -> Optional[Model]:
         """
-        Retrieve the associated Model for a given chat, using the Chat's model_id via text query or ORM.
+        Retrieve the associated Model for a given chat, using the Chat's model_id via ORM.
         """
-        chat_obj = cls.get_by_id(chat_id)
-        if not chat_obj:
-            return None
-            
-        # Convert SQLAlchemy Column to scalar value
-        try:
-            from sqlalchemy import inspect
-            if chat_obj.model_id is not None:
-                model_id = inspect(chat_obj).attrs.model_id.value
-                if model_id is not None:
-                    model = Model.get_by_id(int(model_id))
-                    if model and model.model_type == 'o1':
+        with db_session() as db:
+            chat = db.query(cls).filter(cls.id == chat_id).first()
+            if chat and chat.model_id:
+                model = db.query(Model).filter(Model.id == chat.model_id).first()
+                if model:
+                    if model.model_type == 'o1':
                         # Force Azure-specific settings
                         model.api_version = '2025-01-01-preview'
                         model.temperature = 1.0
                         model.max_completion_tokens = 100000
                     return model
-            return None
-        except Exception as e:
-            logger.error(f"Error getting model for chat: {e}")
-            return None
-        if not model:
-            return None
-            
-        # Handle o1 model type configuration
-        if model.model_type == 'o1':
-            # Force Azure-specific settings
-            model.api_version = '2025-01-01-preview'
-            model.temperature = 1.0
-            model.max_completion_tokens = 100000
-            
-        return model
+            return Model.get_default()
 
     @classmethod
     def add_message(cls, chat_id: str, role: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> int:

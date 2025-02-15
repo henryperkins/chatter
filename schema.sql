@@ -174,7 +174,7 @@ COMMIT;
 -- =============================================================
 
 BEGIN;
--- Insert Azure OpenAI Provider
+-- Insert Azure OpenAI Provider (with conflict handling)
 INSERT INTO providers (
     name, slug, api_base_url, api_version_format, auth_type, 
     endpoint_pattern, is_azure, validation_rules, capabilities, 
@@ -183,17 +183,19 @@ INSERT INTO providers (
     'Azure OpenAI', 
     'azure-openai',
     'https://o1models.openai.azure.com',
-    '2025-01-01-preview',
+    'YYYY-MM-DD',
     'api-key',
     '/openai/deployments/{deployment_name}/chat/completions',
     true,
-    '{}',
+    '{"model_id": "^[a-zA-Z0-9-]{3,64}$"}',
     '{"max_tokens": 200000, "max_completion_tokens": 100000}',
     true,
     true
-);
+) ON CONFLICT (slug) DO UPDATE SET
+    api_base_url = EXCLUDED.api_base_url,
+    capabilities = EXCLUDED.capabilities;
 
--- Insert O1 Model
+-- Insert O1 Model with proper provider reference
 INSERT INTO models (
     provider_id,
     name,
@@ -209,8 +211,7 @@ INSERT INTO models (
     requires_o1_handling,
     supports_streaming,
     api_version,
-    reasoning_effort,
-    store_completion
+    reasoning_effort
 ) VALUES (
     (SELECT id FROM providers WHERE slug = 'azure-openai'),
     'O1 Model',
@@ -226,9 +227,10 @@ INSERT INTO models (
     true,
     false,
     '2025-01-01-preview',
-    'medium',
-    false
-);
+    'medium'
+) ON CONFLICT (provider_id, name) DO UPDATE SET
+    deployment_name = EXCLUDED.deployment_name,
+    api_version = EXCLUDED.api_version;
 
 -- Insert Admin User
 INSERT INTO users (

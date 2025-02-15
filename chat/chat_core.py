@@ -69,14 +69,9 @@ def _load_chat_context(chat_id: Optional[str], user_id: int) -> Dict[str, Any]:
     chat = _get_or_create_chat(chat_id, user_id)
 
     # 2. Retrieve the associated model or the default model
-    model_obj = None
-    if chat.model_id:
-        model_obj = Chat.get_model(chat.id)
-        if not model_obj:
-            raise ValueError("Invalid or missing model configuration for this chat.")
-    else:
-        # No model assigned to this chat, use a global default if it exists
-        model_obj = Model.get_default()
+    model_obj = Model.get_by_id(chat.model_id) if chat.model_id else Model.get_default()
+    if not model_obj:
+        raise ValueError("No model configured and no default model available")
 
     # 3. Decrypt the stored API key if available
     azure_token = ""
