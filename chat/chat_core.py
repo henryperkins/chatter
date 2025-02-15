@@ -71,7 +71,7 @@ def _load_chat_context(chat_id: Optional[str], user_id: int) -> Dict[str, Any]:
     # 2. Retrieve the associated model or the default model
     model_obj = None
     if chat.model_id:
-        model_obj = Chat.get_model(chat.chat_id)
+        model_obj = Chat.get_model(chat.id)
         if not model_obj:
             raise ValueError("Invalid or missing model configuration for this chat.")
     else:
@@ -90,16 +90,16 @@ def _load_chat_context(chat_id: Optional[str], user_id: int) -> Dict[str, Any]:
             raise RuntimeError(f"Error decrypting API key: {str(exc)}")
 
     # 4. Load conversation messages; create welcome if none exist
-    messages = conversation_manager.get_context(chat.chat_id)
+    messages = conversation_manager.get_context(chat.id)
     if not messages:
         # If you have a method that initializes the conversation, call it
         conversation_manager.add_message(
-            chat_id=chat.chat_id,
+            chat_id=chat.id,
             role="system",
             content="Welcome to Azure OpenAI Chat!"
         )
         conversation_manager.add_message(
-            chat_id=chat.chat_id,
+            chat_id=chat.id,
             role="assistant",
             content=(
                 "Hello! I'm ready to help. You can:\n"
@@ -109,7 +109,7 @@ def _load_chat_context(chat_id: Optional[str], user_id: int) -> Dict[str, Any]:
                 "- Start a new chat with the + button"
             )
         )
-        messages = conversation_manager.get_context(chat.chat_id)
+        messages = conversation_manager.get_context(chat.id)
 
     # 5. Sanitize user messages to prevent XSS
     for msg in messages:
