@@ -6,7 +6,11 @@ import json
 import platform
 import sys
 from logging.handlers import RotatingFileHandler
-from concurrent_log_handler import ConcurrentRotatingFileHandler
+try:
+    from concurrent_log_handler import ConcurrentRotatingFileHandler
+except ImportError:
+    # Fall back to regular RotatingFileHandler if concurrent handler isn't available
+    ConcurrentRotatingFileHandler = RotatingFileHandler
 from datetime import datetime
 from typing import Dict, Any
 
