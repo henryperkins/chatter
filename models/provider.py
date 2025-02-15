@@ -205,7 +205,7 @@ class Provider:
                     )
                     raise ValueError(f"A provider with this {field} already exists")
 
-                data = data.copy()
+            data = data.copy()
                 # Convert dict to JSON if needed
                 if isinstance(data.get("capabilities"), dict):
                     data["capabilities"] = json.dumps(data["capabilities"])
