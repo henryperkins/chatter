@@ -13,6 +13,7 @@ import os
 import logging
 import json
 import datetime
+from models.base import Base
 from typing import (
     Optional,
     TypeVar,
