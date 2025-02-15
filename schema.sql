@@ -192,8 +192,16 @@ INSERT INTO providers (
     true,
     true
 ) ON CONFLICT (slug) DO UPDATE SET
+    name = EXCLUDED.name,
     api_base_url = EXCLUDED.api_base_url,
-    capabilities = EXCLUDED.capabilities;
+    api_version_format = EXCLUDED.api_version_format,
+    auth_type = EXCLUDED.auth_type,
+    endpoint_pattern = EXCLUDED.endpoint_pattern,
+    is_azure = EXCLUDED.is_azure,
+    validation_rules = EXCLUDED.validation_rules,
+    capabilities = EXCLUDED.capabilities,
+    requires_authentication = EXCLUDED.requires_authentication,
+    is_active = EXCLUDED.is_active;
 
 -- Insert O1 Model with proper provider reference
 INSERT INTO models (
@@ -230,7 +238,18 @@ INSERT INTO models (
     'medium'
 ) ON CONFLICT (provider_id, name) DO UPDATE SET
     deployment_name = EXCLUDED.deployment_name,
-    api_version = EXCLUDED.api_version;
+    description = EXCLUDED.description,
+    model_type = EXCLUDED.model_type,
+    api_endpoint = EXCLUDED.api_endpoint,
+    api_key = EXCLUDED.api_key,
+    temperature = EXCLUDED.temperature,
+    max_tokens = EXCLUDED.max_tokens,
+    max_completion_tokens = EXCLUDED.max_completion_tokens,
+    is_default = EXCLUDED.is_default,
+    requires_o1_handling = EXCLUDED.requires_o1_handling,
+    supports_streaming = EXCLUDED.supports_streaming,
+    api_version = EXCLUDED.api_version,
+    reasoning_effort = EXCLUDED.reasoning_effort;
 
 -- Insert Admin User
 INSERT INTO users (
