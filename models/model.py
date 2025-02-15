@@ -686,6 +686,9 @@ class Model:
                 raise ValueError("Azure API keys must start with 'sk-' or 'vOJI'")
             if not config.get("api_endpoint", "").startswith("https://o1models."):
                 raise ValueError("o1 models require specific Azure endpoint format")
+            
+            # Ensure requires_o1_handling is set so normal_response uses temperature=1.0, max_completion_tokens
+            config["requires_o1_handling"] = True
         provider_caps = provider.capabilities
         if provider_caps.get("fixed_temperature"):
             config["temperature"] = 1.0
