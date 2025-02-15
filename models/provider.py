@@ -97,6 +97,7 @@ class ProviderCapabilities:
         return errors
 
 
+@dataclass
 class Provider:
     """
     Represents an AI provider configuration.
