@@ -211,9 +211,9 @@ class Provider:
                 data["capabilities"] = json.dumps(data["capabilities"])
 
             api_key = data.get("api_key")
-                if api_key:
-                    from config import config_instance
-                    api_key = encrypt_api_key(api_key, config_instance.ENCRYPTION_KEY)
+            if api_key:
+                from config import config_instance
+                api_key = encrypt_api_key(api_key, config_instance.ENCRYPTION_KEY)
 
                 # Check if it's an Azure-based provider
                 is_azure = data.get("is_azure", False) or "openai.azure.com" in data.get("api_base_url", "")
