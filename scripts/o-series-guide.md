@@ -190,42 +190,6 @@ The following are currently unsupported with reasoning models:
 
 These models [don't currently support the same set of parameters](#api--feature-support) as other models that use the chat completions API. 
 
-# [Python (Microsoft Entra ID)](#tab/python-secure)
-
-You'll need to upgrade your OpenAI client library for access to the latest parameters.
-
-```cmd
-pip install openai --upgrade
-```
-
-If you're new to using Microsoft Entra ID for authentication see [How to configure Azure OpenAI Service with Microsoft Entra ID authentication](../how-to/managed-identity.md).
-
-```python
-from openai import AzureOpenAI
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-
-token_provider = get_bearer_token_provider(
-    DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
-)
-
-client = AzureOpenAI(
-  azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT"), 
-  azure_ad_token_provider=token_provider,
-  api_version="2024-12-01-preview"
-)
-
-response = client.chat.completions.create(
-    model="o1-new", # replace with the model deployment name of your o1-preview, or o1-mini model
-    messages=[
-        {"role": "user", "content": "What steps should I think about when writing my first Python API?"},
-    ],
-    max_completion_tokens = 5000
-
-)
-
-print(response.model_dump_json(indent=2))
-```
-
 # [Python (key-based auth)](#tab/python)
 
 You might need to upgrade your version of the OpenAI Python library to take advantage of the new parameters like `max_completion_tokens`.
@@ -364,43 +328,6 @@ print(response.model_dump_json(indent=2))
 Functionally developer messages ` "role": "developer"` are the same as system messages. 
 
 Adding a developer message to the previous code example would look as follows:
-
-# [Python (Microsoft Entra ID)](#tab/python-secure)
-
-You'll need to upgrade your OpenAI client library for access to the latest parameters.
-
-```cmd
-pip install openai --upgrade
-```
-
-If you're new to using Microsoft Entra ID for authentication see [How to configure Azure OpenAI Service with Microsoft Entra ID authentication](../how-to/managed-identity.md).
-
-```python
-from openai import AzureOpenAI
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-
-token_provider = get_bearer_token_provider(
-    DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
-)
-
-client = AzureOpenAI(
-  azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT"), 
-  azure_ad_token_provider=token_provider,
-  api_version="2024-12-01-preview"
-)
-
-response = client.chat.completions.create(
-    model="o1-new", # replace with the model deployment name of your o1-preview, or o1-mini model
-    messages=[
-        {"role": "developer","content": "You are a helpful assistant."}, # optional equivalent to a system message for reasoning models 
-        {"role": "user", "content": "What steps should I think about when writing my first Python API?"},
-    ],
-    max_completion_tokens = 5000
-
-)
-
-print(response.model_dump_json(indent=2))
-```
 
 # [Python (key-based auth)](#tab/python)
 

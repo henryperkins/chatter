@@ -802,76 +802,97 @@ async function handlePotentialFetchResponse(response) {
 
 // Normal response handler
 async function handleNormalResponse(formData) {
-    // Prepare request data
-    const message = formData.get('message')?.trim() || '';
-    const jsonData = {
-        message,
-        chat_id: window.CHAT_CONFIG.chatId,
-        file_ids: []
-    };
-
-    // Handle file uploads if present
-    // Skipping file upload in handleNormalResponse because we already handle that in sendMessage
-
-    let fetchResponse;
     try {
+        // Get model type and check if it's o-series
+        const modelSelect = document.getElementById('model-select');
+        const selectedOption = modelSelect?.selectedOptions[0];
+        const modelType = selectedOption?.dataset?.modelType || 'azure';
+        const isOSeries = CONFIG.O_SERIES_MODELS.includes(modelType);
+
+        // Prepare request data
+        const message = formData.get('message')?.trim() || '';
+        const jsonData = {
+            message,
+            chat_id: window.CHAT_CONFIG.chatId,
+            file_ids: [],
+            model_type: modelType,
+            stream: false
+        };
+
+        // Add o-series specific parameters
+        if (isOSeries) {
+            jsonData.temperature = 1.0;
+            jsonData.max_completion_tokens =
+                modelType === 'o3-mini' ? 75000 :
+                modelType === 'o1' ? 100000 :
+                modelType === 'o1-mini' ? 50000 :
+                modelType === 'o1-preview' ? 32768 : 32000;
+            
+            // Add reasoning effort for o3-mini and o1
+            if (modelType === 'o3-mini' || modelType === 'o1') {
+                jsonData.reasoning_effort = 'medium';
+            }
+        }
+
+            // Prepare request parameters
+            const requestParams = {
+                method: 'POST',
+                headers: {
+                    'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                    'api-key': window.CHAT_CONFIG?.azureToken,
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRFToken': window.CHAT_CONFIG?.csrfToken
+                },
+                body: JSON.stringify(jsonData)
+            };
+
         console.log('API Request Data:', JSON.stringify({
             endpoint: '/chat/send',
-            method: 'POST',
-            headers: {
-                'X-Chat-ID': window.CHAT_CONFIG.chatId,
-                'api-key': window.CHAT_CONFIG?.azureToken,
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': window.CHAT_CONFIG?.csrfToken
-            },
+            ...requestParams,
             body: jsonData
         }, null, 2));
-        
-        fetchResponse = await window.utils.fetchWithCSRF('/chat/send', {
-            method: 'POST',
-            headers: {
-                'X-Chat-ID': window.CHAT_CONFIG.chatId,
-                'api-key': window.CHAT_CONFIG?.azureToken,
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': window.CHAT_CONFIG?.csrfToken
-            },
-            body: jsonData
-        });
-    } catch (err) {
-        console.error('Error calling fetchWithCSRF:', err);
-        throw err;
-    }
 
-    let data;
-    try {
-        data = await handlePotentialFetchResponse(fetchResponse);
-    } catch (err) {
-        console.error('Error in handleNormalResponse:', err);
-        throw err;
-    }
+        let fetchResponse;
+        try {
+            fetchResponse = await window.utils.fetchWithCSRF('/chat/send', requestParams);
+        } catch (err) {
+            console.error('Error calling fetchWithCSRF:', err);
+            throw err;
+        }
 
-    if (!data || typeof data !== 'object') {
-        throw new Error('No valid JSON data returned from server');
-    }
-    if (!data.success && !data.message) {
-        throw new Error('Request was not successful');
-    }
-    if (!data.message || typeof data.message !== 'object') {
-        throw new Error('Invalid or empty "message" field in server response');
-    }
+        let data;
+        try {
+            data = await handlePotentialFetchResponse(fetchResponse);
+        } catch (err) {
+            console.error('Error in handleNormalResponse:', err);
+            throw err;
+        }
 
-    const { content, content_html: contentHtml } = data.message;
-    if (!content || !contentHtml) {
-        throw new Error('Empty content in response');
-    }
+        if (!data || typeof data !== 'object') {
+            throw new Error('No valid JSON data returned from server');
+        }
+        if (!data.success && !data.message) {
+            throw new Error('Request was not successful');
+        }
+        if (!data.message || typeof data.message !== 'object') {
+            throw new Error('Invalid or empty "message" field in server response');
+        }
 
-    await window.MessageRenderer.appendAssistantMessage({
-        content: content,
-        content_html: contentHtml
-    }, false);
-    window.MessageRenderer.showSuccess('Assistant responded successfully');
+        const { content, content_html: contentHtml } = data.message;
+        if (!content || !contentHtml) {
+            throw new Error('Empty content in response');
+        }
+
+        await window.MessageRenderer.appendAssistantMessage({
+            content: content,
+            content_html: contentHtml
+        }, false);
+        window.MessageRenderer.showSuccess('Assistant responded successfully');
+    } catch (error) {
+        console.error('Error in handleNormalResponse:', error);
+        throw error;
+    }
 }
 
 // Streaming response handler
@@ -905,7 +926,10 @@ async function handleStreamingResponse(formData) {
             // O-series specific parameters
             ...(isOSeries && {
                 temperature: 1.0,
-                max_completion_tokens: 4000
+                max_completion_tokens: modelType === 'o3-mini' ? 75000 :
+                                     modelType === 'o1' ? 100000 :
+                                     modelType === 'o1-mini' ? 50000 :
+                                     modelType === 'o1-preview' ? 32768 : 32000
             })
         };
 

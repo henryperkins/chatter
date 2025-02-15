@@ -133,7 +133,7 @@ class Model:
         },
         "o1": {
             "fixed_temperature": True,
-            "streaming": True,
+            "streaming": False,
             "max_tokens": 200000,
             "max_completion_tokens": 100000,
             "supports_json_mode": True,
@@ -144,9 +144,9 @@ class Model:
         },
         "o1-mini": {
             "fixed_temperature": True,
-            "streaming": True,
-            "max_tokens": 128000,
-            "max_completion_tokens": 65536,
+            "streaming": False,
+            "max_tokens": 100000,
+            "max_completion_tokens": 50000,
             "supports_json_mode": True,
             "requires_reasoning_effort": True,
             "api_version": "2024-12-01-preview",

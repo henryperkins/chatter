@@ -307,7 +307,7 @@ MODEL_CONFIG = {
         "fixed_params": {
             "temperature": 1.0,
             "top_p": 1.0,
-            "supports_streaming": False
+            "supports_streaming": True
         },
         "capabilities": {
             "max_tokens": 150000,
