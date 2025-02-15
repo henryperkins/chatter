@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 # Import Base from SQLAlchemy
 Base = declarative_base()
+Base.__allow_unmapped__ = True  # Temporary development safety
 
 def row_to_dict(row, fields=None):
     """Convert a SQLAlchemy row object to a dictionary.

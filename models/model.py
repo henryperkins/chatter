@@ -108,7 +108,10 @@ class Model:
             "requires_o1_handling": self.requires_o1_handling,
         }
 
-    # Class-level provider capabilities – may be superseded by centralized configuration
+    # Relationships
+    chats = relationship("Chat", back_populates="model")
+
+    # Class-level provider capabilities – may be superseded by centralized configuration  
     PROVIDER_CAPABILITIES: ClassVar[Dict[str, Dict[str, Any]]] = {
         "gpt-4": {"fixed_temperature": True, "streaming": True, "max_tokens": 8192},
         "gpt-4o": {
