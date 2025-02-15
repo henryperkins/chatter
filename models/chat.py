@@ -273,10 +273,10 @@ class Chat(Base):
 
     @classmethod
     def get_model(cls, chat_id: str) -> Optional["Model"]:
-        from .model import Model  # Local import
         """
         Retrieve the associated Model for a given chat, using the Chat's model_id via ORM.
         """
+        from .model import Model  # Local import
         with db_session() as db:
             chat = db.query(cls).filter(cls.id == chat_id).first()
             if chat and chat.model_id:
