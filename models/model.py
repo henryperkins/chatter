@@ -62,16 +62,7 @@ class Model(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text('CURRENT_TIMESTAMP'))
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
 
-    # Fields with Python defaults (must come last)
-    description: Mapped[str] = mapped_column(String(500), nullable=False, default="")
-    max_completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=8300)
-    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    requires_o1_handling: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    supports_streaming: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    api_version: Mapped[str] = mapped_column(String(50), nullable=False, default="2024-12-01-preview")
-    reasoning_effort: Mapped[str] = mapped_column(String(10), nullable=False, default="medium")
-
-    # Relationship fields (defined last since they don't affect table schema)
+    # Relationship fields (must come before Python defaults)
     provider: Mapped["Provider"] = relationship(
         "Provider",
         back_populates="models",
@@ -87,18 +78,14 @@ class Model(Base):
         default_factory=list
     )
 
-    # Relationships
-    provider: Mapped["Provider"] = relationship(
-        "Provider",
-        back_populates="models",
-        lazy="joined"
-    )
-    chats: Mapped[List["Chat"]] = relationship(
-        "Chat",
-        back_populates="model",
-        cascade="all, delete-orphan",
-        lazy="select"
-    )
+    # Fields with Python defaults (must come last)
+    description: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    max_completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=8300)
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    requires_o1_handling: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    supports_streaming: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    api_version: Mapped[str] = mapped_column(String(50), nullable=False, default="2024-12-01-preview")
+    reasoning_effort: Mapped[str] = mapped_column(String(10), nullable=False, default="medium")
 
     # Class-level provider capabilities
     PROVIDER_CAPABILITIES: ClassVar[Dict[str, Dict[str, Any]]] = {
