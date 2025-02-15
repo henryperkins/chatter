@@ -13,7 +13,6 @@ import os
 import logging
 import json
 import datetime
-from models.base import Base
 from typing import (
     Optional,
     TypeVar,
@@ -37,7 +36,10 @@ from sqlalchemy import create_engine, text
 db = SQLAlchemy()
 from sqlalchemy.engine import Engine, CursorResult, Row
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, InterfaceError
-from sqlalchemy.orm import scoped_session, sessionmaker, Session
+from sqlalchemy.orm import scoped_session, sessionmaker, Session, declarative_base
+
+# Create base declarative class here
+Base = declarative_base()
 from sqlalchemy.pool import QueuePool
 from tenacity import (
     retry,

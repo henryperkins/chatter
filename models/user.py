@@ -8,6 +8,7 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from database import db_session
+from models.base import BaseModel
 
 logger = logging.getLogger(__name__)
 

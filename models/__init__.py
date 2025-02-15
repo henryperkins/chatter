@@ -1,5 +1,5 @@
 # models/__init__.py
-from .base import Base
+from .base import BaseModel
 
 # First import models that don't have dependencies
 from .user import User
@@ -11,7 +11,7 @@ from .chat import Chat
 
 # Expose all models
 __all__ = [
-    "Base",
+    "BaseModel",
     "User",
     "Provider",
     "Model",
@@ -21,5 +21,5 @@ __all__ = [
 def init_models(engine):
     """Initialize all models and configure their mappers."""
     from sqlalchemy import orm
-    Base.metadata.create_all(bind=engine)  # Pass engine here
+    BaseModel.metadata.create_all(bind=engine)
     orm.configure_mappers()
