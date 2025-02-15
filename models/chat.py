@@ -34,7 +34,7 @@ class Chat(Base):
                        default=datetime.utcnow)
 
     # Relationships
-    model = relationship("Model", back_populates="chats", lazy="joined")
+    model = relationship("models.model.Model", back_populates="chats", lazy="joined")
     files = relationship("UploadedFile", back_populates="chat")
 
     def __repr__(self):

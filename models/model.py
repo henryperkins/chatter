@@ -109,7 +109,7 @@ class Model:
         }
 
     # Relationships
-    chats = relationship("Chat", back_populates="model")
+    chats = relationship("models.chat.Chat", back_populates="model")
 
     # Class-level provider capabilities – may be superseded by centralized configuration  
     PROVIDER_CAPABILITIES: ClassVar[Dict[str, Dict[str, Any]]] = {
