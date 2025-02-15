@@ -27,3 +27,4 @@ psutil==5.9.8
 flask-wtf==1.2.1
 email-validator==2.0.0.post2
 flask-migrate==4.0.7
+alembic==1.13.1  # Explicitly add alembic for flask-migrate
