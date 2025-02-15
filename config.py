@@ -3,6 +3,7 @@
 import os
 import logging
 import base64
+import click
 from cryptography.fernet import Fernet
 from pathlib import Path
 from typing import Dict, Any
