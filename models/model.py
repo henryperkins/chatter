@@ -5,8 +5,8 @@ from typing import Optional, Dict, Any, List, ClassVar, TYPE_CHECKING
 
 from sqlalchemy import String, Integer, Float, Boolean, DateTime, ForeignKey, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
-
 from config import Config
+from database import db_session
 from logging_config import get_logger
 from .provider import Provider
 from .base import Base
@@ -66,16 +66,13 @@ class Model(Base):
     provider: Mapped["Provider"] = relationship(
         "Provider",
         back_populates="models",
-        lazy="joined",
-        init=False
+        lazy="joined"
     )
     chats: Mapped[List["Chat"]] = relationship(
         "Chat",
         back_populates="model",
         cascade="all, delete-orphan",
-        lazy="select",
-        init=False,
-        default_factory=list
+        lazy="select"
     )
 
     # Fields with Python defaults (must come last)
@@ -232,10 +229,11 @@ class Model(Base):
     @staticmethod
     def get_immutable_fields(model_id: int) -> List[str]:
         """Retrieve a list of fields that cannot be modified for an existing model."""
+        from database import db_session
         try:
-            with db_session() as db:
+            with db_session() as session:
                 query = text("SELECT model_type FROM models WHERE id = :id")
-                model_type = db.execute(query, {"id": model_id}).scalar()
+                model_type = session.execute(query, {"id": model_id}).scalar()
                 immutable_fields = ["provider_id"]
                 if model_type == "o1-preview":
                     immutable_fields.extend(["temperature", "supports_streaming"])
@@ -398,7 +396,7 @@ class Model(Base):
             raise
 
     @staticmethod
-    def update(model_id: int, data: Dict[str, Any]) -> None:
+    def update(session: Session, model_id: int, data: Dict[str, Any]) -> None:
         """Update model with validated data."""
         try:
             if not model_id:
@@ -487,7 +485,7 @@ class Model(Base):
 
             Model.validate_model_config(update_data, model_id)
 
-            current_version = db.execute(
+            current_version = session.execute(
                 text("SELECT version FROM models WHERE id = :model_id"),
                 {"model_id": model_id},
             ).scalar()
@@ -516,7 +514,7 @@ class Model(Base):
                 )
 
             if update_data.get("is_default", False):
-                db.execute(
+                session.execute(
                     text(
                         """
                         UPDATE models

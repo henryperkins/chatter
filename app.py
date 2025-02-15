@@ -54,7 +54,8 @@ from database import (
     db_session,
     is_initialized,
     create_default_model,
-    get_db_state
+    get_db_state,
+    db
 )
 from models import User, Model, Provider
 from routes.auth_routes import bp as auth_bp
@@ -451,10 +452,10 @@ def create_app() -> Flask:
     print(f"DEBUG: DEBUG: {app.config['DEBUG']}", file=sys.stderr)
 
     # Initialize database first
-    db = init_db_app(app)
+    init_db_app(app)
     
-    # Initialize migrate with both app and db
-    migrate.init_app(app, db, render_as_batch=True)
+    # Initialize migrate with app and SQLAlchemy instance
+    migrate.init_app(app, db.db, render_as_batch=True)
 
     # Verify database connection
     max_retries = 3

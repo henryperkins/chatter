@@ -54,17 +54,14 @@ class Chat(Base):
 
         # Relationships
         model: Mapped[Optional["Model"]] = relationship(
-            "Model",  # Changed to string reference
+            "Model",
             back_populates="chats",
-            lazy="joined",
-            init=False
+            lazy="joined"
         )
         files: Mapped[List["UploadedFile"]] = relationship(
-            "UploadedFile",  # Changed to string reference
+            "UploadedFile",
             back_populates="chat",
-            lazy="select",
-            init=False,
-            default_factory=list
+            lazy="select"
         )
 
         def __init__(self, **kwargs) -> None:
