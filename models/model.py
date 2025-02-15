@@ -72,8 +72,7 @@ class Model(Base):
         "Chat",
         back_populates="model",
         cascade="all, delete-orphan",
-        lazy="select",
-        default=None
+        lazy="select"
     )
 
     # Fields with Python defaults (must come last)
