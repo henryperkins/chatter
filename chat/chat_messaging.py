@@ -412,11 +412,11 @@ async def normal_response(
                 content = getattr(choice.message, "content", None)
 
         if not content:
-        if model_obj.requires_o1_handling and model_obj.max_completion_tokens is not None:
-            api_params["max_completion_tokens"] = min(
-                int(model_obj.max_completion_tokens),
-                75000  # Default safe limit
-            )
+            if model_obj.requires_o1_handling and model_obj.max_completion_tokens is not None:
+                api_params["max_completion_tokens"] = min(
+                    int(model_obj.max_completion_tokens),
+                    75000  # Default safe limit
+                )
             else:
                 content = "[No response from model. Please try again or contact support.]"
 
