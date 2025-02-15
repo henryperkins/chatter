@@ -180,16 +180,20 @@ from azure.identity import DefaultAzureCredential
 import openai
 
 class AzureOpenAI:
-    def __init__(self, azure_endpoint, api_key=None, api_version="2024-02-15-preview"):
+    def __init__(self, azure_endpoint, api_key=None, api_version="2024-12-01-preview"):
         if api_key:
             self.credential = AzureKeyCredential(api_key)
         else:
-            self.credential = DefaultAzureCredential()
+            # For Azure AD authentication
+            self.credential = DefaultAzureCredential(
+                credential_scopes=["https://cognitiveservices.azure.com/.default"]
+            )
 
         self.client = openai.AzureOpenAI(
             azure_endpoint=azure_endpoint,
             api_version=api_version,
             credential=self.credential,
+            azure_ad_token_provider=self.credential.get_token if isinstance(self.credential, DefaultAzureCredential) else None,
             max_retries=3
         )
         self.chat = self.client.chat

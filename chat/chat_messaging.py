@@ -184,7 +184,7 @@ async def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         # ---------------------------------
         # Add User Message to Conversation
         # ---------------------------------
-        conversation_manager.add_message(
+        await conversation_manager.add_message(
             chat_id=chat_id,
             role="user",
             content=combined_message,
@@ -403,7 +403,7 @@ def normal_response(
         content_html = server_side_format_markdown(content)
 
         # Save the assistant message into conversation history
-        conversation_manager.add_message(
+        await conversation_manager.add_message(
             chat_id=chat_id,
             role="assistant",
             content=content,
