@@ -300,11 +300,10 @@ class User(Base, UserMixin):
             return False
 
     @classmethod
-    def get_by_username(cls, username: str) -> Optional["User"]:
+    def get_by_username(cls, session: Session, username: str) -> Optional["User"]:
         """Retrieve a user by username (case-insensitive)."""
         try:
-            with db_session() as session:
-                row = db.execute(
+                row = session.execute(
                     text(
                         """
                         SELECT id, username, email, password_hash, role,
