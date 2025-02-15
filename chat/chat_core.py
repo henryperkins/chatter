@@ -51,7 +51,7 @@ def _get_or_create_chat(chat_id: Optional[str], user_id: int) -> Chat:
             return existing_chat
 
     new_id = generate_new_chat_id()
-    Chat.create(chat_id=new_id, user_id=user_id, title="New Chat")
+    Chat.create(id=new_id, user_id=user_id, title="New Chat")
     return Chat.get_by_id(new_id)
 
 

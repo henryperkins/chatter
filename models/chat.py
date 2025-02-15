@@ -226,6 +226,7 @@ class Chat(Base):
 
     @classmethod
     def create(cls, id: str, user_id: int, title: str = "New Chat", model_id: Optional[int] = None) -> None:
+        """Create a new chat with the given ID"""
         """
         Create a new chat record. Accepts an optional model_id or uses the default if none specified.
         """
