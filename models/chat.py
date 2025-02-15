@@ -34,8 +34,6 @@ class Chat(Base):
                        default=datetime.utcnow)
 
     # Relationships
-    model = relationship("Model", back_populates="chats", lazy="joined")
-    files = relationship("UploadedFile", back_populates="chat")
     chats = relationship("Chat", back_populates="model", lazy="dynamic")
 
     def __repr__(self):
@@ -280,15 +278,13 @@ class Chat(Base):
         from .model import Model  # Local import
         with db_session() as db:
             chat = db.query(cls).filter(cls.id == chat_id).first()
-            if chat and chat.model_id:
-                model = db.query(Model).filter(Model.id == chat.model_id).first()
-                if model:
-                    if model.model_type == 'o1':
-                        # Force Azure-specific settings
-                        model.api_version = '2025-01-01-preview'
-                        model.temperature = 1.0
-                        model.max_completion_tokens = 100000
-                    return model
+            if chat and chat.model:
+                if chat.model.model_type == 'o1':
+                    # Force Azure-specific settings
+                    chat.model.api_version = '2025-01-01-preview'
+                    chat.model.temperature = 1.0
+                    chat.model.max_completion_tokens = 100000
+                return chat.model
             return Model.get_default()
 
     @classmethod

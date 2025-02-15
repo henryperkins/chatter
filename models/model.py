@@ -12,7 +12,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List, ClassVar
 from sqlalchemy import text, Integer, Float, Boolean, String, DateTime
-from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import mapped_column, relationship
 
 from database import db_session
 from config import Config
