@@ -151,7 +151,7 @@ class User(Base, UserMixin):
     def get_by_email(cls, session: Session, email: str) -> Optional["User"]:
         """Get user by email using provided database session."""
         try:
-                row = db.execute(
+                row = session.execute(
                     text(
                         """
                         SELECT id, username, email, password_hash, role,
@@ -182,22 +182,22 @@ class User(Base, UserMixin):
             if isinstance(password_hash, bytes):
                 password_hash = password_hash.decode("utf-8")
                 # First ensure we have a default model
-                default_model = db.execute(
+                default_model = session.execute(
                     text("SELECT id FROM models WHERE is_default = TRUE")
                 ).scalar()
                 
                 if not default_model:
                     # Create default model if none exists
                     from database import create_default_model
-                    create_default_model(db)
-                    db.commit()  # Commit the model creation first
+                    create_default_model(session)
+                    session.commit()  # Commit the model creation first
                 
                 # Check if this is the first user
-                user_count = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
+                user_count = session.execute(text("SELECT COUNT(*) FROM users")).scalar()
                 is_first_user = user_count == 0
 
                 # Now check for existing users
-                existing = db.execute(
+                existing = session.execute(
                     text("""
                         SELECT 1 FROM users
                         WHERE LOWER(username) = LOWER(:username)
@@ -242,7 +242,7 @@ class User(Base, UserMixin):
                     
                 user_id = result["id"]
                 logger.debug(f"User created with ID {user_id} and created_at {result.get('created_at')}")
-                db.commit()
+                session.commit()
                 
                 created_user = User.get_by_id(user_id)
                 if not created_user:
@@ -281,7 +281,7 @@ class User(Base, UserMixin):
     def verify_user_exists(session: Session, user_id: int) -> bool:
         """Verify that a user exists and is active using provided session."""
         try:
-                exists = db.execute(
+                exists = session.execute(
                     text(
                         """
                         SELECT 1 FROM users
@@ -303,7 +303,7 @@ class User(Base, UserMixin):
     def get_by_username(cls, username: str) -> Optional["User"]:
         """Retrieve a user by username (case-insensitive)."""
         try:
-            with db_session() as db:
+            with db_session() as session:
                 row = db.execute(
                     text(
                         """
@@ -528,7 +528,7 @@ class User(Base, UserMixin):
     def bulk_deactivate(session: Session, user_ids: List[int]) -> bool:
         """Deactivate multiple users at once using provided session."""
         try:
-                result = db.execute(
+                result = session.execute(
                     text(
                         """
                         UPDATE users
