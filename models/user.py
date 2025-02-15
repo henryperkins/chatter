@@ -8,7 +8,7 @@ from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from sqlalchemy.orm import Session
-from models.base import BaseModel
+from models.base import Base
 from database import db_session
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ T = TypeVar("T", bound="User")
 
 
 @dataclass
-class User(UserMixin):
+class User(Base, UserMixin):
     """Represents a user in the system using raw SQL queries."""
 
     id: int
