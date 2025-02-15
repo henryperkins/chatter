@@ -195,9 +195,14 @@ async def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
         # Retrieve the conversation context
         # For some o-series, you may exclude system messages if your code so dictates
+        # Force exclude system messages for o1-mini and o1-preview
+        exclude_system = not model_obj.requires_o1_handling
+        if model_obj.model_type and model_obj.model_type.lower() in ["o1-mini", "o1-preview"]:
+            exclude_system = True
+
         history = conversation_manager.get_context(
             chat_id,
-            include_system=not model_obj.requires_o1_handling
+            include_system=not exclude_system
         )
 
         # ---------------------------------

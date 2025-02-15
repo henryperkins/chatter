@@ -786,8 +786,8 @@ class ModelForm(FlaskForm):
             provider_max = 16384
 
         if self.requires_o1_handling.data:
-            if not (1 <= value <= 25000):
-                raise ValidationError("Must be between 1-25000 for o1-preview models (OpenAI recommended).")
+            if not (1 <= value <= 32768):
+                raise ValidationError("Must be between 1-32768 for o1-preview models (OpenAI recommended).")
         else:
             if not (1 <= value <= provider_max):
                 raise ValidationError(f"Must be between 1-{provider_max} for this provider.")
