@@ -332,10 +332,9 @@ class User(Base, UserMixin):
             return None
 
     @staticmethod
-    def update(user_id: int, data: Dict[str, Any]) -> bool:
-        """Update an existing user's attributes."""
+    def update(session: Session, user_id: int, data: Dict[str, Any]) -> bool:
+        """Update an existing user's attributes using provided session."""
         try:
-            with db_session() as db:
                 allowed_fields = {"username", "email", "password_hash", "role", "is_active"}
                 update_data = {k: v for k, v in data.items() if k in allowed_fields}
 
