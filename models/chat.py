@@ -28,7 +28,10 @@ class Chat(Base):
     title = Column(String, default="New Chat")
     model_id = Column(Integer, ForeignKey("models.id"), nullable=True)
     is_deleted = Column(Boolean, default=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, server_default=text('NOW()'))
+    created_at = Column(DateTime(timezone=True), 
+                       nullable=False,
+                       server_default=text('CURRENT_TIMESTAMP'),
+                       default=datetime.utcnow)
 
     # Relationship to UploadedFile if any
     files = relationship("UploadedFile", back_populates="chat")
@@ -137,10 +140,10 @@ class Chat(Base):
                 query = text("""
                     SELECT
                         c.id, c.user_id, c.title, c.model_id,
-                        c.created_at AT TIME ZONE 'UTC' as created_at,
+                        c.created_at as created_at,
                         m.name as model_name,
                         COUNT(msg.id) as message_count,
-                        MAX(msg.timestamp) AT TIME ZONE 'UTC' as last_activity,
+                        MAX(msg.timestamp) as last_activity,
                         SUM(CASE WHEN msg.role = 'user' THEN 1 ELSE 0 END) as user_messages,
                         SUM(CASE WHEN msg.role = 'assistant' THEN 1 ELSE 0 END) as assistant_messages
                     FROM chats c

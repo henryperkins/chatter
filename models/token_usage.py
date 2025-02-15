@@ -40,7 +40,7 @@ class TokenUsage:
                     ) VALUES (
                         :user_id, :chat_id, :tokens_used, :token_limit,
                         CURRENT_TIMESTAMP, :metadata
-                    ) RETURNING id
+                    ) RETURNING id, last_updated
                 """)
                 
                 result = db.execute(query, {
@@ -51,19 +51,19 @@ class TokenUsage:
                     "metadata": {"source": "file_upload"}
                 })
                 
-                usage_id = int(result.scalar() or 0)
-                if not usage_id:
+                result = result.mappings().first()
+                if not result:
                     raise ValueError("Failed to create token usage record")
                 
                 db.commit()
                 
                 return TokenUsage(
-                    id=usage_id,
+                    id=result["id"],
                     user_id=user_id,
                     chat_id=chat_id,
                     tokens_used=tokens_used,
                     tokens_limit=token_limit,
-                    last_updated=datetime.now(),
+                    last_updated=result["last_updated"],
                     metadata={"source": "file_upload"}
                 )
 

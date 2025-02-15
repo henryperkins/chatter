@@ -81,41 +81,14 @@ class User(UserMixin):
             logger.error(f"Missing required fields in user data: {data.keys()}")
             raise ValueError("Missing required fields in user data")
 
-        # Parse created_at with better error handling
-        created_at = None
-        if "created_at" in data:
-            try:
-                if isinstance(data["created_at"], datetime):
-                    created_at = data["created_at"]
-                elif isinstance(data["created_at"], str):
-                    # Handle PostgreSQL timestamp string
-                    timestamp_str = str(data["created_at"])
-                    if "+" in timestamp_str:  # Has timezone
-                        created_at = datetime.fromisoformat(timestamp_str)
-                    else:  # No timezone
-                        created_at = datetime.fromisoformat(timestamp_str.replace(" ", "T"))
-                    logger.debug(f"Parsed created_at from string: {created_at}")
-                else:
-                    logger.warning(f"Unexpected created_at type: {type(data['created_at'])}")
-                    created_at = datetime.now()
-            except Exception as e:
-                logger.error(f"Error parsing created_at '{data.get('created_at')}': {e}")
-                created_at = datetime.now()
-        else:
-            logger.warning("No created_at provided, using current time")
-            created_at = datetime.now()
-
-        # Parse reset_token_expiry if present
-        reset_token_expiry = None
-        if data.get("reset_token_expiry"):
-            try:
-                if isinstance(data["reset_token_expiry"], datetime):
-                    reset_token_expiry = data["reset_token_expiry"]
-                else:
-                    reset_token_expiry = datetime.fromisoformat(str(data["reset_token_expiry"]))
-            except Exception as e:
-                logger.error(f"Error parsing reset_token_expiry: {e}")
-                reset_token_expiry = None
+        # Handle datetime fields
+        created_at = data.get("created_at") or datetime.utcnow()
+        if isinstance(created_at, str):
+            created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        
+        reset_token_expiry = data.get("reset_token_expiry")
+        if isinstance(reset_token_expiry, str):
+            reset_token_expiry = datetime.fromisoformat(reset_token_expiry.replace("Z", "+00:00"))
 
         return cls(
             id=int(data["id"]),
