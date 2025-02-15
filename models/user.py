@@ -9,7 +9,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from sqlalchemy.orm import Session
 from models.base import Base
-from database import db_session
 
 logger = logging.getLogger(__name__)
 
@@ -149,10 +148,9 @@ class User(Base, UserMixin):
             return None
 
     @classmethod
-    def get_by_email(cls, email: str) -> Optional["User"]:
-        """Get user by email using a managed database session."""
+    def get_by_email(cls, session: Session, email: str) -> Optional["User"]:
+        """Get user by email using provided database session."""
         try:
-            with db_session() as db:
                 row = db.execute(
                     text(
                         """
@@ -176,15 +174,13 @@ class User(Base, UserMixin):
             logger.error(f"Database error retrieving user by email {email}: {str(e)}")
             return None
 
-    @staticmethod
-    def create(username: str, email: str, password: str) -> "User":
-        """Create a new user with proper transaction handling."""
+    @classmethod
+    def create(cls, session: Session, username: str, email: str, password: str) -> "User":
+        """Create a new user with provided database session."""
         try:
             password_hash = generate_password_hash(password)
             if isinstance(password_hash, bytes):
                 password_hash = password_hash.decode("utf-8")
-
-            with db_session() as db:
                 # First ensure we have a default model
                 default_model = db.execute(
                     text("SELECT id FROM models WHERE is_default = TRUE")
@@ -282,10 +278,9 @@ class User(Base, UserMixin):
             raise
 
     @staticmethod
-    def verify_user_exists(user_id: int) -> bool:
-        """Verify that a user exists and is active."""
+    def verify_user_exists(session: Session, user_id: int) -> bool:
+        """Verify that a user exists and is active using provided session."""
         try:
-            with db_session() as db:
                 exists = db.execute(
                     text(
                         """
