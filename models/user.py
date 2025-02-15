@@ -1,12 +1,12 @@
 from typing import Dict, Any, Optional, TypeVar, List
 from datetime import datetime
-from sqlalchemy import text
+from sqlalchemy import text, Integer, String, Boolean, DateTime, func
 import logging
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, Mapped, mapped_column
 from models.base import Base
 
 logger = logging.getLogger(__name__)
