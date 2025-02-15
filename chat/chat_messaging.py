@@ -343,9 +343,6 @@ def normal_response(
             "o1-preview": 32768
         }
 
-        # O-series models require temperature=1.0
-        if is_o_series:
-            api_params["temperature"] = 1.0
         limit = token_limits.get((model_obj.model_type or "").lower(), 32000)
         max_completion_tokens = min(model_obj.max_completion_tokens, limit) if is_o_series else model_obj.max_completion_tokens
 
@@ -363,9 +360,11 @@ def normal_response(
         if is_o_series:
             # Reasoning docs say no temperature for o-series
             api_params["max_completion_tokens"] = max_completion_tokens
-            # Add reasoning_effort for o3-mini and o1 models
-            if model_obj.model_type.lower() in ["o3-mini", "o1"]:
-                api_params["reasoning_effort"] = model_obj.reasoning_effort
+        if is_o_series:
+            # O-series models require temperature=1.0
+            api_params["temperature"] = 1.0
+            # Reasoning docs say no temperature for o-series
+            api_params["max_completion_tokens"] = max_completion_tokens
         else:
             # Legacy model usage
             api_params["max_tokens"] = model_obj.max_completion_tokens
