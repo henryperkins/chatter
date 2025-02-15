@@ -31,7 +31,7 @@ def validate_api_version(model_type: str, api_version: str) -> bool:
     """
     version_matrix = {
         "o3-mini": ["2024-12-01-preview", "2025-01-01-preview"],
-        "o1": ["2024-12-01-preview", "2025-01-01-preview"],
+        "o1": ["2024-12-01-preview", "2024-10-01-preview"],  # Valid versions for o1
         "o1-preview": ["2024-09-01-preview", "2024-10-01-preview", "2024-12-01-preview"],
         "o1-mini": ["2024-09-01-preview", "2024-10-01-preview", "2024-12-01-preview"]
     }

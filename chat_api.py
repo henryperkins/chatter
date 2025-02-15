@@ -61,7 +61,11 @@ class ChatClient:
                 self._azure_client = AzureOpenAI(
                     azure_endpoint=api_endpoint,
                     api_version=api_version,
-                    api_key=api_key
+                    api_key=api_key,
+                    default_headers={
+                        "x-ms-user-id": "user_id_placeholder",  # Will be set from request context
+                        "x-ms-client-request-id": str(uuid.uuid4())
+                    }
                 )
 
             return self._azure_client
@@ -223,8 +227,10 @@ def get_azure_response(
                         400
                     )
 
-            # Use max_completion_tokens (enforce limit)
+            # o1-specific parameters
             completion_params["max_completion_tokens"] = min(max_completion_tokens, token_limit)
+            if model_type_lower == "o1":
+                completion_params["reasoning_effort"] = "medium"  # Required for o1
 
             # Reasoning effort is optional, but must be one of ['low','medium','high']
             valid_efforts = ["low", "medium", "high"]

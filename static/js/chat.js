@@ -808,7 +808,8 @@ async function handleNormalResponse(formData) {
 
             // reasoning_effort only for o3-mini and o1
             if (modelType === 'o3-mini' || modelType === 'o1') {
-                jsonData.reasoning_effort = 'medium';
+                jsonData.reasoning_effort = 'medium';  // Required for o1
+                jsonData.max_completion_tokens = 100000;  // Must match deployment quota
             }
         }
 
@@ -819,7 +820,9 @@ async function handleNormalResponse(formData) {
                 'api-key': window.CHAT_CONFIG?.azureToken,
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': window.CHAT_CONFIG?.csrfToken
+                'X-CSRFToken': window.CHAT_CONFIG?.csrfToken,
+                'x-ms-user-id': window.CHAT_CONFIG.userId,
+                'x-ms-client-request-id': crypto.randomUUID()
             },
             body: JSON.stringify(jsonData)
         };
