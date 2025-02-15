@@ -24,13 +24,13 @@ class User(Base, UserMixin):
     role: Mapped[str] = mapped_column(String(50), nullable=False, default="user")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # Renamed to clarify we store hashed tokens:
-    reset_token_hash: Optional[str] = None
-    reset_token_expiry: Optional[datetime] = None
-    _active: bool = field(default=True)
-    otp_secret: Optional[str] = field(default=None)
-    otp_required: bool = field(default=False)
-    account_locked_until: Optional[datetime] = field(default=None)
-    failed_login_attempts: int = field(default=0)
+    reset_token_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    reset_token_expiry: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    _active: Mapped[bool] = mapped_column(Boolean, default=True)
+    otp_secret: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    otp_required: Mapped[bool] = mapped_column(Boolean, default=False)
+    account_locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0)
 
     def __post_init__(self):
         """Dataclass hook for post-initialization."""
