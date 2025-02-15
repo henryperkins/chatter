@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any, List, ClassVar, TYPE_CHECKING
 
 from sqlalchemy import String, Integer, Float, Boolean, DateTime, ForeignKey, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
+from database import db_session
 
 from config import Config
 from logging_config import get_logger
@@ -231,7 +232,7 @@ class Model(Base):
     def get_immutable_fields(model_id: int) -> List[str]:
         """Retrieve a list of fields that cannot be modified for an existing model."""
         try:
-            with db_session() as db:
+            with db_session() as session:
                 query = text("SELECT model_type FROM models WHERE id = :id")
                 model_type = db.execute(query, {"id": model_id}).scalar()
                 immutable_fields = ["provider_id"]
@@ -485,7 +486,7 @@ class Model(Base):
 
             Model.validate_model_config(update_data, model_id)
 
-            current_version = db.execute(
+            current_version = session.execute(
                 text("SELECT version FROM models WHERE id = :model_id"),
                 {"model_id": model_id},
             ).scalar()
@@ -514,7 +515,7 @@ class Model(Base):
                 )
 
             if update_data.get("is_default", False):
-                db.execute(
+                session.execute(
                     text(
                         """
                         UPDATE models
