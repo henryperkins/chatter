@@ -3,6 +3,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy import ForeignKey, JSON, DateTime, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column, Session
 from models.base import Base
+from database import db_session
 import logging
 
 logger = logging.getLogger(__name__)
