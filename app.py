@@ -288,6 +288,12 @@ def init_app_components(app: Flask) -> None:
 
 
 def register_cli_commands(app):
+    @app.cli.command("generate-encryption-key")
+    def generate_encryption_key_command():
+        """Generate a new Fernet encryption key via config.py."""
+        from config import Config
+        Config.generate_encryption_key()
+
     @app.cli.command("init-db")
     @with_appcontext
     def init_db_command():
