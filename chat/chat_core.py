@@ -21,8 +21,6 @@ from flask_wtf.csrf import generate_csrf
 from sqlalchemy import text
 
 from database import db_session
-from models.chat import Chat
-from models.model import Model
 from models.provider import Provider
 from utils.encryption import decrypt_api_key, EncryptionError
 from conversation_manager import conversation_manager
