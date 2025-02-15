@@ -111,7 +111,7 @@ class ConversationManager:
 
         return context
 
-    def add_message(
+    async def add_message(
         self,
         chat_id: str,
         role: str,
@@ -188,7 +188,7 @@ class ConversationManager:
             self.lint_message(chat_id, message_id)
 
         # Manage context window
-        await self._manage_context_window(chat_id, model_max_tokens)
+        self._manage_context_window(chat_id, model_max_tokens)
 
     def _extract_file_attachments(self, content: str) -> List[Dict[str, str]]:
         """
@@ -224,7 +224,7 @@ class ConversationManager:
         truncated = encoding.decode(tokens)
         return f"{truncated}\n\n[Note: Content truncated to fit token limit]"
 
-    async def _manage_context_window(self, chat_id: str, max_tokens: Optional[int]) -> None:
+    def _manage_context_window(self, chat_id: str, max_tokens: Optional[int]) -> None:
         """
         Manage advanced context with partial retrieval if needed.
         """
