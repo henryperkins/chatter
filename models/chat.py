@@ -225,7 +225,7 @@ class Chat(Base):
             raise
 
     @classmethod
-    def create(cls, chat_id: str, user_id: int, title: str = "New Chat", model_id: Optional[int] = None) -> None:
+    def create(cls, id: str, user_id: int, title: str = "New Chat", model_id: Optional[int] = None) -> None:
         """
         Create a new chat record. Accepts an optional model_id or uses the default if none specified.
         """
@@ -237,12 +237,14 @@ class Chat(Base):
 
         try:
             with db_session() as db:
-                stmt = text("""
-                    INSERT INTO chats (id, user_id, title, model_id, created_at)
-                    VALUES (:id, :user_id, :title, :model_id, NOW())
-                    RETURNING id, TO_CHAR(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MSZ') as created_at
-                """)
-                result = db.execute(stmt, {"id": chat_id, "user_id": user_id, "title": cleaned_title, "model_id": model_id}).mappings().first()
+                new_chat = cls(
+                    id=id,
+                    user_id=user_id,
+                    title=cleaned_title,
+                    model_id=model_id
+                )
+                db.add(new_chat)
+                result = db.execute(stmt, {"id": id, "user_id": user_id, "title": cleaned_title, "model_id": model_id}).mappings().first()
                 db.commit()
                 if not result:
                     raise ValueError("Failed to create chat - no result returned")
