@@ -276,7 +276,13 @@ class Chat(Base):
         chat_obj = cls.get_by_id(chat_id)
         if not chat_obj or not chat_obj.model_id:
             return None
-        return Model.get_by_id(chat_obj.model_id)
+        model = Model.get_by_id(chat_obj.model_id)
+        if model and model.model_type == 'o1':
+            # Force Azure-specific settings
+            model.api_version = '2025-01-01-preview'
+            model.temperature = 1.0
+            model.max_completion_tokens = 100000
+        return model
 
     @classmethod
     def add_message(cls, chat_id: str, role: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> int:
