@@ -394,10 +394,20 @@ class ApiError(Exception):
         self.status_code = status_code
         super().__init__(self.message)
 
+import click
+from cryptography.fernet import Fernet
+
 class Config:
     """Application configuration."""
     _instance = None
     MODEL_CAPABILITIES = MODEL_CONFIG
+
+    @staticmethod
+    @click.command("generate-encryption-key")
+    def generate_encryption_key():
+        """Generate a new Fernet encryption key."""
+        key = Fernet.generate_key().decode()
+        click.echo(f"New encryption key: {key}\nAdd this to your .env file as ENCRYPTION_KEY=")
 
     @classmethod
     def log_env_values(cls):
