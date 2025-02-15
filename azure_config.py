@@ -1,12 +1,11 @@
 """Azure OpenAI configuration and client management module."""
 
 import os
-from typing import Dict, Optional, Tuple, Any
 import requests
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from openai import AzureOpenAI
+from typing import Dict, Optional, Tuple, Any
 from urllib.parse import urlparse
 
+from openai import AzureOpenAI
 from config import MODEL_CONFIG
 from logging_config import get_logger
 
@@ -32,7 +31,8 @@ def validate_model_config(model_config: Dict[str, Any]) -> None:
     for field in required_fields:
         value = model_config.get(field)
         if not value or not isinstance(value, str):
-            raise ValueError(f"Missing or invalid {field}") 
+            raise ValueError(f"Missing or invalid {field}")
+
     # Safe model_type access and validation
     model_type = model_config.get("model_type")
     if not model_type or not isinstance(model_type, str):
@@ -96,18 +96,14 @@ def validate_model_config(model_config: Dict[str, Any]) -> None:
 def create_client(
     api_endpoint: str,
     api_key: str,
-    use_azure_ad: bool = False,
     api_version: str = DEFAULT_API_VERSION,
     timeout: int = DEFAULT_TIMEOUT,
 ) -> AzureOpenAI:
     """
-    Create properly configured Azure OpenAI client with validated configuration.
-
-    This function validates the API endpoint, ensuring that it is a proper base URL
-    (without a deployments path) and appends the '/openai' segment if needed. It then
-    creates an AzureOpenAI client with either API key or Azure AD-based authentication.
+    Create a properly configured Azure OpenAI client with validated configuration
+    (using only API Key authentication).
     """
-    # Validate input parameters.
+    # Validate input parameters
     if not api_endpoint or not isinstance(api_endpoint, str):
         raise ValueError("Invalid API endpoint")
     if not api_key or not isinstance(api_key, str):
@@ -115,13 +111,13 @@ def create_client(
     if not api_version or not isinstance(api_version, str):
         raise ValueError("Invalid API version")
 
-    # Validate endpoint format: the endpoint should not include a deployments path.
     logger.info("Validating API endpoint format")
+    # The endpoint should not include a deployments path.
     if "/openai/deployments/" in api_endpoint:
         logger.error("Invalid endpoint contains deployments path: %s", api_endpoint)
         raise ValueError("Endpoint should be a base URL without deployments path")
 
-    # Clean and validate the endpoint URL.
+    # Clean and validate the endpoint URL
     api_endpoint = api_endpoint.rstrip("/")
     try:
         parsed = urlparse(api_endpoint)
@@ -135,27 +131,17 @@ def create_client(
 
     logger.debug("Creating Azure OpenAI client with endpoint: %s", api_endpoint)
 
-    # Prepare client configuration.
+    # Prepare client configuration
     client_kwargs = {
         "azure_endpoint": api_endpoint,
         "api_version": api_version.strip(),
         "timeout": timeout,
+        "api_key": api_key,
     }
-
-    if use_azure_ad:
-        token_provider = get_bearer_token_provider(
-            DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
-        )
-        client_kwargs["azure_ad_token_provider"] = token_provider
-    else:
-        client_kwargs["api_key"] = api_key
 
     try:
         client = AzureOpenAI(**client_kwargs)
-        logger.debug(
-            "Created Azure OpenAI client with %s auth",
-            "Azure AD" if use_azure_ad else "API key",
-        )
+        logger.debug("Created Azure OpenAI client using API key authentication.")
         return client
     except Exception as e:
         raise RuntimeError(f"Failed to create Azure OpenAI client: {str(e)}")
@@ -170,14 +156,13 @@ def initialize_client_from_model(
     # Validate model configuration first
     validate_model_config(model_config)
 
-    # Safe access to required fields (already validated)
+    # Required fields (already validated)
     api_endpoint = str(model_config["api_endpoint"])
     api_key = str(model_config["api_key"])
     deployment_name = str(model_config["deployment_name"])
-    use_azure_ad = bool(model_config.get("use_azure_ad", False))
     api_version = str(model_config["api_version"])
 
-    # Handle temperature with proper type conversion
+    # Handle temperature
     temperature = None
     if "temperature" in model_config:
         try:
@@ -185,7 +170,7 @@ def initialize_client_from_model(
         except (TypeError, ValueError):
             raise ValueError("Invalid temperature value")
 
-    # Handle tokens with proper type conversion
+    # Handle tokens
     max_tokens = None
     if "max_tokens" in model_config:
         try:
@@ -205,14 +190,15 @@ def initialize_client_from_model(
     if model_config.get("model_type", "").startswith("o"):
         reasoning_effort = model_config.get("reasoning_effort", "medium")
         if reasoning_effort not in VALID_REASONING_EFFORTS:
-            raise ValueError(f"Invalid reasoning_effort. Must be one of {VALID_REASONING_EFFORTS}")
+            raise ValueError(
+                f"Invalid reasoning_effort. Must be one of {VALID_REASONING_EFFORTS}"
+            )
 
     client = create_client(
         api_endpoint=api_endpoint,
         api_key=api_key,
-        use_azure_ad=use_azure_ad,
         api_version=api_version,
-        timeout=timeout_seconds
+        timeout=timeout_seconds,
     )
 
     requires_o1 = bool(model_config.get("requires_o1_handling", False))
@@ -241,12 +227,10 @@ def validate_api_endpoint(
         return {"success": False, "error": "Missing required parameters"}
 
     try:
-        # Properly construct and validate URL
         base_url = api_endpoint.strip().rstrip("/")
         url = f"{base_url}/openai/deployments/{deployment_name}/chat/completions"
         url = f"{url}?api-version={api_version.strip()}"
 
-        # Validate URL format
         parsed = urlparse(url)
         if not all([parsed.scheme, parsed.netloc, parsed.path]):
             return {"success": False, "error": "Invalid API endpoint URL format"}
@@ -269,7 +253,7 @@ def validate_api_endpoint(
                 "max_completion_tokens": 1,
                 "reasoning_effort": "medium",
                 "stream": False,
-                "temperature": 1.0  # Required for o-series models
+                "temperature": 1.0  # For demonstration
             }
         else:
             # Legacy model payload
@@ -312,10 +296,7 @@ def validate_api_endpoint(
         return {"success": False, "error": error_message}
 
     except requests.exceptions.Timeout:
-        return {
-            "success": False,
-            "error": "Request timed out. Check your network connection.",
-        }
+        return {"success": False, "error": "Request timed out. Check your network connection."}
     except requests.exceptions.RequestException as e:
         return {"success": False, "error": f"Request error: {str(e)}"}
     except Exception as e:
@@ -324,7 +305,7 @@ def validate_api_endpoint(
 
 def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI, str]:
     """
-    Get Azure OpenAI client with optional deployment override.
+    Get Azure OpenAI client with optional deployment override from environment.
     """
     if not deployment_name:
         deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
@@ -333,7 +314,6 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
 
     endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
     api_key = os.getenv("AZURE_OPENAI_KEY", "").strip()
-    use_azure_ad = os.getenv("AZURE_USE_AD_AUTH", "").lower() == "true"
     api_version = os.getenv("AZURE_OPENAI_API_VERSION", DEFAULT_API_VERSION).strip()
 
     if not endpoint or not api_key:
@@ -342,7 +322,6 @@ def get_azure_client(deployment_name: Optional[str] = None) -> Tuple[AzureOpenAI
     client = create_client(
         api_endpoint=endpoint,
         api_key=api_key,
-        use_azure_ad=use_azure_ad,
         api_version=api_version,
     )
 

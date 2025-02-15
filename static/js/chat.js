@@ -703,6 +703,51 @@ document.addEventListener('app:ready', () => {
     }
 });
 
+// Azure AD token handling
+let oSeriesTokenCache = null;
+
+async function getOSeriesToken() {
+    if (oSeriesTokenCache && tokenIsValid(oSeriesTokenCache)) {
+        return oSeriesTokenCache.access_token;
+    }
+    
+    try {
+        const response = await fetch('/auth/azure-ad-token', {
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': window.CHAT_CONFIG.csrfToken
+            }
+        });
+        
+        if (!response.ok) throw new Error('Failed to get Azure AD token');
+        
+        const tokenData = await response.json();
+        validateTokenResponse(tokenData);
+        
+        // Cache token with expiration buffer
+        oSeriesTokenCache = {
+            ...tokenData,
+            expires_at: Date.now() + (tokenData.expires_in - 300) * 1000
+        };
+        
+        return tokenData.access_token;
+    } catch (error) {
+        console.error('Azure AD token acquisition failed:', error);
+        window.MessageRenderer.showError('Authentication failed - please refresh the page');
+        throw error;
+    }
+}
+
+function tokenIsValid(token) {
+    return token?.expires_at > Date.now();
+}
+
+function validateTokenResponse(tokenData) {
+    if (!tokenData?.access_token || !tokenData?.expires_in) {
+        throw new Error('Invalid token response from server');
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Existing Chat Functions
 // -----------------------------------------------------------------------------
@@ -770,6 +815,19 @@ async function handleNormalResponse(formData) {
 
     let fetchResponse;
     try {
+        console.log('API Request Data:', JSON.stringify({
+            endpoint: '/chat/send',
+            method: 'POST',
+            headers: {
+                'X-Chat-ID': window.CHAT_CONFIG.chatId,
+                'api-key': window.CHAT_CONFIG?.azureToken,
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': window.CHAT_CONFIG?.csrfToken
+            },
+            body: jsonData
+        }, null, 2));
+        
         fetchResponse = await window.utils.fetchWithCSRF('/chat/send', {
             method: 'POST',
             headers: {
@@ -833,12 +891,22 @@ async function handleStreamingResponse(formData) {
         }
 
         const uploadedFiles = formData.getAll('files[]') || [];
+        const modelSelect = document.getElementById('model-select');
+        const selectedOption = modelSelect?.selectedOptions[0];
+        const modelType = selectedOption?.dataset?.modelType || 'azure';
+        const isOSeries = CONFIG.O_SERIES_MODELS.includes(modelType);
+
         const jsonData = {
             message: message || '',
             files: uploadedFiles.map(file => file.id),
             chat_id: window.CHAT_CONFIG.chatId,
-            stream: true,
-            model_type: window.CHAT_CONFIG.modelType
+            stream: modelType === 'o3-mini', // Only enable streaming for o3-mini
+            model_type: modelType,
+            // O-series specific parameters
+            ...(isOSeries && {
+                temperature: 1.0,
+                max_completion_tokens: 4000
+            })
         };
 
         let response;

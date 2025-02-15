@@ -7,6 +7,9 @@ from openai import AzureOpenAI
 from dotenv import load_dotenv
 from azure_file_manager import AzureOpenAIFileManager
 
+import logging
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 
 class DocumentProcessor:

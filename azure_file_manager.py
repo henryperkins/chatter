@@ -176,11 +176,25 @@ class AzureOpenAIChatWithFiles:
     def __init__(self, endpoint: str, api_key: str, deployment_id: str):
         self.file_manager = AzureOpenAIFileManager(endpoint, api_key)
         self.deployment_id = deployment_id
+        self.model_type_cache = {}
         self.base_url = f"https://{endpoint}/openai"
         self.headers = {
             "api-key": api_key,
             "Content-Type": "application/json"
         }
+
+    def _get_model_type(self, deployment_id: str) -> str:
+        """Get model type from deployment ID"""
+        if deployment_id not in self.model_type_cache:
+            # In a real implementation, this would query your model registry
+            # Mock logic based on deployment ID patterns
+            if "o3" in deployment_id.lower():
+                self.model_type_cache[deployment_id] = "o3-mini"
+            elif "o1" in deployment_id.lower():
+                self.model_type_cache[deployment_id] = "o1"
+            else:
+                self.model_type_cache[deployment_id] = "azure"
+        return self.model_type_cache[deployment_id]
 
     @safe_file_processing
     def chat_with_file_search(
@@ -190,7 +204,8 @@ class AzureOpenAIChatWithFiles:
         top_n: int = 5,
         strictness: int = 3,
         filter: Optional[dict] = None,
-        temperature: float = 0.7
+        temperature: float = 1.0,
+        model_type: Optional[str] = None
     ) -> dict:
         """
         Chat completion with file search capability.
@@ -221,12 +236,15 @@ class AzureOpenAIChatWithFiles:
                     }
                 }
             ],
-            "temperature": temperature,
+            "temperature": 1.0 if model_type and model_type.startswith("o") else temperature,
+            "max_completion_tokens": 4000 if model_type and model_type.startswith("o") else None,
             "tools": [
                 {
-                    "type": "file_search"
+                    "type": "file_search",
+                    "role": "developer" if model_type and model_type.startswith("o") else None
                 }
-            ]
+            ],
+            "stream": model_type == "o3-mini"  # Only enable streaming for o3-mini
         }
 
         response = requests.post(url, headers=self.headers, json=payload)
@@ -238,7 +256,8 @@ class AzureOpenAIChatWithFiles:
         self,
         messages: List[dict],
         file_ids: List[str],
-        temperature: float = 0.7
+        temperature: float = 0.7,
+        model_type: Optional[str] = None
     ) -> dict:
         """
         Chat completion with code interpreter and file access.
@@ -255,7 +274,8 @@ class AzureOpenAIChatWithFiles:
 
         payload = {
             "messages": messages,
-            "temperature": temperature,
+            "temperature": 1.0 if model_type and model_type.startswith("o") else temperature,
+            "max_completion_tokens": 4000 if model_type and model_type.startswith("o") else None,
             "tools": [
                 {
                     "type": "code_interpreter"

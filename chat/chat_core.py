@@ -1,16 +1,16 @@
 """
 Core chat functionality and basic routes.
-Handles main chat interface and initialization.
+Handles the main chat interface, initialization, and session logic.
 """
 
 import os
 import json
+import bleach
 from datetime import datetime, timedelta
 from typing import Union, Tuple, Dict, Any, Optional
 
-import bleach
 from flask import (
-    Blueprint, request, jsonify, render_template, 
+    Blueprint, request, jsonify, render_template,
     make_response, session, redirect, url_for
 )
 from flask.wrappers import Response as FlaskResponse
@@ -34,16 +34,22 @@ logger = get_logger(__name__)
 # Blueprint setup
 chat_routes = Blueprint("chat", __name__, url_prefix="/chat")
 
-# Initialize upload folder
+# Initialize upload folder for file uploads
 init_upload_folder()
+
 
 @chat_routes.route("/interface")
 @login_required
 def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
-    """Main chat interface route."""
+    """
+    Main chat interface route that either:
+      - Creates a new chat session if none exists.
+      - Loads an existing chat session (and model configuration if available).
+      - Renders the chat.html template with conversation data.
+    """
     try:
         with db_session() as db:
-            # Check if models exist
+            # Ensure at least one model is defined in the system
             model_count = db.scalar(text("SELECT COUNT(*) FROM models"))
             if not model_count:
                 logger.warning("No models found - showing error message")
@@ -53,11 +59,12 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                     show_models_link=True
                 ), 200
 
-            # Get or create chat
+            # Retrieve chat ID from session
             chat_id = session.get("chat_id", "")
             if not isinstance(chat_id, str):
                 chat_id = str(chat_id)
 
+            # Look up the existing chat record
             existing_chat = Chat.get_by_id(chat_id) if chat_id else None
             if not existing_chat:
                 new_id = generate_new_chat_id()
@@ -67,17 +74,19 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
             chat = Chat.get_by_id(chat_id)
             if not chat:
+                # Edge case: If chat creation or retrieval fails
                 return redirect(url_for("chat.index"))
 
-            # Get model configuration
+            # Get model configuration for this chat (or default)
             model_obj = Chat.get_model(chat_id) if chat.model_id else Model.get_default()
             if not model_obj and chat.model_id:
+                logger.error("Invalid or missing model configuration for chat_id=%s", chat_id)
                 return render_template(
                     "error.html",
                     error="The model configuration is invalid."
                 ), 500
 
-            # Get Azure token if available
+            # Decrypt the stored API key (if any)
             azure_token = None
             if model_obj and model_obj.api_key:
                 try:
@@ -86,19 +95,20 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                         config_instance.ENCRYPTION_KEY
                     )
                 except EncryptionError as e:
-                    logger.error("Error decrypting Azure token: %s", str(e))
+                    logger.error("Error decrypting API key for chat_id=%s: %s", chat_id, str(e))
                     return render_template(
                         "error.html",
                         error="Configuration error: Unable to decrypt API key."
                     ), 500
 
-            # Get messages and sanitize
+            # Load the conversation messages
             messages = conversation_manager.get_context(chat_id)
+            # Sanitize user messages (especially if you store raw HTML)
             for message in messages:
                 if message["role"] == "user":
                     message["content"] = bleach.clean(message["content"])
 
-            # Prepare chat config
+            # Prepare data for the front end
             chat_config = {
                 "chatId": chat_id,
                 "csrfToken": generate_csrf(),
@@ -124,25 +134,30 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
             )
 
     except Exception as e:
-        logger.error("Error initializing chat interface: %s", str(e))
+        logger.error("Error initializing chat interface: %s", str(e), exc_info=True)
         return jsonify({"error": "Internal server error"}), 500
 
 
 @chat_routes.route("/chat_interface", methods=["GET"])
 @login_required
 def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
-    """Secondary chat interface route for existing chats."""
+    """
+    Secondary route for loading the existing chat interface with a given chat_id.
+    - If chat_id is missing or invalid, a new chat session is created.
+    - Renders chat.html with relevant context.
+    """
     logger.debug("Current user: id=%s, role=%s", current_user.id, current_user.role)
 
-    # Get chat ID from request or session
+    # Retrieve chat ID from request or session
     chat_id = request.args.get("chat_id") or session.get("chat_id", "")
     if not isinstance(chat_id, str):
         chat_id = str(chat_id)
 
+    # Update session if chat_id is explicitly provided
     if request.args.get("chat_id"):
         session["chat_id"] = chat_id
 
-    # Create new chat if needed
+    # Create a new chat if none found
     if not chat_id or not Chat.get_by_id(chat_id):
         chat_id = generate_new_chat_id()
         Chat.create(chat_id=chat_id, user_id=current_user.id, title="New Chat")
@@ -154,7 +169,7 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         return redirect(url_for("chat.chat_interface"))
 
     try:
-        # Get model and validate
+        # Retrieve model configuration
         model_obj = Chat.get_model(chat_id) if chat.model_id else None
         if not model_obj and chat.model_id:
             return render_template(
@@ -162,7 +177,7 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                 error="The model configuration is invalid."
             ), 500
 
-        # Get Azure token
+        # Decrypt any stored API key
         azure_token = None
         if model_obj and model_obj.api_key:
             try:
@@ -171,16 +186,16 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                     config_instance.ENCRYPTION_KEY
                 )
             except EncryptionError as e:
-                logger.error("Error decrypting Azure token: %s", str(e))
+                logger.error("Error decrypting API key: %s", str(e))
                 return render_template(
                     "error.html",
                     error="Configuration error: Unable to decrypt API key."
                 ), 500
 
-        # Get messages
+        # Retrieve messages
         messages = conversation_manager.get_context(chat_id)
         if not messages:
-            # Add welcome messages
+            # If no messages, initialize with welcome prompts
             conversation_manager.add_message(
                 chat_id=chat_id,
                 role="system",
@@ -190,19 +205,19 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
                 chat_id=chat_id,
                 role="assistant",
                 content="Hello! I'm ready to help. You can:\n"
-                       "- Type a message to chat\n"
-                       "- Upload files for analysis\n"
-                       "- Change models using the dropdown\n"
-                       "- Start a new chat with the + button"
+                        "- Type a message to chat\n"
+                        "- Upload files for analysis\n"
+                        "- Change models using the dropdown\n"
+                        "- Start a new chat with the + button"
             )
             messages = conversation_manager.get_context(chat_id)
 
-        # Sanitize messages
+        # Sanitize user messages
         for message in messages:
             if message["role"] == "user":
                 message["content"] = bleach.clean(message["content"])
 
-        # Prepare chat config
+        # Prepare client-side configuration
         chat_config = {
             "chatId": chat_id,
             "csrfToken": generate_csrf(),
@@ -228,7 +243,7 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         )
 
     except Exception as e:
-        logger.error("Error in chat interface: %s", str(e))
+        logger.error("Error in chat interface for chat_id=%s: %s", chat_id, str(e), exc_info=True)
         return render_template(
             "error.html",
             error="An error occurred while loading the chat interface."

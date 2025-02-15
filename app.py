@@ -653,9 +653,10 @@ def debug():
     })
 
 @app.route('/static/<path:filename>')
-def serve_static(filename):
+def serve_static(filename: str):
     """Serve static files with proper MIME types."""
-    response = send_from_directory(app.static_folder, filename)
+    static_dir: str = app.static_folder or ""
+    response = send_from_directory(static_dir, filename)
     
     # Determine content type
     file_ext = os.path.splitext(filename)[1].lower()

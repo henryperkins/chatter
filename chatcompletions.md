@@ -1,0 +1,96 @@
+chat completions:
+```json
+{
+  "title": "Creates a completion for the provided prompt, parameters and chosen model.",
+  "parameters": {
+    "endpoint": "{endpoint}",
+    "api-version": "2025-01-01-preview",
+    "deployment-id": "<deployment-id>",
+    "body": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "you are a helpful assistant that talks like a pirate"
+        },
+        {
+          "role": "user",
+          "content": "can you tell me how to care for a parrot?"
+        }
+      ]
+    }
+  },
+  "responses": {
+    "200": {
+      "body": {
+        "id": "chatcmpl-7R1nGnsXO8n4oi9UPz2f3UHdgAYMn",
+        "created": 1686676106,
+        "choices": [
+          {
+            "index": 0,
+            "finish_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "Ahoy matey! So ye be wantin' to care for a fine squawkin' parrot, eh? Well, shiver me timbers, let ol' Cap'n Assistant share some wisdom with ye! Here be the steps to keepin' yer parrot happy 'n healthy:\n\n1. Secure a sturdy cage: Yer parrot be needin' a comfortable place to lay anchor! Be sure ye get a sturdy cage, at least double the size of the bird's wingspan, with enough space to spread their wings, yarrrr!\n\n2. Perches 'n toys: Aye, parrots need perches of different sizes, shapes, 'n textures to keep their feet healthy. Also, a few toys be helpin' to keep them entertained 'n their minds stimulated, arrrh!\n\n3. Proper grub: Feed yer feathered friend a balanced diet of high-quality pellets, fruits, 'n veggies to keep 'em strong 'n healthy. Give 'em fresh water every day, or ye’ll have a scurvy bird on yer hands!\n\n4. Cleanliness: Swab their cage deck! Clean their cage on a regular basis: fresh water 'n food daily, the floor every couple of days, 'n a thorough scrubbing ev'ry few weeks, so the bird be livin' in a tidy haven, arrhh!\n\n5. Socialize 'n train: Parrots be a sociable lot, arrr! Exercise 'n interact with 'em daily to create a bond 'n maintain their mental 'n physical health. Train 'em with positive reinforcement, treat 'em kindly, yarrr!\n\n6. Proper rest: Yer parrot be needin' ’bout 10-12 hours o' sleep each night. Cover their cage 'n let them slumber in a dim, quiet quarter for a proper night's rest, ye scallywag!\n\n7. Keep a weather eye open for illness: Birds be hidin' their ailments, arrr! Be watchful for signs of sickness, such as lethargy, loss of appetite, puffin' up, or change in droppings, and make haste to a vet if need be.\n\n8. Provide fresh air 'n avoid toxins: Parrots be sensitive to draft and pollutants. Keep yer quarters well ventilated, but no drafts, arrr! Be mindful of toxins like Teflon fumes, candles, or air fresheners.\n\nSo there ye have it, me hearty! With proper care 'n commitment, yer parrot will be squawkin' \"Yo-ho-ho\" for many years to come! Good luck, sailor, and may the wind be at yer back!"
+            }
+          }
+        ],
+        "usage": {
+          "completion_tokens": 557,
+          "prompt_tokens": 33,
+          "total_tokens": 590
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+```python
+import os  
+import base64
+from openai import AzureOpenAI  
+
+endpoint = os.getenv("ENDPOINT_URL", "https://o1models.openai.azure.com/")  
+deployment = os.getenv("DEPLOYMENT_NAME", "o1-east2")  
+subscription_key = os.getenv("AZURE_OPENAI_API_KEY", "REPLACE_WITH_YOUR_KEY_VALUE_HERE")  
+
+# Initialize Azure OpenAI Service client with key-based authentication    
+client = AzureOpenAI(  
+    azure_endpoint=endpoint,  
+    api_key=subscription_key,  
+    api_version="2024-12-01-preview",
+)
+    
+    
+IMAGE_PATH = "YOUR_IMAGE_PATH"
+encoded_image = base64.b64encode(open(IMAGE_PATH, 'rb').read()).decode('ascii')
+
+#Prepare the chat prompt 
+chat_prompt = [
+    {
+        "role": "developer",
+        "content": [
+            {
+                "type": "text",
+                "text": "You are an AI assistant that helps people find information."
+            }
+        ]
+    }
+] 
+    
+# Include speech result if speech is enabled  
+messages = chat_prompt  
+    
+# Generate the completion  
+completion = client.chat.completions.create(  
+    model=deployment,
+    messages=messages,
+    max_completion_tokens=40000,
+    stop=None,  
+    stream=False
+)
+
+print(completion.to_json())  
+```
