@@ -117,13 +117,7 @@ class User(Base, UserMixin):
             account_locked_until=data.get("account_locked_until"),
         )
 
-    @classmethod
-    def get(cls, user_id: int) -> Optional["User"]:
-        """Get user by ID for Flask-Login."""
-        from database import db_session
-        with db_session() as session:
-<<<<<<< HEAD
-            return cls.get_by_id(session, user_id)
+        # Ensure code is indented under the 'with' block
 =======
             return cls.get_by_id(session, int(user_id))
 >>>>>>> d13c2ede36cc1ba63584bcfb67827f7dcf2c2ba6
