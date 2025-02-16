@@ -261,10 +261,10 @@ class RegistrationForm(FlaskForm):
             DataRequired(message="Password is required."),
             Length(min=12, message="Password must be at least 12 characters long."),
             Regexp(
-                r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*]).{12,}$",
+                r"^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>/?]).{12,}$",
                 message=(
-                    "Password must include uppercase, lowercase, digit, "
-                    "and special character (from !@#$%^&*)."
+                    "Password must contain at least 12 characters including: "
+                    "1 uppercase, 1 lowercase, 1 number, and 1 special character"
                 ),
             ),
         ],
