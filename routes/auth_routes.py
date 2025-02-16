@@ -13,7 +13,6 @@ from flask import (
     flash,
     g,
     jsonify,
-    make_response,
     redirect,
     render_template,
     request,
@@ -119,48 +118,47 @@ def login():
     form = LoginForm()
 
     if form.validate_on_submit():
-        # Account lockout check
-        username = form.username.data
-        if not username:
-            flash("Username is required", "error")
-            return render_template("login.html", form=form)
-        user = User.get_by_username(username.strip())
-        if user and user.account_locked_until and user.account_locked_until > datetime.now(timezone.utc):
-            logger.warning(f"Login attempt for locked account: {user.username}")
-            flash("Account locked for 15 minutes due to multiple failed attempts", "error")
-            return render_template("login.html", form=form)
-
-        # Removed explicit call to form.validate_csrf_token() because FlaskForm already handles CSRF validation in validate_on_submit()
-        try:
+        with db_session() as db:
+            # Account lockout check
             username = form.username.data
-            if not username or not isinstance(username, str):
-                raise ValueError("Invalid username")
-            username = username.strip() if username else ""
-
-            password = form.password.data
-            if not password or not isinstance(password, str):
-                raise ValueError("Invalid password")
-
-            logger.debug(f"Login attempt for username: {username}")
-
-            user = User.get_by_username(username)
-            if not user:
-                logger.warning(f"Login failed - user not found: {username}")
-                flash("Invalid credentials", "error")
+            if not username:
+                flash("Username is required", "error")
+                return render_template("login.html", form=form)
+            user = User.get_by_username(db, username.strip())
+            if user and user.account_locked_until and user.account_locked_until > datetime.now(timezone.utc):
+                logger.warning(f"Login attempt for locked account: {user.username}")
+                flash("Account locked for 15 minutes due to multiple failed attempts", "error")
                 return render_template("login.html", form=form)
 
-            # Track failed attempts
-            if not user.check_password(password):
-                with db_session() as db:
-                    # Update failed attempts atomically
+            # Removed explicit call to form.validate_csrf_token() because FlaskForm already handles CSRF validation in validate_on_submit()
+            try:
+                username = form.username.data
+                if not username or not isinstance(username, str):
+                    raise ValueError("Invalid username")
+                username = username.strip() if username else ""
+
+                password = form.password.data
+                if not password or not isinstance(password, str):
+                    raise ValueError("Invalid password")
+
+                logger.debug(f"Login attempt for username: {username}")
+
+                user = User.get_by_username(db, username)
+                if not user:
+                    logger.warning(f"Login failed - user not found: {username}")
+                    flash("Invalid credentials", "error")
+                    return render_template("login.html", form=form)
+
+                # Track failed attempts
+                if not user.check_password(password):
                     result = db.execute(
                         text("""
-                            UPDATE users 
+                            UPDATE users
                             SET failed_login_attempts = failed_login_attempts + 1,
-                                account_locked_until = CASE 
-                                    WHEN failed_login_attempts + 1 >= 5 
+                                account_locked_until = CASE
+                                    WHEN failed_login_attempts + 1 >= 5
                                     THEN NOW() + INTERVAL '15 minutes'
-                                    ELSE NULL 
+                                    ELSE NULL
                                 END
                             WHERE id = :user_id
                             RETURNING failed_login_attempts
@@ -173,8 +171,7 @@ def login():
                     flash("Invalid credentials", "error")
                     return render_template("login.html", form=form)
 
-            # Reset failed attempts on successful login
-            with db_session() as db:
+                # Reset failed attempts on successful login
                 db.execute(
                     text("""
                         UPDATE users
@@ -185,19 +182,19 @@ def login():
                     {"user_id": user.id}
                 )
 
-            login_user(user, remember=form.remember.data)
-            logger.info(f"User logged in: {user.id} ({username})")
+                login_user(user, remember=form.remember.data)
+                logger.info(f"User logged in: {user.id} ({username})")
 
-            next_page = request.args.get("next")
-            if not next_page or not is_safe_url(next_page):
-                next_page = url_for("chat.chat_interface")
+                next_page = request.args.get("next")
+                if not next_page or not is_safe_url(next_page):
+                    next_page = url_for("chat.chat_interface")
 
-            return redirect(next_page)
+                return redirect(next_page)
 
-        except Exception as e:
-            logger.error(f"Login error: {str(e)}", exc_info=True)
-            flash("Temporary authentication issue - please try again", "error")
-            return render_template("login.html", form=form)
+            except Exception as e:
+                logger.error(f"Login error: {str(e)}", exc_info=True)
+                flash("Temporary authentication issue - please try again", "error")
+                return render_template("login.html", form=form)
 
     return render_template("login.html", form=form)
 
@@ -276,6 +273,7 @@ def register():
                 raise ValueError("Invalid password")
 
             # Create user
+<<<<<<< HEAD
             try:
                 with db_session() as session:
                     user = User.create(
@@ -291,6 +289,18 @@ def register():
                 logger.error(f"Registration integrity error: {str(e)}")
                 flash("Email address already exists", "error")
                 return render_template("register.html", form=form)
+=======
+            with db_session() as db:
+                user = User.create(
+                    db,
+                    username=username,
+                    email=email,
+                    password=password_data
+                )
+    
+            # Log in the user
+            login_user(user)
+>>>>>>> d13c2ede36cc1ba63584bcfb67827f7dcf2c2ba6
             session.permanent = True
             session["_fresh"] = True
             session["user_id"] = user.id
@@ -637,11 +647,13 @@ def test_create_user():
         if not password_env:
             password_env = "TestPassword123"
 
-        user = User.create(
-            username=username_env,
-            email=email_env,
-            password=password_env
-        )
+        with db_session() as db:
+            user = User.create(
+                db,
+                username=username_env,
+                email=email_env,
+                password=password_env
+            )
         return jsonify({"success": True, "user_id": user.id}), 200
     except Exception as e:
         logger.error(

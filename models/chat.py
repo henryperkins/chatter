@@ -123,7 +123,7 @@ class Chat(Base):
                     stmt = text("""
                         UPDATE chats
                         SET model_id = :model_id
-                        WHERE id = :id
+                        WHERE id = :chat_id
                     """)
                     db.execute(stmt, {"chat_id": chat_id, "model_id": model_id})
                     db.commit()
@@ -154,7 +154,7 @@ class Chat(Base):
                     stmt = text("""
                         UPDATE chats
                         SET title = :title
-                        WHERE id = :id
+                        WHERE id = :chat_id
                     """)
                     db.execute(stmt, {"title": cleaned_title, "chat_id": chat_id})
                     db.commit()
@@ -296,7 +296,7 @@ class Chat(Base):
                     stmt = text("""
                         UPDATE chats
                         SET is_deleted = TRUE
-                        WHERE id = :id
+                        WHERE id = :chat_id
                     """)
                     db.execute(stmt, {"chat_id": chat_id})
                     db.commit()

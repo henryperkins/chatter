@@ -8,12 +8,13 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
 from config import Config
 from database import db_session
 from logging_config import get_logger
-from .provider import Provider
+# Removed direct import of Provider to avoid circular reference
 from .base import Base
 
 # Forward references for type hints
 if TYPE_CHECKING:
     from .chat import Chat
+    from .provider import Provider
 
 # Use the standardized logger
 logger = get_logger(__name__)
@@ -153,17 +154,22 @@ class Model(Base):
 
     def apply_provider_constraints(self) -> None:
         """Apply provider-specific constraints to model configuration."""
-        provider = Provider.get_by_id(self.provider_id) if hasattr(self, 'provider_id') else None
-        if not provider or not provider.capabilities:
-            return
-        provider_caps = provider.capabilities
-        if provider_caps.get("fixed_temperature"):
-            self.temperature = provider_caps["fixed_temperature"]
-        if "max_tokens" in provider_caps and self.max_completion_tokens:
-            self.max_completion_tokens = min(
-                self.max_completion_tokens,
-                provider_caps["max_tokens"]
-            )
+        from models.provider import Provider
+        from database import db_session
+
+        with db_session() as session:
+            provider = Provider.get_by_id(session, self.provider_id) if hasattr(self, 'provider_id') else None
+            if not provider or not provider.capabilities:
+                return
+
+            provider_caps = provider.capabilities
+            if provider_caps.get("fixed_temperature"):
+                self.temperature = provider_caps["fixed_temperature"]
+            if "max_tokens" in provider_caps and self.max_completion_tokens:
+                self.max_completion_tokens = min(
+                    self.max_completion_tokens,
+                    provider_caps["max_tokens"]
+                )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert model to dictionary, excluding sensitive data."""
