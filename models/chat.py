@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Union, Any, TYPE_CHECKING
 
-from sqlalchemy import text, String, Integer, Boolean, ForeignKey, DateTime
+from sqlalchemy import JSON, text, String, Integer, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
 
 from .base import Base
