@@ -646,7 +646,7 @@ def test_create_user():
                 "TEST_EMAIL": os.getenv("TEST_EMAIL")
             }
         )
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": False, "error": "An internal error has occurred."}), 500
 
 
 @bp.route("/logout")
