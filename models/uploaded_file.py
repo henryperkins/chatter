@@ -103,11 +103,11 @@ class UploadedFile(Base):
                 "azure_file_id": azure_file_id
             })
             file_id = result.scalar()
-            db.commit()
+            session.commit()
             logger.info(f"File uploaded: {filename} (v{new_version}) for chat {chat_id}")
             return file_id
         except Exception as e:
-            db.rollback()
+            session.rollback()
             # Clean up file if it was created and moved
             if unique_filepath and os.path.exists(unique_filepath):
                 try:
@@ -187,7 +187,7 @@ class UploadedFile(Base):
             logger.info(f"Deleted {len(files)} files ({deleted_bytes} bytes) for chats: {', '.join(chat_ids)}")
             return {"deleted_files": len(files), "deleted_bytes": deleted_bytes}
         except Exception as e:
-            db.rollback()
+            session.rollback()
             logger.error(f"Error deleting uploaded files: {e}")
             raise
 
@@ -211,7 +211,7 @@ class UploadedFile(Base):
                 logger.info(f"Updated Azure file ID for file {file_id}")
             return success
         except Exception as e:
-            db.rollback()
+            session.rollback()
             logger.error(f"Error updating Azure file ID: {e}")
             raise
 
@@ -238,13 +238,13 @@ class UploadedFile(Base):
                     "status": status,
                     "search_id": search_id
                 })
-                db.commit()
+                session.commit()
                 success = result.rowcount > 0
                 if success:
                     logger.info(f"Updated Azure Search status to {status} for file {file_id}")
                 return success
             except Exception as e:
-                db.rollback()
+                session.rollback()
                 logger.error(f"Error updating Azure Search status: {e}")
                 raise
 
@@ -268,18 +268,17 @@ class UploadedFile(Base):
                 raise
 
     @staticmethod
-    def delete_by_azure_file_id(azure_file_id: str) -> bool:
+    def delete_by_azure_file_id(session: Session, azure_file_id: str) -> bool:
         """
         Delete an uploaded file by its Azure file ID.
         """
-        with db_session() as db:
-            try:
-                # First get file info for cleanup
-                query = text("""
-                    SELECT filepath, size FROM uploaded_files
-                    WHERE azure_file_id = :azure_file_id
-                """)
-                file = db.execute(query, {"azure_file_id": azure_file_id}).first()
+        try:
+            # First get file info for cleanup
+            query = text("""
+                SELECT filepath, size FROM uploaded_files
+                WHERE azure_file_id = :azure_file_id
+            """)
+            file = session.execute(query, {"azure_file_id": azure_file_id}).first()
 
                 if not file:
                     return False
@@ -290,7 +289,7 @@ class UploadedFile(Base):
                     WHERE azure_file_id = :azure_file_id
                 """)
                 db.execute(delete_query, {"azure_file_id": azure_file_id})
-                db.commit()
+                session.commit()
 
                 # Clean up file from disk
                 filepath, size = file
@@ -304,7 +303,7 @@ class UploadedFile(Base):
                 return True
 
             except Exception as e:
-                db.rollback()
+                session.rollback()
                 logger.error(f"Error deleting file by Azure ID: {e}")
                 raise
 
@@ -325,12 +324,12 @@ class UploadedFile(Base):
                     "file_id": file_id,
                     "tokenized_text": tokenized_text
                 })
-                db.commit()
+                session.commit()
                 success = result.rowcount > 0
                 if success:
                     logger.info(f"Stored tokenized content for file {file_id}")
                 return success
             except Exception as e:
-                db.rollback()
+                session.rollback()
                 logger.error(f"Error storing tokenized content: {e}")
                 raise
