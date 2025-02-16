@@ -26,7 +26,7 @@ export class CSRFHandler {
             
             // Retry original request with new token
             const config = error.config;
-            config.headers['X-CSRFToken'] = error.response.data.csrf_token;
+            config.headers['X-CSRF-TOKEN'] = error.response.data.csrf_token;
             return axios(config);
         }
         return Promise.reject(error);
