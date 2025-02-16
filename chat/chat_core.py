@@ -51,7 +51,7 @@ def _get_or_create_chat(chat_id: Optional[str], user_id: int) -> Chat:
             logger.warning(f"User {user_id} attempted to access chat {chat_id} belonging to user {existing_chat.user_id}")
 
     new_id = generate_new_chat_id()
-    Chat.create(id=new_id, user_id=user_id, title="New Chat")
+    Chat.create(chat_id=new_id, user_id=user_id, title="New Chat")
     new_chat = Chat.get_by_id(new_id)
     if not new_chat:
         raise RuntimeError(f"Failed to create new chat with ID {new_id}")
@@ -76,7 +76,7 @@ def _load_chat_context(chat_id: Optional[str], user_id: int) -> Dict[str, Any]:
     if chat.model_id:
         model_obj = Model.get_by_id(chat.model_id)
         if not model_obj:
-            logger.warning(f"Model {chat.model_id} not found for chat {chat.chat_id}")
+            logger.warning(f"Model {chat.model_id} not found for chat {chat.id}")
 
     # 3. Decrypt the stored API key if available
     azure_token = ""
@@ -91,33 +91,26 @@ def _load_chat_context(chat_id: Optional[str], user_id: int) -> Dict[str, Any]:
 
     # 4. Load conversation messages; create welcome messages if none exist
     try:
-        messages = conversation_manager.get_context(chat.id)
+        messages = conversation_manager.get_context(chat.id) or []
         logger.debug(f"Loaded {len(messages)} messages for chat {chat.id}")
         
         if not messages:
             # Initialize conversation with welcome messages
-            conversation_manager.add_message(
-                chat_id=chat.id,
-                role="system",
-                content="Welcome to Azure OpenAI Chat!"
-            )
-            conversation_manager.add_message(
-                chat_id=chat.id,
-                role="assistant",
-                content=(
+            messages = [
+                {"role": "system", "content": "Welcome to Azure OpenAI Chat!"},
+                {"role": "assistant", "content": (
                     "Hello! I'm ready to help. You can:\n"
                     "- Type a message to chat\n"
                     "- Upload files for analysis\n"
                     "- Change models using the dropdown\n"
                     "- Start a new chat with the + button"
-                )
-            )
-            messages = conversation_manager.get_context(chat.id)
+                )}
+            ]
             logger.debug(f"Initialized new chat {chat.id} with welcome messages")
         
     except Exception as e:
         logger.error(f"Error loading messages for chat {chat.id}: {str(e)}", exc_info=True)
-        messages = []
+        messages = []  # Return empty list to prevent template errors
 
     # 5. Sanitize user messages to prevent XSS
     for msg in messages:
@@ -134,7 +127,7 @@ def _load_chat_context(chat_id: Optional[str], user_id: int) -> Dict[str, Any]:
 
 @chat_routes.route("/interface")
 @login_required
-def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
+def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:  # type: ignore
     """
     Main chat interface route:
       - Checks for model availability
@@ -170,74 +163,7 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
         # Prepare front-end config
         chat_config = {
-            "chatId": context_data["chat"].chat_id,
-            "csrfToken": generate_csrf(),
-            "azureToken": context_data["azure_token"],
-            "userId": str(current_user.id),
-            "modelSettings": (
-                context_data["model_obj"].to_dict()
-                if context_data["model_obj"]
-                else {}
-            )
-        }
-
-        return render_template(
-            "chat.html",
-            chat_id=context_data["chat"].chat_id,
-            chat_title=context_data["chat"].title,
-            model_name=(
-                context_data["model_obj"].name
-                if context_data["model_obj"]
-                else "Default Model"
-            ),
-            current_model=context_data["model_obj"],
-            messages=context_data["messages"],
-            models=Model.get_all(),
-            conversations=Chat.get_user_chats(current_user.id),
-            now=datetime.now,
-            today=datetime.now().strftime("%Y-%m-%d"),
-            yesterday=(datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
-            azure_token=context_data["azure_token"],
-            CHAT_CONFIG=json.dumps(chat_config)
-        )
-
-    except ValueError as ve:
-        logger.error("Value error in chat interface: %s", str(ve))
-        return render_template("error.html", error=str(ve)), 500
-    except RuntimeError as re:
-        logger.error("Runtime error in chat interface: %s", str(re))
-        return render_template("error.html", error=str(re)), 500
-    except Exception as e:
-        logger.error("Error initializing chat interface: %s", str(e), exc_info=True)
-        return jsonify({"error": "Internal server error"}), 500
-
-
-@chat_routes.route("/chat_interface", methods=["GET"])
-@login_required
-def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
-    """
-    Secondary route for loading the existing chat interface with a given chat_id.
-    - If 'chat_id' is missing or invalid, a new chat session is created.
-    - Renders chat.html with relevant context.
-    """
-    try:
-        session.modified = True  # Ensure session is saved
-        chat_id_param = request.args.get("chat_id")
-        chat = _get_or_create_chat(chat_id_param, current_user.id)
-        context_data = {
-            "chat": chat,
-            "azure_token": None,
-            "model_obj": None,
-            "messages": []
-        }
-
-        # Save updated chat_id to session (in case a new one was created)
-        session["chat_id"] = str(context_data["chat"].id)  # Ensure chat_id is stored as string
-        session.modified = True  # Ensure session is saved
-
-        # Prepare front-end config
-        chat_config = {
-            "chatId": context_data["chat"].chat_id,
+            "chatId": context_data["chat"].id,
             "csrfToken": generate_csrf(),
             "azureToken": context_data["azure_token"],
             "userId": str(current_user.id),
@@ -269,11 +195,9 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         )
 
     except ValueError as ve:
-        # Example for model or config errors
         logger.error("Value error in chat interface: %s", str(ve))
         return render_template("error.html", error=str(ve)), 500
     except RuntimeError as re:
-        # Example for encryption errors
         logger.error("Runtime error in chat interface: %s", str(re))
         return render_template("error.html", error=str(re)), 500
     except Exception as e:
@@ -283,7 +207,7 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
 @chat_routes.route("/chat_interface", methods=["GET"])
 @login_required
-def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
+def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:  # type: ignore
     """
     Secondary route for loading the existing chat interface with a given chat_id.
     - If 'chat_id' is missing or invalid, a new chat session is created.
@@ -308,7 +232,7 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
         # Prepare front-end config
         chat_config = {
-            "chatId": context_data["chat"].id,
+            "chatId": str(context_data["chat"].id),
             "csrfToken": generate_csrf(),
             "azureToken": context_data["azure_token"],
             "userId": str(current_user.id),
@@ -321,7 +245,7 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
         return render_template(
             "chat.html",
-            chat_id=context_data["chat"].id,
+            chat_id=str(context_data["chat"].id),
             chat_title=context_data["chat"].title,
             model_name=(
                 context_data["model_obj"].name

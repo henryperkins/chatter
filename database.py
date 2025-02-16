@@ -288,21 +288,19 @@ def create_default_model(db: Session) -> Optional[int]:
         return None
 
     try:
-        # Check if provider exists
-        provider_row = db.execute(
-            text("SELECT id, is_azure FROM providers WHERE slug = 'azure-openai'")
-        ).mappings().first()
+        from models.provider import Provider  # Local import to avoid circular dependency
+        config_instance = Config()
 
-        if provider_row:
-            db.execute(
-                text("UPDATE providers SET is_azure = TRUE WHERE id = :id"),
-                {"id": provider_row["id"]},
-            )
-            db.commit()
-            provider_id = provider_row["id"]
+        # Check if provider exists
+        provider = Provider.get_by_slug(db, 'azure-openai')
+        
+        if provider:
+            if not provider.is_azure:
+                provider.is_azure = True
+                db.commit()
+            provider_id = provider.id
         else:
-            # Create new provider
-            config_instance = Config()
+            # Create new provider using ORM
             result = db.execute(text("""
                 INSERT INTO providers (
                     name, slug, api_base_url, requires_authentication,
@@ -366,7 +364,7 @@ def create_default_model(db: Session) -> Optional[int]:
             "is_default": True,
         }
         Model.validate_model_config(model_data)
-        model_id = Model.create(model_data)
+        model_id = Model.create(db, model_data)
         logger.info("Default model created successfully")
         return model_id
 

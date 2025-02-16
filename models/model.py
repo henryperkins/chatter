@@ -635,80 +635,137 @@ class Model(Base):
         """
         Validate model configuration parameters.
         """
-        from models.provider import Provider
-        from database import db_session
-        
-        with db_session() as session:
-            provider = Provider.get_by_id(session, config["provider_id"])
-            if not provider:
-                raise ValueError("Invalid provider_id")
+        provider = Provider.get_by_id(config["provider_id"])
+        if not provider:
+            raise ValueError("Invalid provider_id")
 
-            # Azure o1 model validation
-            if config.get("model_type") == "o1":
-                if not (config.get("api_key", "").startswith("sk-") or config.get("api_key", "").startswith("vOJI")):
-                    raise ValueError("Azure API keys must start with 'sk-' or 'vOJI'")
-                if not config.get("api_endpoint", "").startswith("https://o1models."):
-                    raise ValueError("o1 models require specific Azure endpoint format")
+        # Azure o1 model validation
+        if config.get("model_type") == "o1":
+            if not (config.get("api_key", "").startswith("sk-") or config.get("api_key", "").startswith("vOJI")):
+                raise ValueError("Azure API keys must start with 'sk-' or 'vOJI'")
+            if not config.get("api_endpoint", "").startswith("https://o1models."):
+                raise ValueError("o1 models require specific Azure endpoint format")
 
-                # Ensure requires_o1_handling is set
-                config["requires_o1_handling"] = True
+            # Ensure requires_o1_handling is set so normal_response uses temperature=1.0, max_completion_tokens
+            config["requires_o1_handling"] = True
 
-            # Validate API endpoint
-            api_endpoint = config.get("api_endpoint", "")
-            if api_endpoint and not api_endpoint.startswith("https://"):
-                raise ValueError("API endpoint must use HTTPS")
+        provider_caps = provider.capabilities
+        if provider_caps.get("fixed_temperature"):
+            config["temperature"] = 1.0
+        config["supports_streaming"] = provider_caps.get("streaming", True)
+        model_type = config.get("model_type", "").lower()
+        requires_o1 = config.get("requires_o1_handling", False)
+        is_o1_preview = model_type == "o1-preview" and requires_o1
+        model_caps = provider_caps.get(model_type, {})
 
-            validation_rules = provider.validation_rules
-            if isinstance(validation_rules, str):
-                validation_rules = json.loads(validation_rules)
+        if is_o1_preview:
+            max_tokens = config.get("max_completion_tokens", 8300)
+            if not (1 <= max_tokens <= 25000):
+                raise ValueError(
+                    "For o1-preview models, max_completion_tokens must be between 1 and 25000 (OpenAI recommended)"
+                )
+            config["max_completion_tokens"] = max_tokens
+        else:
+            max_tokens = config.get("max_completion_tokens")
+            if max_tokens is not None and max_tokens <= 0:
+                raise ValueError("max_completion_tokens must be positive")
+            if "max_tokens" in model_caps:
+                config["max_completion_tokens"] = min(
+                    max_tokens or model_caps["max_tokens"], model_caps["max_tokens"]
+                )
 
-            if api_endpoint and validation_rules:
-                pattern = validation_rules.get("endpoint")
-                if pattern and not re.match(pattern, api_endpoint):
+        # Handle o-series model validation
+        is_o_series = model_type.startswith("o")
+        if is_o_series:
+            # Validate reasoning effort
+            reasoning_effort = config.get("reasoning_effort", "medium")
+            if reasoning_effort not in ["low", "medium", "high"]:
+                raise ValueError("reasoning_effort must be one of: low, medium, high")
+            config["reasoning_effort"] = reasoning_effort
+
+            # Validate max completion tokens
+            max_completion_tokens = config.get("max_completion_tokens")
+            model_caps = Model.PROVIDER_CAPABILITIES.get(model_type, {})
+            if max_completion_tokens is not None:
+                max_allowed = model_caps.get("max_completion_tokens", 100000)
+                if not (1 <= max_completion_tokens <= max_allowed):
+                    raise ValueError(f"max_completion_tokens must be between 1 and {max_allowed} for {model_type}")
+                config["max_completion_tokens"] = max_completion_tokens
+
+            # Force temperature to 1.0 and remove unsupported parameters
+            config["temperature"] = 1.0
+            config["max_tokens"] = model_caps.get("max_tokens", 200000)  # Set max_tokens from model capabilities
+            config.pop("top_p", None)
+            config.pop("frequency_penalty", None)
+            config.pop("presence_penalty", None)
+        else:
+            config["reasoning_effort"] = "medium"
+            config["max_tokens"] = config.get("max_tokens", 16384)  # Default for non-o-series models
+
+        required_fields = {
+            "provider_id": (int, "Provider ID must be an integer"),
+            "name": (str, "Name must be a non-empty string"),
+            "deployment_name": (str, "Deployment name must be a non-empty string"),
+            "model_type": (str, "Model type must be a non-empty string"),
+            "api_endpoint": (str, "API endpoint must be a valid HTTPS URL"),
+            "api_key": (str, "API key must be a non-empty string"),
+        }
+        for field_name, (expected_type, error_msg) in required_fields.items():
+            if field_name not in config:
+                raise ValueError(f"Missing required field: {field_name}")
+            value = config[field_name]
+            if value is None or value == "":
+                raise ValueError(error_msg)
+            if not isinstance(value, expected_type):
+                raise ValueError(f"{field_name} must be of type {expected_type.__name__}")
+
+        api_endpoint = config["api_endpoint"]
+        if not isinstance(api_endpoint, str):
+            raise ValueError("API endpoint must be a string")
+        if not api_endpoint.startswith("https://"):
+            raise ValueError("API endpoint must use HTTPS")
+
+        validation_rules = provider.validation_rules
+        if isinstance(validation_rules, str):
+            validation_rules = json.loads(validation_rules)
+
+        if api_endpoint:
+            pattern = validation_rules.get("endpoint")
+            if pattern:
+                if not re.match(pattern, api_endpoint):
                     raise ValueError(
                         "API endpoint does not match the required format specified by the provider."
                     )
 
-            # Validate deployment name for Azure providers
-            if provider.is_azure:
-                deployment_name = config.get("deployment_name")
-                if deployment_name and validation_rules:
-                    pattern = validation_rules.get("model_id")
-                    if pattern and not re.match(pattern, deployment_name):
+        if provider.is_azure:
+            deployment_name = config.get("deployment_name")
+            if deployment_name:
+                pattern = validation_rules.get("model_id")
+                if pattern:
+                    if not re.match(pattern, deployment_name):
                         raise ValueError(
                             "Deployment name does not match the required format specified by the provider."
                         )
+        else:
+            config.pop("deployment_name", None)
 
-            # Validate temperature
-            temperature = config.get("temperature")
-            if temperature is not None and (temperature < 0 or temperature > 2):
-                raise ValueError("Temperature must be between 0 and 2")
+        temperature = config.get("temperature")
+        if temperature is not None and (temperature < 0 or temperature > 2):
+            raise ValueError("Temperature must be between 0 and 2")
 
-            # Validate tokens
-            max_tokens = config.get("max_tokens")
-            if max_tokens is not None and max_tokens < 1:
-                raise ValueError("Max tokens must be at least 1")
+        max_tokens = config.get("max_tokens")
+        if max_tokens is not None and max_tokens < 1:
+            raise ValueError("Max tokens must be at least 1")
 
-            model_type = config.get("model_type", "").lower()
-            provider_caps = Model.PROVIDER_CAPABILITIES.get(model_type, {})
-
-            # Apply provider capabilities
-            if provider_caps.get("fixed_temperature"):
-                config["temperature"] = 1.0
-            config["supports_streaming"] = provider_caps.get("streaming", True)
-
-            # Handle o-series model validation
-            if model_type.startswith("o"):
-                reasoning_effort = config.get("reasoning_effort", "medium")
-                if reasoning_effort not in ["low", "medium", "high"]:
-                    raise ValueError("reasoning_effort must be one of: low, medium, high")
-                config["reasoning_effort"] = reasoning_effort
-
-                max_completion_tokens = config.get("max_completion_tokens")
-                if max_completion_tokens is not None:
-                    max_allowed = provider_caps.get("max_completion_tokens", 100000)
-                    if not (1 <= max_completion_tokens <= max_allowed):
-                        raise ValueError(
-                            f"max_completion_tokens must be between 1 and {max_allowed} for {model_type}"
-                        )
-
+        if config.get("is_default", False):
+            with db_session() as session:
+                query = text(
+                    """
+                    SELECT COUNT(*) FROM models
+                    WHERE is_default = TRUE
+                    AND (:model_id IS NULL OR id != :model_id)
+                    """
+                )
+                existing_defaults = session.execute(query, {"model_id": model_id}).scalar()
+                if existing_defaults > 0 and model_id is None:
+                    raise ValueError("Only one default model allowed")
