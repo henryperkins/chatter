@@ -67,13 +67,24 @@ class Provider(Base):
         Initialize the Provider instance.
         If capabilities or validation_rules are provided as dicts, they are stored as JSON strings.
         """
-        capabilities = kwargs.get("capabilities")
-        if isinstance(capabilities, dict):
-            kwargs["capabilities"] = json.dumps(capabilities)
+        # Handle both string and dict inputs
+        if 'capabilities' in kwargs:
+            if isinstance(kwargs['capabilities'], dict):
+                kwargs['capabilities'] = json.dumps(kwargs['capabilities'])
+            elif isinstance(kwargs['capabilities'], str):
+                try:  # Parse if already in string format
+                    kwargs['capabilities'] = json.dumps(json.loads(kwargs['capabilities']))
+                except json.JSONDecodeError:
+                    kwargs['capabilities'] = "{}"
 
-        validation_rules = kwargs.get("validation_rules")
-        if isinstance(validation_rules, dict):
-            kwargs["validation_rules"] = json.dumps(validation_rules)
+        if 'validation_rules' in kwargs:
+            if isinstance(kwargs['validation_rules'], dict):
+                kwargs['validation_rules'] = json.dumps(kwargs['validation_rules'])
+            elif isinstance(kwargs['validation_rules'], str):
+                try:  # Parse if already in string format
+                    kwargs['validation_rules'] = json.dumps(json.loads(kwargs['validation_rules']))
+                except json.JSONDecodeError:
+                    kwargs['validation_rules'] = "{}"
 
         # Set appropriate defaults based on provider type
         if kwargs.get("is_azure") or "openai.azure.com" in kwargs.get("api_base_url", ""):
@@ -133,7 +144,14 @@ class Provider(Base):
     def get_by_id(session: Session, provider_id: int) -> Optional["Provider"]:
         """Retrieve a provider by its ID."""
         try:
-            return session.query(Provider).filter_by(id=provider_id).first()
+            provider = session.query(Provider).filter_by(id=provider_id).first()
+            if provider:
+                # Parse JSON fields if they exist as strings
+                if isinstance(provider.capabilities, str):
+                    provider.capabilities = json.loads(provider.capabilities)
+                if isinstance(provider.validation_rules, str):
+                    provider.validation_rules = json.loads(provider.validation_rules)
+            return provider
         except Exception as e:
             logger.error("Error retrieving provider by ID %d: %s", provider_id, e)
             return None
@@ -151,7 +169,14 @@ class Provider(Base):
     def get_by_slug(session: Session, slug: str) -> Optional["Provider"]:
         """Retrieve a provider by its slug."""
         try:
-            return session.query(Provider).filter_by(slug=slug).first()
+            provider = session.query(Provider).filter_by(slug=slug).first()
+            if provider:
+                # Parse JSON fields if they exist as strings
+                if isinstance(provider.capabilities, str):
+                    provider.capabilities = json.loads(provider.capabilities)
+                if isinstance(provider.validation_rules, str):
+                    provider.validation_rules = json.loads(provider.validation_rules)
+            return provider
         except Exception as e:
             logger.error("Error retrieving provider by slug %s: %s", slug, e)
             return None
