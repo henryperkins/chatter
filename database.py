@@ -503,7 +503,7 @@ def init_db() -> None:
             raise RuntimeError("Database engine not initialized")
 
         # Drop all tables first
-        Base.metadata.drop_all(bind=engine)
+        Base.metadata.drop_all(bind=engine, cascade=True)
         
         # Create all tables
         Base.metadata.create_all(bind=engine)
