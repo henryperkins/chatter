@@ -275,11 +275,15 @@ def register():
                 raise ValueError("Invalid password")
 
             # Create user
-            user = User.create(
-                username=username,
-                email=email,
-                password=password_data
-            )
+            with db_session() as session:
+                user = User.create(
+                    session,
+                    username=username,
+                    email=email,
+                    password=password_data
+                )
+                # Refresh to ensure we have latest DB state
+                session.refresh(user)
 
             # Log in the user
             login_user(user)

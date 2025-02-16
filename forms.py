@@ -300,8 +300,9 @@ class RegistrationForm(FlaskForm):
 
         # Verificar si el username ya existe usando el modelo User
         try:
-            if User.get_by_username(username):
-                raise ValidationError("This username is already taken. Please choose a different username.")
+            with db_session() as session:
+                if User.get_by_username(session, username):
+                    raise ValidationError("This username is already taken. Please choose a different username.")
         except Exception as e:
             logger.error(f"Error validating username: {str(e)}", exc_info=True)
             raise ValidationError("An error occurred while checking username availability. Please try again later.")
