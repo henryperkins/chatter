@@ -105,7 +105,9 @@ class User(Base, UserMixin):
     @classmethod
     def get(cls, user_id: int) -> Optional["User"]:
         """Get user by ID for Flask-Login."""
-        return cls.get_by_id(user_id)
+        from database import db_session
+        with db_session() as session:
+            return cls.get_by_id(session, user_id)
 
     @classmethod
     def get_by_id(cls, session: Session, user_id: int) -> Optional["User"]:
