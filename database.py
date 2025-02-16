@@ -433,6 +433,7 @@ def check_db_health() -> Dict[str, Any]:
 
 def init_db() -> None:
     from models.base import Base
+    from models.login_attempt import LoginAttempt
     from sqlalchemy import MetaData
 
     try:
