@@ -284,33 +284,26 @@ class RegistrationForm(FlaskForm):
         """
         if not field.data:
             return
+            
         username = field.data.strip()
+        
+        # Validación básica del formato primero
+        if len(username) < 4:
+            raise ValidationError("Username must be at least 4 characters long.")
+            
+        if not re.match(r"^[a-zA-Z0-9_]+$", username):
+            raise ValidationError("Username can only contain letters, numbers, and underscores.")
+            
+        if field.data != username:
+            raise ValidationError("Username cannot contain leading or trailing spaces.")
 
-        if not is_initialized():
-            raise ValidationError("System initialization incomplete. Please contact the administrator.")
-
+        # Verificar si el username ya existe usando el modelo User
         try:
-            with db_session(transactional=True) as db:
-                if db.execute(
-                    text("SELECT 1 FROM users WHERE username = :uname"),
-                    {"uname": username},
-                ).scalar():
-                    raise ValidationError("This username is already taken. Please choose a different username.")
-
-            if field.data != username:
-                raise ValidationError("Username cannot contain leading or trailing spaces.")
-
-            if len(username) < 4:
-                raise ValidationError("Username must be at least 4 characters long.")
-
-            if not re.match(r"^[a-zA-Z0-9_]+$", username):
-                raise ValidationError("Username can only contain letters, numbers, and underscores.")
-
-        except ValidationError:
-            raise
+            if User.get_by_username(username):
+                raise ValidationError("This username is already taken. Please choose a different username.")
         except Exception as e:
             logger.error(f"Error validating username: {str(e)}", exc_info=True)
-            raise ValidationError("An unexpected error occurred while validating the username. Please try again later.")
+            raise ValidationError("An error occurred while checking username availability. Please try again later.")
 
     def validate_email(self, field: Field) -> None:
         """
