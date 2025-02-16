@@ -455,7 +455,7 @@ def create_app() -> Flask:
     init_db_app(app)
     
     # Initialize migrate with app and SQLAlchemy instance
-    migrate.init_app(app, db.db, render_as_batch=True)
+    migrate.init_app(app, db, render_as_batch=True)
 
     # Verify database connection
     max_retries = 3
