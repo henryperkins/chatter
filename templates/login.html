@@ -7,7 +7,8 @@
     <div class="w-full max-w-md px-8 py-6 mx-4 mt-4 text-left bg-white dark:bg-gray-800 shadow-xl rounded-lg transition-all duration-200">
         <h1 class="text-2xl font-bold text-center text-gray-900 dark:text-gray-100 mb-6">Login</h1>
 
-        <!-- Messages will be displayed in the central alert container from base.html -->
+        <!-- Optional error display (if needed) -->
+        <div id="error-message" class="mb-4"></div>
 
         <form id="login-form" method="POST" class="space-y-6">
             <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token() }}">
@@ -38,13 +39,31 @@
                         required="required",
                         aria_describedby="password-error"
                     ) }}
-                    <button type="button"
-                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200"
-                            onclick="togglePasswordVisibility()"
-                            aria-label="Toggle password visibility">
-                        <svg class="h-5 w-5" id="password-toggle-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    <button
+                        type="button"
+                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 transition-colors duration-200"
+                        onclick="togglePasswordVisibility()"
+                        aria-label="Toggle password visibility"
+                    >
+                        <svg
+                            class="h-5 w-5"
+                            id="password-toggle-icon"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                            />
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                            />
                         </svg>
                     </button>
                 </div>
@@ -56,22 +75,49 @@
             <!-- Remember Me -->
             <div class="flex items-center justify-between">
                 <div class="flex items-center">
-                    <input id="remember" name="remember" type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                    <label for="remember" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">
+                    <input
+                        id="remember"
+                        name="remember"
+                        type="checkbox"
+                        class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label
+                        for="remember"
+                        class="ml-2 block text-sm text-gray-900 dark:text-gray-300"
+                    >
                         Remember me
                     </label>
                 </div>
             </div>
 
             <!-- Submit Button -->
-            <button type="submit"
-                    class="w-full px-6 py-3 text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                    id="submit-button">
+            <button
+                type="submit"
+                class="w-full px-6 py-3 text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transform hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                id="submit-button"
+            >
                 <span class="relative inline-flex items-center">
                     <span id="button-text">Login</span>
-                    <svg id="loading-spinner" class="hidden w-5 h-5 ml-2 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <svg
+                        id="loading-spinner"
+                        class="hidden w-5 h-5 ml-2 animate-spin"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                    >
+                        <circle
+                            class="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            stroke-width="4"
+                        ></circle>
+                        <path
+                            class="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
                     </svg>
                 </span>
             </button>
@@ -79,14 +125,18 @@
 
         <!-- Links -->
         <div class="mt-8 text-gray-700 dark:text-gray-300 text-center space-y-4">
-            <a href="{{ url_for('auth.forgot_password') }}"
-               class="block text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md">
+            <a
+                href="{{ url_for('auth.forgot_password') }}"
+                class="block text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md"
+            >
                 Forgot Password?
             </a>
 
             <div class="border-t border-gray-200 dark:border-gray-700 pt-4">
-                <a href="{{ url_for('auth.register') }}"
-                   class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md">
+                <a
+                    href="{{ url_for('auth.register') }}"
+                    class="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md"
+                >
                     Don't have an account? Register
                 </a>
             </div>
@@ -95,121 +145,106 @@
 </div>
 
 <!-- Feedback Message -->
-<div id="feedback-message" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center"></div>
+<div
+    id="feedback-message"
+    class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 p-4 rounded-lg shadow-lg z-50 max-w-md w-full text-center"
+></div>
 {% endblock %}
 
 {% block scripts %}
 {{ super() }}
+
 <script>
-<<<<<<< HEAD
-    // Manejo del formulario de login
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const form = e.target;
-        const formData = new FormData(form);
-        const submitButton = document.getElementById('submit-button');
-        const buttonText = document.getElementById('button-text');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        
-        // Mostrar estado de carga
-        submitButton.disabled = true;
-        buttonText.textContent = 'Authenticating...';
-        loadingSpinner.classList.remove('hidden');
+// Minimal pure JavaScript, with no Jinja logic:
 
-        try {
-            const response = await fetch("{{ url_for('auth.login') }}", {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': document.getElementById('csrf_token').value,
-                    'Accept': 'application/json'
-                },
-                body: formData
-            });
+document.addEventListener('DOMContentLoaded', function() {
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
 
-            const data = await response.json();
-            
-            if (data.success) {
-                window.location.href = data.redirect || "{{ url_for('chat.chat_interface') }}";
-            } else {
-                // Mostrar errores
-                const errorDiv = document.getElementById('error-message');
-                errorDiv.innerHTML = `
-                    <div class="bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded-lg relative transition-all duration-200" role="alert">
-                        <strong class="font-bold">Errors:</strong>
-                        <ul class="list-disc list-inside mt-2">
-                            ${Object.values(data.errors).map(error => `<li>${error}</li>`).join('')}
-                        </ul>
-                        <button type="button" class="absolute top-1 right-1 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors duration-200" onclick="this.parentElement.remove()" aria-label="Dismiss">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </button>
-                    </div>`;
+            const formData = new FormData(loginForm);
+            const submitButton = document.getElementById('submit-button');
+            const buttonText = document.getElementById('button-text');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const errorDiv = document.getElementById('error-message');
+
+            if (errorDiv) errorDiv.innerHTML = '';
+
+            if (submitButton) submitButton.disabled = true;
+            if (buttonText) buttonText.textContent = 'Authenticating...';
+            if (loadingSpinner) loadingSpinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch("{{ url_for('auth.login') }}", {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.getElementById('csrf_token').value,
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    window.location.href = data.redirect || "{{ url_for('chat.chat_interface') }}";
+                } else if (errorDiv) {
+                    const errorsHtml = Object.values(data.errors)
+                        .map(function(err) { return '<li>' + err + '</li>'; })
+                        .join('');
+
+                    errorDiv.innerHTML = '' +
+                        '<div class="bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-800 ' +
+                        'text-red-700 dark:text-red-200 px-4 py-3 rounded-lg relative ' +
+                        'transition-all duration-200" role="alert">' +
+                        '<strong class="font-bold">Errors:</strong>' +
+                        '<ul class="list-disc list-inside mt-2">' + errorsHtml + '</ul>' +
+                        '<button type="button" class="absolute top-1 right-1 text-red-500 dark:text-red-400 ' +
+                        'hover:text-red-700 dark:hover:text-red-300 transition-colors duration-200" ' +
+                        'onclick="this.parentElement.remove()" ' +
+                        'aria-label="Dismiss">' +
+                        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+                        'd="M6 18L18 6M6 6l12 12"/>' +
+                        '</svg>' +
+                        '</button>' +
+                        '</div>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An unexpected error occurred. Please try again.');
+            } finally {
+                if (submitButton) submitButton.disabled = false;
+                if (buttonText) buttonText.textContent = 'Login';
+                if (loadingSpinner) loadingSpinner.classList.add('hidden');
             }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('An unexpected error occurred. Please try again.');
-        } finally {
-            submitButton.disabled = false;
-            buttonText.textContent = 'Login';
-            loadingSpinner.classList.add('hidden');
-        }
-    });
-=======
-    // Handle form submission feedback
-    (function() {
-        // Handle Flask flash messages
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    window.utils.showFeedback(
-                        {{ message|tojson }}, 
-                        {{ category|tojson }}
-                    );
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        // Handle WTForms validation errors
-        {% if form.errors %}
-            const errorMessages = [
-                {% for field, errors in form.errors.items() -%}
-                    {% for error in errors -%}
-                        {{ error|tojson }},
-                    {% endfor -%}
-                {% endfor -%}
-            ].filter(Boolean);
-            if (errorMessages.length > 0) {
-                window.utils.showFeedback(
-                    'Please fix the following errors:\\n- ' + errorMessages.join('\\n- '),
-                    'error',
-                    {duration: 7000}
-                );
-            }
-        {% endif %}
-    })();
->>>>>>> d13c2ede36cc1ba63584bcfb67827f7dcf2c2ba6
-
-    // Password visibility toggle
-    function togglePasswordVisibility(fieldId = 'password') {
-        const passwordInput = document.getElementById(fieldId);
-        const icon = document.getElementById(`${fieldId}-toggle-icon`);
-
-        if (!passwordInput || !icon) return;
-
-        if (passwordInput.type === 'password') {
-            passwordInput.type = 'text';
-            icon.innerHTML = `
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
-            `;
-        } else {
-            passwordInput.type = 'password';
-            icon.innerHTML = `
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-            `;
-        }
+        });
     }
+});
+
+function togglePasswordVisibility(fieldId = 'password') {
+    const passwordInput = document.getElementById(fieldId);
+    const icon = document.getElementById(fieldId + '-toggle-icon');
+    if (!passwordInput || !icon) return;
+
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        icon.innerHTML =
+            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+            'd="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7 ' +
+            'a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243 ' +
+            'M9.878 9.878l4.242 4.242 M9.88 9.88l-3.29-3.29 m7.532 7.532l3.29 3.29 ' +
+            'M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7 ' +
+            'a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
+    } else {
+        passwordInput.type = 'password';
+        icon.innerHTML =
+            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+            'd="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />' +
+            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
+            'd="M2.458 12C3.732 7.943 7.523 5 12 5 c4.478 0 8.268 2.943 9.542 7 ' +
+            '-1.274 4.057-5.064 7-9.542 7 -4.477 0-8.268-2.943-9.542-7z"/>';
+    }
+}
 </script>
 {% endblock %}
