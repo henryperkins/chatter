@@ -318,14 +318,14 @@ class UploadedFile(Base):
                 WHERE id = :file_id
             """)
             result = session.execute(query, {
-                    "file_id": file_id,
-                    "tokenized_text": tokenized_text
-                })
-                session.commit()
-                success = result.rowcount > 0
-                if success:
-                    logger.info(f"Stored tokenized content for file {file_id}")
-                return success
+                "file_id": file_id,
+                "tokenized_text": tokenized_text
+            })
+            session.commit()
+            success = result.rowcount > 0
+            if success:
+                logger.info(f"Stored tokenized content for file {file_id}")
+            return success
             except Exception as e:
                 session.rollback()
                 logger.error(f"Error storing tokenized content: {e}")
