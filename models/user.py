@@ -135,6 +135,19 @@ models/user.py
 ```python
 <<<<<<< SEARCH
             return cls.get_by_id(session, int(user_id))
+
+    @classmethod
+    def get_by_id(cls, session: Session, user_id: int) -> Optional["User"]:
+        """Retrieve a user by their ID with proper transaction isolation."""
+        if not user_id:
+            logger.debug("get_by_id called with null/zero user_id")
+            return None
+
+        try:
+            return session.query(cls).filter_by(id=user_id).first()
+        except Exception as e:
+            logger.error(f"Database error retrieving user {user_id}: {str(e)}", exc_info=True)
+            return None
 =======
             return cls.get_by_id(session, int(user_id))
 
