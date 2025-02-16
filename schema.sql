@@ -52,6 +52,15 @@ CREATE TABLE users (
     version INT NOT NULL DEFAULT 0
 );
 
+-- Login attempts tracking
+CREATE TABLE login_attempts (
+    id SERIAL PRIMARY KEY,
+    username TEXT NOT NULL,
+    ip_address TEXT NOT NULL,
+    attempted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    success BOOLEAN NOT NULL
+);
+
 -- MODELS TABLE
 CREATE TABLE models (
     id SERIAL PRIMARY KEY,
