@@ -275,18 +275,21 @@ def register():
                 raise ValueError("Invalid password")
 
             # Create user
-            with db_session() as session:
-                user = User.create(
-                    session,
-                    username=username,
-                    email=email,
-                    password=password_data
-                )
-                # Refresh to ensure we have latest DB state
-                session.refresh(user)
-
-            # Log in the user
-            login_user(user)
+            try:
+                with db_session() as session:
+                    user = User.create(
+                        session,
+                        username=username,
+                        email=email,
+                        password=password_data
+                    )
+                    # Refresh to ensure we have latest DB state
+                    session.refresh(user)
+                    login_user(user)
+            except IntegrityError as e:
+                logger.error(f"Registration integrity error: {str(e)}")
+                flash("Email address already exists", "error")
+                return render_template("register.html", form=form)
             session.permanent = True
             session["_fresh"] = True
             session["user_id"] = user.id
