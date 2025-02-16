@@ -177,7 +177,7 @@ class User(Base, UserMixin):
         """Create a new user with provided database session."""
         try:
             password_hash = generate_password_hash(password)
-            if isinstance(password_hash, bytes:
+            if isinstance(password_hash, bytes):
                 password_hash = password_hash.decode("utf-8")
 
             # Check for existing users first

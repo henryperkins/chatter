@@ -1,6 +1,7 @@
 import re
 import logging
 from datetime import datetime, timedelta
+from models.user import User
 
 from flask import current_app, request
 from flask_wtf import FlaskForm
