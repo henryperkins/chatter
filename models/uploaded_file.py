@@ -216,7 +216,7 @@ class UploadedFile(Base):
             raise
 
     @staticmethod
-    def update_search_status(session: Session, file_id: int, status: str, search_id: Optional[str] = None) -> bool:
+    def update_search_status(session: "Session", file_id: int, status: str, search_id: Optional[str] = None) -> bool:
         """
         Update the Azure Search indexing status for a file.
         """
@@ -233,22 +233,22 @@ class UploadedFile(Base):
                 WHERE id = :file_id
             """)
             result = session.execute(query, {
-                    "file_id": file_id,
-                    "status": status,
-                    "search_id": search_id
-                })
+                "file_id": file_id,
+                "status": status,
+                "search_id": search_id
+            })
             session.commit()
-                success = result.rowcount > 0
-                if success:
-                    logger.info(f"Updated Azure Search status to {status} for file {file_id}")
-                return success
-            except Exception as e:
+            success = result.rowcount > 0
+            if success:
+                logger.info(f"Updated Azure Search status to {status} for file {file_id}")
+            return success
+        except Exception as e:
             session.rollback()
-                logger.error(f"Error updating Azure Search status: {e}")
-                raise
+            logger.error(f"Error updating Azure Search status: {e}")
+            raise
 
     @staticmethod
-    def get_unindexed_files(session: Session) -> List["UploadedFile"]:
+    def get_unindexed_files(session: "Session") -> List["UploadedFile"]:
         """
         Get all files that haven't been indexed in Azure Search.
         """
@@ -261,12 +261,12 @@ class UploadedFile(Base):
             """)
             rows = session.execute(query).mappings().all()
             return [UploadedFile(**dict(row)) for row in rows]
-            except Exception as e:
-                logger.error(f"Error retrieving unindexed files: {e}")
-                raise
+        except Exception as e:
+            logger.error(f"Error retrieving unindexed files: {e}")
+            raise
 
     @staticmethod
-    def delete_by_azure_file_id(session: Session, azure_file_id: str) -> bool:
+    def delete_by_azure_file_id(session: "Session", azure_file_id: str) -> bool:
         """
         Delete an uploaded file by its Azure file ID.
         """
@@ -281,32 +281,31 @@ class UploadedFile(Base):
             if not file:
                 return False
 
-                # Delete database record
-                delete_query = text("""
-                    DELETE FROM uploaded_files
-                    WHERE azure_file_id = :azure_file_id
-                """)
-                session.execute(delete_query, {"azure_file_id": azure_file_id})
-                session.commit()
+            # Delete database record
+            delete_query = text("""
+                DELETE FROM uploaded_files
+                WHERE azure_file_id = :azure_file_id
+            """)
+            session.execute(delete_query, {"azure_file_id": azure_file_id})
+            session.commit()
 
-                # Clean up file from disk
-                filepath, size = file
-                try:
-                    if os.path.exists(filepath):
-                        os.remove(filepath)
-                        logger.info(f"Deleted file {filepath} ({size} bytes)")
-                except Exception as e:
-                    logger.error(f"Failed to delete file {filepath}: {e}")
-
-                return True
-
+            # Clean up file from disk
+            filepath, size = file
+            try:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                    logger.info(f"Deleted file {filepath} ({size} bytes)")
             except Exception as e:
+                logger.error(f"Failed to delete file {filepath}: {e}")
+
+            return True
+        except Exception as e:
             session.rollback()
-                logger.error(f"Error deleting file by Azure ID: {e}")
-                raise
+            logger.error(f"Error deleting file by Azure ID: {e}")
+            raise
 
     @staticmethod
-    def store_tokenized_content(session: Session, file_id: int, tokenized_text: str) -> bool:
+    def store_tokenized_content(session: "Session", file_id: int, tokenized_text: str) -> bool:
         """
         Save the tokenized version of an uploaded file's text in the DB.
         """
@@ -326,7 +325,7 @@ class UploadedFile(Base):
             if success:
                 logger.info(f"Stored tokenized content for file {file_id}")
             return success
-            except Exception as e:
+        except Exception as e:
             session.rollback()
-                logger.error(f"Error storing tokenized content: {e}")
-                raise
+            logger.error(f"Error storing tokenized content: {e}")
+            raise
