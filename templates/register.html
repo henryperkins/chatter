@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch("{{ url_for('auth.register') }}", {
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': document.getElementById('csrf_token').value,
+                    'X-CSRF-TOKEN': document.getElementById('csrf_token').value,
                     'Accept': 'application/json'
                 },
                 body: formData

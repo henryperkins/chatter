@@ -69,7 +69,7 @@ class ModelFormHandler {
             const csrfToken = this.utils.getCSRFToken();
             const headers = {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken,
+                'X-CSRF-TOKEN': csrfToken,
                 'X-Requested-With': 'XMLHttpRequest'
             };
 
