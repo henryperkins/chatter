@@ -108,8 +108,10 @@ def manage_users():
 
 
 @bp.route("/login", methods=["GET", "POST"])
-@limiter.limit("10/minute;100/day")
+@limiter.limit("20/minute;200/day")
 def login():
+    if current_app.config["ENV"] == "development":
+        limiter.exempt(login)
     if current_user.is_authenticated:
         return redirect(url_for("chat.chat_interface"))
 
