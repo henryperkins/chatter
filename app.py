@@ -432,11 +432,10 @@ def create_app() -> Flask:
         )
         return markdown_processor(text)
 
+    configure_mime_types(app)
+
     if hasattr(Flask, "_already_configured"):
         return Flask._app_instance  # type: ignore
-
-    app = Flask(__name__)
-    configure_mime_types(app)
     Flask._already_configured = True  # type: ignore
     Flask._app_instance = app  # type: ignore
 
