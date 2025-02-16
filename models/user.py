@@ -137,7 +137,6 @@ models/user.py
             return cls.get_by_id(session, int(user_id))
 =======
             return cls.get_by_id(session, int(user_id))
->>>>>>> d13c2ede36cc1ba63584bcfb67827f7dcf2c2ba6
 
     @classmethod
     def get_by_id(cls, session: Session, user_id: int) -> Optional["User"]:
