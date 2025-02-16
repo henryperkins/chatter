@@ -50,7 +50,7 @@ class Provider(Base):
     validation_rules: Mapped[str] = mapped_column(Text, nullable=True, default="{}")
     requires_authentication: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
-    capabilities: Mapped[str] = mapped_column(Text, nullable=True, default="{}")
+    capabilities: Mapped[dict] = mapped_column(JSON, nullable=True, default=lambda: {})
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
     # Optional fields
@@ -69,13 +69,14 @@ class Provider(Base):
         """
         # Handle both string and dict inputs
         if 'capabilities' in kwargs:
-            if isinstance(kwargs['capabilities'], dict):
-                kwargs['capabilities'] = json.dumps(kwargs['capabilities'])
-            elif isinstance(kwargs['capabilities'], str):
-                try:  # Parse if already in string format
-                    kwargs['capabilities'] = json.dumps(json.loads(kwargs['capabilities']))
+            # Ensure capabilities is always a dict
+            if isinstance(kwargs['capabilities'], str):
+                try:
+                    kwargs['capabilities'] = json.loads(kwargs['capabilities'])
                 except json.JSONDecodeError:
-                    kwargs['capabilities'] = "{}"
+                    kwargs['capabilities'] = {}
+            elif not isinstance(kwargs['capabilities'], dict):
+                kwargs['capabilities'] = {}
 
         if 'validation_rules' in kwargs:
             if isinstance(kwargs['validation_rules'], dict):
