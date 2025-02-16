@@ -237,13 +237,13 @@ class UploadedFile(Base):
                     "status": status,
                     "search_id": search_id
                 })
-                session.commit()
+            session.commit()
                 success = result.rowcount > 0
                 if success:
                     logger.info(f"Updated Azure Search status to {status} for file {file_id}")
                 return success
             except Exception as e:
-                session.rollback()
+            session.rollback()
                 logger.error(f"Error updating Azure Search status: {e}")
                 raise
 
@@ -301,7 +301,7 @@ class UploadedFile(Base):
                 return True
 
             except Exception as e:
-                session.rollback()
+            session.rollback()
                 logger.error(f"Error deleting file by Azure ID: {e}")
                 raise
 
@@ -327,6 +327,6 @@ class UploadedFile(Base):
                 logger.info(f"Stored tokenized content for file {file_id}")
             return success
             except Exception as e:
-                session.rollback()
+            session.rollback()
                 logger.error(f"Error storing tokenized content: {e}")
                 raise
