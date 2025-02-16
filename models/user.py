@@ -178,67 +178,23 @@ class User(Base, UserMixin):
             if isinstance(password_hash, bytes):
                 password_hash = password_hash.decode("utf-8")
 
-<<<<<<< HEAD
-            # Check for existing users first
-            existing = session.execute(
-                text("""
-                    SELECT 1 FROM users
-                    WHERE LOWER(username) = LOWER(:username)
-                    OR LOWER(email) = LOWER(:email)
-                """),
-                {
-                    "username": username.strip(),
-                    "email": email.strip().lower()
-                }
-            ).first()
-
-            if existing:
-                raise ValueError("Username or email already exists")
-
-            # Check if this is the first user
-            user_count = session.execute(text("SELECT COUNT(*) FROM users")).scalar()
-            is_first_user = user_count == 0
-
-            # Insert new user - first user gets admin role
-            result = session.execute(
-                text(
-                    """
-                    INSERT INTO users (
-                        username, email, password_hash, role,
-                        reset_token_hash, reset_token_expiry,
-                        created_at, is_active
-                    )
-                    VALUES (
-                        :username, :email, :password_hash, :role,
-                        NULL, NULL, NOW(), TRUE
-                    )
-                    RETURNING id, created_at
-                    """
-                ),
-                {
-                    "username": username.strip(),
-                    "email": email.strip().lower(),
-                    "password_hash": password_hash,
-                    "role": "admin" if is_first_user else "user"
-                },
-            ).mappings().first()
-
-            if not result:
-                logger.error("User creation failed - no result returned")
-                raise ValueError("Failed to create user")
+            # Create new user
+            new_user = cls(
+                username=username.strip(),
+                email=email.strip().lower(),
+                password_hash=password_hash,
+                role="admin" if is_first_user else "user",
+                _active=True
+            )
+            session.add(new_user)
+            session.flush()  # Get the ID without committing
             
-            user_id = result["id"]
-            logger.debug(f"User created with ID {user_id}")
+            logger.debug(f"User created with ID {new_user.id}")
+            session.commit()
             
-            # Refresh session to get new user
-            session.flush()
-            
-            created_user = session.get(cls, user_id)
-            if not created_user:
-                logger.error(f"Failed to retrieve created user with ID {user_id}")
-                raise ValueError("Failed to create user")
-            
-            return created_user
+            logger.debug(f"Successfully created and retrieved user: {new_user.to_dict()}")
+            return new_user
+>>>>>>> d13c2ede36cc1ba63584bcfb67827f7dcf2c2ba6
 =======
             # Create new user
             new_user = cls(
