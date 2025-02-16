@@ -443,6 +443,10 @@ def create_app() -> Flask:
     # Ensure config is loaded before database initialization
     config = Config()
     app.config.from_object(config)
+    
+    # Set required Flask-SQLAlchemy configuration
+    app.config['SQLALCHEMY_DATABASE_URI'] = config.DATABASE_URI
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     # Debug log the current environment
     import sys
@@ -451,11 +455,12 @@ def create_app() -> Flask:
     print(f"DEBUG: ENV: {app.config['ENV']}", file=sys.stderr)
     print(f"DEBUG: DEBUG: {app.config['DEBUG']}", file=sys.stderr)
 
-    # Initialize database first
+    # Initialize database and SQLAlchemy
     init_db_app(app)
+    db.init_app(app)
     
     # Initialize migrate with app and SQLAlchemy instance
-    migrate.init_app(app, db.db, render_as_batch=True)
+    migrate.init_app(app, db, render_as_batch=True)
 
     # Verify database connection
     max_retries = 3

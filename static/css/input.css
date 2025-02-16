@@ -41,4 +41,21 @@
           @apply transition-transform active:scale-95;
       }
   }
+
+  /* Feedback message styling */
+  .alert {
+      @apply border;
+  }
+
+  .alert-success {
+      @apply bg-green-100 dark:bg-green-900/50 border-green-400 dark:border-green-800 text-green-700 dark:text-green-200;
+  }
+
+  .alert-info {
+      @apply bg-blue-100 dark:bg-blue-900/50 border-blue-400 dark:border-blue-800 text-blue-700 dark:text-blue-200;
+  }
+
+  .alert-error {
+      @apply bg-red-100 dark:bg-red-900/50 border-red-400 dark:border-red-800 text-red-700 dark:text-red-200;
+  }
 }

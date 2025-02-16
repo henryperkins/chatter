@@ -1,6 +1,6 @@
-from typing import Dict, Any, Optional, TypeVar, List
+from typing import Dict, Any, Optional, TypeVar, List, Literal, Self
 from datetime import datetime
-from sqlalchemy import text, Integer, String, Boolean, DateTime, func
+from sqlalchemy import Integer, String, Boolean, DateTime, func, or_, update
 import logging
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from flask_login import UserMixin
@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from sqlalchemy.orm import Session, Mapped, mapped_column
 from models.base import Base
+from models.model import Model
 
 logger = logging.getLogger(__name__)
 
@@ -41,25 +42,31 @@ class User(Base, UserMixin):
         return str(self.id)
 
     @property
-    def is_authenticated(self) -> bool:
+    def is_authenticated(self) -> Literal[True]:
         """User is considered authenticated if loaded from the DB."""
         return True
 
     @property
-    def is_active(self) -> bool:
+    def is_active(self) -> Literal[True]:
         """Check if user account is active."""
-        return self._active
+        if not self._active:
+            raise ValueError("User is not active")
+        return True
 
     @property
-    def is_anonymous(self) -> bool:
+    def is_anonymous(self) -> Literal[False]:
         """By default, a real user is never anonymous."""
         return False
 
     def check_password(self, password: str) -> bool:
         """Check password with hash validation and error handling."""
         try:
-            if not self.password_hash or not password:
-                logger.debug("Missing password hash or empty password.")
+            if not password:
+                logger.debug("Empty password provided.")
+                return False
+
+            if not self.password_hash:
+                logger.debug("User has no password hash set.")
                 return False
 
             stored_hash = (
@@ -67,8 +74,16 @@ class User(Base, UserMixin):
                 if isinstance(self.password_hash, bytes)
                 else self.password_hash
             )
-            return check_password_hash(stored_hash, password)
+            if not stored_hash:
+                logger.debug("Invalid password hash format.")
+                return False
 
+            # Use type guard to narrow type
+            if not isinstance(stored_hash, str):
+                logger.debug("Password hash is not a valid string")
+                return False
+            # No need to cast since isinstance already confirmed it's a string
+            return check_password_hash(stored_hash, password)
         except Exception as e:
             logger.error(f"Password check failed for user {self.id}: {str(e)}")
             return False
@@ -105,7 +120,9 @@ class User(Base, UserMixin):
     @classmethod
     def get(cls, user_id: int) -> Optional["User"]:
         """Get user by ID for Flask-Login."""
-        return cls.get_by_id(user_id)
+        from database import db_session
+        with db_session() as session:
+            return cls.get_by_id(session, int(user_id))
 
     @classmethod
     def get_by_id(cls, session: Session, user_id: int) -> Optional["User"]:
@@ -115,32 +132,7 @@ class User(Base, UserMixin):
             return None
 
         try:
-                result = session.execute(
-                    text(
-                        """
-                        SELECT id, username, email, password_hash, role,
-                               created_at, reset_token_hash, reset_token_expiry, is_active,
-                               account_locked_until
-                        FROM users
-                        WHERE id = :user_id
-                        """
-                    ),
-                    {"user_id": user_id},
-                ).mappings().first()
-
-                if not result:
-                    logger.warning(f"No user found in database with ID: {user_id}")
-                    return None
-
-                user = User.from_dict(dict(result))
-                
-                if not user.is_active:
-                    logger.debug(f"Retrieved inactive user with ID: {user_id}")
-                else:
-                    logger.debug(f"Retrieved active user with ID: {user_id}")
-                    
-                return user
-
+            return session.query(cls).filter_by(id=user_id).first()
         except Exception as e:
             logger.error(f"Database error retrieving user {user_id}: {str(e)}", exc_info=True)
             return None
@@ -149,25 +141,10 @@ class User(Base, UserMixin):
     def get_by_email(cls, session: Session, email: str) -> Optional["User"]:
         """Get user by email using provided database session."""
         try:
-                row = session.execute(
-                    text(
-                        """
-                        SELECT id, username, email, password_hash, role,
-                               created_at, reset_token_hash, reset_token_expiry, is_active
-                        FROM users
-                        WHERE LOWER(email) = LOWER(:email)
-                          AND is_active = TRUE
-                        """
-                    ),
-                    {"email": email},
-                ).mappings().first()
-
-                if not row:
-                    logger.info(f"No user found with email: {email}")
-                    return None
-
-                return cls.from_dict(dict(row))
-
+            return session.query(cls).filter(
+                func.lower(cls.email) == func.lower(email),
+                cls._active.is_(True)
+            ).first()
         except SQLAlchemyError as e:
             logger.error(f"Database error retrieving user by email {email}: {str(e)}")
             return None
@@ -176,123 +153,87 @@ class User(Base, UserMixin):
     def create(cls, session: Session, username: str, email: str, password: str) -> "User":
         """Create a new user with provided database session."""
         try:
+            # First ensure we have a default model
+            default_model = session.query(Model).filter_by(is_default=True).first()
+            if not default_model:
+                # Create default model if none exists
+                from database import create_default_model
+                create_default_model(session)
+                session.commit()  # Commit the model creation first
+            
+            # Check if this is the first user
+            is_first_user = session.query(cls).count() == 0
+
+            # Check for existing users
+            existing = session.query(cls).filter(
+                or_(
+                    func.lower(cls.username) == func.lower(username.strip()),
+                    func.lower(cls.email) == func.lower(email.strip())
+                )
+            ).first()
+
+            if existing:
+                raise ValueError("Username or email already exists")
+
+            # Create password hash
             password_hash = generate_password_hash(password)
             if isinstance(password_hash, bytes):
                 password_hash = password_hash.decode("utf-8")
-                # First ensure we have a default model
-                default_model = session.execute(
-                    text("SELECT id FROM models WHERE is_default = TRUE")
-                ).scalar()
-                
-                if not default_model:
-                    # Create default model if none exists
-                    from database import create_default_model
-                    create_default_model(session)
-                    session.commit()  # Commit the model creation first
-                
-                # Check if this is the first user
-                user_count = session.execute(text("SELECT COUNT(*) FROM users")).scalar()
-                is_first_user = user_count == 0
 
-                # Now check for existing users
-                existing = session.execute(
-                    text("""
-                        SELECT 1 FROM users
-                        WHERE LOWER(username) = LOWER(:username)
-                        OR LOWER(email) = LOWER(:email)
-                    """),
-                    {
-                        "username": username.strip(),
-                        "email": email.strip().lower()
-                    }
-                ).first()
-
-                if existing:
-                    raise ValueError("Username or email already exists")
-
-                # Insert new user - first user gets admin role
-                result = session.execute(
-                    text(
-                        """
-                        INSERT INTO users (
-                            username, email, password_hash, role,
-                            reset_token_hash, reset_token_expiry,
-                            created_at, is_active
-                        )
-                        VALUES (
-                            :username, :email, :password_hash, :role,
-                            NULL, NULL, NOW(), TRUE
-                        )
-                        RETURNING id, created_at
-                        """
-                    ),
-                    {
-                        "username": username.strip(),
-                        "email": email.strip().lower(),
-                        "password_hash": password_hash,
-                        "role": "admin" if is_first_user else "user"
-                    },
-                ).mappings().first()
-
-                if not result:
-                    logger.error("User creation failed - no result returned")
-                    raise ValueError("Failed to create user")
-                    
-                user_id = result["id"]
-                logger.debug(f"User created with ID {user_id} and created_at {result.get('created_at')}")
-                session.commit()
-                
-                created_user = User.get_by_id(user_id)
-                if not created_user:
-                    logger.error(f"Failed to retrieve created user with ID {user_id}")
-                    raise ValueError("Failed to create user")
-                
-                logger.debug(f"Successfully created and retrieved user: {created_user.to_dict()}")
-                return created_user
+            # Create new user
+            new_user = cls(
+                username=username.strip(),
+                email=email.strip().lower(),
+                password_hash=password_hash,
+                role="admin" if is_first_user else "user",
+                _active=True
+            )
+            session.add(new_user)
+            session.flush()  # Get the ID without committing
+            
+            logger.debug(f"User created with ID {new_user.id}")
+            session.commit()
+            
+            logger.debug(f"Successfully created and retrieved user: {new_user.to_dict()}")
+            return new_user
 
         except IntegrityError as e:
             logger.error(
-                 f"Integrity error creating user '{username}': {e}",
-                 exc_info=True,
-                 extra={
-                     "file": "models/user.py",
-                     "phase": "user creation",
-                     "username": username,
-                     "email": email
-                 }
-             )
+                f"Integrity error creating user '{username}': {e}",
+                exc_info=True,
+                extra={
+                    "file": "models/user.py",
+                    "phase": "user creation",
+                    "username": username,
+                    "email": email
+                }
+            )
             raise ValueError("Username or email already exists")
         except Exception as e:
             logger.error(
-                 f"Error creating user '{username}': {e}",
-                 exc_info=True,
-                 extra={
-                     "file": "models/user.py",
-                     "phase": "user creation",
-                     "username": username,
-                     "email": email
-                 }
-             )
+                f"Error creating user '{username}': {e}",
+                exc_info=True,
+                extra={
+                    "file": "models/user.py",
+                    "phase": "user creation",
+                    "username": username,
+                    "email": email
+                }
+            )
             raise
 
     @staticmethod
     def verify_user_exists(session: Session, user_id: int) -> bool:
         """Verify that a user exists and is active using provided session."""
         try:
-                exists = session.execute(
-                    text(
-                        """
-                        SELECT 1 FROM users
-                        WHERE id = :user_id
-                          AND is_active = TRUE
-                        """
-                    ),
-                    {"user_id": user_id},
-                ).scalar() is not None
-                logger.debug(
-                    f"User existence check for ID {user_id}: {'Exists' if exists else 'Not found'}"
-                )
-                return exists
+            exists = session.query(User).filter(
+                User.id == user_id,
+                User._active.is_(True)
+            ).first() is not None
+            logger.debug(
+                f"User existence check for ID {user_id}: {'Exists' if exists else 'Not found'}"
+            )
+            return exists
         except Exception as e:
             logger.error(f"Error verifying user existence for ID {user_id}: {str(e)}")
             return False
@@ -301,24 +242,10 @@ class User(Base, UserMixin):
     def get_by_username(cls, session: Session, username: str) -> Optional["User"]:
         """Retrieve a user by username (case-insensitive)."""
         try:
-                row = session.execute(
-                    text(
-                        """
-                        SELECT id, username, email, password_hash, role,
-                               created_at, reset_token_hash, reset_token_expiry, is_active
-                        FROM users
-                        WHERE LOWER(username) = LOWER(:username)
-                          AND is_active = TRUE
-                        """
-                    ),
-                    {"username": username.strip()},
-                ).mappings().first()
-
-                if not row:
-                    logger.debug(f"No user found for username: {username}")
-                    return None
-
-                return cls.from_dict(dict(row))
+            return session.query(cls).filter(
+                func.lower(cls.username) == func.lower(username.strip()),
+                cls._active.is_(True)
+            ).first()
         except Exception as e:
             logger.error(f"Error retrieving user by username {username}: {str(e)}")
             return None
@@ -327,82 +254,79 @@ class User(Base, UserMixin):
     def update(session: Session, user_id: int, data: Dict[str, Any]) -> bool:
         """Update an existing user's attributes using provided session."""
         try:
-                allowed_fields = {"username", "email", "password_hash", "role", "is_active"}
-                update_data = {k: v for k, v in data.items() if k in allowed_fields}
+            allowed_fields = {"username", "email", "password_hash", "role", "_active"}
+            update_data = {k: v for k, v in data.items() if k in allowed_fields}
 
-                if not update_data:
-                    logger.info(f"No valid fields to update for user ID {user_id}")
-                    return False
+            if not update_data:
+                logger.info(f"No valid fields to update for user ID {user_id}")
+                return False
 
-                set_clause = ", ".join(f"{key} = :{key}" for key in update_data)
-                params = {**update_data, "user_id": user_id}
+            # Convert is_active to _active for database field
+            if "is_active" in update_data:
+                update_data["_active"] = update_data.pop("is_active")
 
-                result = session.execute(
-                    text(
-                        f"""
-                        UPDATE users
-                        SET {set_clause}
-                        WHERE id = :user_id
-                        RETURNING id
-                        """
-                    ),
-                    params,
-                )
+            # Use SQLAlchemy update
+            stmt = (
+                update(User)
+                .where(User.id == user_id)
+                .values(**update_data)
+                .returning(User.id)
+            )
+            result = session.execute(stmt)
+            success = result.scalar() is not None
 
-                success = result.scalar() is not None
-                if success:
-                    logger.info(f"User {user_id} updated successfully")
-                return success
+            if success:
+                logger.info(f"User {user_id} updated successfully")
+                session.commit()
+            return success
 
         except SQLAlchemyError as e:
             logger.error(f"Database error updating user {user_id}: {e}")
+            session.rollback()
             raise ValueError(f"Failed to update user: {str(e)}")
 
     @staticmethod
     def deactivate(session: Session, user_id: int) -> bool:
         """Deactivate a user account using provided session."""
         try:
-                result = session.execute(
-                    text(
-                        """
-                        UPDATE users
-                        SET is_active = FALSE
-                        WHERE id = :user_id
-                        RETURNING id
-                        """
-                    ),
-                    {"user_id": user_id},
-                )
-                success = result.scalar() is not None
-                if success:
-                    logger.info(f"User {user_id} deactivated")
-                return success
+            stmt = (
+                update(User)
+                .where(User.id == user_id)
+                .values(_active=False)
+                .returning(User.id)
+            )
+            result = session.execute(stmt)
+            success = result.scalar() is not None
+            
+            if success:
+                logger.info(f"User {user_id} deactivated")
+                session.commit()
+            return success
         except Exception as e:
             logger.error(f"Error deactivating user {user_id}: {e}")
+            session.rollback()
             return False
 
     @staticmethod
     def validate_reset_token(session: Session, token: str) -> Optional["User"]:
         """Validate a password reset token by comparing hashes using provided session."""
         try:
-                # Get all users with unexpired reset tokens
-                results = session.execute(
-                    text(
-                        """
-                        SELECT id, username, email, password_hash, role,
-                               created_at, reset_token_hash, reset_token_expiry, is_active
-                        FROM users
-                        WHERE reset_token_expiry > NOW()
-                          AND is_active = TRUE
-                        """
-                    )
-                ).mappings().all()
+            # Get all users with unexpired reset tokens
+            users = (
+                session.query(User)
+                .filter(
+                    User.reset_token_expiry > func.now(),
+                    User._active.is_(True)
+                )
+                .all()
+            )
 
-                # Compare hashes in Python
-                for user_data in results:
-                    if check_password_hash(user_data["reset_token_hash"], token):
-                        return User.from_dict(dict(user_data))
-                return None
+            # Compare hashes in Python
+            for user in users:
+                if user.reset_token_hash and isinstance(user.reset_token_hash, str):
+                    if check_password_hash(user.reset_token_hash, token):
+                        return user
+            return None
         except Exception as e:
             logger.error(f"Error validating reset token: {e}")
             return None
@@ -411,48 +335,46 @@ class User(Base, UserMixin):
     def set_role(session: Session, user_id: int, role: str) -> bool:
         """Change a user's role using provided session."""
         try:
-                result = session.execute(
-                    text(
-                        """
-                        UPDATE users
-                        SET role = :role
-                        WHERE id = :user_id
-                        RETURNING id
-                        """
-                    ),
-                    {"user_id": user_id, "role": role},
-                )
-                success = result.scalar() is not None
-                if success:
-                    logger.info(f"User {user_id} role updated to {role}")
-                return success
+            stmt = (
+                update(User)
+                .where(User.id == user_id)
+                .values(role=role)
+                .returning(User.id)
+            )
+            result = session.execute(stmt)
+            success = result.scalar() is not None
+            
+            if success:
+                logger.info(f"User {user_id} role updated to {role}")
+                session.commit()
+            return success
         except Exception as e:
             logger.error(f"Error updating role for user {user_id}: {e}")
+            session.rollback()
             return False
 
     def save(self, session: Session) -> bool:
         """Save current user state to database using provided session."""
         try:
-                result = session.execute(
-                    text("""
-                        UPDATE users 
-                        SET failed_login_attempts = :attempts,
-                            account_locked_until = :locked_until
-                        WHERE id = :user_id
-                        RETURNING id
-                    """),
-                    {
-                        "attempts": self.failed_login_attempts,
-                        "locked_until": self.account_locked_until,
-                        "user_id": self.id
-                    }
+            stmt = (
+                update(User)
+                .where(User.id == self.id)
+                .values(
+                    failed_login_attempts=self.failed_login_attempts,
+                    account_locked_until=self.account_locked_until
                 )
-                success = result.scalar() is not None
-                if success:
-                    logger.info(f"Updated user {self.id} state")
-                return success
+                .returning(User.id)
+            )
+            result = session.execute(stmt)
+            success = result.scalar() is not None
+            
+            if success:
+                logger.info(f"Updated user {self.id} state")
+                session.commit()
+            return success
         except Exception as e:
             logger.error(f"Error saving user {self.id} state: {e}")
+            session.rollback()
             return False
 
     def change_password(self, session: Session, new_password: str) -> bool:
@@ -461,27 +383,28 @@ class User(Base, UserMixin):
             password_hash = generate_password_hash(new_password)
             if isinstance(password_hash, bytes):
                 password_hash = password_hash.decode("utf-8")
-                result = session.execute(
-                    text(
-                        """
-                        UPDATE users
-                        SET password_hash = :password_hash,
-                            reset_token_hash = NULL,
-                            reset_token_expiry = NULL
-                        WHERE id = :user_id
-                        RETURNING id
-                        """
-                    ),
-                    {"password_hash": password_hash, "user_id": self.id},
+
+            stmt = (
+                update(User)
+                .where(User.id == self.id)
+                .values(
+                    password_hash=password_hash,
+                    reset_token_hash=None,
+                    reset_token_expiry=None
                 )
-                success = result.scalar() is not None
-                if success:
-                    session.commit()
-                    self.password_hash = password_hash
-                    logger.info(f"Password changed for user {self.id}")
-                return success
+                .returning(User.id)
+            )
+            result = session.execute(stmt)
+            success = result.scalar() is not None
+            
+            if success:
+                self.password_hash = password_hash
+                logger.info(f"Password changed for user {self.id}")
+                session.commit()
+            return success
         except Exception as e:
             logger.error(f"Error changing password for user {self.id}: {e}")
+            session.rollback()
             return False
 
     @property
@@ -501,22 +424,15 @@ class User(Base, UserMixin):
         }
 
     @classmethod
-    def list_active_users(cls, session: Session) -> List["User"]:
+    def list_active_users(cls, session: Session) -> List[Self]:
         """Get all active users using provided session."""
         try:
-                results = session.execute(
-                    text(
-                        """
-                        SELECT id, username, email, password_hash, role,
-                               created_at, is_active
-                        FROM users
-                        WHERE is_active = TRUE
-                        ORDER BY created_at DESC
-                        """
-                    )
-                ).mappings().all()
-
-                return [cls.from_dict(dict(row)) for row in results]
+            return (
+                session.query(cls)
+                .filter(cls._active.is_(True))
+                .order_by(cls.created_at.desc())
+                .all()
+            )
         except Exception as e:
             logger.error(f"Error listing active users: {e}")
             return []
@@ -525,20 +441,20 @@ class User(Base, UserMixin):
     def bulk_deactivate(session: Session, user_ids: List[int]) -> bool:
         """Deactivate multiple users at once using provided session."""
         try:
-                result = session.execute(
-                    text(
-                        """
-                        UPDATE users
-                        SET is_active = FALSE
-                        WHERE id = ANY(:user_ids)
-                        RETURNING id
-                        """
-                    ),
-                    {"user_ids": user_ids},
-                )
-                affected = result.rowcount
+            stmt = (
+                update(User)
+                .where(User.id.in_(user_ids))
+                .values(_active=False)
+                .returning(User.id)
+            )
+            result = session.execute(stmt)
+            affected = len(result.all())
+            
+            if affected > 0:
                 logger.info(f"Deactivated {affected} users")
-                return affected > 0
+                session.commit()
+            return affected > 0
         except Exception as e:
             logger.error(f"Error bulk deactivating users: {e}")
+            session.rollback()
             return False
