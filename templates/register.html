@@ -14,8 +14,8 @@
         </div>
         {% endif %}
 
-        <form id="registration-form" method="POST" action="{{ url_for('auth.register') }}" class="space-y-6">
-            {{ form.hidden_tag() }}
+        <form id="registration-form" method="POST" class="space-y-6">
+            <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token() }}">
 
             <!-- Form Errors -->
             <div id="form-errors" class="text-red-600 dark:text-red-400 text-sm mt-2 hidden"></div>
@@ -134,6 +134,46 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Manejo del formulario de registro
+    document.getElementById('registration-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const form = e.target;
+        const formData = new FormData(form);
+        const submitButton = document.getElementById('submit-button');
+        const errorDiv = document.getElementById('form-errors');
+
+        submitButton.disabled = true;
+        errorDiv.classList.add('hidden');
+
+        try {
+            const response = await fetch("{{ url_for('auth.register') }}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.getElementById('csrf_token').value,
+                    'Accept': 'application/json'
+                },
+                body: formData
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                window.location.href = "{{ url_for('chat.chat_interface') }}";
+            } else {
+                errorDiv.innerHTML = Object.values(data.errors).map(error => 
+                    `<div class="error-text">${error}</div>`
+                ).join('');
+                errorDiv.classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            errorDiv.innerHTML = '<div class="error-text">An unexpected error occurred. Please try again.</div>';
+            errorDiv.classList.remove('hidden');
+        } finally {
+            submitButton.disabled = false;
+        }
+    });
     window.togglePasswordVisibility = function(fieldId) {
         const field = document.getElementById(fieldId);
         const icon = document.getElementById(`${fieldId}-toggle-icon`);

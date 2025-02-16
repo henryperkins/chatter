@@ -27,8 +27,8 @@
             {% endif %}
         </div>
 
-        <form id="login-form" method="POST" action="{{ url_for('auth.login') }}" class="space-y-6">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <form id="login-form" method="POST" class="space-y-6">
+            <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token() }}">
 
             <!-- Username Field -->
             <div class="space-y-1">
@@ -119,6 +119,61 @@
 {% block scripts %}
 {{ super() }}
 <script>
+    // Manejo del formulario de login
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const form = e.target;
+        const formData = new FormData(form);
+        const submitButton = document.getElementById('submit-button');
+        const buttonText = document.getElementById('button-text');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        
+        // Mostrar estado de carga
+        submitButton.disabled = true;
+        buttonText.textContent = 'Authenticating...';
+        loadingSpinner.classList.remove('hidden');
+
+        try {
+            const response = await fetch("{{ url_for('auth.login') }}", {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': document.getElementById('csrf_token').value,
+                    'Accept': 'application/json'
+                },
+                body: formData
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                window.location.href = data.redirect || "{{ url_for('chat.chat_interface') }}";
+            } else {
+                // Mostrar errores
+                const errorDiv = document.getElementById('error-message');
+                errorDiv.innerHTML = `
+                    <div class="bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-800 text-red-700 dark:text-red-200 px-4 py-3 rounded-lg relative transition-all duration-200" role="alert">
+                        <strong class="font-bold">Errors:</strong>
+                        <ul class="list-disc list-inside mt-2">
+                            ${Object.values(data.errors).map(error => `<li>${error}</li>`).join('')}
+                        </ul>
+                        <button type="button" class="absolute top-1 right-1 text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors duration-200" onclick="this.parentElement.remove()" aria-label="Dismiss">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>`;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An unexpected error occurred. Please try again.');
+        } finally {
+            submitButton.disabled = false;
+            buttonText.textContent = 'Login';
+            loadingSpinner.classList.add('hidden');
+        }
+    });
+
     // Password visibility toggle
     function togglePasswordVisibility(fieldId = 'password') {
         const passwordInput = document.getElementById(fieldId);
