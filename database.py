@@ -1,12 +1,5 @@
 """
 Database module for the application.
-
-Key functionalities:
-• mark_initialized() and is_initialized()
-• test_db_connection() for quick connectivity checks
-• db_session() and db_transaction() context managers
-• check_open_transactions() and check_db_health() for diagnostics
-• init_db(), init_app(), and init_db_command() for schema and app initialization
 """
 
 import os
@@ -46,43 +39,32 @@ from tenacity import (
 from config import Config
 from logging_config import get_logger
 
+from models.model import Model  # Needed in create_default_model
 logger = get_logger(__name__)
 
-# Type variables and aliases
 T = TypeVar("T")
 F = TypeVar("F", bound=Callable[..., Any])
 DbState = Dict[str, Union[Engine, scoped_session, bool, None]]
 SessionFactory = scoped_session
 
-# Global marker if desired (optional); rely on db_state["initialized"] mostly
 _initialized = False
 
-# Connection pool settings
 POOL_SETTINGS = {
     "POOL_SIZE": int(os.getenv("DB_POOL_SIZE", "15")),
     "MAX_OVERFLOW": int(os.getenv("DB_MAX_OVERFLOW", "30")),
     "POOL_TIMEOUT": int(os.getenv("DB_POOL_TIMEOUT", "30")),
-    "POOL_PRE_PING": True,  # Always check connection before using
+    "POOL_PRE_PING": True,
     "POOL_RECYCLE": int(os.getenv("DB_POOL_RECYCLE", "3600")),
 }
 
-
-# Initialize Flask-SQLAlchemy
 db = SQLAlchemy()
 
 
 def get_db_state(app: Optional[Flask] = None) -> DbState:
-    """
-    Retrieve the chatter-db state from Flask's extensions dict, ensuring a
-    default structure if not present.
-    """
     if not app:
         app = current_app
     if not app:
-        # If there's truly no app context, return a safe default.
         return {"engine": None, "Session": None, "initialized": False}
-
-    # Guarantee our extension dict is present
     db_state = app.extensions.setdefault("chatter-db", {
         "engine": None,
         "Session": None,
@@ -92,10 +74,6 @@ def get_db_state(app: Optional[Flask] = None) -> DbState:
 
 
 def mark_initialized() -> None:
-    """
-    Mark the database as initialized. Optionally keep a global
-    marker if you want to skip repeated inits.
-    """
     global _initialized
     _initialized = True
     db_state = get_db_state()
@@ -103,17 +81,11 @@ def mark_initialized() -> None:
 
 
 def is_initialized() -> bool:
-    """
-    Check if the database is marked as initialized.
-    """
     db_state = get_db_state()
     return bool(db_state.get("initialized", False))
 
 
 def create_db_engine(db_uri: str) -> Engine:
-    """
-    Create SQLAlchemy engine with optimized settings.
-    """
     return create_engine(
         db_uri,
         future=True,
@@ -145,10 +117,6 @@ def with_db_retries(
     max_attempts: int = 3,
     wait_seconds: float = 0.5
 ) -> Callable[[F], F]:
-    """
-    Decorator to retry certain database operations using Tenacity.
-    Retries on OperationalError or InterfaceError.
-    """
     def decorator(func: F) -> F:
         @retry(
             stop=stop_after_attempt(max_attempts),
@@ -168,7 +136,6 @@ def with_db_retries(
             except Exception as e:
                 logger.error(f"Unexpected error: {str(e)}")
                 raise
-
         return cast(F, wrapper)
     return decorator
 
@@ -179,11 +146,8 @@ def execute_statement(
     statement: str,
     params: Optional[Dict[str, Any]] = None
 ) -> CursorResult[Row[Any]]:
-    """
-    Execute a SQL statement with optional params, returning a CursorResult.
-    """
-    import time  # For timing measurements
-    logger.debug("Executing SQL statement: %s", statement[:200])  # Truncated log
+    import time
+    logger.debug("Executing SQL statement: %s", statement[:200])
     try:
         start_time = time.perf_counter()
         with db.begin():
@@ -202,10 +166,6 @@ def execute_statement(
 
 
 def test_db_connection() -> None:
-    """
-    Test database connection by executing a simple query.
-    Uses a fresh session to avoid any existing transaction state.
-    """
     try:
         db_state = get_db_state()
         session_factory = cast(Optional[SessionFactory], db_state.get("Session"))
@@ -229,10 +189,6 @@ def test_db_connection() -> None:
 
 @contextmanager
 def db_session(app: Optional[Flask] = None, transactional: bool = False) -> Iterator[Session]:
-    """
-    Provides a session context manager. If 'transactional' is True,
-    a transaction is opened and committed/rolled back around the block.
-    """
     db_state = get_db_state(app)
     session_factory = db_state["Session"]
     if not session_factory:
@@ -254,10 +210,6 @@ def db_session(app: Optional[Flask] = None, transactional: bool = False) -> Iter
 
 @contextmanager
 def db_transaction(app: Optional[Flask] = None) -> Iterator[Session]:
-    """
-    A specialized transactional context from a snippet.
-    Always begins a transaction, commits if successful, rolls back on error.
-    """
     db_state = get_db_state(app)
     session_factory = db_state["Session"]
     if not session_factory:
@@ -276,11 +228,8 @@ def db_transaction(app: Optional[Flask] = None) -> Iterator[Session]:
 
 
 def create_default_model(db: Session) -> Optional[int]:
-    from models.model import Model  # Local import to avoid circular dependency
-    from models.provider import Provider  # Local import to avoid circular dependency
     """
     Create a default model if it doesn't exist.
-    References config.py for encryption details.
     """
     # Check if a default model already exists
     result = db.execute(text("SELECT COUNT(*) FROM models WHERE is_default = TRUE"))
@@ -288,19 +237,20 @@ def create_default_model(db: Session) -> Optional[int]:
         return None
 
     try:
-        from models.provider import Provider  # Local import to avoid circular dependency
+        from config import Config
         config_instance = Config()
+
+        from models.provider import Provider
 
         # Check if provider exists
         provider = Provider.get_by_slug(db, 'azure-openai')
-        
         if provider:
             if not provider.is_azure:
                 provider.is_azure = True
                 db.commit()
             provider_id = provider.id
         else:
-            # Create new provider using ORM
+            # Create new provider using raw SQL or ORM
             result = db.execute(text("""
                 INSERT INTO providers (
                     name, slug, api_base_url, requires_authentication,
@@ -330,22 +280,14 @@ def create_default_model(db: Session) -> Optional[int]:
             provider_id = result.scalar()
             db.commit()
 
-        # Encrypt API key
-        try:
-            from utils.encryption import encrypt_api_key
-            config_instance = Config()
-            # Ensure keys are not None
-            if not config_instance.AZURE_OPENAI_KEY or not config_instance.ENCRYPTION_KEY:
-                raise ValueError("Missing API or ENCRYPTION key in config.")
-            api_key = encrypt_api_key(
-                config_instance.AZURE_OPENAI_KEY,
-                config_instance.ENCRYPTION_KEY
-            )
-        except Exception as e:
-            logger.error(f"Failed to encrypt API key: {e}")
-            raise ValueError("Failed to encrypt API key")
+        from utils.encryption import encrypt_api_key
+        if not config_instance.AZURE_OPENAI_KEY or not config_instance.ENCRYPTION_KEY:
+            raise ValueError("Missing API or ENCRYPTION key in config.")
+        api_key = encrypt_api_key(
+            config_instance.AZURE_OPENAI_KEY,
+            config_instance.ENCRYPTION_KEY
+        )
 
-        # Build model data
         model_data = {
             "provider_id": provider_id,
             "name": config_instance.DEFAULT_MODEL_NAME,
@@ -363,9 +305,13 @@ def create_default_model(db: Session) -> Optional[int]:
             "supports_streaming": False,
             "is_default": True,
         }
-        Model.validate_model_config(model_data)
+
+        # Validate the model config with the session
+        Model.validate_model_config(model_data, db)
+
+        # Now actually create the record
         model_id = Model.create(db, model_data)
-        logger.info("Default model created successfully")
+        logger.info("Default model created successfully with ID %s", model_id)
         return model_id
 
     except Exception as e:
@@ -375,9 +321,6 @@ def create_default_model(db: Session) -> Optional[int]:
 
 
 def check_open_transactions() -> List[Dict[str, Any]]:
-    """
-    Check for open transactions that might be stuck (long idle in transaction).
-    """
     try:
         with db_session() as session:
             result = session.execute(text("""
@@ -398,17 +341,6 @@ def check_open_transactions() -> List[Dict[str, Any]]:
 
 
 def check_db_health() -> Dict[str, Any]:
-    """
-    Perform a more comprehensive database health check:
-    - Basic connectivity
-    - Pool stats
-    - Blocked queries
-    - Optional replication status
-    - Long-running queries
-    - Database size
-    - Connection stats
-    - Open transactions
-    """
     health_status = {
         "status": "healthy",
         "details": {},
@@ -424,7 +356,6 @@ def check_db_health() -> Dict[str, Any]:
                 health_status["status"] = "unhealthy"
                 health_status["errors"].append("Basic connectivity check failed")
 
-            # Corrected pool stats access
             engine = session.get_bind()
             pool_stats = {
                 "checked_out": engine.pool.checkedout(),
@@ -437,7 +368,6 @@ def check_db_health() -> Dict[str, Any]:
             }
             health_status["details"]["pool"] = pool_stats
 
-            # Blocked queries
             blocked_queries = session.execute(text("""
                 SELECT COUNT(*)
                 FROM pg_stat_activity
@@ -448,7 +378,7 @@ def check_db_health() -> Dict[str, Any]:
                 health_status["status"] = "degraded"
                 health_status["details"]["blocked_queries"] = blocked_queries
 
-            # Replication status (may fail if not a replication setup)
+            # Replication status (ignore if not present)
             try:
                 rep_result = session.execute(text("""
                     SELECT state, sync_state
@@ -458,9 +388,8 @@ def check_db_health() -> Dict[str, Any]:
                 if replication_status:
                     health_status["details"]["replication"] = replication_status
             except Exception:
-                pass  # Not a replication setup
+                pass
 
-            # Long-running queries
             long_running = session.execute(text("""
                 SELECT pid,
                        age(clock_timestamp(), query_start) AS duration,
@@ -475,13 +404,11 @@ def check_db_health() -> Dict[str, Any]:
                 health_status["status"] = "degraded"
                 health_status["details"]["long_running"] = [dict(row) for row in long_running]
 
-            # Database size
             db_size = session.execute(text("""
                 SELECT pg_size_pretty(pg_database_size(current_database()))
             """)).scalar()
             health_status["details"]["size"] = db_size
 
-            # Connection stats
             conn_stats = session.execute(text("""
                 SELECT state, count(*)
                 FROM pg_stat_activity
@@ -490,7 +417,6 @@ def check_db_health() -> Dict[str, Any]:
             """)).all()
             health_status["details"]["connections"] = dict(conn_stats)
 
-            # Check open transactions
             open_txs = check_open_transactions()
             if open_txs:
                 health_status["status"] = "degraded"
@@ -506,23 +432,16 @@ def check_db_health() -> Dict[str, Any]:
 
 
 def init_db() -> None:
-    """
-    (Re)Initialize the database using SQLAlchemy metadata.
-    Now uses reflection to handle dependent objects properly.
-    """
     from models.base import Base
     from sqlalchemy import MetaData
 
     try:
         db_state = get_db_state()
         engine = db_state["engine"]
-
         if not engine:
             raise RuntimeError("Database engine not initialized")
 
-        # Attempt to ensure the providers table has is_active if it already exists
-        # so that inserting the new provider row won't fail.
-        # If the table doesn't exist, this will be ignored.
+        # Attempt to ensure certain columns exist
         try:
             with engine.begin() as conn:
                 conn.execute(
@@ -531,21 +450,16 @@ def init_db() -> None:
         except Exception:
             pass
 
-        # Reflect existing DB state into a temporary MetaData instance
         meta = MetaData()
         meta.reflect(bind=engine)
-
-        # Drop all reflected tables (handles dependent objects)
         meta.drop_all(bind=engine)
 
-        # Now create our tables as defined by Base
         Base.metadata.create_all(bind=engine)
 
         # Create a default model if needed
-        with db_session(transactional=True) as db:
-            create_default_model(db)
+        with db_session(transactional=True) as dbs:
+            create_default_model(dbs)
 
-        # Mark the database initialization as done
         mark_initialized()
         logger.info("Database initialization completed successfully")
 
@@ -555,10 +469,6 @@ def init_db() -> None:
 
 
 def init_app(app: Flask) -> None:
-    """
-    Initialize database for the Flask application. This function is typically
-    called once during app startup, e.g., in your create_app() factory.
-    """
     db_state = get_db_state(app)
     if db_state["initialized"]:
         logger.debug("Database is already initialized; skipping init_app.")
@@ -571,12 +481,12 @@ def init_app(app: Flask) -> None:
         engine = db_state["engine"]
         logger.info("Database engine created successfully with URI: %s", app.config["DATABASE_URI"])
 
-        # Test a raw connection
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
             conn.commit()
 
-        # Create a custom Session class if you need special behavior
+        from sqlalchemy.orm import Session
+
         class CustomSession(Session):
             def __init__(self, *args, **kwargs):
                 kwargs.setdefault("autocommit", False)
@@ -605,10 +515,6 @@ def init_app(app: Flask) -> None:
 
 
 def close_db(e: Optional[BaseException] = None) -> None:
-    """
-    Clean up database resources, disposing of the engine pool.
-    Typically called on app teardown.
-    """
     db_state = get_db_state()
     if not db_state["initialized"]:
         return
@@ -631,11 +537,6 @@ def close_db(e: Optional[BaseException] = None) -> None:
 
 @click.command("init-db")
 def init_db_command() -> None:
-    """
-    Flask CLI command to initialize the database.
-    This is wired in your app's CLI group, e.g.:
-      app.cli.add_command(init_db_command)
-    """
     try:
         init_db()
         click.echo("Initialized the database.")
