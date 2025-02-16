@@ -722,32 +722,3 @@ def health_check():
         return create_error_response("Service unavailable", 500)
 
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    host = os.environ.get("HOST", "0.0.0.0")
-    debug_mode = app.config["DEBUG"]
-
-    app.config.update(
-        {
-            "DEBUG": debug_mode,
-            "TEMPLATES_AUTO_RELOAD": debug_mode,
-            "SEND_FILE_MAX_AGE_DEFAULT": 0,  # Disable caching completely in development
-        }
-    )
-
-    if debug_mode:
-        logger.warning("Debug mode is enabled - not recommended for production")
-        app.config.update(
-            {"DEBUG_TB_ENABLED": False, "DEBUG_TB_INTERCEPT_REDIRECTS": False}
-        )
-
-    logger.info(f"Starting application on {host}:{port}")
-    from werkzeug.serving import run_simple
-
-    run_simple(
-        host,
-        port,
-        app,
-        use_debugger=app.config["DEBUG"],
-        request_handler=UTF8RequestHandler,
-    )
