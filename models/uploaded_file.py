@@ -278,8 +278,8 @@ class UploadedFile(Base):
             """)
             file = session.execute(query, {"azure_file_id": azure_file_id}).first()
 
-                if not file:
-                    return False
+            if not file:
+                return False
 
                 # Delete database record
                 delete_query = text("""
