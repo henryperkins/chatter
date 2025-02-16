@@ -117,30 +117,24 @@ class User(Base, UserMixin):
             account_locked_until=data.get("account_locked_until"),
         )
 
-            return cls.get_by_id(session, int(user_id))
->>>>>>> d13c2ede36cc1ba63584bcfb67827f7dcf2c2ba6
+        return cls(
+            id=int(data["id"]),
+            username=data["username"],
+            email=data["email"],
+            password_hash=data.get("password_hash"),
+            role=data.get("role", "user"),
+            created_at=created_at,
+            reset_token_hash=data.get("reset_token_hash"),
+            reset_token_expiry=reset_token_expiry,
+            _active=data.get("is_active", True),
+            account_locked_until=data.get("account_locked_until"),
+        )
 ```
 
 models/user.py
 ```python
 <<<<<<< SEARCH
-            # Create new user
-            new_user = cls(
-                username=username.strip(),
-                email=email.strip().lower(),
-                password_hash=password_hash,
-                role="admin" if is_first_user else "user",
-                _active=True
-            )
-            session.add(new_user)
-            session.flush()  # Get the ID without committing
-            
-            logger.debug(f"User created with ID {new_user.id}")
-            session.commit()
-            
-            logger.debug(f"Successfully created and retrieved user: {new_user.to_dict()}")
-            return new_user
->>>>>>> d13c2ede36cc1ba63584bcfb67827f7dcf2c2ba6
+            return cls.get_by_id(session, int(user_id))
 =======
             return cls.get_by_id(session, int(user_id))
 >>>>>>> d13c2ede36cc1ba63584bcfb67827f7dcf2c2ba6
