@@ -1,7 +1,7 @@
 import json
 import re
 from typing import Optional, Dict, Any, List
-from sqlalchemy import Integer, String, Boolean, DateTime, Text
+from sqlalchemy import Integer, String, Boolean, DateTime, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
 from sqlalchemy.sql import func
 from logging_config import get_logger
