@@ -250,7 +250,7 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
         return render_template(
             "chat.html",
-            chat_id=context_data["chat"].chat_id,
+            chat_id=context_data["chat"].id,
             chat_title=context_data["chat"].title,
             model_name=(
                 context_data["model_obj"].name
@@ -269,7 +269,78 @@ def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
         )
 
     except ValueError as ve:
-        logger.error("Value error in chat_interface: %s", str(ve))
+        # Example for model or config errors
+        logger.error("Value error in chat interface: %s", str(ve))
+        return render_template("error.html", error=str(ve)), 500
+    except RuntimeError as re:
+        # Example for encryption errors
+        logger.error("Runtime error in chat interface: %s", str(re))
+        return render_template("error.html", error=str(re)), 500
+    except Exception as e:
+        logger.error("Error initializing chat interface: %s", str(e), exc_info=True)
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@chat_routes.route("/chat_interface", methods=["GET"])
+@login_required
+def chat_interface() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
+    """
+    Secondary route for loading the existing chat interface with a given chat_id.
+    - If 'chat_id' is missing or invalid, a new chat session is created.
+    - Renders chat.html with relevant context.
+    """
+    try:
+        logger.debug("Current user: id=%s, role=%s", current_user.id, current_user.role)
+
+        # Retrieve chat ID from query param or session
+        chat_id = request.args.get("chat_id") or session.get("chat_id", "")
+        if not isinstance(chat_id, str):
+            chat_id = str(chat_id)
+
+        # If an explicit chat_id is provided, store it in the session
+        if request.args.get("chat_id"):
+            session["chat_id"] = chat_id
+
+        # Load the chat context
+        context_data = _load_chat_context(chat_id, current_user.id)
+        # In case a new one was created
+        session["chat_id"] = context_data["chat"].id
+
+        # Prepare front-end config
+        chat_config = {
+            "chatId": context_data["chat"].id,
+            "csrfToken": generate_csrf(),
+            "azureToken": context_data["azure_token"],
+            "userId": str(current_user.id),
+            "modelSettings": (
+                context_data["model_obj"].to_dict()
+                if context_data["model_obj"]
+                else {}
+            )
+        }
+
+        return render_template(
+            "chat.html",
+            chat_id=context_data["chat"].id,
+            chat_title=context_data["chat"].title,
+            model_name=(
+                context_data["model_obj"].name
+                if context_data["model_obj"]
+                else "Default Model"
+            ),
+            current_model=context_data["model_obj"],
+            messages=context_data["messages"],
+            models=Model.get_all(),
+            conversations=Chat.get_user_chats(current_user.id),
+            now=datetime.now,
+            today=datetime.now().strftime("%Y-%m-%d"),
+            yesterday=(datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d"),
+            azure_token=context_data["azure_token"],
+            CHAT_CONFIG=json.dumps(chat_config)
+        )
+
+    except ValueError as ve:
+        logger.error("Value error in /chat_interface: %s", str(ve))
         return render_template("error.html", error=str(ve)), 500
     except RuntimeError as re:
         logger.error("Runtime error in chat_interface: %s", str(re))

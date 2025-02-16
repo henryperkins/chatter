@@ -1,6 +1,5 @@
 import os
 import logging
-
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import LoginManager
@@ -14,10 +13,7 @@ login_manager.login_view = 'auth.login'  # type: ignore
 login_manager.login_message_category = 'info'
 
 # Initialize CSRF Protection
-csrf = CSRFProtect()  # Initialize CSRF protection without skip_on_get argument
-
-# Alias for csrf.protect
-csrf_protect = csrf.protect
+csrf = CSRFProtect()
 
 # Initialize Limiter with memory storage by default
 limiter = Limiter(
@@ -27,7 +23,7 @@ limiter = Limiter(
     strategy="fixed-window",
 )
 
-# Only try Redis if explicitly configured
+# Configure Redis if explicitly enabled
 if os.getenv("USE_REDIS_LIMITER") and os.getenv("REDIS_URL"):
     try:
         redis_url = os.getenv("REDIS_URL")

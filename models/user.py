@@ -3,10 +3,10 @@ from datetime import datetime
 from sqlalchemy import Integer, String, Boolean, DateTime, func, or_, update
 import logging
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.orm import Session, Mapped, mapped_column
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from sqlalchemy.orm import Session, Mapped, mapped_column
 from models.base import Base
 from models.model import Model
 
@@ -24,7 +24,6 @@ class User(Base, UserMixin):
     password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     role: Mapped[str] = mapped_column(String(50), nullable=False, default="user")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    # Renamed to clarify we store hashed tokens:
     reset_token_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     reset_token_expiry: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     _active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -78,11 +77,10 @@ class User(Base, UserMixin):
                 logger.debug("Invalid password hash format.")
                 return False
 
-            # Use type guard to narrow type
             if not isinstance(stored_hash, str):
                 logger.debug("Password hash is not a valid string")
                 return False
-            # No need to cast since isinstance already confirmed it's a string
+
             return check_password_hash(stored_hash, password)
         except Exception as e:
             logger.error(f"Password check failed for user {self.id}: {str(e)}")
@@ -95,7 +93,6 @@ class User(Base, UserMixin):
             logger.error(f"Missing required fields in user data: {data.keys()}")
             raise ValueError("Missing required fields in user data")
 
-        # Handle datetime fields
         created_at = data.get("created_at") or datetime.utcnow()
         if isinstance(created_at, str):
             created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
@@ -117,25 +114,6 @@ class User(Base, UserMixin):
             account_locked_until=data.get("account_locked_until"),
         )
 
-        return cls(
-            id=int(data["id"]),
-            username=data["username"],
-            email=data["email"],
-            password_hash=data.get("password_hash"),
-            role=data.get("role", "user"),
-            created_at=created_at,
-            reset_token_hash=data.get("reset_token_hash"),
-            reset_token_expiry=reset_token_expiry,
-            _active=data.get("is_active", True),
-            account_locked_until=data.get("account_locked_until"),
-        )
-```
-
-models/user.py
-```python
-<<<<<<< SEARCH
-            return cls.get_by_id(session, int(user_id))
-
     @classmethod
     def get_by_id(cls, session: Session, user_id: int) -> Optional["User"]:
         """Retrieve a user by their ID with proper transaction isolation."""
@@ -163,36 +141,39 @@ models/user.py
 
     @classmethod
     def create(cls, session: Session, username: str, email: str, password: str) -> "User":
-        """Create a new user with provided database session."""
+        """
+        Create a new user with the given username, email, and password.
+        - Ensures that if no default Model exists, one is created first.
+        - If this is the first user, assign the 'admin' role.
+        - Raises ValueError if the username/email already exists.
+        """
         try:
-            # First ensure we have a default model
+            # 1) Ensure we have a default Model
             default_model = session.query(Model).filter_by(is_default=True).first()
             if not default_model:
-                # Create default model if none exists
                 from database import create_default_model
                 create_default_model(session)
-                session.commit()  # Commit the model creation first
-            
-            # Check if this is the first user
+                session.commit()
+
+            # 2) Check if this is the first user
             is_first_user = session.query(cls).count() == 0
 
-            # Check for existing users
+            # 3) Check for existing user
             existing = session.query(cls).filter(
                 or_(
                     func.lower(cls.username) == func.lower(username.strip()),
                     func.lower(cls.email) == func.lower(email.strip())
                 )
             ).first()
-
             if existing:
                 raise ValueError("Username or email already exists")
 
-            # Create password hash
+            # 4) Create and store password hash
             password_hash = generate_password_hash(password)
             if isinstance(password_hash, bytes):
                 password_hash = password_hash.decode("utf-8")
 
-            # Create new user
+            # 5) Create new user object
             new_user = cls(
                 username=username.strip(),
                 email=email.strip().lower(),
@@ -201,132 +182,13 @@ models/user.py
                 _active=True
             )
             session.add(new_user)
-            session.flush()  # Get the ID without committing
-            
+            session.flush()  # get the primary key (id) without a full commit
+
             logger.debug(f"User created with ID {new_user.id}")
             session.commit()
-            
+
             logger.debug(f"Successfully created and retrieved user: {new_user.to_dict()}")
             return new_user
-
-        except IntegrityError as e:
-            logger.error(
-                f"Integrity error creating user '{username}': {e}",
-                exc_info=True,
-                extra={
-                    "file": "models/user.py",
-                    "phase": "user creation",
-                    "username": username,
-                    "email": email
-                }
-            )
-            raise ValueError("Username or email already exists")
-        except Exception as e:
-            logger.error(
-                f"Error creating user '{username}': {e}",
-                exc_info=True,
-                extra={
-                    "file": "models/user.py",
-                    "phase": "user creation",
-                    "username": username,
-                    "email": email
-                }
-            )
-            raise
-=======
-            return cls.get_by_id(session, int(user_id))
-
-    @classmethod
-    def get_by_id(cls, session: Session, user_id: int) -> Optional["User"]:
-        """Retrieve a user by their ID with proper transaction isolation."""
-        if not user_id:
-            logger.debug("get_by_id called with null/zero user_id")
-            return None
-
-        try:
-            return session.query(cls).filter_by(id=user_id).first()
-        except Exception as e:
-            logger.error(f"Database error retrieving user {user_id}: {str(e)}", exc_info=True)
-            return None
-
-    @classmethod
-    def get_by_email(cls, session: Session, email: str) -> Optional["User"]:
-        """Get user by email using provided database session."""
-        try:
-            return session.query(cls).filter(
-                func.lower(cls.email) == func.lower(email),
-                cls._active.is_(True)
-            ).first()
-        except SQLAlchemyError as e:
-            logger.error(f"Database error retrieving user by email {email}: {str(e)}")
-            return None
-
-    @classmethod
-    def create(cls, session: Session, username: str, email: str, password: str) -> "User":
-        """Create a new user with provided database session."""
-        try:
-            # First ensure we have a default model
-            default_model = session.query(Model).filter_by(is_default=True).first()
-            if not default_model:
-                # Create default model if none exists
-                from database import create_default_model
-                create_default_model(session)
-                session.commit()  # Commit the model creation first
-            
-            # Check if this is the first user
-            is_first_user = session.query(cls).count() == 0
-
-            # Check for existing users
-            existing = session.query(cls).filter(
-                or_(
-                    func.lower(cls.username) == func.lower(username.strip()),
-                    func.lower(cls.email) == func.lower(email.strip())
-                )
-            ).first()
-
-            if existing:
-                raise ValueError("Username or email already exists")
-
-            # Create password hash
-            password_hash = generate_password_hash(password)
-            if isinstance(password_hash, bytes):
-                password_hash = password_hash.decode("utf-8")
-
-            # Create new user
-            new_user = cls(
-                username=username.strip(),
-                email=email.strip().lower(),
-                password_hash=password_hash,
-                role="admin" if is_first_user else "user",
-                _active=True
-            )
-            session.add(new_user)
-            session.flush()  # Get the ID without committing
-            
-            logger.debug(f"User created with ID {new_user.id}")
-            session.commit()
-            
-            logger.debug(f"Successfully created and retrieved user: {new_user.to_dict()}")
-            return new_user
->>>>>>> d13c2ede36cc1ba63584bcfb67827f7dcf2c2ba6
-=======
-            # Create new user
-            new_user = cls(
-                username=username.strip(),
-                email=email.strip().lower(),
-                password_hash=password_hash,
-                role="admin" if is_first_user else "user",
-                _active=True
-            )
-            session.add(new_user)
-            session.flush()  # Get the ID without committing
-            
-            logger.debug(f"User created with ID {new_user.id}")
-            session.commit()
-            
-            logger.debug(f"Successfully created and retrieved user: {new_user.to_dict()}")
-            return new_user
->>>>>>> d13c2ede36cc1ba63584bcfb67827f7dcf2c2ba6
 
         except IntegrityError as e:
             logger.error(
@@ -355,7 +217,7 @@ models/user.py
 
     @staticmethod
     def verify_user_exists(session: Session, user_id: int) -> bool:
-        """Verify that a user exists and is active using provided session."""
+        """Verify that a user exists and is active."""
         try:
             exists = session.query(User).filter(
                 User.id == user_id,
@@ -383,7 +245,10 @@ models/user.py
 
     @staticmethod
     def update(session: Session, user_id: int, data: Dict[str, Any]) -> bool:
-        """Update an existing user's attributes using provided session."""
+        """
+        Update an existing user's attributes using provided session.
+        Only keys in allowed_fields can be updated.
+        """
         try:
             allowed_fields = {"username", "email", "password_hash", "role", "_active"}
             update_data = {k: v for k, v in data.items() if k in allowed_fields}
@@ -392,11 +257,10 @@ models/user.py
                 logger.info(f"No valid fields to update for user ID {user_id}")
                 return False
 
-            # Convert is_active to _active for database field
+            # Convert is_active to _active if present
             if "is_active" in update_data:
                 update_data["_active"] = update_data.pop("is_active")
 
-            # Use SQLAlchemy update
             stmt = (
                 update(User)
                 .where(User.id == user_id)
@@ -410,7 +274,6 @@ models/user.py
                 logger.info(f"User {user_id} updated successfully")
                 session.commit()
             return success
-
         except SQLAlchemyError as e:
             logger.error(f"Database error updating user {user_id}: {e}")
             session.rollback()
@@ -418,7 +281,7 @@ models/user.py
 
     @staticmethod
     def deactivate(session: Session, user_id: int) -> bool:
-        """Deactivate a user account using provided session."""
+        """Deactivate a user account by setting _active to False."""
         try:
             stmt = (
                 update(User)
@@ -440,9 +303,12 @@ models/user.py
 
     @staticmethod
     def validate_reset_token(session: Session, token: str) -> Optional["User"]:
-        """Validate a password reset token by comparing hashes using provided session."""
+        """
+        Validate a password reset token by comparing hashes.
+        Only returns a user with a non-expired reset token.
+        """
         try:
-            # Get all users with unexpired reset tokens
+            # Find users whose reset_token_expiry hasn't passed
             users = (
                 session.query(User)
                 .filter(
@@ -452,7 +318,7 @@ models/user.py
                 .all()
             )
 
-            # Compare hashes in Python
+            # Compare candidate token to stored hash in Python
             for user in users:
                 if user.reset_token_hash and isinstance(user.reset_token_hash, str):
                     if check_password_hash(user.reset_token_hash, token):
@@ -464,7 +330,7 @@ models/user.py
 
     @staticmethod
     def set_role(session: Session, user_id: int, role: str) -> bool:
-        """Change a user's role using provided session."""
+        """Change a user's role."""
         try:
             stmt = (
                 update(User)
@@ -485,7 +351,10 @@ models/user.py
             return False
 
     def save(self, session: Session) -> bool:
-        """Save current user state to database using provided session."""
+        """
+        Save current user state, typically used to update `failed_login_attempts`
+        and `account_locked_until`.
+        """
         try:
             stmt = (
                 update(User)
@@ -509,7 +378,7 @@ models/user.py
             return False
 
     def change_password(self, session: Session, new_password: str) -> bool:
-        """Change user's password and clear any reset token data using provided session."""
+        """Change user's password and clear reset token data."""
         try:
             password_hash = generate_password_hash(new_password)
             if isinstance(password_hash, bytes):
@@ -544,7 +413,7 @@ models/user.py
         return self.role == "admin"
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert user object to dictionary."""
+        """Convert user object to a dictionary representation."""
         return {
             "id": self.id,
             "username": self.username,
@@ -556,7 +425,7 @@ models/user.py
 
     @classmethod
     def list_active_users(cls, session: Session) -> List[Self]:
-        """Get all active users using provided session."""
+        """Get all active users in descending order by creation date."""
         try:
             return (
                 session.query(cls)
@@ -570,7 +439,7 @@ models/user.py
 
     @staticmethod
     def bulk_deactivate(session: Session, user_ids: List[int]) -> bool:
-        """Deactivate multiple users at once using provided session."""
+        """Deactivate multiple users by ID, setting _active=False."""
         try:
             stmt = (
                 update(User)

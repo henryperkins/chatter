@@ -31,9 +31,6 @@ import click
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import create_engine, text
-
-# Initialize Flask-SQLAlchemy
-db = SQLAlchemy()
 from sqlalchemy.engine import Engine, CursorResult, Row
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, InterfaceError
 from sqlalchemy.orm import scoped_session, sessionmaker, Session
@@ -46,6 +43,7 @@ from tenacity import (
     before_sleep_log,
 )
 
+from config import Config
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -68,6 +66,11 @@ POOL_SETTINGS = {
     "POOL_RECYCLE": int(os.getenv("DB_POOL_RECYCLE", "3600")),
 }
 
+
+# Initialize Flask-SQLAlchemy
+db = SQLAlchemy()
+
+
 def get_db_state(app: Optional[Flask] = None) -> DbState:
     """
     Retrieve the chatter-db state from Flask's extensions dict, ensuring a
@@ -87,6 +90,7 @@ def get_db_state(app: Optional[Flask] = None) -> DbState:
     })
     return cast(DbState, db_state)
 
+
 def mark_initialized() -> None:
     """
     Mark the database as initialized. Optionally keep a global
@@ -97,12 +101,14 @@ def mark_initialized() -> None:
     db_state = get_db_state()
     db_state["initialized"] = True
 
+
 def is_initialized() -> bool:
     """
     Check if the database is marked as initialized.
     """
     db_state = get_db_state()
     return bool(db_state.get("initialized", False))
+
 
 def create_db_engine(db_uri: str) -> Engine:
     """
@@ -133,6 +139,7 @@ def create_db_engine(db_uri: str) -> Engine:
         },
         json_serializer=lambda obj: json.dumps(obj, ensure_ascii=False),
     )
+
 
 def with_db_retries(
     max_attempts: int = 3,
@@ -165,6 +172,7 @@ def with_db_retries(
         return cast(F, wrapper)
     return decorator
 
+
 @with_db_retries()
 def execute_statement(
     db: Session,
@@ -192,6 +200,7 @@ def execute_statement(
         )
         raise RuntimeError(f"Database operation failed: {str(e)}") from e
 
+
 def test_db_connection() -> None:
     """
     Test database connection by executing a simple query.
@@ -217,6 +226,7 @@ def test_db_connection() -> None:
         logger.error("Database connection test failed: %s", str(e))
         raise
 
+
 @contextmanager
 def db_session(app: Optional[Flask] = None, transactional: bool = False) -> Iterator[Session]:
     """
@@ -241,6 +251,7 @@ def db_session(app: Optional[Flask] = None, transactional: bool = False) -> Iter
     finally:
         session.close()
 
+
 @contextmanager
 def db_transaction(app: Optional[Flask] = None) -> Iterator[Session]:
     """
@@ -263,14 +274,14 @@ def db_transaction(app: Optional[Flask] = None) -> Iterator[Session]:
     finally:
         session.close()
 
+
 def create_default_model(db: Session) -> Optional[int]:
+    from models.model import Model  # Local import to avoid circular dependency
+    from models.provider import Provider  # Local import to avoid circular dependency
     """
     Create a default model if it doesn't exist.
     References config.py for encryption details.
     """
-    from models import Model
-    from config import Config
-
     # Check if a default model already exists
     result = db.execute(text("SELECT COUNT(*) FROM models WHERE is_default = TRUE"))
     if result.scalar() > 0:
@@ -296,7 +307,7 @@ def create_default_model(db: Session) -> Optional[int]:
                 INSERT INTO providers (
                     name, slug, api_base_url, requires_authentication,
                     api_version_format, endpoint_pattern, auth_type,
-                    validation_rules, capabilities, is_azure
+                    validation_rules, capabilities, is_azure, is_active
                 ) VALUES (
                     'Azure OpenAI',
                     'azure-openai',
@@ -307,6 +318,7 @@ def create_default_model(db: Session) -> Optional[int]:
                     'api-key',
                     :validation_rules,
                     :capabilities,
+                    TRUE,
                     TRUE
                 ) RETURNING id
             """), {
@@ -363,6 +375,7 @@ def create_default_model(db: Session) -> Optional[int]:
         db.rollback()
         raise
 
+
 def check_open_transactions() -> List[Dict[str, Any]]:
     """
     Check for open transactions that might be stuck (long idle in transaction).
@@ -384,6 +397,7 @@ def check_open_transactions() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Failed to check open transactions: {str(e)}")
         return []
+
 
 def check_db_health() -> Dict[str, Any]:
     """
@@ -412,16 +426,16 @@ def check_db_health() -> Dict[str, Any]:
                 health_status["status"] = "unhealthy"
                 health_status["errors"].append("Basic connectivity check failed")
 
-            # Pool stats (requires session.connection().connection.pool)
-            conn = session.connection().connection
+            # Corrected pool stats access
+            engine = session.get_bind()
             pool_stats = {
-                "checked_out": conn.pool.checkedout(),
-                "checked_in": conn.pool.checkedin(),
-                "overflow": conn.pool.overflow(),
-                "size": conn.pool.size(),
-                "max_overflow": conn.pool.max_overflow(),
-                "timeout": conn.pool.timeout(),
-                "recycle": conn.pool.recycle(),
+                "checked_out": engine.pool.checkedout(),
+                "checked_in": engine.pool.checkedin(),
+                "overflow": engine.pool.overflow(),
+                "size": engine.pool.size(),
+                "max_overflow": engine.pool.max_overflow(),
+                "timeout": engine.pool.timeout(),
+                "recycle": engine.pool.recycle(),
             }
             health_status["details"]["pool"] = pool_stats
 
@@ -492,33 +506,55 @@ def check_db_health() -> Dict[str, Any]:
 
     return health_status
 
+
 def init_db() -> None:
-    """(Re)Initialize the database using SQLAlchemy metadata"""
+    """
+    (Re)Initialize the database using SQLAlchemy metadata.
+    Now uses reflection to handle dependent objects properly.
+    """
     from models.base import Base
+    from sqlalchemy import MetaData
+
     try:
         db_state = get_db_state()
         engine = db_state["engine"]
-        
+
         if not engine:
             raise RuntimeError("Database engine not initialized")
 
-        # Drop all tables first
-        Base.metadata.drop_all(bind=engine)
-        
-        # Create all tables
+        # Attempt to ensure the providers table has is_active if it already exists
+        # so that inserting the new provider row won't fail.
+        # If the table doesn't exist, this will be ignored.
+        try:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT TRUE")
+                )
+        except Exception:
+            pass
+
+        # Reflect existing DB state into a temporary MetaData instance
+        meta = MetaData()
+        meta.reflect(bind=engine)
+
+        # Drop all reflected tables (handles dependent objects)
+        meta.drop_all(bind=engine)
+
+        # Now create our tables as defined by Base
         Base.metadata.create_all(bind=engine)
 
         # Create a default model if needed
         with db_session(transactional=True) as db:
             create_default_model(db)
 
-        # Mark as initialized
+        # Mark the database initialization as done
         mark_initialized()
         logger.info("Database initialization completed successfully")
 
     except Exception as e:
         logger.error(f"Database initialization failed: {str(e)}")
         raise
+
 
 def init_app(app: Flask) -> None:
     """
@@ -569,6 +605,7 @@ def init_app(app: Flask) -> None:
         logger.error("Database initialization failed for app %s: %s", app.name, str(e))
         raise
 
+
 def close_db(e: Optional[BaseException] = None) -> None:
     """
     Clean up database resources, disposing of the engine pool.
@@ -592,6 +629,7 @@ def close_db(e: Optional[BaseException] = None) -> None:
 
     except Exception:
         logger.error("Error during database shutdown", exc_info=True)
+
 
 @click.command("init-db")
 def init_db_command() -> None:
