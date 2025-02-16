@@ -288,7 +288,7 @@ class RegistrationForm(FlaskForm):
             
         username = field.data.strip()
         
-        # Validación básica del formato primero
+        # Validacion basica del formato primero
         if len(username) < 4:
             raise ValidationError("Username must be at least 4 characters long.")
             
