@@ -141,6 +141,8 @@ def index() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:  # type: ignore
             model_count = db.scalar(text("SELECT COUNT(*) FROM models"))
             if not model_count:
                 logger.warning("No models found - showing error message")
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify({"error": "No AI models are configured. Please contact your administrator."}), 500
                 return make_response(
                     render_template(
                         "error.html",

@@ -627,7 +627,8 @@ def index() -> WerkzeugResponse:
     # Add an explicit route to handle requests to "/login" in case they are arriving here instead of "/auth/login"
     @app.route("/login", methods=["GET", "POST"])
     def direct_login():
-        # Redirect to the actual auth.login route
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"redirect": url_for("auth.login")}), 302
         return redirect(url_for("auth.login"))
 
 @app.route("/clear-session")

@@ -80,10 +80,14 @@ async def handle_chat() -> Union[FlaskResponse, Tuple[FlaskResponse, int]]:
 
         if not chat_id:
             logger.warning("No chat ID provided")
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"error": "No chat ID provided"}), 400
             return jsonify({"error": "No chat ID provided"}), 400
 
         if not validate_chat_access(chat_id, current_user.id):
             logger.warning(f"Unauthorized access attempt: chat_id={chat_id}")
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"error": "Unauthorized access to chat"}), 403
             return jsonify({"error": "Unauthorized access to chat"}), 403
 
         # ---------------------------------

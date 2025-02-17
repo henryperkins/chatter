@@ -113,6 +113,8 @@ def login():
     if current_app.config["ENV"] == "development":
         limiter.exempt(login)
     if current_user.is_authenticated:
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"redirect": url_for("chat.chat_interface")}), 200
         return redirect(url_for("chat.chat_interface"))
 
     form = LoginForm()
@@ -161,6 +163,8 @@ def login():
                             }
                         }), 400
                     else:
+                        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                            return jsonify({"error": "Credenciales inválidas"}), 400
                         flash("Credenciales inválidas", "error")
                         return render_template("login.html", form=form)
 
