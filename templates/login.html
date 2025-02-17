@@ -82,6 +82,17 @@
                         type="checkbox"
                         class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
+                    const rememberCheckbox = document.getElementById('remember');
+                    if (rememberCheckbox) {
+                        rememberCheckbox.addEventListener('change', (ev) => {
+                            console.debug('[Login] Remember me checkbox changed:', ev.target.checked);
+                            if (window.monitoring) {
+                                window.monitoring.logInteraction('User toggled remember me', {
+                                    value: ev.target.checked
+                                });
+                            }
+                        });
+                    }
                     <label
                         for="remember"
                         class="ml-2 block text-sm text-gray-900 dark:text-gray-300"
@@ -159,6 +170,10 @@ document.addEventListener('DOMContentLoaded', function() {
     if (loginForm) {
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
+            console.debug('[Login] Form submit triggered');
+            if (window.monitoring) {
+                window.monitoring.log('debug', 'User triggered login form submission');
+            }
         });
 
         const submitBtn = document.getElementById('submit-button');
@@ -206,6 +221,10 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function togglePasswordVisibility(fieldId = 'password') {
+    console.debug('[Login] Toggled password visibility for:', fieldId);
+    if (window.monitoring) {
+        window.monitoring.logInteraction('Toggled password visibility', { fieldId });
+    }
     const passwordInput = document.getElementById(fieldId);
     const icon = document.getElementById(fieldId + '-toggle-icon');
     if (!passwordInput || !icon) return;
