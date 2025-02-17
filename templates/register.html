@@ -135,46 +135,52 @@
 {{ super() }}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Manejo del formulario de registro
-    document.getElementById('registration-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const form = e.target;
-        const formData = new FormData(form);
-        const submitButton = document.getElementById('submit-button');
-        const errorDiv = document.getElementById('form-errors');
+    const regForm = document.getElementById('registration-form');
+    if (regForm) {
+        regForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+        });
 
-        submitButton.disabled = true;
-        errorDiv.classList.add('hidden');
+        const submitBtn = document.getElementById('submit-button');
+        submitBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
 
-        try {
-            const response = await fetch("{{ url_for('auth.register') }}", {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': document.getElementById('csrf_token').value,
-                    'Accept': 'application/json'
-                },
-                body: formData
-            });
+            const formData = new FormData(regForm);
+            const submitButton = document.getElementById('submit-button');
+            const errorDiv = document.getElementById('form-errors');
 
-            const data = await response.json();
-            
-            if (data.success) {
-                window.location.href = "{{ url_for('chat.chat_interface') }}";
-            } else {
-                errorDiv.innerHTML = Object.values(data.errors).map(error => 
-                    `<div class="error-text">${error}</div>`
-                ).join('');
+            submitButton.disabled = true;
+            errorDiv.classList.add('hidden');
+
+            try {
+                const response = await fetch("{{ url_for('auth.register') }}", {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.getElementById('csrf_token').value
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    window.location.href = data.redirect || "{{ url_for('chat.chat_interface') }}";
+                } else {
+                    errorDiv.innerHTML = Object.values(data.errors || data)
+                        .map(err => `<div class="error-text">${err}</div>`)
+                        .join('');
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error('Registration error:', err);
+                errorDiv.innerHTML = '<div class="error-text">An unexpected error occurred. Please try again.</div>';
                 errorDiv.classList.remove('hidden');
+            } finally {
+                submitButton.disabled = false;
             }
-        } catch (error) {
-            console.error('Error:', error);
-            errorDiv.innerHTML = '<div class="error-text">An unexpected error occurred. Please try again.</div>';
-            errorDiv.classList.remove('hidden');
-        } finally {
-            submitButton.disabled = false;
-        }
-    });
+        });
+    }
     window.togglePasswordVisibility = function(fieldId) {
         const field = document.getElementById(fieldId);
         const icon = document.getElementById(`${fieldId}-toggle-icon`);
