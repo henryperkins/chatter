@@ -200,6 +200,7 @@
     <script src="{{ url_for('static', filename='js/lib/prism.js') }}"></script>
 
     <!-- Initialize Axios CSRF -->
+    <script src="{{ url_for('static', filename='js/lib/axios.min.js') }}"></script>
     <script>
         window.axios.defaults.headers.common['X-CSRFToken'] = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     </script>
