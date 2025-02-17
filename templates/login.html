@@ -154,9 +154,11 @@
 {{ super() }}
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+console.debug('[Login] login.html inline script is loaded and running');
+document.addEventListener('app:ready', function() {
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
+        console.debug('[Login] Found login form:', loginForm);
         loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
             console.debug('[Login] Form submit triggered');
