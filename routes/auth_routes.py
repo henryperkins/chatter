@@ -122,26 +122,27 @@ def login():
 
     form = LoginForm()
 
-    if form.validate_on_submit():
-        with db_session() as db:
-            # Account lockout check
-            username = form.username.data
-            if not username:
-                flash("Username is required", "error")
-                return render_template("login.html", form=form)
-            user = User.get_by_username(db, username.strip())
-            if user and user.account_locked_until and user.account_locked_until > datetime.now(timezone.utc):
-                logger.warning(f"Login attempt for locked account: {user.username}")
-                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                    return jsonify({
-                        "success": False,
-                        "errors": {
-                            "login": "Account locked for 15 minutes due to multiple failed attempts"
-                        }
-                    }), 403
-                else:
-                    flash("Account locked for 15 minutes due to multiple failed attempts", "error")
+    if request.method == "POST":
+        if form.validate_on_submit():
+            with db_session() as db:
+                # Account lockout check
+                username = form.username.data
+                if not username:
+                    flash("Username is required", "error")
                     return render_template("login.html", form=form)
+                user = User.get_by_username(db, username.strip())
+                if user and user.account_locked_until and user.account_locked_until > datetime.now(timezone.utc):
+                    logger.warning(f"Login attempt for locked account: {user.username}")
+                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                        return jsonify({
+                            "success": False,
+                            "errors": {
+                                "login": "Account locked for 15 minutes due to multiple failed attempts"
+                            }
+                        }), 403
+                    else:
+                        flash("Account locked for 15 minutes due to multiple failed attempts", "error")
+                        return render_template("login.html", form=form)
 
             try:
                 username = form.username.data
