@@ -165,8 +165,9 @@ def login():
                                 "login": "Credenciales inválidas"
                             }
                         }), 400
-                    flash("Credenciales inválidas", "error")
-                    return render_template("login.html", form=form)
+                    else:
+                        flash("Invalid credentials", "error")
+                        return render_template("login.html", form=form)
 
                 # Track failed attempts
                 if not user.check_password(password):
