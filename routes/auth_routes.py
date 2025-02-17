@@ -221,7 +221,13 @@ def login():
                 flash("Temporary authentication issue - please try again", "error")
                 return render_template("login.html", form=form)
 
-    return render_template("login.html", form=form)
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify({
+            "success": False,
+            "errors": form.errors or {"login": "Invalid form submission"}
+        }), 400
+    else:
+        return render_template("login.html", form=form)
 
 
 @bp.errorhandler(CSRFError)
