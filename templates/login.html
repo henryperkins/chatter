@@ -169,6 +169,13 @@ document.addEventListener('DOMContentLoaded', function() {
         submitBtn.addEventListener('click', async function(e) {
             e.preventDefault();
 
+            console.debug('[Login] Submit button clicked');
+            if (window.monitoring) {
+                window.monitoring.logInteraction('User clicked login submit button', {
+                    formData: Object.fromEntries(new FormData(loginForm))
+                });
+            }
+
             const formData = new FormData(loginForm);
             const submitButton = document.getElementById('submit-button');
             const buttonText = document.getElementById('button-text');
