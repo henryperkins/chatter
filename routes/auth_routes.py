@@ -226,12 +226,22 @@ def login():
                 flash("Temporary authentication issue - please try again", "error")
                 return render_template("login.html", form=form)
 
-    # Handle all response formats consistently at the end
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
-        return jsonify({
-            "success": False,
-            "errors": form.errors or {"login": "Invalid form submission"}
-        }), 400
+            except Exception as e:
+                logger.error(f"Login error: {str(e)}", exc_info=True)
+                flash("Temporary authentication issue - please try again", "error")
+                return render_template("login.html", form=form)
+
+        # Handle failed form submission for POST requests
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
+            return jsonify({
+                "success": False,
+                "errors": form.errors or {"login": "Invalid form submission"}
+            }), 400
+        else:
+            flash("Invalid credentials", "error")
+            return render_template("login.html", form=form)
+
+    # Handle GET requests by just showing the form
     return render_template("login.html", form=form)
 
 
