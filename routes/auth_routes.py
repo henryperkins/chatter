@@ -157,11 +157,11 @@ def login():
                         return jsonify({
                             "success": False,
                             "errors": {
-                                "login": "Invalid credentials"
+                                "login": "Credenciales inválidas"
                             }
                         }), 400
                     else:
-                        flash("Invalid credentials", "error")
+                        flash("Credenciales inválidas", "error")
                         return render_template("login.html", form=form)
 
                 # Track failed attempts
@@ -208,16 +208,13 @@ def login():
                 login_user(user, remember=form.remember.data)
                 logger.info(f"User logged in: {user.id} ({username})")
 
-                next_page = request.args.get("next")
-                if not next_page or not is_safe_url(next_page):
-                    next_page = url_for("chat.chat_interface")
-
                 if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                     return jsonify({
                         "success": True,
                         "redirect": url_for("chat.chat_interface")
                     })
-                return redirect(next_page)
+                else:
+                    return redirect(url_for("chat.chat_interface"))
 
             except Exception as e:
                 logger.error(f"Login error: {str(e)}", exc_info=True)
