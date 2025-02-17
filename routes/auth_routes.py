@@ -115,6 +115,9 @@ def login():
     if current_user.is_authenticated:
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"redirect": url_for("chat.chat_interface")}), 200
+        # Add JSON fallback for API-like requests
+        if request.accept_mimetypes.accept_json:
+            return jsonify({"redirect": url_for("chat.chat_interface")}), 302
         return redirect(url_for("chat.chat_interface"))
 
     form = LoginForm()
@@ -162,11 +165,8 @@ def login():
                                 "login": "Credenciales inválidas"
                             }
                         }), 400
-                    else:
-                        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                            return jsonify({"error": "Credenciales inválidas"}), 400
-                        flash("Credenciales inválidas", "error")
-                        return render_template("login.html", form=form)
+                    flash("Credenciales inválidas", "error")
+                    return render_template("login.html", form=form)
 
                 # Track failed attempts
                 if not user.check_password(password):
@@ -225,13 +225,13 @@ def login():
                 flash("Temporary authentication issue - please try again", "error")
                 return render_template("login.html", form=form)
 
-    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+    # Handle all response formats consistently at the end
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
         return jsonify({
             "success": False,
             "errors": form.errors or {"login": "Invalid form submission"}
         }), 400
-    else:
-        return render_template("login.html", form=form)
+    return render_template("login.html", form=form)
 
 
 @bp.errorhandler(CSRFError)

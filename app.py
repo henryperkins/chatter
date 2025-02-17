@@ -624,10 +624,9 @@ def index() -> WerkzeugResponse:
         return redirect(url_for("auth.login"))
     return redirect(url_for("chat.chat_interface"))
 
-    # Add an explicit route to handle requests to "/login" in case they are arriving here instead of "/auth/login"
     @app.route("/login", methods=["GET", "POST"])
     def direct_login():
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
             return jsonify({"redirect": url_for("auth.login")}), 302
         return redirect(url_for("auth.login"))
 
