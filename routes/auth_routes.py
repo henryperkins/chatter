@@ -145,8 +145,16 @@ def login():
                 user = User.get_by_username(db, username)
                 if not user:
                     logger.warning(f"Login failed - user not found: {username}")
-                    flash("Invalid credentials", "error")
-                    return render_template("login.html", form=form)
+                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                        return jsonify({
+                            "success": False,
+                            "errors": {
+                                "login": "Credenciales inválidas"
+                            }
+                        }), 400
+                    else:
+                        flash("Invalid credentials", "error")
+                        return render_template("login.html", form=form)
 
                 # Track failed attempts
                 if not user.check_password(password):
@@ -167,8 +175,16 @@ def login():
                     
                     attempts = result if result is not None else 1
                     logger.warning(f"Invalid password for user: {username} (Attempt {attempts}/5)")
-                    flash("Invalid credentials", "error")
-                    return render_template("login.html", form=form)
+                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                        return jsonify({
+                            "success": False,
+                            "errors": {
+                                "login": "Credenciales inválidas"
+                            }
+                        }), 400
+                    else:
+                        flash("Invalid credentials", "error")
+                        return render_template("login.html", form=form)
 
                 # Reset failed attempts on successful login
                 db.execute(
@@ -188,7 +204,13 @@ def login():
                 if not next_page or not is_safe_url(next_page):
                     next_page = url_for("chat.chat_interface")
 
-                return redirect(next_page)
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify({
+                        "success": True,
+                        "redirect": url_for("chat.chat_interface")
+                    })
+                else:
+                    return redirect(next_page)
 
             except Exception as e:
                 logger.error(f"Login error: {str(e)}", exc_info=True)
