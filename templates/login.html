@@ -11,7 +11,7 @@
         <!-- Optional error display (if needed) -->
         <div id="error-message" class="mb-4"></div>
 
-        <form id="login-form" method="POST" class="space-y-6">
+        <form id="login-form" class="space-y-6">
             <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token() }}">
 
             <!-- Username Field -->
@@ -156,12 +156,15 @@
 {{ super() }}
 
 <script>
-// Minimal pure JavaScript, with no Jinja logic:
-
 document.addEventListener('DOMContentLoaded', function() {
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
-        loginForm.addEventListener('submit', async function(e) {
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+        });
+
+        const submitBtn = document.getElementById('submit-button');
+        submitBtn.addEventListener('click', async function(e) {
             e.preventDefault();
 
             const formData = new FormData(loginForm);
@@ -170,55 +173,35 @@ document.addEventListener('DOMContentLoaded', function() {
             const loadingSpinner = document.getElementById('loading-spinner');
             const errorDiv = document.getElementById('error-message');
 
-            if (errorDiv) errorDiv.innerHTML = '';
-
-            if (submitButton) submitButton.disabled = true;
-            if (buttonText) buttonText.textContent = 'Authenticating...';
-            if (loadingSpinner) loadingSpinner.classList.remove('hidden');
+            submitButton.disabled = true;
+            errorDiv.classList.add('hidden');
 
             try {
                 const response = await fetch("{{ url_for('auth.login') }}", {
                     method: 'POST',
                     headers: {
-                        'X-CSRF-TOKEN': document.getElementById('csrf_token').value,
+                        'X-Requested-With': 'XMLHttpRequest',
                         'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
+                        'X-CSRF-TOKEN': document.getElementById('csrf_token').value
                     },
                     body: formData
                 });
-
+                
                 const data = await response.json();
                 if (data.success) {
                     window.location.href = data.redirect || "{{ url_for('chat.chat_interface') }}";
-                } else if (errorDiv) {
-                    const errorsHtml = Object.values(data.errors)
-                        .map(function(err) { return '<li>' + err + '</li>'; })
+                } else {
+                    errorDiv.innerHTML = Object.values(data.errors || data)
+                        .map(err => `<div class="error-text">${err}</div>`)
                         .join('');
-
-                    errorDiv.innerHTML = '' +
-                        '<div class="bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-800 ' +
-                        'text-red-700 dark:text-red-200 px-4 py-3 rounded-lg relative ' +
-                        'transition-all duration-200" role="alert">' +
-                        '<strong class="font-bold">Errors:</strong>' +
-                        '<ul class="list-disc list-inside mt-2">' + errorsHtml + '</ul>' +
-                        '<button type="button" class="absolute top-1 right-1 text-red-500 dark:text-red-400 ' +
-                        'hover:text-red-700 dark:hover:text-red-300 transition-colors duration-200" ' +
-                        'onclick="this.parentElement.remove()" ' +
-                        'aria-label="Dismiss">' +
-                        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
-                        'd="M6 18L18 6M6 6l12 12"/>' +
-                        '</svg>' +
-                        '</button>' +
-                        '</div>';
+                    errorDiv.classList.remove('hidden');
                 }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('An unexpected error occurred. Please try again.');
+            } catch (err) {
+                console.error('Login error:', err);
+                errorDiv.innerHTML = '<div class="error-text">An unexpected error occurred. Please try again.</div>';
+                errorDiv.classList.remove('hidden');
             } finally {
-                if (submitButton) submitButton.disabled = false;
-                if (buttonText) buttonText.textContent = 'Login';
-                if (loadingSpinner) loadingSpinner.classList.add('hidden');
+                submitButton.disabled = false;
             }
         });
     }
