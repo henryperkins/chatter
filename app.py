@@ -624,12 +624,6 @@ def index() -> WerkzeugResponse:
         return redirect(url_for("auth.login"))
     return redirect(url_for("chat.chat_interface"))
 
-    @app.route("/login", methods=["GET", "POST"])
-    def direct_login():
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
-            return jsonify({"redirect": url_for("auth.login")}), 302
-        return redirect(url_for("auth.login"))
-
 @app.route("/clear-session")
 def clear_session() -> WerkzeugResponse:
     logout_user()
