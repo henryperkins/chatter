@@ -127,8 +127,16 @@ def login():
             user = User.get_by_username(db, username.strip())
             if user and user.account_locked_until and user.account_locked_until > datetime.now(timezone.utc):
                 logger.warning(f"Login attempt for locked account: {user.username}")
-                flash("Account locked for 15 minutes due to multiple failed attempts", "error")
-                return render_template("login.html", form=form)
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify({
+                        "success": False,
+                        "errors": {
+                            "login": "Account locked for 15 minutes due to multiple failed attempts"
+                        }
+                    }), 403
+                else:
+                    flash("Account locked for 15 minutes due to multiple failed attempts", "error")
+                    return render_template("login.html", form=form)
 
             try:
                 username = form.username.data
@@ -149,7 +157,7 @@ def login():
                         return jsonify({
                             "success": False,
                             "errors": {
-                                "login": "Credenciales inválidas"
+                                "login": "Invalid credentials"
                             }
                         }), 400
                     else:
@@ -209,8 +217,7 @@ def login():
                         "success": True,
                         "redirect": url_for("chat.chat_interface")
                     })
-                else:
-                    return redirect(next_page)
+                return redirect(next_page)
 
             except Exception as e:
                 logger.error(f"Login error: {str(e)}", exc_info=True)
