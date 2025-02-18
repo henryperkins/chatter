@@ -4,6 +4,7 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+
 load_dotenv(dotenv_path=str(Path(__file__).parent / ".env"))
 import logging
 import click
@@ -46,6 +47,7 @@ from werkzeug.serving import WSGIRequestHandler
 from sqlalchemy.orm import Session, scoped_session
 from sqlalchemy import text, Engine
 from flask_migrate import Migrate
+
 migrate = Migrate(compare_type=True)
 from extensions import limiter, login_manager, csrf
 from config import Config, ApiError
@@ -55,7 +57,7 @@ from database import (
     is_initialized,
     create_default_model,
     get_db_state,
-    db
+    db,
 )
 from models import User, Model, Provider
 from routes.auth_routes import bp as auth_bp
@@ -72,22 +74,22 @@ logger = get_logger(__name__)
 
 def configure_mime_types(app: Flask) -> None:
     """Configure MIME type mappings for static files."""
-    app.config['MIME_TYPES'] = {
-        '.css': 'text/css',
-        '.js': 'application/javascript',
-        '.json': 'application/json',
-        '.html': 'text/html',
-        '.txt': 'text/plain',
-        '.png': 'image/png',
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.gif': 'image/gif',
-        '.svg': 'image/svg+xml',
-        '.ico': 'image/x-icon',
-        '.woff': 'font/woff',
-        '.woff2': 'font/woff2',
-        '.ttf': 'font/ttf',
-        '.eot': 'application/vnd.ms-fontobject'
+    app.config["MIME_TYPES"] = {
+        ".css": "text/css",
+        ".js": "application/javascript",
+        ".json": "application/json",
+        ".html": "text/html",
+        ".txt": "text/plain",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".svg": "image/svg+xml",
+        ".ico": "image/x-icon",
+        ".woff": "font/woff",
+        ".woff2": "font/woff2",
+        ".ttf": "font/ttf",
+        ".eot": "application/vnd.ms-fontobject",
     }
 
 
@@ -97,7 +99,9 @@ class SecurityMiddleware:
     def __init__(self, app):
         import base64
         import os
+
         self.app = app
+
     def __call__(self, environ, start_response):
         logger.debug("SecurityMiddleware: Applying security headers")
         environ["HTTP_X_FORWARDED_PROTO"] = "https"
@@ -108,32 +112,37 @@ class SecurityMiddleware:
         def custom_start_response(status, headers, exc_info=None):
             # Convert headers to a dict for easier manipulation
             headers_dict = dict(headers)
-            
+
             security_headers = [
                 ("X-Content-Type-Options", "nosniff"),
                 ("X-Frame-Options", "SAMEORIGIN"),
                 ("X-XSS-Protection", "1; mode=block"),
                 ("Strict-Transport-Security", "max-age=31536000; includeSubDomains"),
-                ("Content-Security-Policy", (
-                    "default-src 'self' https://liveonshuffle.com; "
-                    "script-src 'self' 'unsafe-inline' https://liveonshuffle.com *.googletagmanager.com; "
-                    "style-src 'self' https://liveonshuffle.com fonts.googleapis.com; "
-                    "img-src 'self' data: blob: https://liveonshuffle.com *.google-analytics.com; "
-                    "font-src 'self' data: https://liveonshuffle.com fonts.gstatic.com; "
-                    "connect-src 'self' wss: https://liveonshuffle.com *.google-analytics.com; "
-                    "base-uri 'self'; "
-                    "form-action 'self'; "
-                    "frame-src 'self'; "
-                    "media-src 'self' blob: data:; "
-                    "object-src 'none'; "
-                    "child-src 'self' blob:; "
-                    "worker-src 'self' blob:"
-                )),
+                (
+                    "Content-Security-Policy",
+                    (
+                        "default-src 'self'; "
+                        "script-src 'self' 'unsafe-inline' *.googletagmanager.com; "
+                        "style-src 'self' fonts.googleapis.com; "
+                        "img-src 'self' data: blob: *.google-analytics.com; "
+                        "font-src 'self' data: fonts.gstatic.com; "
+                        "connect-src 'self' wss: *.google-analytics.com; "
+                        "base-uri 'self'; "
+                        "form-action 'self'; "
+                        "frame-src 'self'; "
+                        "media-src 'self' blob: data:; "
+                        "object-src 'none'; "
+                        "child-src 'self' blob:; "
+                        "worker-src 'self' blob:"
+                    ),
+                ),
                 ("Connection", "keep-alive"),
                 ("Expires", "0"),
             ]
             headers.extend(security_headers)
-            return start_response(status, [(str(k), str(v)) for k, v in headers], exc_info)
+            return start_response(
+                status, [(str(k), str(v)) for k, v in headers], exc_info
+            )
 
         return self.app(environ, custom_start_response)
 
@@ -174,10 +183,11 @@ def configure_app(app: Optional[Flask] = None) -> None:
         app = current_app
 
     app.config.from_object(Config)
-    # Explicitly set SESSION_COOKIE_DOMAIN to 'localhost' during local dev
-    # if you're testing at http://localhost:5000 so cookies match the domain
+    # In development, allow cookies without secure flag and set domain to None
     if app.config.get("ENV", "production").lower() == "development":
-        app.config["SESSION_COOKIE_DOMAIN"] = "localhost"
+        app.config["SESSION_COOKIE_SECURE"] = False
+        app.config["SESSION_COOKIE_DOMAIN"] = None
+        app.config["WTF_CSRF_SSL_STRICT"] = False
 
     # Session configuration
     app.config.update(
@@ -201,23 +211,28 @@ def configure_app(app: Optional[Flask] = None) -> None:
     )
 
     # CSRF configuration with standardized naming and settings
-    app.config.update(
-        {
-            'WTF_CSRF_ENABLED': True,
-            'WTF_CSRF_SECRET_KEY': app.config['SECRET_KEY'],
-            'WTF_CSRF_TIME_LIMIT': 3600,
-            'WTF_CSRF_SSL_STRICT': False,
-            'WTF_CSRF_HEADERS': ['X-CSRF-TOKEN'],  # Standardized header name
-            'WTF_CSRF_METHODS': ['POST', 'PUT', 'PATCH', 'DELETE'],
-            'WTF_CSRF_FIELD_NAME': 'csrf_token',
-            'WTF_CSRF_CHECK_DEFAULT': True,
-            'WTF_CSRF_COOKIE_NAME': 'X-CSRF-TOKEN',  # Match header name
-            'WTF_CSRF_COOKIE_HTTPONLY': False,  # Allow JS to read for double-submit
-            'WTF_CSRF_COOKIE_SAMESITE': 'Lax',  # More permissive for cross-origin
-            'WTF_CSRF_COOKIE_SECURE': True,
-            'WTF_CSRF_COOKIE_PATH': '/'  # Ensure cookie is available site-wide
-        }
-    )
+    csrf_config = {
+        "WTF_CSRF_ENABLED": True,
+        "WTF_CSRF_SECRET_KEY": app.config["SECRET_KEY"],
+        "WTF_CSRF_TIME_LIMIT": 3600,
+        "WTF_CSRF_SSL_STRICT": False,
+        "WTF_CSRF_HEADERS": ["X-CSRF-TOKEN"],  # Standardized header name
+        "WTF_CSRF_METHODS": ["POST", "PUT", "PATCH", "DELETE"],
+        "WTF_CSRF_FIELD_NAME": "csrf_token",
+        "WTF_CSRF_CHECK_DEFAULT": True,
+        "WTF_CSRF_COOKIE_NAME": "X-CSRF-TOKEN",  # Match header name
+        "WTF_CSRF_COOKIE_HTTPONLY": False,  # Allow JS to read for double-submit
+        "WTF_CSRF_COOKIE_SAMESITE": "Lax",  # More permissive for cross-origin
+        "WTF_CSRF_COOKIE_PATH": "/",  # Ensure cookie is available site-wide
+    }
+
+    # In development, don't require secure cookies
+    if app.config.get("ENV", "production").lower() == "development":
+        csrf_config["WTF_CSRF_COOKIE_SECURE"] = False
+    else:
+        csrf_config["WTF_CSRF_COOKIE_SECURE"] = True
+
+    app.config.update(csrf_config)
 
     # Upload folder configuration
     if not app.config.get("UPLOAD_FOLDER"):
@@ -229,20 +244,13 @@ def configure_app(app: Optional[Flask] = None) -> None:
 
 
 def init_app_components(app: Flask) -> None:
-    app.wsgi_app = ProxyFix(
-        app.wsgi_app,
-        x_for=2,
-        x_proto=2,
-        x_host=1,
-        x_prefix=1
-    )
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=2, x_proto=2, x_host=1, x_prefix=1)
     app.wsgi_app = SecurityMiddleware(app.wsgi_app)
-
 
     # Initialize CSRF protection with enhanced settings
     csrf.init_app(app)
     csrf.exempt(lambda _: False)  # Clear any existing exemptions using public API
-    
+
     # Then initialize login manager
     login_manager.init_app(app)
     login_manager.login_view = "auth.login"  # type: ignore
@@ -268,25 +276,26 @@ def init_app_components(app: Flask) -> None:
     app.static_url_path = "/static"
 
     # Configure static file serving with security headers
-    app.config.update({
-        'SEND_FILE_MAX_AGE_DEFAULT': 0,
-        'STATIC_FOLDER': static_folder,
-        'STATIC_URL_PATH': '/static',
-        'STATIC_HEADERS': {
-            'Cache-Control': 'no-store, max-age=0',
-            'X-Content-Type-Options': 'nosniff'
+    app.config.update(
+        {
+            "SEND_FILE_MAX_AGE_DEFAULT": 0,
+            "STATIC_FOLDER": static_folder,
+            "STATIC_URL_PATH": "/static",
+            "STATIC_HEADERS": {
+                "Cache-Control": "no-store, max-age=0",
+                "X-Content-Type-Options": "nosniff",
+            },
         }
-    })
+    )
 
     # Exempt static files from CSRF protection
     csrf.exempt(static_folder)
 
     # Add markdown filter
-    @app.template_filter('markdown')
+    @app.template_filter("markdown")
     def markdown_filter(text):
         markdown_processor = mistune.create_markdown(
-            plugins=['url', 'table'],
-            escape=False
+            plugins=["url", "table"], escape=False
         )
         return markdown_processor(text)
 
@@ -296,6 +305,7 @@ def register_cli_commands(app):
     def generate_encryption_key_command():
         """Generate a new Fernet encryption key via config.py."""
         from config import Config
+
         Config.generate_encryption_key()
 
     @app.cli.command("init-db")
@@ -318,7 +328,10 @@ def register_cli_commands(app):
         """Check model configuration in database."""
         try:
             with db_session() as db:
-                result = db.execute(text("""
+                result = (
+                    db.execute(
+                        text(
+                            """
                     SELECT
                         m.id as model_id,
                         m.name as model_name,
@@ -333,7 +346,12 @@ def register_cli_commands(app):
                     FROM models m
                     JOIN providers p ON m.provider_id = p.id
                     WHERE m.is_default = true;
-                """)).mappings().first()
+                """
+                        )
+                    )
+                    .mappings()
+                    .first()
+                )
 
                 if result:
                     print("\nModel Configuration:")
@@ -351,7 +369,10 @@ def register_cli_commands(app):
         try:
             with db_session() as db:
                 # Get model details
-                result = db.execute(text("""
+                result = (
+                    db.execute(
+                        text(
+                            """
                     SELECT
                         m.id as model_id,
                         m.name as model_name,
@@ -367,30 +388,45 @@ def register_cli_commands(app):
                     FROM models m
                     JOIN providers p ON m.provider_id = p.id
                     WHERE m.is_default = true;
-                """)).mappings().first()
+                """
+                        )
+                    )
+                    .mappings()
+                    .first()
+                )
 
                 if result:
                     print("\nModel Configuration:")
                     print("-" * 50)
                     for key, value in result.items():
-                        if key != 'encrypted_key':  # Don't print the actual encrypted key
+                        if (
+                            key != "encrypted_key"
+                        ):  # Don't print the actual encrypted key
                             print(f"{key}: {value}")
 
                     # Test decryption
-                    if result['encrypted_key']:
+                    if result["encrypted_key"]:
                         from config import Config
                         from utils.encryption import decrypt_api_key
                         import base64
                         import hashlib
 
                         config_instance = Config()
-                        key_bytes = hashlib.sha256(config_instance.ENCRYPTION_KEY.encode()).digest()
+                        key_bytes = hashlib.sha256(
+                            config_instance.ENCRYPTION_KEY.encode()
+                        ).digest()
                         encryption_key = base64.b64encode(key_bytes).decode()
 
                         try:
-                            decrypted_key = decrypt_api_key(result['encrypted_key'], encryption_key)
-                            print(f"\nAPI Key decryption test: {'SUCCESS' if decrypted_key else 'FAILED'}")
-                            print(f"Decrypted key length: {len(decrypted_key) if decrypted_key else 0}")
+                            decrypted_key = decrypt_api_key(
+                                result["encrypted_key"], encryption_key
+                            )
+                            print(
+                                f"\nAPI Key decryption test: {'SUCCESS' if decrypted_key else 'FAILED'}"
+                            )
+                            print(
+                                f"Decrypted key length: {len(decrypted_key) if decrypted_key else 0}"
+                            )
                         except Exception as e:
                             print(f"\nAPI Key decryption error: {str(e)}")
                 else:
@@ -403,12 +439,14 @@ def register_cli_commands(app):
         """Fix the deployment name typo."""
         try:
             with db_session() as db:
-                query = text("""
+                query = text(
+                    """
                     UPDATE models
                     SET deployment_name = 'gpt-deployment'
                     WHERE deployment_name = 'gpt-deploymente'
                     RETURNING id
-                """)
+                """
+                )
                 result = db.execute(query)
                 db.commit()
                 if result.rowcount > 0:  # type: ignore
@@ -421,15 +459,15 @@ def register_cli_commands(app):
 
 def create_app() -> Flask:
     from database import get_db_state  # Add missing import
+
     # Create app instance first
     app = Flask(__name__)
-    
+
     # Add markdown filter
-    @app.template_filter('markdown')
+    @app.template_filter("markdown")
     def markdown_filter(text):
         markdown_processor = mistune.create_markdown(
-            plugins=['url', 'table'],
-            escape=False
+            plugins=["url", "table"], escape=False
         )
         return markdown_processor(text)
 
@@ -443,13 +481,14 @@ def create_app() -> Flask:
     # Ensure config is loaded before database initialization
     config = Config()
     app.config.from_object(config)
-    
+
     # Set required Flask-SQLAlchemy configuration
-    app.config['SQLALCHEMY_DATABASE_URI'] = config.DATABASE_URI
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config["SQLALCHEMY_DATABASE_URI"] = config.DATABASE_URI
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
     # Debug log the current environment
     import sys
+
     print(f"DEBUG: app.config['ENV'] -> {app.config['ENV']}", file=sys.stderr)
     print(f"DEBUG: app.config['DEBUG'] -> {app.config['DEBUG']}", file=sys.stderr)
     print(f"DEBUG: ENV: {app.config['ENV']}", file=sys.stderr)
@@ -458,7 +497,7 @@ def create_app() -> Flask:
     # Initialize database and SQLAlchemy
     init_db_app(app)
     db.init_app(app)
-    
+
     # Initialize migrate with app and SQLAlchemy instance
     migrate.init_app(app, db, render_as_batch=True)
 
@@ -473,7 +512,9 @@ def create_app() -> Flask:
             with engine.connect() as conn:  # type: ignore
                 result = conn.execute(text("SELECT 1"))
                 result.scalar()
-            if not db_state.get("Session") or not isinstance(db_state["Session"], scoped_session):
+            if not db_state.get("Session") or not isinstance(
+                db_state["Session"], scoped_session
+            ):
                 raise RuntimeError("Database session factory not initialized")
             break  # Break out of loop on success
         except Exception as e:
@@ -498,7 +539,6 @@ def create_app() -> Flask:
     return app
 
 
-
 def create_error_response(
     error_msg: str, status_code: int
 ) -> Tuple[WerkzeugResponse, int]:
@@ -510,6 +550,7 @@ def create_error_response(
         ),
         status_code,
     )
+
 
 app = create_app()
 
@@ -527,10 +568,10 @@ def internal_server_error(error: HTTPException) -> Tuple[WerkzeugResponse, int]:
 @app.errorhandler(Exception)
 def handle_exception(e):
     # Log static file errors but let Flask handle them
-    if request.path.startswith('/static/'):
+    if request.path.startswith("/static/"):
         logger.debug(f"Static file request error: {str(e)}")
         return app.send_static_file(request.path[8:])
-    
+
     logger.exception(
         "Unhandled exception occurred - URL: %s, Method: %s, User: %s, Error: %s",
         request.url,
@@ -552,10 +593,9 @@ def handle_csrf_error(e: CSRFError) -> Tuple[WerkzeugResponse, int]:
 def validate_request():
     logger.debug("Processing request: %s %s", request.method, request.path)
     # Skip validation for static and auth endpoints
-    if request.endpoint in [
-        "static",
-        "auth.login"
-    ] or request.path.startswith("/static/"):
+    if request.endpoint in ["static", "auth.login"] or request.path.startswith(
+        "/static/"
+    ):
         logger.debug("Skipping validation for endpoint: %s", request.endpoint)
         return
 
@@ -624,6 +664,7 @@ def index() -> WerkzeugResponse:
         return redirect(url_for("auth.login"))
     return redirect(url_for("chat.chat_interface"))
 
+
 @app.route("/clear-session")
 def clear_session() -> WerkzeugResponse:
     logout_user()
@@ -638,48 +679,50 @@ def log_error():
         error_data = request.get_json()
         if error_data is None:
             return create_error_response("Invalid JSON data", 400)
-            
+
         extra_data = {
             "chat_id": error_data.get("chatId") if error_data else None,
             "user_id": error_data.get("userId") if error_data else None,
-            "user_agent": error_data.get("userAgent") if error_data else None
+            "user_agent": error_data.get("userAgent") if error_data else None,
         }
         logger.error(
-            "Client Error: %s",
-            json.dumps(error_data, indent=2),
-            extra=extra_data
+            "Client Error: %s", json.dumps(error_data, indent=2), extra=extra_data
         )
         return jsonify({"status": "logged"})
     except Exception as e:
         logger.error("Error logging client error: %s", str(e))
         return create_error_response("Failed to log error", 500)
 
+
 @app.route("/debug")
 def debug():
     """Debug endpoint to verify header handling."""
-    return jsonify({
-        "x-forwarded-proto": request.headers.get("X-Forwarded-Proto"),
-        "scheme": request.scheme,
-        "is_secure": request.is_secure,
-        "cookies_secure": current_app.config.get("SESSION_COOKIE_SECURE")
-    })
+    return jsonify(
+        {
+            "x-forwarded-proto": request.headers.get("X-Forwarded-Proto"),
+            "scheme": request.scheme,
+            "is_secure": request.is_secure,
+            "cookies_secure": current_app.config.get("SESSION_COOKIE_SECURE"),
+        }
+    )
 
-@app.route('/static/<path:filename>')
+
+@app.route("/static/<path:filename>")
 def serve_static(filename: str):
     """Serve static files with proper MIME types."""
     static_dir: str = app.static_folder or ""
     response = send_from_directory(static_dir, filename)
-    
+
     # Determine content type
     file_ext = os.path.splitext(filename)[1].lower()
-    content_type = app.config.get('MIME_TYPES', {}).get(file_ext)
-    
+    content_type = app.config.get("MIME_TYPES", {}).get(file_ext)
+
     if not content_type:
         content_type, _ = mimetypes.guess_type(filename)
-    
+
     if content_type:
-        response.headers['Content-Type'] = content_type
-    
+        response.headers["Content-Type"] = content_type
+
     return response
 
 
@@ -720,5 +763,3 @@ def health_check():
     except Exception as e:
         logger.error("Health check failed", exc_info=True)
         return create_error_response("Service unavailable", 500)
-
-

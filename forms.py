@@ -78,155 +78,44 @@ def validate_azure_deployment(self, deployment_name: str, subscription_id: str, 
             account_name=account_name,
             deployment_name=deployment_name
         )
-        deployments = client.deployments.list(resource_group, account_name)
-        return any(d.name == deployment_name for d in deployments)
-    except Exception as e:
-        logger.error(f"Error validating Azure deployment: {str(e)}", exc_info=True)
-        return False
-
-def derive_encryption_key(master_key: bytes, salt: bytes) -> bytes:
-    """
-    Derive an encryption key using PBKDF2HMAC.
-    """
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA512(),
-        length=32,
-        salt=salt,
-        iterations=600000,
-    )
-    return kdf.derive(master_key)
-
-def verify_database_schema():
-    """
-    Verify that the required database schema is in place.
-    (Implementation depends on your DB/ORM; ensure migrations are applied.)
-    """
-    # required_schema = {
-    #     'users': ['locked_until', 'version'],
-    #     'models': ['deployment_name', 'azure_verified']
-    # }
-    logger.info("Database schema verification is pending. Please ensure migrations are applied.")
-
-
-# ------------------------------------------------------------------------
-# Custom Fields: NullableIntegerField, NullableFloatField, (Optional) HardenedStringField
-# ------------------------------------------------------------------------
-
-class NullableIntegerField(IntegerField):
-    """
-    A custom IntegerField that treats empty or invalid input as None.
-    """
-    def process_formdata(self, valuelist):
-        if valuelist and valuelist[0]:
-            try:
-                self.data = int(valuelist[0])
-            except (ValueError, TypeError):
-                self.data = None
-        else:
-            self.data = None
-
-class NullableFloatField(FloatField):
-    """
-    A custom FloatField that treats empty or invalid input as None.
-    """
-    def process_formdata(self, valuelist):
-        if valuelist and valuelist[0]:
-            try:
-                self.data = float(valuelist[0])
-            except (ValueError, TypeError):
-                self.data = None
-        else:
-            self.data = None
-
-# Optional: HardenedStringField for input sanitization
-# class HardenedStringField(StringField):
-#     def process_formdata(self, valuelist):
-#         if valuelist:
-#             self.data = sanitize_input(valuelist[0])
-
-# ------------------------------------------------------------------------
-# LoginForm
-# ------------------------------------------------------------------------
-
-class LoginForm(FlaskForm):
-    """
-    Form for user login.
-    """
-    username = StringField(
-        "Username",
-        validators=[DataRequired(message="Username is required.")],
-    )
-    password = PasswordField(
-        "Password",
-        validators=[DataRequired(message="Password is required.")],
-    )
-    remember = BooleanField("Remember Me", default=False)
-    submit = SubmitField("Login")
-
-    def validate_username(self, field: Field) -> None:
-        """
-        Add account lockout checks, password spray protection, and security logging.
-        """
-        username = field.data.strip().lower()
-        ip_address = request.remote_addr
-
-        try:
-            with db_session() as db:
-                # 1) Check if account is locked
-                account_locked_until = db.execute(
-                    text("""
-                        SELECT account_locked_until
-                        FROM users
-                        WHERE username = :username
-                    """),
-                    {"username": username}
-                ).scalar()
-
-                if account_locked_until is not None and account_locked_until > datetime.utcnow():
-                    logger.error("Account locked", extra={
-                        'username': username,
-                        'ip': ip_address,
-                        'locked_until': account_locked_until
-                    })
-                    raise ValidationError("Account temporarily locked - please try again later.")
-
-                # 2) Check recent failed attempts for username or IP
-                recent_failures = db.execute(
-                    text("""
-                        SELECT COUNT(*)
-                        FROM login_attempts
-                        WHERE (username = :username OR ip_address = :ip)
-                        AND success = false
-                        AND attempted_at > NOW() - INTERVAL '15 minutes'
-                    """),
-                    {"username": username, "ip": ip_address}
-                ).scalar() or 0  # Handle NULL case
-
-                if recent_failures and recent_failures >= 5:
-                    extra_failures = recent_failures - 5
-                    lock_minutes = 15 * (2 ** min(extra_failures, 5))  # exponential backoff
-                    lock_time = datetime.utcnow() + timedelta(minutes=lock_minutes)
+                    # Track failed attempt
                     db.execute(
                         text("""
-                            UPDATE users
-                            SET locked_until = :lock_time
-                            WHERE username = :username
+                            INSERT INTO login_attempts (username, ip_address, success, attempted_at)
+                            VALUES (:username, :ip, false, NOW())
                         """),
-                        {"lock_time": lock_time, "username": username}
+                        {
+                            "username": self._username,
+                            "ip": request.remote_addr
+                        }
                     )
-                    logger.error("Excessive login failures", extra={
-                        'username': username,
-                        'ip': ip_address,
-                        'recent_failures': recent_failures,
-                        'lock_time': lock_time
-                    })
-                    raise ValidationError(f"Too many failed attempts - account locked for {lock_minutes} minutes.")
+                    raise ValidationError("Invalid credentials")
+
+                # Reset failed attempts on successful validation
+                db.execute(
+                    text("""
+                        UPDATE users
+                        SET failed_login_attempts = 0,
+                            account_locked_until = NULL
+                        WHERE id = :user_id
+                    """),
+                    {"user_id": user.id}
+                )
+
+                # Store user for login
+                self._user = user
 
         except ValidationError:
             raise
         except Exception as e:
-            logger.error(f"Security validation error: {str(e)}", exc_info=True)
+            logger.error(f"Password validation error: {str(e)}", exc_info=True)
             raise ValidationError("Login temporarily unavailable - please try again later.")
+
+    def get_user(self):
+        """
+        Get the validated user after successful form validation.
+        """
+        return getattr(self, '_user', None)
 
 # ------------------------------------------------------------------------
 # RegistrationForm

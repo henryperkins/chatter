@@ -9,7 +9,10 @@ from pathlib import Path
 from typing import Dict, Any
 from urllib.parse import urlparse, urlunparse
 from dotenv import load_dotenv
-from utils.encryption import encrypt_api_key, decrypt_api_key  # Ensure this exists in your project
+from utils.encryption import (
+    encrypt_api_key,
+    decrypt_api_key,
+)  # Ensure this exists in your project
 
 logger = logging.getLogger(__name__)
 
@@ -20,75 +23,63 @@ MODEL_CONFIG = {
             "deployment_name",
             "api_version",
             "max_completion_tokens",
-            "reasoning_effort"
+            "reasoning_effort",
         ],
-        "fixed_params": {
-            "temperature": 1.0,
-            "top_p": 1.0,
-            "supports_streaming": False
-        },
+        "fixed_params": {"temperature": 1.0, "top_p": 1.0, "supports_streaming": False},
         "capabilities": {
             "max_tokens": 200000,
             "max_completion_tokens": 100000,
             "supports_function_calling": True,
             "supports_vision": True,
             "requires_reasoning_effort": True,
-            "valid_reasoning_efforts": ["low", "medium", "high"]
-        }
+            "valid_reasoning_efforts": ["low", "medium", "high"],
+        },
     },
     "o1-mini": {
         "required_params": [
             "deployment_name",
             "api_version",
             "max_completion_tokens",
-            "reasoning_effort"
+            "reasoning_effort",
         ],
-        "fixed_params": {
-            "temperature": 1.0,
-            "top_p": 1.0,
-            "supports_streaming": False
-        },
+        "fixed_params": {"temperature": 1.0, "top_p": 1.0, "supports_streaming": False},
         "capabilities": {
             "max_tokens": 100000,
             "max_completion_tokens": 50000,  # Updated limit
             "supports_function_calling": True,
             "supports_vision": False,
             "requires_reasoning_effort": True,
-            "valid_reasoning_efforts": ["low", "medium", "high"]
-        }
+            "valid_reasoning_efforts": ["low", "medium", "high"],
+        },
     },
     "o1-preview": {
         "required_params": [
             "deployment_name",
             "api_version",
             "max_completion_tokens",
-            "reasoning_effort"
+            "reasoning_effort",
         ],
-        "fixed_params": {
-            "temperature": 1.0,
-            "top_p": 1.0,
-            "supports_streaming": False
-        },
+        "fixed_params": {"temperature": 1.0, "top_p": 1.0, "supports_streaming": False},
         "capabilities": {
             "max_tokens": 200000,
             "max_completion_tokens": 100000,
             "supports_function_calling": True,
             "supports_vision": True,
             "requires_reasoning_effort": True,
-            "valid_reasoning_efforts": ["low", "medium", "high"]
-        }
+            "valid_reasoning_efforts": ["low", "medium", "high"],
+        },
     },
     "o3-mini": {
         "required_params": [
             "deployment_name",
             "api_version",
             "max_completion_tokens",
-            "reasoning_effort"
+            "reasoning_effort",
         ],
         "fixed_params": {
             "temperature": 1.0,
             "top_p": 1.0,
-            "supports_streaming": True  # Updated to support streaming
+            "supports_streaming": True,  # Updated to support streaming
         },
         "capabilities": {
             "max_tokens": 150000,
@@ -96,8 +87,8 @@ MODEL_CONFIG = {
             "supports_function_calling": True,
             "supports_vision": False,
             "requires_reasoning_effort": True,
-            "valid_reasoning_efforts": ["low", "medium", "high"]
-        }
+            "valid_reasoning_efforts": ["low", "medium", "high"],
+        },
     },
     "azure": {
         "supports_streaming": True,
@@ -105,7 +96,7 @@ MODEL_CONFIG = {
         "token_overhead": 3,
         "endpoint_format": "https://{endpoint}/openai/deployments/{deployment}/chat/completions",
         "api_version": "2024-12-01-preview",
-    }
+    },
 }
 
 # File type configurations
@@ -154,7 +145,9 @@ def validate_config(config: Dict[str, Any]) -> None:
     required_vars = {"ENCRYPTION_KEY", "AZURE_OPENAI_KEY"}
     missing = [var for var in required_vars if not config.get(var)]
     if missing:
-        raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
+        raise ValueError(
+            f"Missing required environment variables: {', '.join(missing)}"
+        )
 
     if config["DEFAULT_MAX_TOKENS"] <= 0:
         raise ValueError("DEFAULT_MAX_TOKENS must be positive")
@@ -174,6 +167,7 @@ class ApiError(Exception):
 
 class Config:
     """Application configuration."""
+
     _instance = None
     MODEL_CAPABILITIES = MODEL_CONFIG
 
@@ -182,7 +176,9 @@ class Config:
     def generate_encryption_key():
         """Generate a new Fernet encryption key."""
         key = Fernet.generate_key().decode()
-        click.echo(f"New encryption key: {key}\nAdd this to your .env file as ENCRYPTION_KEY=")
+        click.echo(
+            f"New encryption key: {key}\nAdd this to your .env file as ENCRYPTION_KEY="
+        )
 
     @classmethod
     def log_env_values(cls):
@@ -208,7 +204,9 @@ class Config:
         # Load environment variables
         env_path = Path(os.path.dirname(os.path.abspath(__file__))) / ".env"
         if not env_path.exists():
-            raise ValueError("Missing .env file. Please create one using .env.template as a guide.")
+            raise ValueError(
+                "Missing .env file. Please create one using .env.template as a guide."
+            )
         load_dotenv(dotenv_path=str(env_path), override=True)
 
         # Environment and debug settings
@@ -223,28 +221,27 @@ class Config:
         # Core settings
         self.SECRET_KEY = os.getenv("SECRET_KEY")
         self.DATABASE_URI = os.getenv("DATABASE_URI", "")
-        
-        # Convert postgres:// to postgresql:// if needed
-        parsed = urlparse(self.DATABASE_URI)
-        if parsed.scheme == "postgres":
-            parsed = parsed._replace(scheme="postgresql")
-            self.DATABASE_URI = urlunparse(parsed)
-            logger.info(f"Converted database URI from postgres:// to postgresql://: {self.DATABASE_URI}")
+
+        # Set SQLAlchemy database URI directly from environment variable
+        self.SQLALCHEMY_DATABASE_URI = self.DATABASE_URI
+        logger.info("Database URI set from environment variable")
 
         # Azure OpenAI settings with fallback for legacy env vars
         self.AZURE_OPENAI_KEY = (
-            os.getenv("AZURE_OPENAI_KEY", "").strip() or
-            os.getenv("AZURE_API_KEY", "").strip()
+            os.getenv("AZURE_OPENAI_KEY", "").strip()
+            or os.getenv("AZURE_API_KEY", "").strip()
         )
         self.AZURE_OPENAI_ENDPOINT = (
-            os.getenv("AZURE_OPENAI_ENDPOINT", "").strip() or
-            os.getenv("AZURE_API_BASE", "https://o1models.openai.azure.com").strip()
+            os.getenv("AZURE_OPENAI_ENDPOINT", "").strip()
+            or os.getenv("AZURE_API_BASE", "https://o1models.openai.azure.com").strip()
         )
         self.AZURE_OPENAI_API_VERSION = (
-            os.getenv("AZURE_OPENAI_API_VERSION", "").strip() or
-            os.getenv("AZURE_API_VERSION", "2024-12-01-preview").strip()
+            os.getenv("AZURE_OPENAI_API_VERSION", "").strip()
+            or os.getenv("AZURE_API_VERSION", "2024-12-01-preview").strip()
         )
-        self.AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "o1-east2").strip()
+        self.AZURE_OPENAI_DEPLOYMENT_NAME = os.getenv(
+            "AZURE_OPENAI_DEPLOYMENT_NAME", "o1-east2"
+        ).strip()
 
         # Ensure we have consistent values for backward compatibility
         os.environ["AZURE_OPENAI_KEY"] = self.AZURE_OPENAI_KEY
@@ -255,35 +252,59 @@ class Config:
         # Model settings
         self.MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "Azure o1")
         self.DEFAULT_MODEL_NAME = os.getenv("DEFAULT_MODEL_NAME", "Azure o1")
-        self.DEFAULT_DEPLOYMENT_NAME = os.getenv("DEFAULT_DEPLOYMENT_NAME", self.AZURE_OPENAI_DEPLOYMENT_NAME)
+        self.DEFAULT_DEPLOYMENT_NAME = os.getenv(
+            "DEFAULT_DEPLOYMENT_NAME", self.AZURE_OPENAI_DEPLOYMENT_NAME
+        )
         self.DEFAULT_MODEL_TYPE = os.getenv("DEFAULT_MODEL_TYPE", "o1-preview")
-        self.DEFAULT_API_ENDPOINT = os.getenv("DEFAULT_API_ENDPOINT", self.AZURE_OPENAI_ENDPOINT)
-        self.DEFAULT_API_VERSION = os.getenv("DEFAULT_API_VERSION", self.AZURE_OPENAI_API_VERSION)
+        self.DEFAULT_API_ENDPOINT = os.getenv(
+            "DEFAULT_API_ENDPOINT", self.AZURE_OPENAI_ENDPOINT
+        )
+        self.DEFAULT_API_VERSION = os.getenv(
+            "DEFAULT_API_VERSION", self.AZURE_OPENAI_API_VERSION
+        )
         self.DEFAULT_TEMPERATURE = float(os.getenv("DEFAULT_TEMPERATURE", "1.0"))
         self.DEFAULT_MAX_TOKENS = int(os.getenv("DEFAULT_MAX_TOKENS", "200000"))
-        self.DEFAULT_MAX_COMPLETION_TOKENS = int(os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "100000"))
+        self.DEFAULT_MAX_COMPLETION_TOKENS = int(
+            os.getenv("DEFAULT_MAX_COMPLETION_TOKENS", "100000")
+        )
         self.DEFAULT_REASONING_EFFORT = os.getenv("DEFAULT_REASONING_EFFORT", "medium")
         self.DEFAULT_REQUIRES_O1_HANDLING = True
         self.DEFAULT_SUPPORTS_STREAMING = False
 
         # File handling settings
-        self.UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "uploads")
+        self.UPLOAD_FOLDER = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "uploads"
+        )
         self.MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", 10 * 1024 * 1024))
-        self.MAX_TOTAL_FILE_SIZE = int(os.getenv("MAX_TOTAL_FILE_SIZE", 50 * 1024 * 1024))
+        self.MAX_TOTAL_FILE_SIZE = int(
+            os.getenv("MAX_TOTAL_FILE_SIZE", 50 * 1024 * 1024)
+        )
         self.ALLOWED_FILE_EXTENSIONS = FILE_CONFIG["ALLOWED_EXTENSIONS"]
-        self.ALLOWED_MIME_TYPES: set[str] = {v for v in FILE_CONFIG["MIME_TYPES"].values()}
+        self.ALLOWED_MIME_TYPES: set[str] = {
+            v for v in FILE_CONFIG["MIME_TYPES"].values()
+        }
         self.MIME_TYPE_MAP = FILE_CONFIG["MIME_TYPES"]
 
         # Security settings
-        self.ENCRYPTION_KEY = self._process_encryption_key(os.getenv("ENCRYPTION_KEY", ""))
+        self.ENCRYPTION_KEY = self._process_encryption_key(
+            os.getenv("ENCRYPTION_KEY", "")
+        )
         self.PASSWORD_MIN_LENGTH = int(os.getenv("PASSWORD_MIN_LENGTH", "8"))
-        self.PASSWORD_REQUIRE_UPPERCASE = bool(os.getenv("PASSWORD_REQUIRE_UPPERCASE", True))
-        self.PASSWORD_REQUIRE_LOWERCASE = bool(os.getenv("PASSWORD_REQUIRE_LOWERCASE", True))
+        self.PASSWORD_REQUIRE_UPPERCASE = bool(
+            os.getenv("PASSWORD_REQUIRE_UPPERCASE", True)
+        )
+        self.PASSWORD_REQUIRE_LOWERCASE = bool(
+            os.getenv("PASSWORD_REQUIRE_LOWERCASE", True)
+        )
         self.PASSWORD_REQUIRE_NUMBER = bool(os.getenv("PASSWORD_REQUIRE_NUMBER", True))
-        self.PASSWORD_REQUIRE_SPECIAL_CHAR = bool(os.getenv("PASSWORD_REQUIRE_SPECIAL_CHAR", True))
+        self.PASSWORD_REQUIRE_SPECIAL_CHAR = bool(
+            os.getenv("PASSWORD_REQUIRE_SPECIAL_CHAR", True)
+        )
 
         # Session settings
-        self.PERMANENT_SESSION_LIFETIME = int(os.getenv("PERMANENT_SESSION_LIFETIME", "3600"))
+        self.PERMANENT_SESSION_LIFETIME = int(
+            os.getenv("PERMANENT_SESSION_LIFETIME", "3600")
+        )
         self.SESSION_COOKIE_SECURE = True  # Always use secure cookies
         self.SESSION_COOKIE_HTTPONLY = True
         self.SESSION_COOKIE_SAMESITE = "Lax"  # Required for cross-origin safety
@@ -324,7 +345,9 @@ class Config:
 
         The Fernet key must be 32 url-safe base64-encoded bytes.
         """
-        logger.debug("Processing encryption key (redacted) length=%d", len(key) if key else 0)
+        logger.debug(
+            "Processing encryption key (redacted) length=%d", len(key) if key else 0
+        )
 
         if not key:
             raise ValueError("ENCRYPTION_KEY is missing. Check your .env setup.")
@@ -368,7 +391,9 @@ class Config:
             return fernet_key.decode()
 
         except Exception as e:
-            raise ValueError(f"Could not process encryption key into valid format: {str(e)}")
+            raise ValueError(
+                f"Could not process encryption key into valid format: {str(e)}"
+            )
 
     @staticmethod
     def validate_model_config(config: dict) -> None:

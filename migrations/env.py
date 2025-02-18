@@ -3,8 +3,11 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-# Import base metadata from your models package
-from models.base import Base
+# Import Flask app and SQLAlchemy instance
+from app import create_app, db
+
+# Create Flask app instance
+app = create_app()
 
 # This is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -14,9 +17,8 @@ config = context.config
 # This line sets up loggers basically.
 fileConfig(config.config_file_name)
 
-# Add your model's MetaData object here for 'autogenerate' support.
-# If you have multiple MetaData objects, just combine them into one (or set target_metadata = None).
-target_metadata = Base.metadata
+# Set target_metadata using the SQLAlchemy instance from Flask-SQLAlchemy
+target_metadata = db.Model.metadata
 
 def run_migrations_offline():
     """
@@ -26,7 +28,7 @@ def run_migrations_offline():
     as well. By skipping the Engine creation, we don't even need
     a DBAPI to be available.
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = app.config['SQLALCHEMY_DATABASE_URI']
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -44,17 +46,17 @@ def run_migrations_online():
     In this scenario we need to create an Engine
     and associate a connection with the context.
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    with app.app_context():
+        connectable = db.engine
 
-    with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        with connectable.connect() as connection:
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata
+            )
 
-        with context.begin_transaction():
-            context.run_migrations()
+            with context.begin_transaction():
+                context.run_migrations()
 
 
 if context.is_offline_mode():

@@ -56,19 +56,10 @@ window.utils = {
             let finalBody = options.body;
             if (finalBody) {
                 if (finalBody instanceof FormData) {
-                    // FormData validation not needed - handled by chat.js
-                    // Just ensure the data exists
-                    if (!finalBody.has('message') && !finalBody.has('files[]')) {
-                        console.warn('No message or files in FormData. Request may fail');
-                    }
+                    // No validation needed for FormData
+                    // Each form will handle its own validation
                 } else if (typeof finalBody === 'object') {
-                    // For JSON requests, validate content
-                    const hasMessage = finalBody.message && finalBody.message.trim().length > 0;
-                    const hasFiles = finalBody.file_ids?.length > 0 || finalBody.files?.length > 0;
-                    
-                    if (!hasMessage && !hasFiles) {
-                        console.warn('No message or files in JSON data. Request may fail');
-                    }
+                    // For JSON requests, add CSRF token
                     
                     finalBody = JSON.stringify({
                         ...finalBody,
@@ -412,9 +403,9 @@ window.utils = {
     handleError(error) {
         console.error('Error:', error);
 
-        const errorMessage = data?.error?.message || 
-                           data?.detail?.message || 
-                           data?.message || 
+        const errorMessage = error?.data?.error?.message || 
+                           error?.data?.detail?.message || 
+                           error?.data?.message || 
                            'Unknown error occurred';
         let message = errorMessage;
         let type = 'error';

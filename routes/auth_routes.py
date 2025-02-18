@@ -124,123 +124,62 @@ def login():
 
     if request.method == "POST":
         if form.validate_on_submit():
-            with db_session() as db:
-                # Account lockout check
-                username = form.username.data
-                if not username:
-                    flash("Username is required", "error")
-                    return render_template("login.html", form=form)
-                user = User.get_by_username(db, username.strip())
-                if user and user.account_locked_until and user.account_locked_until > datetime.now(timezone.utc):
-                    logger.warning(f"Login attempt for locked account: {user.username}")
-                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                        return jsonify({
-                            "success": False,
-                            "errors": {
-                                "login": "Account locked for 15 minutes due to multiple failed attempts"
-                            }
-                        }), 403
-                    else:
-                        flash("Account locked for 15 minutes due to multiple failed attempts", "error")
-                        return render_template("login.html", form=form)
-
             try:
-                username = form.username.data
-                if not username or not isinstance(username, str):
-                    raise ValueError("Invalid username")
-                username = username.strip()
-
-                password = form.password.data
-                if not password or not isinstance(password, str):
-                    raise ValueError("Invalid password")
-
-                logger.debug(f"Login attempt for username: {username}")
-
-                user = User.get_by_username(db, username)
+                user = form.get_user()
                 if not user:
-                    logger.warning(f"Login failed - user not found: {username}")
+                    logger.error("Form validated but no user found")
                     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                         return jsonify({
                             "success": False,
-                            "errors": {
-                                "login": "Credenciales inválidas"
-                            }
-                        }), 400
-                    else:
-                        flash("Invalid credentials", "error")
-                        return render_template("login.html", form=form)
+                            "errors": {"login": "An unexpected error occurred"}
+                        }), 500
+                    flash("An unexpected error occurred", "error")
+                    return render_template("login.html", form=form)
 
-                # Track failed attempts
-                if not user.check_password(password):
-                    result = db.execute(
+                # Record successful login attempt
+                with db_session() as db:
+                    db.execute(
                         text("""
-                            UPDATE users
-                            SET failed_login_attempts = failed_login_attempts + 1,
-                                account_locked_until = CASE
-                                    WHEN failed_login_attempts + 1 >= 5
-                                    THEN NOW() + INTERVAL '15 minutes'
-                                    ELSE NULL
-                                END
-                            WHERE id = :user_id
-                            RETURNING failed_login_attempts
+                            INSERT INTO login_attempts (username, ip_address, success, attempted_at)
+                            VALUES (:username, :ip, true, NOW())
                         """),
-                        {"user_id": user.id}
-                    ).scalar()
-                    
-                    attempts = result if result is not None else 1
-                    logger.warning(f"Invalid password for user: {username} (Attempt {attempts}/5)")
-                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                        return jsonify({
-                            "success": False,
-                            "errors": {
-                                "login": "Credenciales inválidas"
-                            }
-                        }), 400
-                    else:
-                        flash("Invalid credentials", "error")
-                        return render_template("login.html", form=form)
-
-                # Reset failed attempts on successful login
-                db.execute(
-                    text("""
-                        UPDATE users
-                        SET failed_login_attempts = 0,
-                            account_locked_until = NULL
-                        WHERE id = :user_id
-                    """),
-                    {"user_id": user.id}
-                )
+                        {
+                            "username": user.username,
+                            "ip": request.remote_addr
+                        }
+                    )
 
                 login_user(user, remember=form.remember.data)
-                logger.info(f"User logged in: {user.id} ({username})")
+                logger.info(f"User logged in: {user.id} ({user.username})")
 
                 if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                     return jsonify({
                         "success": True,
-                        "redirect": url_for("chat.chat_interface")
+                        "redirect": url_for('chat.chat_interface', _external=True),
+                        "session_token": user.get_auth_token()
                     })
-                else:
-                    return redirect(url_for("chat.chat_interface"))
+                return redirect(url_for("chat.chat_interface"))
 
             except Exception as e:
                 logger.error(f"Login error: {str(e)}", exc_info=True)
-                flash("Temporary authentication issue - please try again", "error")
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify({
+                        "success": False,
+                        "errors": {"login": "An unexpected error occurred"}
+                    }), 500
+                flash("An unexpected error occurred", "error")
                 return render_template("login.html", form=form)
 
-            except Exception as e:
-                logger.error(f"Login error: {str(e)}", exc_info=True)
-                flash("Temporary authentication issue - please try again", "error")
-                return render_template("login.html", form=form)
-
-        # Handle failed form submission for POST requests
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest" or request.accept_mimetypes.accept_json:
+        # Handle failed form validation
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({
                 "success": False,
-                "errors": form.errors or {"login": "Invalid form submission"}
+                "errors": form.errors
             }), 400
-        else:
-            flash("Invalid credentials", "error")
-            return render_template("login.html", form=form)
+        for field, errors in form.errors.items():
+            for error in errors:
+                flash(f"{error}", "error")
+        return render_template("login.html", form=form)
 
     # Handle GET requests by just showing the form
     return render_template("login.html", form=form)

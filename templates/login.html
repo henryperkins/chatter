@@ -11,7 +11,7 @@
         <!-- Optional error display (if needed) -->
         <div id="error-message" class="mb-4"></div>
 
-        <form id="login-form" class="space-y-6">
+        <form id="login-form" class="space-y-6" method="POST">
             <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token() }}">
 
             <!-- Username Field -->
@@ -155,68 +155,85 @@
 
 <script>
 console.debug('[Login] login.html inline script is loaded and running');
-document.addEventListener('app:ready', function() {
+function initializeLoginForm() {
     const loginForm = document.getElementById('login-form');
-    if (loginForm) {
-        console.debug('[Login] Found login form:', loginForm);
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            console.debug('[Login] Form submit triggered');
-            if (window.monitoring) {
-                window.monitoring.log('debug', 'User triggered login form submission');
-            }
-        });
-
-        const submitBtn = document.getElementById('submit-button');
-        submitBtn.addEventListener('click', async function(e) {
-            e.preventDefault();
-
-            console.debug('[Login] Submit button clicked');
-            if (window.monitoring) {
-                window.monitoring.logInteraction('User clicked login submit button', {
-                    formData: Object.fromEntries(new FormData(loginForm))
-                });
-            }
-
-            const formData = new FormData(loginForm);
-            const submitButton = document.getElementById('submit-button');
-            const buttonText = document.getElementById('button-text');
-            const loadingSpinner = document.getElementById('loading-spinner');
-            const errorDiv = document.getElementById('error-message');
-
-            submitButton.disabled = true;
-            errorDiv.classList.add('hidden');
-
-            try {
-                const response = await fetch("{{ url_for('auth.login') }}", {
-                    method: 'POST',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Accept': 'application/json',
-                        'X-CSRF-Token': document.querySelector('[name="csrf_token"]').value
-                    },
-                    body: formData
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    window.location.href = data.redirect || "{{ url_for('chat.chat_interface') }}";
-                } else {
-                    errorDiv.innerHTML = Object.values(data.errors || data)
-                        .map(err => `<div class="error-text">${err}</div>`)
-                        .join('');
-                    errorDiv.classList.remove('hidden');
-                }
-            } catch (err) {
-                console.error('Login error:', err);
-                errorDiv.innerHTML = '<div class="error-text">An unexpected error occurred. Please try again.</div>';
-                errorDiv.classList.remove('hidden');
-            } finally {
-                submitButton.disabled = false;
-            }
-        });
+    if (!loginForm) {
+        console.error('[Login] Login form not found');
+        return;
     }
-});
+
+    if (!window.utils) {
+        console.error('[Login] Utils not initialized');
+        return;
+    }
+
+    console.debug('[Login] Found login form:', loginForm);
+    loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+        console.debug('[Login] Form submit triggered');
+        if (window.monitoring) {
+            window.monitoring.log('debug', 'User triggered login form submission');
+        }
+
+        const formData = new FormData(loginForm);
+        const submitButton = document.getElementById('submit-button');
+        const buttonText = document.getElementById('button-text');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const errorDiv = document.getElementById('error-message');
+
+        // Show loading state
+        submitButton.disabled = true;
+        buttonText.classList.add('opacity-0');
+        loadingSpinner.classList.remove('hidden');
+        errorDiv.classList.add('hidden');
+
+        try {
+            const data = await window.utils.fetchWithCSRF(window.location.href, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (data.success && data.redirect) {
+                window.location.href = data.redirect;
+            } else if (data.success) {
+                window.location.href = "{{ url_for('chat.chat_interface') }}";
+            } else {
+                const errors = data.errors || { error: Object.values(data).join('. ') };
+                errorDiv.innerHTML = Object.values(errors)
+                    .map(err => `<div class="error-text text-red-600 dark:text-red-400 text-sm mt-1">${err}</div>`)
+                    .join('');
+                errorDiv.classList.remove('hidden');
+            }
+        } catch (err) {
+            console.error('Login error:', err);
+            const errorMessage = err.data?.error || err.message || 'An unexpected error occurred. Please try again.';
+            errorDiv.innerHTML = `<div class="error-text text-red-600 dark:text-red-400 text-sm mt-1">${errorMessage}</div>`;
+            errorDiv.classList.remove('hidden');
+        } finally {
+            submitButton.disabled = false;
+            buttonText.classList.remove('opacity-0');
+            loadingSpinner.classList.add('hidden');
+        }
+    });
+}
+
+// Initialize when DOM is ready and app is initialized
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.App?.initialized) {
+            initializeLoginForm();
+        } else {
+            document.addEventListener('app:ready', initializeLoginForm);
+        }
+    });
+} else {
+    if (window.App?.initialized) {
+        initializeLoginForm();
+    } else {
+        document.addEventListener('app:ready', initializeLoginForm);
+    }
+}
 
 // Remember me checkbox handling
 const rememberCheckbox = document.getElementById('remember');

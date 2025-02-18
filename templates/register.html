@@ -158,8 +158,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
                         'Accept': 'application/json',
-                        'X-CSRF-TOKEN': document.getElementById('csrf_token').value
+                        'X-CSRFToken': document.getElementById('csrf_token').value
                     },
+                    credentials: 'include',
                     body: formData
                 });
                 
