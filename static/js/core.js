@@ -28,12 +28,15 @@ window.App = {
             // 2. Initialize utils
             await this.initUtils();
 
+            // Emit an event when utils is ready
+            document.dispatchEvent(new Event('utils:ready'));
+
             // 3. Initialize core dependencies in parallel
             const timeout = 15000;
             await Promise.all([
-                this.initializeWithTimeout(this.initializeMarkdown(), 'Markdown', timeout),
-                this.initializeWithTimeout(this.initializePrism(), 'Prism', timeout),
-                this.initializeWithTimeout(this.initializeDarkMode(), 'Dark Mode', timeout)
+                this.initializeWithTimeout(this.initializeMarkdown(), 'Markdown', timeout).catch(() => false),
+                this.initializeWithTimeout(this.initializePrism(), 'Prism', timeout).catch(() => false),
+                this.initializeWithTimeout(this.initializeDarkMode(), 'Dark Mode', timeout).catch(() => false)
             ]);
 
             // 4. Initialize chat-specific components if on chat page
@@ -74,7 +77,7 @@ window.App = {
             throw new Error('Utils not loaded');
         }
         this.components.utils = true;
-        console.log('Utils initialized');
+        console.debug('App: Utils initialized');
     },
 
     async initializeChatComponents() {
@@ -142,7 +145,7 @@ window.App = {
 
     async initializePrism() {
         if (!window.Prism) {
-            throw new Error('Prism not loaded');
+            return true; // Not required for login
         }
 
         try {
@@ -161,7 +164,7 @@ window.App = {
             const start = Date.now();
 
             const check = () => {
-                const requiredDeps = ['markdown', 'prism', 'darkMode'];
+                const requiredDeps = ['utils'];
                 if (requiredDeps.every(dep => this.components[dep])) {
                     resolve();
                     return;
@@ -225,7 +228,7 @@ window.App = {
 // Initialize when DOM is ready, with error handling
 document.addEventListener('DOMContentLoaded', () => {
     console.debug('App: DOMContentLoaded triggered, starting initialization');
-    window.App.init().catch(error => {
+    window.App?.init().catch(error => {
         console.error('Failed to initialize App:', error);
         window.App.handleInitializationError(error);
     });

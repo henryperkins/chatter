@@ -412,6 +412,12 @@ class User(Base, UserMixin):
         """Check if user has admin role."""
         return self.role == "admin"
 
+    def get_auth_token(self) -> str:
+        import secrets
+        # Generate a random hex token of length 64 (32 bytes)
+        token = secrets.token_hex(32)
+        return token
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert user object to a dictionary representation."""
         return {

@@ -61,6 +61,69 @@ from database import (
 )
 from models import User, Model, Provider
 from routes.auth_routes import bp as auth_bp
+"""Flask application main module (app.py)."""
+
+# Load environment variables before any other imports
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path=str(Path(__file__).parent / ".env"))
+import logging
+import click
+import json
+import os
+import platform
+import sys
+import time
+import traceback
+import psutil
+import uuid
+import io
+import mistune
+import logging
+import mimetypes
+from datetime import timedelta, datetime
+from typing import Optional, Tuple, Union, Dict
+
+from flask import (
+    Flask,
+    jsonify,
+    redirect,
+    url_for,
+    request,
+    session,
+    g,
+    current_app,
+    render_template,
+    send_from_directory,
+    make_response,
+)
+from flask_login import current_user, logout_user
+from flask_wtf.csrf import CSRFError
+from flask.cli import with_appcontext
+from werkzeug.exceptions import HTTPException
+from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.wrappers import Response as WerkzeugResponse
+from werkzeug.serving import WSGIRequestHandler
+
+from sqlalchemy.orm import Session, scoped_session
+from sqlalchemy import text, Engine
+from flask_migrate import Migrate
+
+migrate = Migrate(compare_type=True)
+from extensions import limiter, login_manager, csrf
+from config import Config, ApiError
+from database import (
+    init_app as init_db_app,
+    db_session,
+    is_initialized,
+    create_default_model,
+    get_db_state,
+    db,
+)
+from models import User, Model, Provider
+from routes.auth_routes import bp as auth_bp
 from chat import chat_routes  # Import from new modular chat package
 
 from routes.model_routes import bp as model_bp

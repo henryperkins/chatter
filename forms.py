@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timedelta
 from models.user import User
 
+from werkzeug.security import check_password_hash
 from flask import current_app, request
 from flask_wtf import FlaskForm
 from wtforms import (
@@ -56,7 +57,7 @@ logger = logging.getLogger(__name__)
 # Utility Functions
 # ------------------------------------------------------------------------
 
-def validate_azure_deployment(self, deployment_name: str, subscription_id: str, resource_group: str, account_name: str) -> bool:
+def validate_azure_deployment(deployment_name: str, subscription_id: str, resource_group: str, account_name: str) -> bool:
     """
     Validate that the specified Azure deployment exists.
     """
@@ -67,7 +68,7 @@ def validate_azure_deployment(self, deployment_name: str, subscription_id: str, 
     try:
         from azure.identity import DefaultAzureCredential
         from azure.mgmt.cognitiveservices import CognitiveServicesManagementClient
-        
+
         credential = DefaultAzureCredential()
         client = CognitiveServicesManagementClient(
             credential=credential,
@@ -75,47 +76,17 @@ def validate_azure_deployment(self, deployment_name: str, subscription_id: str, 
         )
         deployments = client.deployments.list(
             resource_group_name=resource_group,
-            account_name=account_name,
-            deployment_name=deployment_name
+            account_name=account_name
         )
-                    # Track failed attempt
-                    db.execute(
-                        text("""
-                            INSERT INTO login_attempts (username, ip_address, success, attempted_at)
-                            VALUES (:username, :ip, false, NOW())
-                        """),
-                        {
-                            "username": self._username,
-                            "ip": request.remote_addr
-                        }
-                    )
-                    raise ValidationError("Invalid credentials")
+        
+        # Check if deployment exists in the list
+        deployment_exists = any(d.name == deployment_name for d in deployments)
+        return deployment_exists
+        
+    except Exception as e:
+        logger.error(f"Error validating Azure deployment: {str(e)}")
+        return False
 
-                # Reset failed attempts on successful validation
-                db.execute(
-                    text("""
-                        UPDATE users
-                        SET failed_login_attempts = 0,
-                            account_locked_until = NULL
-                        WHERE id = :user_id
-                    """),
-                    {"user_id": user.id}
-                )
-
-                # Store user for login
-                self._user = user
-
-        except ValidationError:
-            raise
-        except Exception as e:
-            logger.error(f"Password validation error: {str(e)}", exc_info=True)
-            raise ValidationError("Login temporarily unavailable - please try again later.")
-
-    def get_user(self):
-        """
-        Get the validated user after successful form validation.
-        """
-        return getattr(self, '_user', None)
 
 # ------------------------------------------------------------------------
 # RegistrationForm
@@ -233,6 +204,57 @@ class RegistrationForm(FlaskForm):
         except Exception as e:
             logger.error(f"Error validating password: {str(e)}")
             raise ValidationError("Unable to validate password at this time")
+
+# ------------------------------------------------------------------------
+# LoginForm 
+# ------------------------------------------------------------------------
+
+class LoginForm(FlaskForm):
+    """
+    Form for user login.
+    """
+    username = StringField(
+        "Username",
+        validators=[
+            DataRequired(message="Username is required."),
+            Length(min=4, max=20, message="Username must be between 4 and 20 characters."),
+            Regexp(
+                r"^[a-zA-Z0-9_]+$",
+                message="Username can only contain letters, numbers, and underscores.",
+            ),
+        ],
+    )
+    password = PasswordField(
+        "Password",
+        validators=[DataRequired(message="Password is required.")]
+    )
+    remember = BooleanField("Remember Me")
+    submit = SubmitField("Login")
+
+    def validate(self):
+        """
+        Custom validation to check both username and password match.
+        """
+        if not super().validate():
+            return False
+
+        with db_session() as session:
+            user = User.get_by_username(session, self.username.data)
+            
+            if not user:
+                self.username.errors.append('Invalid username or password')
+                return False
+                
+            if not check_password_hash(user.password_hash, self.password.data):
+                self.password.errors.append('Invalid username or password')
+                return False
+                
+            self._user = user
+            return True
+            
+    def get_user(self):
+        """Return the validated user"""
+        return getattr(self, '_user', None)
 
 # ------------------------------------------------------------------------
 # ResetPasswordForm

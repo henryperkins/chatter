@@ -2,10 +2,8 @@ import logging
 import os
 from datetime import datetime, timezone
 from urllib.parse import urlparse, urljoin
-
 from typing import Optional
-from flask_wtf.csrf import CSRFError, generate_csrf
-from email_validator import EmailNotValidError, validate_email
+
 from flask import (
     Blueprint,
     current_app,
@@ -19,6 +17,8 @@ from flask import (
     session,
     url_for,
 )
+from flask_wtf.csrf import CSRFError, generate_csrf
+from email_validator import EmailNotValidError, validate_email
 from flask_login import current_user, login_required, login_user, logout_user
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
@@ -30,11 +30,14 @@ from extensions import limiter
 from forms import LoginForm, RegistrationForm, ResetPasswordForm, ForgotPasswordForm
 from models import User
 from scripts.send_email import send_email
-
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
 
 logger = logging.getLogger(__name__)
 
+# -----------------------
+# Blueprint Setup
+# -----------------------
+bp = Blueprint("auth", __name__)
 
 # -----------------------
 # Helper Functions
@@ -45,7 +48,6 @@ def is_safe_url(target: str) -> bool:
     ref_url = urlparse(request.host_url)
     test_url = urlparse(urljoin(request.host_url, target))
     return test_url.scheme in ("http", "https") and ref_url.netloc == test_url.netloc
-
 
 def json_response(
     success: bool,
@@ -63,7 +65,6 @@ def json_response(
     }
     return jsonify(response), status_code
 
-
 def send_reset_email(email: str, reset_url: str) -> None:
     """Send password reset email to user."""
     try:
@@ -78,14 +79,6 @@ def send_reset_email(email: str, reset_url: str) -> None:
     except Exception as e:
         logger.error(f"Failed to send password reset email: {str(e)}")
         raise
-
-
-# -----------------------
-# Blueprint Setup
-# -----------------------
-
-bp = Blueprint("auth", __name__)
-
 
 # -----------------------
 # Routes
@@ -106,34 +99,37 @@ def manage_users():
     )
     return render_template("manage_users.html")
 
-
 @bp.route("/login", methods=["GET", "POST"])
 @limiter.limit("20/minute;200/day")
 def login():
+    logger.info("Login route accessed - Method: %s", request.method)
+    
     if current_app.config["ENV"] == "development":
         limiter.exempt(login)
+        
     if current_user.is_authenticated:
+        logger.debug("User already authenticated, redirecting to chat interface")
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"redirect": url_for("chat.chat_interface")}), 200
-        # Add JSON fallback for API-like requests
         if request.accept_mimetypes.accept_json:
             return jsonify({"redirect": url_for("chat.chat_interface")}), 302
         return redirect(url_for("chat.chat_interface"))
 
     form = LoginForm()
+    logger.debug("Login form initialized")
 
     if request.method == "POST":
         if form.validate_on_submit():
             try:
                 user = form.get_user()
                 if not user:
-                    logger.error("Form validated but no user found")
+                    logger.warning("Login attempt failed - invalid credentials")
                     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                         return jsonify({
                             "success": False,
-                            "errors": {"login": "An unexpected error occurred"}
-                        }), 500
-                    flash("An unexpected error occurred", "error")
+                            "errors": {"username": ["Invalid username or password"]}
+                        }), 400
+                    flash("Invalid username or password", "error")
                     return render_template("login.html", form=form)
 
                 # Record successful login attempt
@@ -170,7 +166,6 @@ def login():
                 flash("An unexpected error occurred", "error")
                 return render_template("login.html", form=form)
 
-        # Handle failed form validation
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({
                 "success": False,
@@ -181,9 +176,7 @@ def login():
                 flash(f"{error}", "error")
         return render_template("login.html", form=form)
 
-    # Handle GET requests by just showing the form
     return render_template("login.html", form=form)
-
 
 @bp.errorhandler(CSRFError)
 def handle_csrf_error(e):
@@ -202,7 +195,6 @@ def handle_csrf_error(e):
         }
     )
     
-    # Use existing CSRF token or generate new one
     csrf_token = session.get('csrf_token') or generate_csrf()
     session['csrf_token'] = csrf_token
     g.csrf_token = csrf_token
@@ -213,7 +205,6 @@ def handle_csrf_error(e):
         "csrf_token": csrf_token
     }), 403)
 
-    # Set cookie for double-submit pattern
     response.set_cookie(
         'X-CSRF-TOKEN',
         value=csrf_token,
@@ -224,7 +215,6 @@ def handle_csrf_error(e):
         path='/'
     )
     return response
-
 
 @bp.route("/register", methods=["GET", "POST"]) 
 @limiter.limit("5 per minute")
@@ -253,57 +243,47 @@ def register():
             if not password_data or not isinstance(password_data, str):
                 raise ValueError("Invalid password")
 
-            # Attempt user creation
-            try:
-                with db_session() as db:
-                    user = User.create(
-                        db,
-                        username=username,
-                        email=email,
-                        password=password_data
-                    )
-                    # Refresh to ensure we have the latest DB state
-                    db.refresh(user)
-                    login_user(user)
+            with db_session() as db:
+                user = User.create(
+                    db,
+                    username=username,
+                    email=email,
+                    password=password_data
+                )
+                db.refresh(user)
+                login_user(user)
 
-            except IntegrityError as e:
-                logger.error(f"Registration integrity error: {str(e)}")
-                flash("Email address already exists", "error")
-                return render_template("register.html", form=form)
-
-            # Set up the Flask session
             session.permanent = True
             session["_fresh"] = True
             session["user_id"] = user.id
             session["last_active"] = datetime.now().isoformat()
             session.modified = True
 
-            # Redirect to chat interface
             return redirect(url_for("chat.chat_interface"))
         
+        except IntegrityError as e:
+            logger.error(f"Registration integrity error: {str(e)}")
+            flash("Email address already exists", "error")
+            return render_template("register.html", form=form)
         except Exception as e:
             logger.error(f"Registration error: {str(e)}", exc_info=True)
             flash(str(e), "error")
 
     return render_template("register.html", form=form)
 
-
 @bp.route("/forgot_password", methods=["GET", "POST"])
 def forgot_password():
-    # No rate limit in development, but 5 per minute in production
     if current_app.config["ENV"] == "development":
         limiter.exempt(forgot_password)
     else:
         limiter.limit("5 per minute")(forgot_password)
 
-    """Handle forgot password requests."""
     form = ForgotPasswordForm()
 
     if request.method == "POST":
         email = request.form.get("email", "").strip()
 
         try:
-            # Validate email format
             validate_email(email, check_deliverability=False)
 
             with db_session() as db:
@@ -316,7 +296,6 @@ def forgot_password():
                     .first()
                 )
 
-                # Always return success to prevent email enumeration
                 success_message = {
                     "success": True,
                     "message": (
@@ -336,7 +315,6 @@ def forgot_password():
                     )
                     return jsonify(success_message), 200
 
-                # If user exists, generate the reset token.
                 serializer = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
                 reset_token = serializer.dumps(email, salt="password-reset")
                 reset_token_str = (
@@ -345,7 +323,6 @@ def forgot_password():
                 )
                 hashed_token = generate_password_hash(reset_token_str)
 
-                # Update DB with hashed token and expiry
                 db.execute(
                     text(
                         """
@@ -413,16 +390,13 @@ def forgot_password():
 
     return render_template("forgot_password.html", form=form)
 
-
 @bp.route("/reset_password/<token>", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
 def reset_password(token: str):
-    """Handle password reset requests."""
     form = ResetPasswordForm()
     serializer = URLSafeTimedSerializer(current_app.config["SECRET_KEY"])
 
     try:
-        # Decode the token to get the email, ensuring it's not expired
         email = serializer.loads(token, salt="password-reset", max_age=3600)
 
         with db_session() as db:
@@ -451,7 +425,6 @@ def reset_password(token: str):
                     400,
                 )
 
-            # Check if token is actually stored and not expired
             if not user["reset_token_hash"] or not user["reset_token_expiry"]:
                 logger.warning(
                     "Missing reset token data in DB",
@@ -468,7 +441,6 @@ def reset_password(token: str):
                     400,
                 )
 
-            # Ensure the token hasn't expired
             if user["reset_token_expiry"].replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
                 logger.warning(
                     "Reset token has expired",
@@ -485,7 +457,6 @@ def reset_password(token: str):
                     400,
                 )
 
-            # Verify the hashed token matches
             if not check_password_hash(user["reset_token_hash"], token):
                 logger.warning(
                     "Reset token mismatch",
@@ -542,7 +513,6 @@ def reset_password(token: str):
                 )
 
             elif request.method == "POST":
-                # Form not valid
                 logger.warning(
                     "Password reset form validation failed",
                     extra={
@@ -580,13 +550,11 @@ def reset_password(token: str):
         )
         return jsonify({"success": False, "error": "An unexpected error occurred"}), 500
 
-
 @bp.route("/auth/check", methods=["GET"])
 @login_required
 def check_auth():
     """Verify if the user is logged in."""
     return jsonify({"authenticated": True, "user_id": current_user.id}), 200
-
 
 @bp.after_request
 def cleanup_session(response):
@@ -599,22 +567,13 @@ def cleanup_session(response):
         logger.error(f"Session cleanup error: {str(e)}")
     return response
 
-
 @bp.route("/test-create-user")
 def test_create_user():
     """Test route for creating a user with hardcoded data."""
     try:
-        username_env = os.getenv("TEST_USERNAME")
-        email_env = os.getenv("TEST_EMAIL")
-        password_env = os.getenv("TEST_PASSWORD")
-
-        # Provide a fallback or raise an error if any of them is None
-        if not username_env:
-            username_env = "test-user"
-        if not email_env:
-            email_env = "test@example.com"
-        if not password_env:
-            password_env = "TestPassword123"
+        username_env = os.getenv("TEST_USERNAME") or "test-user"
+        email_env = os.getenv("TEST_EMAIL") or "test@example.com"
+        password_env = os.getenv("TEST_PASSWORD") or "TestPassword123"
 
         with db_session() as db:
             user = User.create(
@@ -636,7 +595,6 @@ def test_create_user():
             }
         )
         return jsonify({"success": False, "error": str(e)}), 500
-
 
 @bp.route("/logout")
 @login_required

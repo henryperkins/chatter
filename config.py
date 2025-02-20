@@ -223,7 +223,16 @@ class Config:
         self.DATABASE_URI = os.getenv("DATABASE_URI", "")
 
         # Set SQLAlchemy database URI directly from environment variable
-        self.SQLALCHEMY_DATABASE_URI = self.DATABASE_URI
+        # Use psycopg2 driver with explicit SSL configuration
+        self.SQLALCHEMY_DATABASE_URI = self.DATABASE_URI.replace(
+            'postgresql://',
+            'postgresql+psycopg2://',
+            1
+        ) + "?sslmode=verify-full&sslrootcert=/home/azureuser/chatter/DigiCertGlobalRootG2.crt.pem"
+        self.SQLALCHEMY_ENGINE_OPTIONS = {
+            "pool_recycle": 290,  # Azure closes idle connections after 5 minutes
+            "pool_pre_ping": True  # Test connections before using them
+        }
         logger.info("Database URI set from environment variable")
 
         # Azure OpenAI settings with fallback for legacy env vars

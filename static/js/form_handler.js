@@ -1,6 +1,6 @@
 // form_handler.js
 
-class ModelFormHandler {
+class FormHandler {
     constructor() {
         this.initialized = false;
         this.initPromise = this.init();
@@ -9,38 +9,40 @@ class ModelFormHandler {
             'is_default',
             'supports_streaming'
         ];
+        
+        // Wait for utils to be ready before initializing
+        document.addEventListener('utils:ready', () => {
+            console.debug('FormHandler: Utils ready, initializing...');
+            this.init();
+        });
     }
 
     async init() {
         if (this.initialized) return;
-
-        // Wait for core app to be ready
-        return new Promise((resolve) => {
-            const initializeForm = () => {
-                this.utils = window.utils;
-                this.initialized = true;
-                this.initializeForms();
-                resolve();
-            };
-
-            if (window.App?.initialized) {
-                initializeForm();
-            } else {
-                document.addEventListener('app:ready', () => {
-                    initializeForm();
-                });
-            }
-        });
+        
+        try {
+            if (!window.utils) throw new Error('Utils not initialized');
+            
+            this.utils = window.utils;
+            this.initialized = true;
+            this.initializeForms();
+            
+            console.debug('FormHandler initialized successfully');
+            return true;
+        } catch (error) {
+            console.error('FormHandler initialization failed:', error);
+            this.initialized = false;
+            return false;
+        }
     }
 
     initializeForms() {
-        document.addEventListener('DOMContentLoaded', () => {
-            const forms = document.querySelectorAll('.model-form');
-            forms.forEach(form => {
-                form.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    await this.handleFormSubmit(e);
-                });
+        const forms = document.querySelectorAll('form[method="POST"]');
+        forms.forEach(form => {
+            console.debug('FormHandler: Binding submit handler to form:', form.id);
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.handleFormSubmit(e);
             });
         });
     }
@@ -51,30 +53,40 @@ class ModelFormHandler {
         const actionUrl = form.action;
         let response;
 
+        const isLoginForm = form.id === 'login-form';
         try {
             // Show loading state
             submitButton.disabled = true;
             submitButton.innerHTML = this.loadingButtonHTML();
 
-            // Ensure CSRF token is present
+            // Get form data
             const formData = new FormData(form);
+            
+            // Ensure CSRF token is present
             if (!formData.get('csrf_token')) {
                 const csrfToken = this.utils.getCSRFToken();
                 formData.append('csrf_token', csrfToken);
             }
 
-            const data = this.processFormData(formData);
+            // Special handling for login form
+            if (isLoginForm && !formData.get('remember')) {
+                formData.append('remember', 'false');
+            }
 
             // Add CSRF token from meta tag as header
             const csrfToken = this.utils.getCSRFToken();
             const headers = {
-                'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken,
                 'X-Requested-With': 'XMLHttpRequest'
             };
 
-            // Send request with CSRF headers
-            response = await this.sendFormRequest(actionUrl, data, headers);
+            // Send request with form data directly
+            response = await fetch(actionUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: headers,
+                body: formData
+            });
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -99,76 +111,21 @@ class ModelFormHandler {
         }
     }
 
-    processFormData(formData) {
-        const data = {};
-
-        formData.forEach((value, key) => {
-            data[key] = this.convertFormValue(key, value);
-        });
-
-        // Ensure all boolean fields are present
-        this.requiredBooleanFields.forEach(field => {
-            if (!(field in data)) {
-                data[field] = false;
-            }
-        });
-
-        return data;
-    }
-
-    convertFormValue(key, value) {
-        // Handle numeric fields
-        if (['max_tokens', 'max_completion_tokens'].includes(key)) {
-            return this.parseNumericValue(value);
-        }
-
-        // Handle temperature field
-        if (key === 'temperature') {
-            return this.parseFloatValue(value);
-        }
-
-        // Handle boolean fields
-        if (this.requiredBooleanFields.includes(key)) {
-            return this.parseBooleanValue(value);
-        }
-
-        // Handle other string values
-        return value.toString().trim();
-    }
-
-    parseNumericValue(value) {
-        if (['', 'null', 'undefined', 'None'].includes(value)) return null;
-        const parsed = parseInt(value);
-        return isNaN(parsed) ? null : parsed;
-    }
-
-    parseFloatValue(value) {
-        if (['', 'null', 'undefined', 'None'].includes(value)) return null;
-        const parsed = parseFloat(value);
-        return isNaN(parsed) ? null : parsed;
-    }
-
-    parseBooleanValue(value) {
-        if (typeof value === 'boolean') return value;
-        return ['on', 'true', '1'].includes(value.toLowerCase());
-    }
-
-    async sendFormRequest(url, data, headers) {
-        return fetch(url, {
-            method: 'POST',
-            credentials: 'same-origin',  // Ensure cookies (including the CSRF cookie) are sent
-            headers: headers,
-            body: JSON.stringify(data)  // Token only sent in header
-        });
-    }
-
     handleSuccess(responseData) {
-        this.utils.showFeedback(responseData.message || 'Model saved successfully', 'success');
+        if (responseData.message) {
+            this.utils.showFeedback(responseData.message, 'success');
+        }
 
         if (responseData.redirect) {
-            setTimeout(() => {
+            // For login form, redirect immediately
+            if (responseData.session_token) {
                 window.location.href = responseData.redirect;
-            }, 1500);
+            } else {
+                // For other forms, show message then redirect
+                setTimeout(() => {
+                    window.location.href = responseData.redirect;
+                }, 1500);
+            }
         }
     }
 
@@ -257,7 +214,7 @@ class ModelFormHandler {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    window.modelFormHandler = new ModelFormHandler();
+    window.formHandler = new FormHandler();
 });
 
 // Helper to capitalize strings

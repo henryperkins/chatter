@@ -11,7 +11,7 @@
         <!-- Optional error display (if needed) -->
         <div id="error-message" class="mb-4"></div>
 
-        <form id="login-form" class="space-y-6" method="POST">
+        <form id="login-form" class="space-y-6" method="POST" action="{{ url_for('auth.login') }}" data-submit-text="Login">
             <input type="hidden" name="csrf_token" id="csrf_token" value="{{ csrf_token() }}">
 
             <!-- Username Field -->
@@ -154,127 +154,19 @@
 {{ super() }}
 
 <script>
-console.debug('[Login] login.html inline script is loaded and running');
-function initializeLoginForm() {
-    const loginForm = document.getElementById('login-form');
-    if (!loginForm) {
-        console.error('[Login] Login form not found');
-        return;
-    }
-
-    if (!window.utils) {
-        console.error('[Login] Utils not initialized');
-        return;
-    }
-
-    console.debug('[Login] Found login form:', loginForm);
-    loginForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-
-        console.debug('[Login] Form submit triggered');
-        if (window.monitoring) {
-            window.monitoring.log('debug', 'User triggered login form submission');
-        }
-
-        const formData = new FormData(loginForm);
-        const submitButton = document.getElementById('submit-button');
-        const buttonText = document.getElementById('button-text');
-        const loadingSpinner = document.getElementById('loading-spinner');
-        const errorDiv = document.getElementById('error-message');
-
-        // Show loading state
-        submitButton.disabled = true;
-        buttonText.classList.add('opacity-0');
-        loadingSpinner.classList.remove('hidden');
-        errorDiv.classList.add('hidden');
-
-        try {
-            const data = await window.utils.fetchWithCSRF(window.location.href, {
-                method: 'POST',
-                body: formData
-            });
-
-            if (data.success && data.redirect) {
-                window.location.href = data.redirect;
-            } else if (data.success) {
-                window.location.href = "{{ url_for('chat.chat_interface') }}";
-            } else {
-                const errors = data.errors || { error: Object.values(data).join('. ') };
-                errorDiv.innerHTML = Object.values(errors)
-                    .map(err => `<div class="error-text text-red-600 dark:text-red-400 text-sm mt-1">${err}</div>`)
-                    .join('');
-                errorDiv.classList.remove('hidden');
-            }
-        } catch (err) {
-            console.error('Login error:', err);
-            const errorMessage = err.data?.error || err.message || 'An unexpected error occurred. Please try again.';
-            errorDiv.innerHTML = `<div class="error-text text-red-600 dark:text-red-400 text-sm mt-1">${errorMessage}</div>`;
-            errorDiv.classList.remove('hidden');
-        } finally {
-            submitButton.disabled = false;
-            buttonText.classList.remove('opacity-0');
-            loadingSpinner.classList.add('hidden');
-        }
-    });
-}
-
-// Initialize when DOM is ready and app is initialized
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        if (window.App?.initialized) {
-            initializeLoginForm();
-        } else {
-            document.addEventListener('app:ready', initializeLoginForm);
-        }
-    });
-} else {
-    if (window.App?.initialized) {
-        initializeLoginForm();
-    } else {
-        document.addEventListener('app:ready', initializeLoginForm);
-    }
-}
-
-// Remember me checkbox handling
-const rememberCheckbox = document.getElementById('remember');
-if (rememberCheckbox) {
-    rememberCheckbox.addEventListener('change', (ev) => {
-        console.debug('[Login] Remember me checkbox changed:', ev.target.checked);
-        if (window.monitoring) {
-            window.monitoring.logInteraction('User toggled remember me', {
-                value: ev.target.checked
-            });
-        }
-    });
-}
-
-function togglePasswordVisibility(fieldId = 'password') {
-    console.debug('[Login] Toggled password visibility for:', fieldId);
-    if (window.monitoring) {
-        window.monitoring.logInteraction('Toggled password visibility', { fieldId });
-    }
-    const passwordInput = document.getElementById(fieldId);
-    const icon = document.getElementById(fieldId + '-toggle-icon');
-    if (!passwordInput || !icon) return;
-
+// Password visibility toggle
+function togglePasswordVisibility() {
+    const passwordInput = document.getElementById('password');
+    const icon = document.getElementById('password-toggle-icon');
     if (passwordInput.type === 'password') {
         passwordInput.type = 'text';
-        icon.innerHTML =
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
-            'd="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7 ' +
-            'a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243 ' +
-            'M9.878 9.878l4.242 4.242 M9.88 9.88l-3.29-3.29 m7.532 7.532l3.29 3.29 ' +
-            'M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7 ' +
-            'a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
+        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>';
     } else {
         passwordInput.type = 'password';
-        icon.innerHTML =
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
-            'd="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />' +
-            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" ' +
-            'd="M2.458 12C3.732 7.943 7.523 5 12 5 c4.478 0 8.268 2.943 9.542 7 ' +
-            '-1.274 4.057-5.064 7-9.542 7 -4.477 0-8.268-2.943-9.542-7z"/>';
+        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>';
     }
 }
+
+document.addEventListener('DOMContentLoaded', () => window.formHandler?.init());
 </script>
 {% endblock %}
