@@ -31,6 +31,7 @@ from wtforms.validators import (
     Regexp,
 )
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from database import db_session, is_initialized
 from chat_utils import validate_password_strength
@@ -231,26 +232,41 @@ class LoginForm(FlaskForm):
     remember = BooleanField("Remember Me")
     submit = SubmitField("Login")
 
-    def validate(self):
+    def validate(self, extra_validators=None):
         """
         Custom validation to check both username and password match.
+        Handles database errors and provides detailed error messages.
+        
+        Args:
+            extra_validators: Optional extra validators from Flask-WTF
         """
-        if not super().validate():
+        if not super().validate(extra_validators=extra_validators):
             return False
 
-        with db_session() as session:
-            user = User.get_by_username(session, self.username.data)
-            
-            if not user:
-                self.username.errors.append('Invalid username or password')
-                return False
+        try:
+            with db_session() as session:
+                user = User.get_by_username(session, self.username.data)
                 
-            if not check_password_hash(user.password_hash, self.password.data):
-                self.password.errors.append('Invalid username or password')
-                return False
+                if not user:
+                    self.username.errors.append('Invalid username or password')
+                    return False
+                    
+                if not check_password_hash(user.password_hash, self.password.data):
+                    self.password.errors.append('Invalid username or password')
+                    return False
+                    
+                # Store a copy of the user data rather than the SQLAlchemy object
+                self._user = User.from_dict(user.to_dict())
+                return True
                 
-            self._user = user
-            return True
+        except SQLAlchemyError as e:
+            logger.error(f"Database error during login validation: {str(e)}", exc_info=True)
+            self.form_errors = ['A database error occurred. Please try again later.']
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error during login validation: {str(e)}", exc_info=True)
+            self.form_errors = ['An unexpected error occurred. Please try again.']
+            return False
             
     def get_user(self):
         """Return the validated user"""

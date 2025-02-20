@@ -119,8 +119,8 @@ def login():
     logger.debug("Login form initialized")
 
     if request.method == "POST":
-        if form.validate_on_submit():
-            try:
+        try:
+            if form.validate_on_submit():
                 user = form.get_user()
                 if not user:
                     logger.warning("Login attempt failed - invalid credentials")
@@ -128,53 +128,92 @@ def login():
                         return jsonify({
                             "success": False,
                             "errors": {"username": ["Invalid username or password"]}
-                        }), 400
+                        }), 401
                     flash("Invalid username or password", "error")
                     return render_template("login.html", form=form)
 
-                # Record successful login attempt
-                with db_session() as db:
-                    db.execute(
-                        text("""
-                            INSERT INTO login_attempts (username, ip_address, success, attempted_at)
-                            VALUES (:username, :ip, true, NOW())
-                        """),
-                        {
-                            "username": user.username,
-                            "ip": request.remote_addr
-                        }
-                    )
+                try:
+                    # Record successful login attempt
+                    with db_session() as db:
+                        db.execute(
+                            text("""
+                                INSERT INTO login_attempts (username, ip_address, success, attempted_at)
+                                VALUES (:username, :ip, true, NOW())
+                            """),
+                            {
+                                "username": user.username,
+                                "ip": request.remote_addr
+                            }
+                        )
 
-                login_user(user, remember=form.remember.data)
-                logger.info(f"User logged in: {user.id} ({user.username})")
+                    # Store only necessary user data in session
+                    user_data = {
+                        'id': user.id,
+                        'username': user.username,
+                        'role': user.role,
+                        'is_active': user.is_active
+                    }
+                    login_user(user, remember=form.remember.data)
+                    session['user_data'] = user_data
+                    logger.info(f"User logged in: {user.id} ({user.username})")
 
+                    # Create a new chat session for the user
+                    from chat.chat_utilities import generate_new_chat_id
+                    from models.chat import Chat
+                    chat_id = generate_new_chat_id()
+                    with db_session(transactional=True) as db:
+                        Chat.create(session=db, chat_id=chat_id, user_id=user.id, title="New Chat")
+                    session["chat_id"] = chat_id
+                    logger.info(f"Created new chat session {chat_id} for user {user.id}")
+
+                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                        return jsonify({
+                            "success": True,
+                            "message": "Login successful! Redirecting to chat interface...",
+                            "redirect": url_for('chat.chat_interface', _external=True),
+                            "session_token": user.get_auth_token()
+                        })
+                    flash("Login successful!", "success")
+                    return redirect(url_for("chat.chat_interface"))
+                except Exception as e:
+                    logger.error(f"Login error: {str(e)}", exc_info=True)
+                    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                        return jsonify({
+                            "success": False,
+                            "error": "An error occurred during login"
+                        }), 500
+                    flash("An error occurred during login", "error")
+                    return render_template("login.html", form=form)
+            else:
+                # Form validation failed
+                logger.warning("Login form validation failed")
                 if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                    return jsonify({
-                        "success": True,
-                        "redirect": url_for('chat.chat_interface', _external=True),
-                        "session_token": user.get_auth_token()
-                    })
-                return redirect(url_for("chat.chat_interface"))
-
-            except Exception as e:
-                logger.error(f"Login error: {str(e)}", exc_info=True)
-                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    errors = {}
+                    # Add field-specific errors
+                    for field_name, field_errors in form.errors.items():
+                        errors[field_name] = field_errors
+                    # Add any form-level errors
+                    if hasattr(form, 'form_errors') and form.form_errors:
+                        errors['form'] = form.form_errors
                     return jsonify({
                         "success": False,
-                        "errors": {"login": "An unexpected error occurred"}
-                    }), 500
-                flash("An unexpected error occurred", "error")
+                        "errors": errors
+                    }), 400
+                # Flash form-level errors if any
+                if hasattr(form, 'form_errors') and form.form_errors:
+                    for error in form.form_errors:
+                        flash(error, "error")
                 return render_template("login.html", form=form)
 
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({
-                "success": False,
-                "errors": form.errors
-            }), 400
-        for field, errors in form.errors.items():
-            for error in errors:
-                flash(f"{error}", "error")
-        return render_template("login.html", form=form)
+        except Exception as e:
+            logger.error(f"Login error: {str(e)}", exc_info=True)
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({
+                    "success": False,
+                    "errors": {"login": ["An unexpected error occurred"]}
+                }), 500
+            flash("An unexpected error occurred", "error")
+            return render_template("login.html", form=form)
 
     return render_template("login.html", form=form)
 
@@ -243,7 +282,7 @@ def register():
             if not password_data or not isinstance(password_data, str):
                 raise ValueError("Invalid password")
 
-            with db_session() as db:
+            with db_session(transactional=True) as db:
                 user = User.create(
                     db,
                     username=username,
@@ -258,6 +297,15 @@ def register():
             session["user_id"] = user.id
             session["last_active"] = datetime.now().isoformat()
             session.modified = True
+
+            # Create a new chat session for the registered user
+            from chat.chat_utilities import generate_new_chat_id
+            from models.chat import Chat
+            chat_id = generate_new_chat_id()
+            with db_session(transactional=True) as db:
+                Chat.create(session=db, chat_id=chat_id, user_id=user.id, title="New Chat")
+            session["chat_id"] = chat_id
+            logger.info(f"Created new chat session {chat_id} for registered user {user.id}")
 
             return redirect(url_for("chat.chat_interface"))
         
@@ -567,7 +615,7 @@ def cleanup_session(response):
         logger.error(f"Session cleanup error: {str(e)}")
     return response
 
-@bp.route("/test-create-user")
+@bp.route("/auth/test-create-user")
 def test_create_user():
     """Test route for creating a user with hardcoded data."""
     try:

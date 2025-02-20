@@ -57,7 +57,7 @@ POOL_SETTINGS = {
     "POOL_RECYCLE": int(os.getenv("DB_POOL_RECYCLE", "3600")),
 }
 
-db = SQLAlchemy(engine_options=current_app.config.get('SQLALCHEMY_ENGINE_OPTIONS', {}))
+db = SQLAlchemy()
 
 
 def get_db_state(app: Optional[Flask] = None) -> DbState:

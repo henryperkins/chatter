@@ -214,14 +214,14 @@
     <script src="{{ url_for('static', filename='js/alerts.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/dark-mode.js') }}" defer></script>
 
-    <!-- Form Handling -->
-    <script src="{{ url_for('static', filename='js/shared-validation.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='js/form_handler.js') }}"></script>
-
     <!-- Feature Modules -->
     <script src="{{ url_for('static', filename='js/base.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/fileUpload.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/token-usage.js') }}"></script>
+
+    <!-- Form Handling -->
+    <script src="{{ url_for('static', filename='js/shared-validation.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/form_handler.js') }}" defer></script>
 
     <!-- ES Modules (loaded in chat.html) -->
     {% block modules %}{% endblock %}
